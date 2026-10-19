@@ -174,7 +174,7 @@ Shift = Lync.replicate(Lync.struct({
 	Night = Lync.int(0, 10),
 	IsNight = Lync.bool(),
 	Attempt = Lync.int(0, 9),                   -- tentativas da noite atual (0 = primeira)
-	Phase = Lync.enum(Content.Shift.PhaseKeys), -- Resume, Intro, Prep, Open, Closing, Summary, Call, Night, NightEnd, NightLost, Finale, RunEnd
+	Phase = Lync.enum(Content.Shift.PhaseKeys), -- Resume, Prep, Open, Closing, Summary, Call, Night, NightEnd, NightLost, Finale, RunEnd
 	PhaseStartedAt = Lync.f64(),
 	PhaseDuration = Lync.int(0, 3600),          -- teto da fase; Closing termina antes se o balcão esvaziar
 	ClockFrom = Lync.int(0, 2880),              -- minutos de jogo
@@ -947,7 +947,7 @@ Pedestrians = Lync.replicate(Lync.struct({   -- id = slot 1..8
 | Mesmo registro 1D do `Traffic` | uma função de posição (`Traffic/shared/Motion.luau`) para carros e passantes; ≤ 3 registros por passante por travessia |
 | Aparência no set (exceção à regra 9) | passante não tem modelo no servidor (T46) para levar atributo; `Species`/`Outfit` são chaves de `Content`; o client monta e o `RigController` veste, inclusive o Night local da faixa baixa (DEC-169) |
 
-**Portão de carregamento (Provisório, frontend-coder 2026-10-11, feedback do usuário: o começo da intro se perdia
+**Portão de carregamento (Provisório, frontend-coder 2026-10-11, feedback do usuário: o começo de uma cena se perdia
 enquanto o client ainda carregava).** `Cutscene` ganha `Waiting = Lync.bool()` (true enquanto o `CutsceneService`
 segura a cadeia; `Scene = "none"` nesse meio-tempo) e há um packet novo:
 
@@ -960,9 +960,9 @@ segura a cadeia; `Scene = "none"` nesse meio-tempo) e há um packet novo:
 (backlog perdido como `drop.unready`; ver README, "Um aviso que nao e teu"). O reparo geral é o
 `NetService:Resync(player)` no `Ready`, que reenvia todos os sets àquele jogador.
 
-O `LoadingController` (tela de carregamento: jogo carregado, controllers iniciados, kit da crew, sons/imagens da
-intro e falas TTS da intro) manda `ClientReady`; a cadeia só começa quando todo participante conectado mandou, ou
-após `Content.Cutscenes.Rules.ReadyTimeout` (25 s). O teto da fase Intro (`Shift.luau`) cobre essa espera + o `Cap`.
+O `LoadingController` (tela de carregamento: jogo carregado, controllers iniciados, kit da crew, imagens
+críticas) manda `ClientReady`; a cadeia só começa quando todo participante conectado mandou, ou
+após `Content.Cutscenes.Rules.ReadyTimeout` (30 s). A fase Intro, cujo teto cobria essa espera, foi removida (DEC-309); a regra vale para o finale.
 Não é o handshake `Ready` do `NetService`.
 
 ### 13.8 Lobby e sessão (onda 4)

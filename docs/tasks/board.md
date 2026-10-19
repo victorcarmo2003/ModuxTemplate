@@ -2187,5 +2187,11 @@ Cada fase termina num **Play do dono** (a meta da fase 1 é: fazer um hot dog e 
 | TASK-580 | erros | **3 erros do gate** em `Prep/PrepService/Bridge.luau` (145, 267) e `Plate/PlateService/CenterTable.luau` (167), de edição não commitada; resolver junto com a 566 (podem sair com a esteira). | debugger | 566 | Pendente |
 | TASK-581 | remoção | **Tirar a esteira e o preparo focado** (`kitchen-world.md` §6): `src/Prep/**` menos `Grade`, mesa central do `PlateService`/`PlateController`, modo esteira de `Kitchen`, `Content.Prep` reduzido, `Restaurant.CenterTable`/`Binding.Center*`. Resolve os 3 erros do gate (TASK-580). | backend-coder + frontend-coder | 566 | Pendente |
 
+### Remoção da intro
+
+| TASK | Item | Descrição e critério de aceite | Dono | Depende | Status |
+|---|---|---|---|---|---|
+| TASK-582 | remoção | **Cutscene introdutória removida (DEC-309):** cena `intro` e fase `Intro` saem (Shift, Round/Flow, Cutscenes, CutsceneService, Character, Loading, Stage, Hud, Dev). Aceite: run nova entra em `Call` (noite) ou `Prep` (dia); finale e créditos tocam; `/dev tutorial reset` funciona; `modux check` e analyze sem erro novo. Pendente de QA no Play: ordem de fases, atrasado spawna normal, tela de carregamento sem a etapa Voices. | backend-coder + frontend-coder | — | Pronto para QA |
+
 **Paralelismo:** 562 e 563 em paralelo · 564 e 565 depois da 563 (arquivos disjuntos) · 566 após 562 · 567, 568, 571 em paralelo após a 566 · 569 → 570 · 572 fecha a fase 1 · 573 pode começar com a 566.
 

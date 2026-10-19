@@ -487,14 +487,14 @@ return Lync.define("game", {
 	Cutscene = Lync.replicate(cutsceneRecord()),
 	-- s -> Audience, on every Cutscene write and in reply to ClientReady. Writer: CutsceneService. Same record as the
 	-- set; the client (CutsceneController) uses it only while its Cutscene set has no record 1 (a backlog lost to
-	-- drop.unready before NetService:Resync landed): the intro must never wait on one lost keyframe
+	-- drop.unready before NetService:Resync landed): a scene must never wait on one lost keyframe
 	CutsceneSnapshot = Lync.packet(cutsceneRecord()),
 
 	-- §13.7 c -> s, <= 1 per segment. Responder: CutsceneService
 	SkipVote = Lync.packet(Lync.empty()),
 
 	-- c -> s, once per join: this client finished its loading screen (game loaded, controllers started, crew kit,
-	-- intro sounds/images and intro voices preloaded; LoadingController). Responder: CutsceneService (the intro waits
+	-- images preloaded; LoadingController). Responder: CutsceneService (a scene waits
 	-- for every participant, up to Content.Cutscenes.Rules.ReadyTimeout). Not the Net handshake (`Ready`).
 	ClientReady = Lync.packet(Lync.empty()),
 

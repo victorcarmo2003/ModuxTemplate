@@ -14,7 +14,7 @@
 -- next queued call goes straight to Talking (Walt stays on the line; this is what keeps the sequences of one Call
 -- phase inside its 60 s cap, Validate L2-12) or Idle. The server only writes StartedAt: the line is
 -- floor((now - StartedAt) / LineTime), the same for everyone, and whoever joins mid-call gets the rest (T44).
--- No call starts in Intro, Finale, NightLost, RunEnd or Resume; entering one hangs up the current call, and
+-- No call starts in Finale, NightLost, RunEnd or Resume; entering one hangs up the current call, and
 -- NightLost/RunEnd/Resume also empty the queue. Probe "Call" = queue empty and the phone Idle.
 -- Once rows are marked played when they start Talking (heard), so a shift capture taken at the shift start does
 -- not hold the call of that shift: a Resume plays it again. Snapshot "Bs" = sorted played keys, restored as is.
@@ -70,7 +70,7 @@ const LESSON_CALL = TutorialRules.Upgrade.Call
 -- day phases where the tutorial call may ring and talk
 const TUTORIAL_PHASES: { [string]: boolean } = { Prep = true, Open = true }
 -- No call starts here; entering one hangs up (architecture.md §19.9 "Fila")
-const BLOCKED: { [string]: boolean } = { Intro = true, Finale = true, NightLost = true, RunEnd = true, Resume = true }
+const BLOCKED: { [string]: boolean } = { Finale = true, NightLost = true, RunEnd = true, Resume = true }
 -- Entering one of these also empties the queue
 const CLEARS: { [string]: boolean } = { NightLost = true, RunEnd = true, Resume = true }
 

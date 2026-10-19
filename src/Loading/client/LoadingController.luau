@@ -1,8 +1,8 @@
 --!strict
 --[[
-	LoadingController: the "client ready" gate of a join (user feedback 2026-10-11: the start of the intro was lost
-	while the client was still loading, and the voices failed to load). Drives the loading screen that Loading/Boot
-	(ReplicatedFirst) put up, then tells the server with `ClientReady`; CutsceneService holds the intro until every
+	LoadingController: the "client ready" gate of a join (user feedback 2026-10-11: the start of a cutscene was
+	lost while the client was still loading, and the voices failed to load). Drives the loading screen that Loading/Boot
+	(ReplicatedFirst) put up, then tells the server with `ClientReady`; CutsceneService holds a scene until every
 	participant sent it (Content.Cutscenes.Rules.ReadyTimeout at most).
 
 	Steps (weights of the real progress bar), the slow ones in parallel:
@@ -10,15 +10,11 @@
 	  Start    every Modux controller ran its OnStart: this controller has the lowest priority, so the Loader
 	           (descending priority, OnInit of all then OnStart of all) reaches its OnStart last
 	  Kit      RigController warm-up done (crew meshes, expressions, look textures: RigController:Warmup)
-	  Assets   LoadQueue (the one audio queue, small batches) of the intro sounds (music cue, phone, horns, car, prompt, skip, day
-	           ambience), the UI images (Icons.Ids) and the critical images (PreloadController/Images CriticalUi / CriticalWorld)
-	  Voices   Run place only: the text-to-speech lines of the first seconds of the intro (CutsceneController:
-	           PreloadVoices; one piece at a time with retry, see Speech.luau); the later intro lines keep loading in
-	           order of use. Walt's tutorial lines (rookies) load in the background after the curtain lifts
-	           (BackgroundVoices), during the intro that comes before the tutorial (playtest 2026-10-11: the gate took
-	           ~45 s with all of them blocking)
+	  Assets   LoadQueue (the one audio queue, small batches) of the UI images (Icons.Ids) and the critical images (PreloadController/Images CriticalUi / CriticalWorld)
+	  Voices   none blocks the gate: Walt's tutorial lines (rookies) load in the background after the curtain lifts
+	           (BackgroundVoices; playtest 2026-10-11: the gate took ~45 s with all of them blocking)
 	Every step has its own timeout and the whole gate STEP_CAP (18 s); a step that fails or times out never blocks the join.
-	After ClientReady the curtain stays while the server says the intro is Waiting for the other participants
+	After ClientReady the curtain stays while the server says a scene is Waiting for the other participants
 	(Cutscene set) up to the server's ReadyTimeout + margin, then lifts (attribute Done on the ScreenGui).
 
 	Skip (playtest 2026-10-14): after 10 s the boot shows "Skip loading"; a skip lifts the curtain at once and sets the
@@ -47,30 +43,17 @@ const SKIPPED_ATTRIBUTE = "LoadingSkipped" -- set on the LocalPlayer by Loading/
 const KIT_TIMEOUT = 10 -- s for the crew kit warm-up (it keeps going in the background; RigController has its own cap)
 const MAP_TIMEOUT = 14 -- s for the meshes and textures of the map / lobby (the rest keeps loading behind the curtain)
 const ASSET_TIMEOUT = 12 -- s for PreloadAsync of sounds and images
-const VOICE_TIMEOUT = 8 -- s for the intro voices of the first seconds (the rest keeps loading in the background)
 const TUTORIAL_VOICE_TIMEOUT = 150 -- s the background load of Walt's tutorial lines may run (rookies only)
 const STEP_CAP = 18 -- s for all steps together (the server's ReadyTimeout stays 10 s above it)
 const CREW_MARGIN = 3 -- s past the server's ReadyTimeout that the curtain waits for the others
 const POLL = 0.1
-const INTRO = "intro"
--- intro sounds besides the scene's music cue and the car horns (Content.Sounds keys; missing keys are skipped)
-const INTRO_SOUNDS = {
-	"phone_pickup",
-	"phone_hangup",
-	"phone_ring",
-	"prompt_done",
-	"skip_vote",
-	"car_engine",
-	"amb_day_street",
-}
 -- weights of the steps on the bar
-const WEIGHTS: { [string]: number } = { Game = 1, Start = 0.5, Kit = 2, Assets = 2, Voices = 3, Map = 3 }
+const WEIGHTS: { [string]: number } = { Game = 1, Start = 0.5, Kit = 2, Assets = 2, Map = 3 }
 -- texts (ReplicatedFirst/client/Loading/Tips); fallback when the boot folder is missing (Studio without it)
 const FALLBACK_STATUS: { [string]: string } = {
 	Game = "Loading...",
 	Kit = "Loading...",
 	Assets = "Loading...",
-	Voices = "Loading...",
 	Crew = "Waiting for the crew...",
 	Done = "Ready!",
 }
@@ -99,7 +82,7 @@ function LoadingController:Setup()
 	self.Progress = Vide.source(0) :: Vide.Source<number>
 	self.Status = texts() :: { [string]: string }
 	-- fraction 0..1 of each step
-	self.Steps = { Game = 0, Start = 0, Kit = 0, Assets = 0, Voices = 0, Map = 0 } :: { [string]: number }
+	self.Steps = { Game = 0, Start = 0, Kit = 0, Assets = 0, Map = 0 } :: { [string]: number }
 	self.Gui = nil :: ScreenGui?
 	self.Sent = false :: boolean
 	self.Skipped = false :: boolean
@@ -173,32 +156,10 @@ function LoadingController:Mark(step: string, fraction: number)
 	end
 end
 
--- Sounds and images of the intro, as PreloadAsync items
+-- UI and critical images, as PreloadAsync items (the sounds are the AudioController's own LoadQueue)
 function LoadingController:AssetList(): { any }
 	const list: { any } = {}
-	const keys: { string } = table.clone(INTRO_SOUNDS)
-	const scene = Content.Cutscenes.ByKey[INTRO]
-	if scene ~= nil and scene.Music ~= nil then
-		const cue = Content.Music.ByKey[scene.Music]
-		if cue ~= nil then
-			table.insert(keys, cue.Sound)
-		end
-	end
-	for _, car in Content.Cutscenes.Rules.Cars do
-		table.insert(keys, car.Horn)
-	end
 	const seen: { [string]: boolean } = {}
-	for _, key in keys do
-		const row = Content.Sounds.ByKey[key]
-		if row == nil or row.Id == "" or seen[row.Id] then
-			continue
-		end
-		seen[row.Id] = true
-		const sound = Instance.new("Sound")
-		sound.Name = key
-		sound.SoundId = row.Id
-		table.insert(list, sound)
-	end
 	const ids: { [string]: string } = Icons.Ids :: any
 	for _, id in ids do
 		if id ~= "" and not seen[id] then
@@ -350,23 +311,7 @@ function LoadingController:StepMap()
 	self:Mark("Map", 1)
 end
 
-function LoadingController:StepVoices()
-	if not self.Dependencies.PlaceController:Is("Run") then
-		self:Mark("Voices", 1)
-		return
-	end
-	self:SetStatus("Voices")
-	-- only the intro lines of its first seconds are waited for (CutsceneController:PreloadVoices queues the whole
-	-- scene in order of use); Walt's tutorial lines load in the background after the curtain lifts (Lift)
-	within(VOICE_TIMEOUT + 1, function()
-		self.Dependencies.CutsceneController:PreloadVoices(VOICE_TIMEOUT, function(fraction: number)
-			self:Mark("Voices", fraction)
-		end)
-	end)
-	self:Mark("Voices", 1)
-end
-
--- After the curtain: the tutorial voices of a rookie load during the intro (~2 min before the tutorial starts)
+-- After the curtain: the tutorial voices of a rookie load in the background
 function LoadingController:BackgroundVoices()
 	if not self.Dependencies.PlaceController:Is("Run") then
 		return
@@ -391,9 +336,9 @@ function LoadingController:Run()
 	-- 2. every controller started (this OnStart is the last one)
 	self:Mark("Start", 1)
 
-	-- 3-5. kit, assets and voices together
+	-- 3-5. kit, assets and map together
 	self:SetStatus("Kit")
-	local pending = 4
+	local pending = 3
 	local function done()
 		pending -= 1
 	end
@@ -404,10 +349,6 @@ function LoadingController:Run()
 	end)
 	task.spawn(function()
 		self:StepAssets()
-		done()
-	end)
-	task.spawn(function()
-		self:StepVoices()
 		done()
 	end)
 	task.spawn(function()
@@ -422,10 +363,10 @@ function LoadingController:Run()
 		self:Mark(key, 1)
 	end
 
-	-- the server may start the intro now
+	-- the server may start a scene now
 	self:SendReady()
 
-	-- hold the curtain while the intro waits for the other participants (not after a skip: the curtain is gone)
+	-- hold the curtain while a scene waits for the other participants (not after a skip: the curtain is gone)
 	const cutscene = self.Dependencies.CutsceneController
 	if self.Dependencies.PlaceController:Is("Run") and not self.Skipped then
 		const holdUntil = os.clock() + Content.Cutscenes.Rules.ReadyTimeout + CREW_MARGIN
@@ -452,7 +393,7 @@ function LoadingController:SendReady()
 end
 
 function LoadingController:Lift()
-	-- the audio queue may run its background jobs now; the tutorial voices start loading behind the intro
+	-- the audio queue may run its background jobs now; the tutorial voices start loading in the background
 	LoadQueue.Release()
 	self:BackgroundVoices()
 	self.Ready(true)

@@ -23,7 +23,7 @@ export type Window = "Calm" | "Shift" | "Last"
 export type Windows = { Calm: { number }, Shift: { number }, Last: { number } }
 
 -- Phases a probe may end early (architecture.md §19.4 "Termina"). Night only ends on its cap or LoseNight.
-const PROBED: { [string]: boolean } = { Intro = true, Call = true, Closing = true, Finale = true, Resume = true }
+const PROBED: { [string]: boolean } = { Call = true, Closing = true, Finale = true, Resume = true }
 -- Phases where a night can still be lost (LoseNight)
 const LOSABLE: { [string]: boolean } = { Call = true, Prep = true, Night = true }
 const MAX_SKIPS = 8 -- guard against a skip loop on a broken table
@@ -69,23 +69,17 @@ function Flow.IsFirst(info: Info, atNight: boolean): boolean
 	return info.Day <= 1 and not info.IsNight
 end
 
--- First phase of a shift: Intro only on the first shift of a new run (also on a night, DEC-300); a night opens with
--- the boss call
-function Flow.First(info: Info, newRun: boolean): string
-	if newRun then
-		return "Intro"
-	end
+-- First phase of a shift: a night opens with the boss call, a day with Prep
+function Flow.First(info: Info): string
 	return if info.IsNight then "Call" else "Prep"
 end
 
 -- Fixed successor of a phase, nil when the service decides (Night, Summary, NightLost, RunEnd)
 function Flow.After(phase: string, info: Info, lastNight: number): string?
-	if phase == "Intro" then
-		return if info.IsNight then "Call" else "Prep"
-	elseif phase == "Call" then
+	if phase == "Call" then
 		return "Prep"
 	elseif phase == "Resume" then
-		return Flow.First(info, false)
+		return Flow.First(info)
 	elseif phase == "Prep" then
 		return if info.IsNight then "Night" else "Open"
 	elseif phase == "Open" then

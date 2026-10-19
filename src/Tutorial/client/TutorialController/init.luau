@@ -3,7 +3,7 @@
 	TutorialController (user request 2026-10-11; Provisional until a FEAT/TASK is written for it)
 
 	First-hot-dog tutorial, on Day 1 of every run for everyone (user request 2026-10-11, Provisional; nothing is saved: no profile flag).
-	After the intro cutscene it walks the player through the first sale, following the order of one tutorial customer
+	It walks the player through the first sale, following the order of one tutorial customer
 	(user request 2026-10-11, Provisional):
 	  answer the phone -> (the tutorial customer walks up) take the order -> grill -> slice -> (cooking) -> collect
 	  -> assemble -> toppings of the order (or throw away a wrong one) -> open the shop (only if still in Prep: the
@@ -1772,7 +1772,7 @@ function TutorialController:Tick()
 		self:Finish("over")
 		return
 	end
-	if ready and phase ~= "Prep" and phase ~= "Intro" and not Vide.untrack(self.ClockRevealed) then
+	if ready and phase ~= "Prep" and not Vide.untrack(self.ClockRevealed) then
 		self.ClockRevealed(true)
 	end
 

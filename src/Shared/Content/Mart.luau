@@ -115,7 +115,7 @@ export type Mart = {
 const mart: Mart = {
 	-- Always down: lost night / resume and the non-play phases. Summary and Call left the list with the business hours
 	-- (2026-10-17): the turn change is now when the stand is OPEN (Q-176 A had them closed).
-	KioskClosedPhases = { "NightLost", "Resume", "Intro", "Finale", "RunEnd" },
+	KioskClosedPhases = { "NightLost", "Resume", "Finale", "RunEnd" },
 	-- Business hours (owner request 2026-10-17, PROVISIONAL numbers): opens at ShiftEnded, 45 s into the next shift's
 	-- selling phase for the last purchases, "closing in 20s" toast, then CLOSED
 	Hours = {

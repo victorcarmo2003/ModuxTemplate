@@ -18,14 +18,13 @@
 	  Prompt    PromptBillboard on the target that fills by itself (input locked, script.md §1)
 	  Line      subtitle strip (CallSubtitle): "Walt" lines, or "You" for crew lines (no balloons: one avatar);
 	            voiced by text-to-speech when the engine has it (Speech.luau, Rules.Voices; subtitles only otherwise)
-	  Actor     local actors (Actors.luau): flip phone, Walt, coffee, Raincoat Lady, street cars (none in the intro),
+	  Actor     local actors (Actors.luau): flip phone, Walt, coffee, Raincoat Lady, street cars (none now),
 	            flyer, Mart bell. A car with Rules.Cars[].Cross is synced to the own body: it passes when the body
 	            reaches fraction At of the crossing + the planned time to its stop + After (CrossClock)
 
 	Ready gate: the server holds a chain (record Waiting = true, Scene "none") until every participant's client sent
-	ClientReady (LoadingController); `Waiting` mirrors it so the loading screen stays up meanwhile. The intro voices
-	are loaded under that loading screen (PreloadVoices -> Speech.Preload: one request at a time, retry, voice
-	fallback), and the same Speech is used when the chain starts.
+	ClientReady (LoadingController); `Waiting` mirrors it so the loading screen stays up meanwhile. The scene's voices
+	are prepared by the Speech when the chain starts.
 
 	Cutscene active (for the HUD and anyone else): `CutsceneController.Active` (Vide source, true from the first
 	segment to the end of the chain) and the attribute `CutsceneActive` (true / nil) on Players.LocalPlayer.
@@ -106,8 +105,6 @@ const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }
 
 const RECORD = 1
 const NONE = "none"
-const INTRO = "intro"
-const VOICE_AHEAD = 25 -- s of the intro whose voices the loading screen waits for (the later ones load in the background)
 const BIND_NAME = "CutsceneSkip"
 const KEY_LABEL = { KeyboardMouse = "E", Gamepad = "X", Touch = "" }
 const RENDER_STEP = "CutsceneController.Timeline"
@@ -569,32 +566,6 @@ function CutsceneController:SpeechOf(): Speech.Speech
 	end)
 	self.Speech = speech
 	return speech
-end
-
--- Loads the voices of every intro line ahead (LoadingController, under the loading screen): the variant this
--- client will most likely see first (party = more than one player now), then the other. Yields until all are
--- settled or `timeout`; what is left keeps loading in the background. progress(0..1).
-function CutsceneController:PreloadVoices(timeout: number, progress: ((number) -> ())?)
-	const scene = Content.Cutscenes.ByKey[INTRO]
-	if scene == nil then
-		if progress ~= nil then
-			progress(1)
-		end
-		return
-	end
-	-- one avatar: always the Solo variant
-	const lines = Timeline.Beats(scene, false)
-	-- the loading screen waits only for the lines of the first VOICE_AHEAD s of the scene; every line is queued in
-	-- order of use, so the rest keeps loading in the background while the intro plays
-	const speech = self:SpeechOf()
-	const early: { Beat } = {}
-	for _, beat in lines do
-		if beat.At <= VOICE_AHEAD then
-			table.insert(early, beat)
-		end
-	end
-	speech.Prepare(lines)
-	speech.Preload(early, timeout, progress)
 end
 
 function CutsceneController:BeginChain()

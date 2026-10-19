@@ -1,7 +1,7 @@
 --!strict
 -- Boss call commands (board TASK-070; FEAT-018). Thin wrappers over BossService (Dev* methods check IsDev).
 --   call                 phone state, current call and line, queue
---   call <key>           rings <key> now, ahead of the queue, even if already heard (not in Intro/Finale/NightLost/
+--   call <key>           rings <key> now, ahead of the queue, even if already heard (not in Finale/NightLost/
 --                        RunEnd/Resume)
 --   call answer          answers the ringing phone (same as Prompt_Answer)
 --   call stop            hangs up and empties the queue

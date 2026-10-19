@@ -74,7 +74,7 @@ chamadas das noites 3, 7, 8, 9, 10 neutras quanto ao veículo. `Validate`: `Nigh
 | Traffic | rotas `TR-1..TR-6` (Ninth Avenue / Juniper Street); números de FEAT-033; ~~semáforo decidido~~ (revogado por DEC-130, ver §0.0) | ~~DEC-120~~, FEAT-033 |
 | Nights | `Duration` 20 → 30 min | DEC-127 |
 | Flow | `PartySource = "ActiveAtShiftStart"` | FEAT-009 (proposta para `Q-067`) |
-| Cutscenes | só cutscenes de verdade (intro, finale, credits); troca de veículo e noite perdida são transições no mundo | FEAT-004 |
+| Cutscenes | só cutscenes de verdade (finale, credits; a intro foi removida, DEC-309); troca de veículo e noite perdida são transições no mundo | FEAT-004 |
 | Actions | `take_item` vira `pick_up_item` ("Pick Up", toque) | FEAT-036 |
 
 ### 0.3 Versão 2
@@ -257,7 +257,7 @@ existem com `Keys` corretas e valores preenchidos nas TASK-008/009.
 
 | Campo | Tipo | Valor inicial |
 |---|---|---|
-| `Phases` | lista `{ Key, Duration, ClockFrom, ClockTo, Kind = "Day"/"Night"/"Any" }` | **Resume 15 s** · Intro · Prep 60 s 7:00→8:00 · Open 360 s 8:00→18:00 · Closing ≤ 30 s · Summary 15 s · Call · Night (duração por `Nights`) 20:00→06:00 · NightEnd · NightLost · Finale · RunEnd |
+| `Phases` | lista `{ Key, Duration, ClockFrom, ClockTo, Kind = "Day"/"Night"/"Any" }` | **Resume 15 s** · Prep 60 s 7:00→8:00 · Open 360 s 8:00→18:00 · Closing ≤ 30 s · Summary 15 s · Call · Night (duração por `Nights`) 20:00→06:00 · NightEnd · NightLost · Finale · RunEnd |
 | `ClockStepMinutes` | int | 5 (pedido do usuário 2026-10-11; era 10) |
 | `PhaseKeys` | derivado | enum do set `Shift` |
 
@@ -758,7 +758,7 @@ física, DEC-179). Lixeira de rua (DEC-200) reaproveita `discard` (o que aceita:
 | Tabela | Campos |
 |---|---|
 | BossCalls | `Key`, `Lines` (`{ Text, Audio? }`), `Short` (versão curta), `Skippable = false` (DEC-077, `Q-077` b) |
-| Cutscenes | `Key` (`none`, `intro`, `finale`, `credits`), `Duration`, `Skippable` (todas, por voto; FEAT-004). Troca de veículo e noite perdida **não** são cutscene: são transições no mundo, sem "Skip" (FEAT-004), dirigidas por `VehicleService` e `RunStateService`/`AmbulanceService`. Campos: `Marks` (nomes `CutsceneMark1..4` no mapa), `Beats` (lista `{ At, Kind = "MoveTo"/"LookAt"/"Line"/"Actor", Target }`) |
+| Cutscenes | `Key` (`none`, `finale`, `credits`), `Duration`, `Skippable` (todas, por voto; FEAT-004). Troca de veículo e noite perdida **não** são cutscene: são transições no mundo, sem "Skip" (FEAT-004), dirigidas por `VehicleService` e `RunStateService`/`AmbulanceService`. Campos: `Marks` (nomes `CutsceneMark1..4` no mapa), `Beats` (lista `{ At, Kind = "MoveTo"/"LookAt"/"Line"/"Actor", Target }`) |
 | Notices | `Key`, `Text` com `{value}` (ou `{item}`/`{upgrade}` quando `Value` é `IndexOf` de tabela), `Audience = "Player" \| "Party"`. **Onda 1:** `hands_full` ("Hands full", FEAT-005), `package_limit`, `not_enough_cash`, `upgrade_bought` ("{upgrade} upgraded!", Party, FEAT-015), `ingredient_unlocked` (Party, FEAT-032), `class_bought`, `class_selected`, `not_enough_gems`, `class_locked` (DEC-186). Ondas seguintes: `gems_gained`, `afk_no_gems`, `revive_credit_saved`, `revive_used`, `trailer_price`, `shift_ended_resume`, `shift_cant_resume`, `item_dropped`, `special_on_bench`. Textos placeholder até `ui-text.md` (narrative-writer) |
 | Hallucinations | `Key`, `MinSanity`, `MaxSanity`, `Kind`, `Cooldown`, `Weight` (teto por `Q-043`) |
 | OpalLines | `Phase` (`Day`, `N1_3`, `N4_6`, `N7_10`), `Lines` (CHR-003) |
@@ -838,7 +838,7 @@ Lista inicial (Provisória, `Q-168`):
 
 | Campo | Valor | Quem lê |
 |---|---|---|
-| `KioskClosedPhases` | `Summary`, `Call`, `NightLost`, `Resume`, `Intro`, `Finale`, `RunEnd` | `MarketService` (recusa e prompts), `MarketController` (porta), `OpalController` (sem balão) |
+| `KioskClosedPhases` | `Summary`, `Call`, `NightLost`, `Resume`, `Finale`, `RunEnd` | `MarketService` (recusa e prompts), `MarketController` (porta), `OpalController` (sem balão) |
 | `Pedestals` | `B1`..`B5` (`Offer = "Upgrade"`, via `Upgrades.BenchSpot`), `S1` (`"Special"`), da esquerda para a direita | `MarketController`, `Required.Kiosk` |
 | `Doors` | `L` = B1–B3, `C` = balcão da Opal, `R` = B4, B5, S1 (ordem = defasagem) | `Kiosk.luau`, `Required.Kiosk` |
 | `Door` | `CloseTime` 2,0 · `OpenTime` 1,6 · `Stagger` 0,25 | `Kiosk.luau` |
@@ -913,7 +913,6 @@ Campos novos por linha: `Selling: boolean` (nasce cliente, gaveta conta), `SkipW
 | Key | Duration (dia / noite) | Relógio dia | Relógio noite | Selling | SkipWithoutProbe |
 |---|---|---|---|---|---|
 | `Resume` | 15 | parado | parado | não | não |
-| `Intro` | 50 (cap) | 7:00 AM | — | não | **sim** |
 | `Call` | — / 60 (cap) | — | 7:00 PM parado | não | **sim** |
 | `Prep` | 60 / **90** | 7→8 AM | 7→8 PM | não | não |
 | `Open` | 360 / — | 8 AM→6 PM | — | **sim** | não |
@@ -1062,7 +1061,7 @@ janela fechada e dentro do trailer, `architecture.md` §19.14); N10 `PostsOff = 
 | Tabela | Campos | Valores iniciais |
 |---|---|---|
 | Hallucinations | `Key`, `MaxSanity` (60 / 40 / 20), `Effect` (nome do módulo em `Effects/`), `Cooldown`, `Weight` | FEAT-019: `fake_call` (< 60), `grill_hiss` (< 60), `roof_steps` (< 40), `ghost_customer` (< 40), `post_flicker` (< 40, sem zumbido, DEC-123), `whisper` (< 20), `mart_sign_blink` (< 20), `window_shadow` (< 20) |
-| Cutscenes | como §3.19 + `Participants = "ConnectedAtStart"` | `intro` 67,2 s (cap 70, Provisório 2026-10-11; era 45 s, cap 50), `finale` ≤ 60, `credits` ≤ 75 (FEAT-004, FEAT-027) |
+| Cutscenes | como §3.19 + `Participants = "ConnectedAtStart"` | `finale` ≤ 60, `credits` ≤ 75 (FEAT-004, FEAT-027) |
 | WalkPaths | `Key`, `Nodes = { NodeId }`, `Loop`, `Shift = "Day" \| "Night" \| "Any"`, `Weight` | caminhos de calçada do MAP-01 (level-designer); faixa = par de nós com `Crosswalk` |
 
 ### 6.12 Onda 4

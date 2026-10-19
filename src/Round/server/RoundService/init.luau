@@ -4,7 +4,7 @@
 -- Phases, durations and clock ranges come from Content.Shift (night override per row, Night length from
 -- Content.Nights); the decisions that are pure (next phase, next shift, skip, window) live in Flow.luau.
 -- The clock never pauses (DEC-085 a): a phase ends at PhaseStartedAt + Duration whoever is connected. Early ends:
--- the service window opened in Prep (OpenShop, VehicleService; TASK-284), a phase probe (Intro, Call, Closing, Finale, Resume), LoseNight, dev commands. Every end goes
+-- the service window opened in Prep (OpenShop, VehicleService; TASK-284), a phase probe (Call, Closing, Finale, Resume), LoseNight, dev commands. Every end goes
 -- through Advance, the same path as the timer.
 -- Shift boundary (end of Summary), fixed order: BeforeShift(prev) -> Flow.Next -> RunStateService:SetEndless(false) ->
 -- StartShift (atoms in one batch -> ShiftStarted -> PhaseChanged(first) -> Capture).
@@ -34,7 +34,6 @@ local Modux = require(ServerScriptService.server.Modux)
 
 export type Phase =
 	"Resume"
-	| "Intro"
 	| "Prep"
 	| "Open"
 	| "Closing"
@@ -353,7 +352,7 @@ end
 
 -- Hooks (T42; registered in the owner's OnInit/OnStart) -------------------------------------------------------
 
--- "Can end now" for Intro, Call, Closing, Finale or Resume. Last registration wins.
+-- "Can end now" for Call, Closing, Finale or Resume. Last registration wins.
 function RoundService:SetPhaseProbe(phase: Phase, probe: () -> boolean)
 	if not Flow.CanProbe(phase) or type(probe) ~= "function" then
 		error(`[RoundService] SetPhaseProbe: {phase} cannot end by probe (or probe is not a function)`, 2)
@@ -543,8 +542,9 @@ function RoundService:Go(phase: Phase, startedAt: number)
 end
 
 -- New shift from startedAt. capture = false never happens on the natural path (kept for symmetry with wave 1).
+-- newRun is no longer read (the intro phase is gone, DEC-309); the parameter stays until ModuxTypes is regenerated.
 function RoundService:StartShift(info: ShiftInfo, startedAt: number, capture: boolean, newRun: boolean)
-	const first = self:Resolve(Flow.First(info, newRun), info)
+	const first = self:Resolve(Flow.First(info), info)
 	self.NightEndedAt = 0
 	self:Enter(first, startedAt, info, nil)
 	const current = self:Info()
@@ -558,7 +558,7 @@ end
 -- Resume restore: wait phase on the restored shift; the shift (ShiftStarted + capture) starts when it ends.
 -- The clock shows the start of the shift's first phase.
 function RoundService:EnterResume(info: ShiftInfo, startedAt: number)
-	const first = self:Resolve(Flow.First(info, false), info)
+	const first = self:Resolve(Flow.First(info), info)
 	const timing =
 		Flow.Timing(first, Content.Shift.ByKey[first], info.IsNight, self:NightDuration(info.Night))
 	self.NightEndedAt = 0

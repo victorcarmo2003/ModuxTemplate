@@ -40,7 +40,7 @@
 	Toasts (owner request 2026-10-12): bottom centre above the hotbar (HudScreen), never in the top right.
 
 	Cinematic and progressive reveal (user request 2026-10-11, owner request 2026-10-12): the whole Hud ScreenGui is off
-	while Interface/Cinematic is on (StageController: intro / finale / credits). During a first run the HUD starts with
+	while Interface/Cinematic is on (StageController: finale / credits). During a first run the HUD starts with
 	only the essentials and releases the rest as the tutorial moves (Content.HudReveal: element -> trigger; the client
 	reads TutorialController StepKey / Finished and the shift; EvaluateReveal latches each element for the session, the
 	server is not involved). A player who skips the tutorial, a run past Day 1 and every night shift see everything. Dev:
@@ -79,7 +79,7 @@ local Toast = require(StarterPlayer.StarterPlayerScripts.client.Interface.Compon
 -- short; the Summary phase itself keeps its Content.Shift length, 8 s day / 10 s night, as the break between shifts)
 const SUMMARY_SHOWN = 3
 -- Phases that start a new shift: an old summary (or run end screen) still on screen goes away
-const NEW_SHIFT: { [string]: boolean } = { Intro = true, Prep = true, Open = true, Call = true, Night = true }
+const NEW_SHIFT: { [string]: boolean } = { Prep = true, Open = true, Call = true, Night = true }
 -- network.md §4.2: toast on screen 3-6 s
 const TOAST_DURATION = 4
 -- Notices waiting beyond this are dropped (the oldest waiting first); 3 are on screen at a time
@@ -801,7 +801,7 @@ function HudController:EvaluateReveal()
 			elseif not gated or night then
 				on = true
 			elseif row.Trigger == "Start" then
-				on = phase ~= "Intro" and not cinematic
+				on = not cinematic
 			elseif row.Trigger == "Step" then
 				on = stepIndex > 0 and stepIndex >= (Steps.IndexOf[row.Step] or math.huge)
 			elseif row.Trigger == "TutorialEnd" then
@@ -926,7 +926,7 @@ function HudController:Mount(playerGui: Instance)
 			ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			DisplayOrder = 1,
-			-- no HUD while a cinematic owns the screen (intro / finale / credits; Interface/Cinematic)
+			-- no HUD while a cinematic owns the screen (finale / credits; Interface/Cinematic)
 			Enabled = function()
 				return not Cinematic.Active()
 			end,

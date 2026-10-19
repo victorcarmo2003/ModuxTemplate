@@ -42,7 +42,7 @@ Anomalia = key, `ANM-###`, número (o do ANM) ou parte do nome (`blackout`, `kno
 | `shop receipt\|code\|reward\|market\|gear ...` | loja, códigos, recompensas, Gear Stand |
 | `upgrade [key] [level]` | upgrade grátis (inalterado) |
 | `call [<key>\|answer\|stop\|list]` · `cutscene [play\|vote\|skip\|stop]` | telefone do chefe · cutscenes |
-| `tutorial [reset\|step <k>\|intro\|voice ...\|debug]` | tutorial (`intro skip`, `voice`, `tutdebug` entraram aqui) |
+| `tutorial [reset\|step <k>\|voice ...\|debug]` | tutorial (`voice`, `tutdebug` entraram aqui; `intro skip` removido, DEC-309) |
 | `ui hud\|offer\|journal\|rejoin\|showcase ...` | interface |
 | `street cars\|walkers\|thief ...` | rua: carros, pedestres, ladrão |
 | `debug audio\|interact\|movement\|drop\|light ...` | leituras de debug |
@@ -63,7 +63,7 @@ Anomalia = key, `ANM-###`, número (o do ANM) ou parte do nome (`blackout`, `kno
 | `arrivals on\|off` · `spawns` · `seating [buy\|sit]` | `customer on\|off` · `customer spawns` · `customer tables [buy\|sit]` |
 | `cash` · `gems` · `tips` · `economy ledger` | `money cash` · `money gems` · `money tips` · `money ledger` |
 | `receipt` · `code` · `reward` · `market` · `gear` | `shop receipt` · `shop code` · `shop reward` · `shop market` · `shop gear` |
-| `intro skip` · `voice` · `tutdebug` | `tutorial intro` · `tutorial voice` · `tutorial debug` |
+| `voice` · `tutdebug` | `tutorial voice` · `tutorial debug` (`intro skip` removido, DEC-309) |
 | `hud` · `offer` · `journal` · `rejoin` · `showcase` | `ui hud` · `ui offer` · `ui journal` · `ui rejoin` · `ui showcase` |
 | `traffic` · `walkers` · `thief` | `street cars` · `street walkers` · `street thief` |
 | `audio` · `interactlog` · `movement` · `drop` · `light` | `debug audio` · `debug interact` · `debug movement` · `debug drop` · `debug light` |
@@ -145,8 +145,8 @@ duplicado ou debug de uma TASK). "Chamado por código" = Admin / Showcase / DevT
 | gear | `gear [open\|close\|state]` | GearStandService | fundir → `shop gear` |
 | upgrade | `upgrade [key] [level]` | UpgradeService | manter (Admin) |
 | call | `call [<key>\|answer\|stop\|list]` | BossService | manter |
-| cutscene | `cutscene [play <key>\|vote\|skip\|stop]` | CutsceneService | manter, ganha `intro` |
-| intro | `intro skip` | TutorialService/RoundService | fundir → `cutscene intro` |
+| cutscene | `cutscene [play <key>\|vote\|skip\|stop]` | CutsceneService | manter |
+| intro | ~~`intro skip`~~ | — | removido (DEC-309) |
 | tutorial | `tutorial [reset\|step <k>]` | TutorialService | manter, ganha `debug`, `voice` |
 | tutdebug | `tutdebug` | Net (client) | fundir → `tutorial debug` |
 | voice | `voice ...` | Net (client) | fundir → `tutorial voice` |
