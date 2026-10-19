@@ -38,9 +38,6 @@ const Smoke: Api.Module = function(ctx: Api.Context): { Api.Command }
 				if running then
 					error("smoke is already running", 0)
 				end
-				if not Content.Restaurant.Rules.Enabled then
-					error("restaurant off (Content.Restaurant.Rules.Enabled = false)", 0)
-				end
 				running = true
 				task.spawn(function()
 					const success, report = pcall(RestaurantSmoke.run, ctx, dev, caller)
