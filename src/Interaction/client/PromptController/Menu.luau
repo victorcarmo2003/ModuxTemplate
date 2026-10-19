@@ -47,8 +47,6 @@ const PRIORITY: { [string]: number } = {
 	clean_table = 4,
 	switch_light = 5,
 	shutter_toggle = 5,
-	trailer_enter = 5,
-	trailer_exit = 5,
 	safe_spot = 5,
 	discard = 6,
 }
@@ -74,8 +72,6 @@ const ICONS: { [string]: string } = {
 	switch_light = "Ui/lantern",
 	answer_phone = "Hud/phone",
 	shutter_toggle = "Ui/lantern",
-	trailer_enter = "Notice/trailer",
-	trailer_exit = "Notice/trailer",
 	clean_table = "Ui/sparkle",
 }
 
@@ -121,8 +117,6 @@ const SHORT: { [string]: string } = {
 	answer_phone = "Answer",
 	safe_spot = "Hide",
 	shutter_toggle = "Window",
-	trailer_enter = "Enter",
-	trailer_exit = "Exit",
 	clean_table = "Clean",
 }
 

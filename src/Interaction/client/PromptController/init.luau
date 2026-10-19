@@ -142,7 +142,6 @@ function PromptController:Setup()
 	-- Named gates (AddGate), all of them must allow; independent of the legacy SetGate slot above
 	self.Gates = {} :: { [string]: (Instance) -> boolean }
 	-- the two door anchors (trailer_exit / trailer_enter), found once (DoorSideAllows)
-	self.DoorPair = nil :: any
 	-- InteractionMenu state: Menu.State is the order / selection, the sources feed the component
 	self.MenuState = Menu.new() :: Menu.State
 	self.MenuActive = false :: boolean
@@ -294,53 +293,31 @@ function PromptController:Gated(anchor: Instance): boolean
 		end
 	end
 	const action = anchor:GetAttribute("PromptAction")
-	if action == "trailer_exit" or action == "trailer_enter" then
-		return self:DoorSideAllows(anchor, action)
+	if action == "door_toggle" then
+		return self:NearestSideAllows(anchor)
 	end
 	return true
 end
 
--- The two door prompts sit a step apart (Exit just inside, Enter just outside) and their radius reaches both: only the one on the
--- side the player is on shows (owner request 2026-10-14). The side is where the player stands relative to the middle of the pair, along
--- the line from the outside anchor to the inside one. Presentation only (TrailerDoorService revalidates). Fails open.
-function PromptController:DoorSideAllows(anchor: Instance, action: string): boolean
-	local doors: any = self.DoorPair
-	if doors == nil or doors.Exit == nil or doors.Exit.Parent == nil or doors.Enter == nil or doors.Enter.Parent == nil then
-		doors = { Exit = nil, Enter = nil }
-		for candidate in self.Prompts do
-			const kind = candidate:GetAttribute("PromptAction")
-			if kind == "trailer_exit" then
-				doors.Exit = candidate
-			elseif kind == "trailer_enter" then
-				doors.Enter = candidate
-			end
-		end
-		self.DoorPair = doors
-	end
-	const exitAnchor: Instance?, enterAnchor: Instance? = doors.Exit, doors.Enter
+-- Restaurant back door (RestaurantDoorService): one door_toggle anchor per face of the leaf, siblings under the same holder, both
+-- within reach from either side. Only the one closest to the player shows (owner 2026-10-18: "tem 2 proximityprompts na porta").
+-- Presentation only (the server accepts either). Fails open.
+function PromptController:NearestSideAllows(anchor: Instance): boolean
+	const holder = anchor.Parent
 	const character = Players.LocalPlayer.Character
 	const root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
-	if exitAnchor == nil or enterAnchor == nil or root == nil or not root:IsA("BasePart") then
+	if holder == nil or not anchor:IsA("Attachment") or root == nil or not root:IsA("BasePart") then
 		return true
 	end
-	local function at(instance: Instance): Vector3?
-		if instance:IsA("Attachment") then
-			return instance.WorldPosition
-		elseif instance:IsA("BasePart") then
-			return instance.Position
+	const mine = (anchor.WorldPosition - root.Position).Magnitude
+	for _, sibling in holder:GetChildren() do
+		if sibling ~= anchor and sibling:IsA("Attachment") and sibling:GetAttribute("PromptAction") == "door_toggle" then
+			if (sibling.WorldPosition - root.Position).Magnitude < mine then
+				return false
+			end
 		end
-		return nil
 	end
-	const inner, outer = at(exitAnchor), at(enterAnchor)
-	if inner == nil or outer == nil then
-		return true
-	end
-	const inward = inner - outer
-	if inward.Magnitude < 1e-3 then
-		return true
-	end
-	const inside = (root.Position - (inner + outer) / 2):Dot(inward) > 0
-	return if action == "trailer_exit" then inside else not inside
+	return true
 end
 
 function PromptController:Add(anchor: Instance)

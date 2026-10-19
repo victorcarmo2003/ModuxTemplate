@@ -110,12 +110,6 @@ return Table.new({
 		Wave = 1,
 	},
 
-	-- Trailer door (user request 2026-10-11, Provisional; owner TrailerDoorService): the back door only opens by prompt.
-	-- Exit Trailer inside by the door, Enter Trailer outside by the steps; both only while the trailer is the vehicle in use.
-	-- Radius 3.6 x2 < ~7.65 studs between the two anchors (TrailerDoorService): the spheres must not overlap, or the
-	-- menu lists the same "Open door" twice (both actions have the same text since 2026-10-12).
-	{ Key = "trailer_exit", Text = "Open door", Hold = 0, Radius = 3.6, Requires = {}, Night = "Any", Wave = 3 },
-	{ Key = "trailer_enter", Text = "Open door", Hold = 0, Radius = 3.6, Requires = {}, Night = "Any", Wave = 3 },
 	-- restaurant back door by hand (owner 2026-10-18; RestaurantDoorService sets Open / Close / Locked as PromptText)
 	{ Key = "door_toggle", Text = "Open Door", Hold = 0, Radius = 4, Requires = {}, Night = "Any", Wave = 3 },
 

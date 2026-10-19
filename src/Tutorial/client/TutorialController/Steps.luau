@@ -518,7 +518,7 @@ const SHOPPING: { string } = { "mart_go", "mart_buy", "mart_back", "restock" }
 -- never gated (it only exists in the selling phases anyway: Content.Actions Requires.Phase).
 -- trailer_exit / trailer_enter: the back door is never gated (the tutorial must not lock the player in or out of the trailer)
 -- pick_up_item: an item dropped by a car hit must always be recoverable, whatever the step (owner bug 2026-10-16)
-const ALWAYS: { string } = { "answer_phone", "prep_work", "trailer_exit", "trailer_enter", "pick_up_item" }
+const ALWAYS: { string } = { "answer_phone", "prep_work", "pick_up_item" }
 -- Restaurant (TASK-393): from the tablet on, the whole restaurant kitchen shows (a crewmate helping or a player getting
 -- ahead is never locked out; the steps follow the shared state, design/tutorial-restaurant.md §4)
 const KITCHEN: { string } = {

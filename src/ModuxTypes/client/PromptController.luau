@@ -10,7 +10,6 @@ local Menu = require(StarterPlayer.StarterPlayerScripts.client.Interaction.Promp
 
 export type Public = {
 	AutoSelectSaved: boolean?,
-	DoorPair: any,
 	FocusButtons: { [InteractionMenu.Item]: GuiButton },
 	Gate: ((Instance) -> boolean)?,
 	Gates: { [string]: (Instance) -> boolean },
@@ -41,7 +40,6 @@ export type Public = {
 	RemoveGate: (self: Public, name: string) -> (),
 	Gated: (self: Public, anchor: Instance) -> boolean,
 	NearestSideAllows: (self: Public, anchor: Instance) -> boolean,
-	DoorSideAllows: (self: Public, anchor: Instance, action: string) -> boolean,
 	Add: (self: Public, anchor: Instance) -> (),
 	Remove: (self: Public, anchor: Instance) -> (),
 	Fire: (self: Public, prompt: Prompt.Prompt) -> (),

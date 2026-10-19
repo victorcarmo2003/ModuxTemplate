@@ -31,7 +31,7 @@ local Kit = require(script.Parent.Kit.CustomerActor)
 const REF = "ANM-009"
 const SCARE_CUE = "jumpscare"
 const ENTITY_MOD = 65536 -- AnomalyCue.Entity is 0..65535
-const DOOR_ACTIONS: { [string]: boolean } = { trailer_exit = true, trailer_enter = true, door_toggle = true }
+const DOOR_ACTIONS: { [string]: boolean } = { door_toggle = true }
 -- Defaults when Rules/ANM-009 is missing (same numbers as the rule file)
 const DEFAULT_WINDOW = 12
 const DEFAULT_SECOND_AT = 10.8
@@ -40,7 +40,6 @@ const DEFAULT_SCARE_FAINT = 0.5
 const DEFAULT_ZONE_POINT = "TRL"
 const DEFAULT_ZONE_RADIUS = 24
 
-type TrailerDoor = { IsOpen: (self: any) -> boolean }
 type RestaurantDoor = {
 	IsOpen: (self: any, mapId: string?) -> boolean,
 	SetOpen: (self: any, mapId: string, open: boolean, player: Player?) -> (),
@@ -58,14 +57,6 @@ type State = {
 	Scared: { [number]: boolean },
 	AnyFailed: boolean,
 }
-
-local doorCache: TrailerDoor? = nil
-local function trailerDoor(): TrailerDoor
-	if doorCache == nil then
-		doorCache = (require :: any)(ServerScriptService.server.Vehicle.TrailerDoorService) :: TrailerDoor
-	end
-	return doorCache :: TrailerDoor
-end
 
 -- restaurant (owner 2026-10-18): the back door is RestaurantDoorService's DOOR-B, opened by hand (door_toggle)
 local restaurantCache: RestaurantDoor? = nil
@@ -187,7 +178,7 @@ const Knock: Api.Module = {
 		if state == nil or event.Kind ~= "Action" or not DOOR_ACTIONS[event.Action] then
 			return
 		end
-		const open = if event.Action == "door_toggle" then restaurantDoor():IsOpen(nil) else trailerDoor():IsOpen()
+		const open = restaurantDoor():IsOpen(nil)
 		if open then
 			scare(ctx, occ, state, event.Player)
 		end
