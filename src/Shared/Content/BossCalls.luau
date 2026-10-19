@@ -236,7 +236,9 @@ const base = Table.new({
 	nightCall(
 		2,
 		lines("Someone shaking all over?", "Shut the window. Keep working."),
-		lines("Shaking? Shut the window.")
+		lines("Shaking? Shut the window."),
+		-- TASK-561: ANM-009 debuts tonight in the restaurant (back door opened by hand); Walt has a key and never knocks
+		{ Lines = lines("Someone shaking all over? Shut the window.", "Knocks on the back door?", "I've got a key. Don't open."), Short = lines("Shaking? Window. Knocks? Don't open.") }
 	),
 	nightCall(
 		3,

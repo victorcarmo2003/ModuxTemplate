@@ -15,7 +15,16 @@
 --   Stop     nothing to undo.
 -- PROVISIONAL (TASK-333): the old shutter test at the end is gone (the window does nothing now); not opening is the
 -- answer. The door service is resolved from its module like ANM-004 does.
+--
+-- Restaurant (TASK-561, owner 2026-10-18; design/anomalies-v3-restaurant.md §8.3): the back door is DOOR-B, opened by
+-- hand (RestaurantDoorService). At the start the door is shut if someone left it open (the draught slams it). Four
+-- series instead of two (Params Series2At / Series3At / Series4At): far and soft, closer, Walt's voice, the voice
+-- wrong; the scene (Content.HorrorScenes anm_009_knock) builds the silence, the handle and the latch over them.
+-- "Seen" = every active player (the whole building hears it). Opening = jumpscare + -Sanity.RuleBroken through
+-- ctx.Fail (DEC-277: no faint by itself), not VitalService:Fall.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
+local Content = require(ReplicatedStorage.shared.Content)
 local Api = require(script.Parent.Parent.Api)
 local Kit = require(script.Parent.Kit.CustomerActor)
 
@@ -32,7 +41,10 @@ const DEFAULT_ZONE_POINT = "TRL"
 const DEFAULT_ZONE_RADIUS = 24
 
 type TrailerDoor = { IsOpen: (self: any) -> boolean }
-type RestaurantDoor = { IsOpen: (self: any, mapId: string?) -> boolean }
+type RestaurantDoor = {
+	IsOpen: (self: any, mapId: string?) -> boolean,
+	SetOpen: (self: any, mapId: string, open: boolean, player: Player?) -> (),
+}
 
 type State = {
 	SecondAt: number,
@@ -41,6 +53,9 @@ type State = {
 	ZonePoint: string,
 	ZoneRadius: number,
 	Second: boolean,
+	Restaurant: boolean,
+	Series: { number }, -- restaurant: absolute times of series 2.. (cue knock Entity = index + 1)
+	NextSeries: number,
 	Scared: { [number]: boolean },
 	AnyFailed: boolean,
 }
@@ -79,7 +94,25 @@ local function text(rule: Api.Rule?, name: string, default: string): string
 end
 
 local function inZone(ctx: Api.Context, state: State, player: Player): boolean
+	if state.Restaurant then
+		return true
+	end
 	return ctx.Vehicle.IsInside(player) or ctx.InZone(player, state.ZonePoint, state.ZoneRadius)
+end
+
+-- Restaurant series 2.. as absolute times; a time past the window or out of order is dropped
+local function seriesTimes(rule: Api.Rule?, startedAt: number, window: number): { number }
+	const out: { number } = {}
+	local last = 0
+	for index = 2, 4 do
+		const at = param(rule, `Series{index}At`, -1)
+		if at <= last or at > window then
+			continue
+		end
+		last = at
+		table.insert(out, startedAt + at)
+	end
+	return out
 end
 
 -- V2 error (DEC-255): the face for the one who opened, the napkins for everyone, then the faint.
@@ -95,6 +128,10 @@ local function scare(ctx: Api.Context, occ: Api.Occurrence, state: State, player
 		ctx.Cue(occ, "door_crack", 0)
 	end
 	ctx.Cue(occ, SCARE_CUE, userId % ENTITY_MOD)
+	if state.Restaurant then
+		ctx.Fail(occ, { player }) -- DEC-277: -35, falls only at zero
+		return
+	end
 	task.delay(state.ScareFaint, function()
 		if player.Parent ~= nil then
 			Kit.Vital():Fall(player)
@@ -108,6 +145,7 @@ const Knock: Api.Module = {
 	Start = function(ctx: Api.Context, occ: Api.Occurrence): boolean
 		const rule = ctx.Rule(REF)
 		const window = if rule ~= nil and rule.Window > 0 then rule.Window else DEFAULT_WINDOW
+		const restaurant = Content.Restaurant.Rules.Enabled
 		const state: State = {
 			SecondAt = occ.StartedAt + math.min(param(rule, "SecondAt", DEFAULT_SECOND_AT), window),
 			EndsAt = occ.StartedAt + window + param(rule, "DoorGrace", DEFAULT_GRACE),
@@ -115,10 +153,22 @@ const Knock: Api.Module = {
 			ZonePoint = text(rule, "ZonePoint", DEFAULT_ZONE_POINT),
 			ZoneRadius = param(rule, "ZoneRadius", DEFAULT_ZONE_RADIUS),
 			Second = false,
+			Restaurant = restaurant,
+			Series = if restaurant then seriesTimes(rule, occ.StartedAt, window) else {},
+			NextSeries = 1,
 			Scared = {},
 			AnyFailed = false,
 		}
 		occ.State = state
+		if restaurant then
+			-- nobody knocks on an open door: the draught slams it shut first
+			const mapId = Content.Restaurant.ManualDoors[1]
+			const door = restaurantDoor()
+			if mapId ~= nil and door:IsOpen(mapId) then
+				door:SetOpen(mapId, false, nil)
+				ctx.Log(occ, `{mapId} was open: shut at the start`)
+			end
+		end
 		ctx.Publish(occ, { Phase = "Active", Step = 1, Anchor = 0 })
 		ctx.Cue(occ, "knock", 1)
 		-- AudioZone "seen": in the zone of the sound when it starts (the first knock)
@@ -132,7 +182,14 @@ const Knock: Api.Module = {
 
 	Tick = function(ctx: Api.Context, occ: Api.Occurrence, now: number)
 		const state = occ.State :: State
-		if not state.Second and now >= state.SecondAt then
+		if state.Restaurant then
+			const at = state.Series[state.NextSeries]
+			if at ~= nil and now >= at then
+				state.NextSeries += 1
+				ctx.Publish(occ, { Step = state.NextSeries })
+				ctx.Cue(occ, "knock", state.NextSeries)
+			end
+		elseif not state.Second and now >= state.SecondAt then
 			state.Second = true
 			ctx.Publish(occ, { Step = 2 })
 			ctx.Cue(occ, "knock", 2)

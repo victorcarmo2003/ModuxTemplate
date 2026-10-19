@@ -29,6 +29,14 @@
 	    between the door glass (AN-05) and the vehicle centre;
 	  - the subtitle strip is local to this effect (Ink pill, 18 px, no phone badge: it is not a call) and sits above
 	    the boss call strip; text copied from anomalies.md N9 (Aprovado) until ui-text.md lists it.
+
+	Restaurant (TASK-561, owner 2026-10-18; anomalies-v3-restaurant.md §8.3). Four series from the server, each its own
+	SERIES row: 1 far and soft (slow, quiet, no voice), 2 closer and rhythmic, 3 Walt's voice ("It's me. It's Walt."),
+	4 the voice wrong (lower knocks, uneven gaps, the line typed out word by word with dead pauses). The knocker stands
+	at SCENE-DOOR-OUT facing SCENE-DOOR and is drawn on any security camera (Kit/Watch) or for a local player OUTSIDE
+	within OUTSIDE_RANGE of the door (from the street it is right there). door_crack: the leaf is really open (the
+	player opened it), so no swing; the napkins and the wind blow in from SCENE-DOOR-OUT through SCENE-DOOR. The
+	silence, the handle, the latch and the hit are the scene's (Content.HorrorScenes anm_009_knock).
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -42,6 +50,7 @@ local UiScale = require(StarterPlayer.StarterPlayerScripts.client.Interface.Comp
 local Haptics = require(StarterPlayer.StarterPlayerScripts.client.Input.Haptics)
 local Effect = require(script.Parent.Parent.Effect)
 local Jumpscare = require(script.Parent.Kit.Jumpscare)
+local Watch = require(script.Parent.Kit.Watch)
 
 const create = Vide.create
 const spring = Vide.spring
@@ -61,7 +70,20 @@ const VEHICLE_TAG = "Vehicle"
 const DOOR_NAMES = { "Door_Back", "Door_Glass" }
 const NAPKIN_ANCHOR = "VFX_Napkins"
 -- restaurant (owner 2026-10-18, Walt knocking on the back door): the pantry's exit door DOOR-B, from outside
-const DOOR_POINT = if Content.Restaurant.Rules.Enabled then "SCENE-DOOR-OUT" else "AN-05"
+const RESTAURANT = Content.Restaurant.Rules.Enabled
+const DOOR_POINT = if RESTAURANT then "SCENE-DOOR-OUT" else "AN-05"
+const DOOR_IN_POINT = "SCENE-DOOR" -- restaurant: the inside of DOOR-B (the blackout's door point)
+const OUTSIDE_RANGE = 40 -- studs: a local player outside this near DOOR-B sees the knocker
+
+-- Restaurant series (TASK-561; PROVISIONAL): volume scale, gaps between knocks (s; uneven = wrong), playback speed,
+-- line (nil = no voice); Typed = the line comes word by word with this pause (s) between words
+type Series = { Volume: number, Gaps: { number }, Speed: number, Line: string?, Typed: number? }
+const SERIES: { Series } = {
+	{ Volume = 0.3, Gaps = { 0.75, 0.75 }, Speed = 0.92 },
+	{ Volume = 0.75, Gaps = { 0.38, 0.38, 0.38 }, Speed = 1 },
+	{ Volume = 1, Gaps = { 0.42, 0.42 }, Speed = 1, Line = "Rookie? It's me. It's Walt. Open up." },
+	{ Volume = 1.1, Gaps = { 0.9, 0.25, 1.4 }, Speed = 0.78, Line = "Rookie. Open. The. Door.", Typed = 0.55 },
+}
 
 -- Door swing (state Ajar)
 const AJAR_ANGLE = math.rad(10)
@@ -201,6 +223,28 @@ local function say(line: string)
 	end)
 end
 
+-- The wrong voice: the line grows word by word, a dead pause between words, then holds
+local function sayTyped(line: string, pause: number)
+	const target = strip()
+	target.Token += 1
+	const token = target.Token
+	const words = string.split(line, " ")
+	local shown = ""
+	for index, word in words do
+		if target.Token ~= token then
+			return
+		end
+		shown = if index == 1 then word else `{shown} {word}`
+		target.Text(shown)
+		task.wait(pause * (if index % 2 == 0 then 1.6 else 1))
+	end
+	task.delay(SUBTITLE_TIME, function()
+		if target.Token == token then
+			target.Text("")
+		end
+	end)
+end
+
 -- World -------------------------------------------------------------------------------------------------------------
 
 local function vehicleModel(ctx: Effect.Context): Model?
@@ -246,8 +290,34 @@ local function nextSeries(cue: Effect.Cue): number
 	return current.Count
 end
 
+local function knockRestaurant(ctx: Effect.Context, number: number)
+	const row = SERIES[math.clamp(number, 1, #SERIES)]
+	const point = ctx.Point(DOOR_POINT)
+	const at = if point then point.Position else nil
+	const line = row.Line
+	if line ~= nil then
+		const typed = row.Typed
+		if typed ~= nil then
+			task.spawn(sayTyped, line, typed)
+		else
+			say(line)
+		end
+	end
+	for i = 1, #row.Gaps + 1 do
+		ctx.Audio:Play("door_knock", at, { Volume = row.Volume, Speed = row.Speed, Vary = 0.02 })
+		const gap = row.Gaps[i]
+		if gap ~= nil then
+			task.wait(gap)
+		end
+	end
+end
+
 local function knock(ctx: Effect.Context, cue: Effect.Cue)
 	const number = nextSeries(cue)
+	if RESTAURANT then
+		knockRestaurant(ctx, number)
+		return
+	end
 	say(LINES[math.min(number, #LINES)])
 	const at = doorPoint(ctx, vehicleModel(ctx))
 	for i = 1, KNOCKS do
@@ -452,17 +522,34 @@ local function wisps(ctx: Effect.Context, at: Vector3, direction: Vector3)
 	end)
 end
 
+-- Restaurant: DOOR-B is really open; the wind comes from outside through it (nil when the points are not streamed)
+local function restaurantGust(ctx: Effect.Context): (Vector3?, Vector3?)
+	const outside = ctx.Point(DOOR_POINT)
+	const inside = ctx.Point(DOOR_IN_POINT)
+	if outside == nil or inside == nil then
+		return nil, nil
+	end
+	const flat = Vector3.new(inside.X - outside.X, 0, inside.Z - outside.Z)
+	return inside.Position, if flat.Magnitude > 1e-3 then flat.Unit else Vector3.zAxis
+end
+
 local function doorCrack(ctx: Effect.Context, cue: Effect.Cue)
 	const duration = math.max(cue.Row.Duration, OPEN_TIME + CLOSE_TIME)
-	const vehicle = vehicleModel(ctx)
-	const door = doorPoint(ctx, vehicle)
+	const vehicle = if RESTAURANT then nil else vehicleModel(ctx)
+	local door = doorPoint(ctx, vehicle)
 	const swing = if vehicle then makeSwing(ctx, vehicle) else nil
+	local direction = windDirection(vehicle, door)
+	local origin = napkinOrigin(vehicle, door)
+	if RESTAURANT then
+		const gustAt, gustDirection = restaurantGust(ctx)
+		door = gustAt
+		origin = gustAt
+		direction = gustDirection or direction
+	end
 	ctx.Audio:Play("door_creak", door)
 
 	const rng = cue.Rng
-	const direction = windDirection(vehicle, door)
 	const side = direction:Cross(Vector3.yAxis)
-	const origin = napkinOrigin(vehicle, door)
 	const napkins: { Napkin } = {}
 	if origin then
 		const folder = ctx.Folder()
@@ -570,6 +657,21 @@ end
 
 -- Feet pose outside the back door, facing it (nil when the door is not known on this client)
 local function knockerPose(ctx: Effect.Context): CFrame?
+	if RESTAURANT then
+		-- SCENE-DOOR-OUT outside DOOR-B, facing SCENE-DOOR; feet on the ground under it
+		const outside = ctx.Point(DOOR_POINT)
+		const inside = ctx.Point(DOOR_IN_POINT)
+		if outside == nil or inside == nil then
+			return nil
+		end
+		const params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = { ctx.Folder() }
+		const hit = workspace:Raycast(outside.Position + Vector3.new(0, 3, 0), Vector3.new(0, -20, 0), params)
+		const feet = if hit then hit.Position else outside.Position
+		const look = Vector3.new(inside.X, feet.Y, inside.Z)
+		return if (look - feet).Magnitude > 1e-3 then CFrame.lookAt(feet, look) else CFrame.new(feet)
+	end
 	const vehicle = vehicleModel(ctx)
 	const door = doorPoint(ctx, vehicle)
 	if door == nil or vehicle == nil then
@@ -603,6 +705,20 @@ local function buildKnocker(pose: CFrame): Model
 	return model
 end
 
+-- Restaurant: the local player stands outside DOOR-B (past the door, on the SCENE-DOOR-OUT side) and near it
+local function outsideNear(ctx: Effect.Context): boolean
+	const outside = ctx.Point(DOOR_POINT)
+	const inside = ctx.Point(DOOR_IN_POINT)
+	const character = Players.LocalPlayer.Character
+	const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	if outside == nil or inside == nil or root == nil or not root:IsA("BasePart") then
+		return false
+	end
+	const out = outside.Position - inside.Position
+	const from = root.Position - inside.Position
+	return from:Dot(out) > out:Dot(out) * 0.5 and (root.Position - outside.Position).Magnitude <= OUTSIDE_RANGE
+end
+
 -- Watching camera 2 right now (TASK-285 attributes on the LocalPlayer)
 local function onCamera(): boolean
 	const player = Players.LocalPlayer
@@ -631,7 +747,7 @@ local function mountKnocker(ctx: Effect.Context, occ: Effect.Occurrence)
 		if current == nil then
 			return
 		end
-		const visible = live and onCamera()
+		const visible = live and (if RESTAURANT then Watch.Watching() or outsideNear(ctx) else onCamera())
 		if visible ~= shown then
 			shown = visible
 			for _, part in current:GetDescendants() do

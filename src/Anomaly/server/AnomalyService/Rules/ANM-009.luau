@@ -21,7 +21,12 @@ const rule: Api.Rule = {
 	Params = {
 		-- s after the start of the second series of three knocks (the first one is at 0); it ends ~1 s later, at the
 		-- Window ("três batidas, pausa, mais três (~12 s)"). PROVISIONAL
-		SecondAt = if restaurant then 9 else 10.8,
+		SecondAt = 10.8,
+		-- restaurant (TASK-561): s of series 2, 3, 4 (far and soft at 0, closer, Walt's voice, the voice wrong); the
+		-- handle and the latch are the scene's (17..19.3 s). PROVISIONAL
+		Series2At = if restaurant then 4.5 else nil,
+		Series3At = if restaurant then 8.5 else nil,
+		Series4At = if restaurant then 12.5 else nil,
 		-- s after the Window the door still bites (the figure is still outside); PROVISIONAL (TASK-333)
 		DoorGrace = 2,
 		-- s between the jumpscare and the faint
