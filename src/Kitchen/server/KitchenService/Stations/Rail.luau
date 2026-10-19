@@ -1,27 +1,19 @@
 --!strict
--- Resting rail (FEAT-006 step 3; architecture.md §18.4, §18.12; network.md §3.5; TASK-026). StationKind "rail".
--- No actions: a FIFO of grilled sausages fed by "Collect" on the grill (Grill.luau) and drained by "Add Sausage" on
--- the board (Board.luau, TASK-027). One Stations record (Slot 0): State Ready with >= 1 sausage, Count = how many.
--- Capacity = Content.Vehicles[station.Vehicle].RailSlots (cart 6, trailer 8).
--- Other station modules use the functions below (require(script.Parent.Rail)); KitchenService serializes per
--- station, and every call here is synchronous, so a Push/Pop never interleaves with another one.
+-- Rest rail pile (FEAT-006 step 3; architecture.md §18.4, §18.12; network.md §3.5; TASK-026). StationKind "rail".
+-- World kitchen (kitchen-world.md §1-§3; DEC-306, DEC-308; TASK-568/569): a FIFO of grilled sausages fed by "Collect" on the
+-- grill (Grill.luau) and drained by "Add Sausage" (plate_add_sausage, Prompt_Rail): the oldest sausage goes on the plate in the
+-- hand of who touched (ctx.FillPlate; with a bun already on it the plate becomes the hot_dog Tool). One Stations record
+-- (Slot 0): State Ready with >= 1 sausage, Count = how many. Capacity = Content.Vehicles[station.Vehicle].RailSlots (8).
+-- Other station modules use the functions below (require(script.Parent.Rail)); KitchenService serializes per station, and
+-- every call here is synchronous, so a Push/Pop never interleaves with another one.
+-- Refusals (toasts via Refusal.luau): empty pile -> pile_empty; the plate already has a sausage -> plate_full. No plate in
+-- hand stays silent (the client shows the prompt only with one, Requires.Held = plate).
 -- Snapshot: nothing kept (data.md §2.2: the shift restarts with an empty rail).
--- Wave 3 (TASK-109, ANM-002, ITM-020): Alter puts one gray sausage at the FRONT of the queue (the next "Add Sausage"
--- of any player takes it), using one rail place, no stock. At most one altered sausage per rail. Record.Altered =
--- its position 1..Count (nil when none). Pop tells the board whether the sausage it took was the altered one.
--- Restaurant (TASK-378; tech/restaurant-flow.md rev. 2 §2.3, design FEAT-045), behind Content.Restaurant.Rules.Enabled:
---   rail_take (anchor with PromptAction rail_take inside the rail station, tap "Take Dogs")  the front sausages -> the
---             sausage_grilled stack in hand (Tool Count, cap Content.Restaurant.Stacks.Sausage), or a new sausage_grilled
---             Tool when the hand holds none (ItemService limits: hotbar, CategoryLimits.Ingredient -> hands_full). Takes as
---             many as fit, FIFO; Count of the record drops by the same amount. The altered sausage (ANM-002) is never
---             taken here (it stays at the front for the board; the restaurant anomalies come with wave R4): with it at the
---             front the prompt is off. Prompt off while the rail is empty or the flag is off.
--- Conveyor kitchen (TASK-515; tech/prep-conveyor.md §5, DT-E6), Content.Prep.Rules.Mode = "Conveyor": this rail IS the shared rest
--- table. Capacity = Content.Prep.Conveyor.Rest.Capacity (8, DEC-305); fed by the grill's auto rest (Grill.luau), drained by any
--- assembler through PrepStage Dog: PopAt(position) takes THAT sausage (any position without someone else's claim; the
--- claims live in PrepService, the client suggests the front one, P10). Every entry carries the flip-bonus stamp
--- (Entry.Flip, true = flipped inside the window), handed back by PopAt / At / Pop / Front so PrepService can write it on the
--- plate as FlipBonus (paid once per plate at the sale, TASK-517). "Take Dogs" (rail_take) is off in the conveyor.
+-- Wave 3 (TASK-109, ANM-002, ITM-020): Alter puts one gray sausage at the FRONT of the queue (the next "Add Sausage" of any
+-- player takes it, and the plate carries Altered), using one rail place, no stock. At most one altered sausage per rail.
+-- Record.Altered = its position 1..Count (nil when none).
+-- Every entry carries the flip-bonus stamp (Entry.Flip, true = flipped inside the window, Grill.luau): it goes on the plate
+-- as Flipped and lifts the grade one band (Grade.Assembly, kitchen-world.md §4).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local StationApi = require(script.Parent.Parent.StationApi)
@@ -31,13 +23,8 @@ type Context = StationApi.Context
 type Station = StationApi.Station
 
 -- One sausage on the rail: server time it arrived; Altered = the anomaly's gray sausage (ITM-020); Score = grill flip
--- score 0..100 stamped by the server (prep mode, TASK-169; nil = not graded: world "Collect", altered sausage).
--- Flip = the conveyor flip bonus stamp (TASK-515; false outside the conveyor, for an unflipped or late-flipped sausage and
--- for the altered one).
+-- score 0..100 (nil = not flipped); Flip = the flip bonus stamp (false for an unflipped / late-flipped / altered sausage).
 type Entry = { At: number, Altered: boolean, Score: number?, Flip: boolean }
-
--- What PopAt / At hand back (tech/prep-conveyor.md §10.2, Bridge.Dog): a copy, never the queue entry itself.
-export type Taken = { Score: number?, Flip: boolean, Altered: boolean }
 
 -- Private state of a rail station: sausages in take order (front = next "Add Sausage").
 type RailState = { Queue: { Entry } }
@@ -45,8 +32,8 @@ type RailState = { Queue: { Entry } }
 const KIND = "rail"
 const RECORD_SLOT = 0 -- single-record station (network.md §3.5)
 const COUNT_MAX = 30 -- Stations.Count wire range
-const TAKE = "rail_take"
-const ITEM = "sausage_grilled"
+const ADD = "plate_add_sausage"
+const SAUSAGE = "Sausage"
 
 -- Bound rail stations (one per vehicle expected). Stale entries (station removed/re-added) are skipped by alive().
 const bound: { Station } = {}
@@ -68,22 +55,10 @@ local function stateOf(station: Station): RailState
 	return fresh
 end
 
-local function beltMode(): boolean
-	return Content.Prep.Rules.Mode == "Conveyor"
-end
-
--- Conveyor: the rest table holds Conveyor.Rest.Capacity (Validate keeps it <= Vehicles.trailer.RailSlots and PrepGrab.Slot 8).
 local function capacityOf(station: Station): number
-	if beltMode() then
-		return math.clamp(math.floor(Content.Prep.Conveyor.Rest.Capacity), 0, COUNT_MAX)
-	end
 	const vehicle = Content.Vehicles.ByKey[station.Vehicle]
 	const slots = if vehicle then vehicle.RailSlots else 0
 	return math.clamp(slots, 0, COUNT_MAX)
-end
-
-local function copyOf(entry: Entry): Taken
-	return { Score = entry.Score, Flip = entry.Flip, Altered = entry.Altered }
 end
 
 -- Position 1..#Queue of the altered sausage, nil when there is none.
@@ -111,85 +86,54 @@ local function write(ctx: Context, station: Station)
 	ctx.Publish(station)
 end
 
--- Restaurant "Take Dogs" ------------------------------------------------------------------------------------------------
+-- "Add Sausage" -------------------------------------------------------------------------------------------------------
 
-local function stackCap(): number
-	return math.max(math.floor(Content.Restaurant.Stacks.Sausage), 1)
-end
-
--- Held sausage_grilled stack and its Count (nil, 0 when the hand holds something else or nothing).
-local function heldStack(ctx: Context, player: Player): (Tool?, number)
-	const tool = ctx.Held(player)
-	if tool == nil or tool:GetAttribute("Item") ~= ITEM then
-		return nil, 0
+-- (plate?, notice?): a plate in hand without a sausage and a sausage on the pile.
+local function canAdd(ctx: Context, station: Station, player: Player): (Tool?, string?)
+	if station.Kind ~= KIND then
+		return nil, nil
 	end
-	const raw = tool:GetAttribute("Count")
-	return tool, if type(raw) == "number" then math.floor(raw) else 1
-end
-
--- Sausages "Take Dogs" can take now from the front (stops at the altered one).
-local function takeable(station: Station): number
-	local count = 0
-	for _, entry in stateOf(station).Queue do
-		if entry.Altered then
-			break
-		end
-		count += 1
+	const plate = ctx.HeldPlate(player)
+	if plate == nil then
+		return nil, nil
 	end
-	return count
-end
-
-local function refreshTake(ctx: Context, station: Station)
-	const on = not beltMode() and takeable(station) > 0
-	for _, anchor in station.Anchors do
-		if anchor:GetAttribute("PromptAction") == TAKE and anchor:GetAttribute("PromptEnabled") ~= on then
-			ctx.SetPrompt(anchor, on, nil)
-		end
+	if plate:GetAttribute(SAUSAGE) == true then
+		return nil, "plate_full"
 	end
+	if #stateOf(station).Queue < 1 then
+		return nil, "pile_empty"
+	end
+	return plate, nil
 end
 
-const take: StationApi.Action = {
+const add: StationApi.Action = {
 	Validate = function(ctx: Context, station: Station, player: Player, _anchor: Instance): (boolean, string?)
-		if beltMode() or station.Kind ~= KIND or takeable(station) < 1 then
-			return false, nil
+		const plate, notice = canAdd(ctx, station, player)
+		if notice ~= nil then
+			Refusal.notify(ctx, player, notice, nil)
 		end
-		const tool, count = heldStack(ctx, player)
-		if tool ~= nil and count >= stackCap() then
-			Refusal.notify(ctx, player, "hands_full", nil)
-			return false, nil
-		end
-		return true, nil
+		return plate ~= nil, nil
 	end,
-	-- Inside the rail lock, synchronous: the Tool first (the hand limits can refuse it), then the sausages leave the rail.
+	-- Inside the rail lock, synchronous: the front sausage leaves only when the plate took it.
 	Run = function(ctx: Context, station: Station, player: Player, _anchor: Instance)
-		const tool, count = heldStack(ctx, player)
-		const room = stackCap() - (if tool ~= nil then count else 0)
-		const amount = math.min(room, takeable(station))
-		if amount < 1 then
+		const plate = canAdd(ctx, station, player)
+		const queue = stateOf(station).Queue
+		const front = queue[1]
+		if plate == nil or front == nil then
 			return
 		end
-		if tool ~= nil then
-			ctx.Consume(player, tool)
+		if not ctx.FillPlate(player, plate, "Sausage", { Altered = front.Altered, Flipped = front.Flip }) then
+			return
 		end
-		if not ctx.Give(player, ITEM, { Count = count + amount }) then
-			if tool ~= nil then
-				warn(`[Rail] sausage_grilled stack of {player.Name} lost on restack ({count})`)
-			end
-			return -- a new stack refused: ItemService already told the player (hands_full)
-		end
-		const queue = stateOf(station).Queue
-		for _ = 1, amount do
-			table.remove(queue, 1)
-		end
+		table.remove(queue, 1)
 		write(ctx, station)
-		refreshTake(ctx, station)
 	end,
 }
 
 const Rail = {
 	Kinds = { KIND },
 	Actions = {
-		[TAKE] = take,
+		[ADD] = add,
 	} :: { [string]: StationApi.Action },
 }
 
@@ -221,8 +165,8 @@ function Rail.Room(vehicle: string): number
 	return math.max(capacityOf(station) - #stateOf(station).Queue, 0)
 end
 
--- Adds one grilled sausage at the end of the queue. False when there is no rail or it is full. `score` = the flip score
--- of the prep mode grill (nil = the sausage carries no grade). `flip` = the conveyor flip-bonus stamp (TASK-515; nil = false).
+-- Adds one grilled sausage at the end of the queue. False when there is no rail or it is full. `score` = the grill flip
+-- score (nil = not flipped), `flip` = the flip bonus stamp (nil = false).
 function Rail.Push(ctx: Context, vehicle: string, score: number?, flip: boolean?): boolean
 	const station = Rail.Find(vehicle)
 	if station == nil then
@@ -238,91 +182,6 @@ function Rail.Push(ctx: Context, vehicle: string, score: number?, flip: boolean?
 	return true
 end
 
--- Front sausage without taking it: (exists, altered, score, flip bonus). Read only.
-function Rail.Front(vehicle: string): (boolean, boolean, number?, boolean)
-	const station = Rail.Find(vehicle)
-	const front = if station then stateOf(station).Queue[1] else nil
-	if front == nil then
-		return false, false, nil, false
-	end
-	return true, front.Altered, front.Score, front.Flip
-end
-
--- Sausage at position `index` (1 = the front, 1..Count) without taking it: a copy, nil when there is none. Read only.
-function Rail.At(vehicle: string, index: number): Taken?
-	const station = Rail.Find(vehicle)
-	const entry = if station then stateOf(station).Queue[index] else nil
-	return if entry then copyOf(entry) else nil
-end
-
--- Conveyor rest table (TASK-515; prep-conveyor.md §5, §10.2 Bridge.Dog / KitchenService:TakeRest): takes the sausage at position
--- `index` (1 = the front; any position, the altered one included: it is how ANM-002 reaches a plate). The places behind it move
--- one forward (PrepService reindexes its claims, SausageLeft). Returns (copy of the entry with Score, Flip = the flip bonus
--- for the plate's FlipBonus, Altered; nil) or (nil, "Empty"). Synchronous.
-function Rail.PopAt(ctx: Context, vehicle: string, index: number): (Taken?, string?)
-	const station = Rail.Find(vehicle)
-	if station == nil or index ~= math.floor(index) then
-		return nil, "Empty"
-	end
-	const queue = stateOf(station).Queue
-	const entry = queue[index]
-	if entry == nil then
-		return nil, "Empty"
-	end
-	table.remove(queue, index)
-	write(ctx, station)
-	return copyOf(entry), nil
-end
-
--- True when the next sausage "Add Sausage" would take is the altered one (read only).
-function Rail.FrontAltered(vehicle: string): boolean
-	const station = Rail.Find(vehicle)
-	if station == nil then
-		return false
-	end
-	const front = stateOf(station).Queue[1]
-	return front ~= nil and front.Altered
-end
-
--- Takes the front sausage (FIFO; an altered one sits at the front). Returns (taken, it was the altered one, its grill
--- flip score or nil, its conveyor flip bonus).
-function Rail.Pop(ctx: Context, vehicle: string): (boolean, boolean, number?, boolean)
-	const station = Rail.Find(vehicle)
-	if station == nil then
-		return false, false, nil, false
-	end
-	const queue = stateOf(station).Queue
-	if #queue == 0 then
-		return false, false, nil, false
-	end
-	const entry = table.remove(queue, 1)
-	write(ctx, station)
-	if entry == nil then
-		return false, false, nil, false
-	end
-	return true, entry.Altered, entry.Score, entry.Flip
-end
-
--- The bin by drag (prep mode, 2026-10-12): removes the sausage at position `index` (1 = the front) of the vehicle's rail. The altered
--- sausage is never thrown away from here (only a hot dog resolves ANM-002). (true, nil) or (false, "Empty" | "Altered").
-function Rail.DiscardAt(ctx: Context, vehicle: string, index: number): (boolean, string?)
-	const station = Rail.Find(vehicle)
-	if station == nil then
-		return false, "Empty"
-	end
-	const queue = stateOf(station).Queue
-	const entry = queue[index]
-	if entry == nil then
-		return false, "Empty"
-	end
-	if entry.Altered then
-		return false, "Altered"
-	end
-	table.remove(queue, index)
-	write(ctx, station)
-	return true, nil
-end
-
 -- StationApi.Module ---------------------------------------------------------------------------------------------------
 
 function Rail.Bind(ctx: Context, station: Station)
@@ -335,12 +194,6 @@ function Rail.Bind(ctx: Context, station: Station)
 	table.insert(bound, station)
 	station.State = { Queue = {} } :: RailState
 	write(ctx, station)
-	refreshTake(ctx, station)
-end
-
--- 10 Hz, current vehicle only: keep "Take Dogs" in step with the rail (fed by the grill's Collect) and the flag.
-function Rail.Tick(ctx: Context, station: Station, _now: number)
-	refreshTake(ctx, station)
 end
 
 -- Wave 3 (TASK-109): one altered sausage at the front of this rail. False without room or with one already there.

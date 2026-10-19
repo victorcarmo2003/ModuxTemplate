@@ -15,10 +15,17 @@
 --   Module.Alter     optional: put one altered item on the station (slot nil = the module picks); false = no room
 --   Module.ClearAltered optional: remove every altered item of the station (6:00 AM, end of the occurrence)
 --   Context.Emit     kitchen event for other services (KitchenService.Emitted, deferred out of the station lock):
---                    "assembled" (player, { Altered = boolean }) from the board when a hot dog is made
+--                    "assembled" (player, { Altered = boolean }) when a plate becomes a hot dog (FillPlate)
 --   Context.Give     attrs.Altered = true marks the hot dog (Tool attribute Altered, network.md §7.1)
 
+-- Added by TASK-569 (world kitchen, kitchen-world.md §2): Context.HeldPlate / FillPlate, the plate Tool in hand.
+
 export type SlotState = "Empty" | "Working" | "Ready" | "Cleaning" -- Cleaning: coffee machine only (TASK-328)
+
+-- What goes on a plate: the bun from the cut-bun pile or the sausage from the rest rail
+export type PlatePart = "Bun" | "Sausage"
+-- Altered = an ANM-002 item (the plate, and the hot dog it becomes, carry Altered); Flipped = sausage flipped in the window
+export type PlateFill = { Altered: boolean?, Flipped: boolean? }
 
 -- network.md §3.5. Id on the wire = Station.Id * 100 + Slot. Kind must be a Content.Stations.RecordKeys key.
 export type Record = {
@@ -56,6 +63,10 @@ export type Context = {
 	Held: (player: Player) -> Tool?,
 	Consume: (player: Player, tool: Tool) -> (),
 	AddTopping: (tool: Tool, ingredient: string) -> boolean, -- ItemService: same Tool, HotDogVisual refreshed
+	HeldPlate: (player: Player) -> Tool?, -- the `plate` Tool in hand (empty or half made), nil otherwise
+	-- puts the part on the plate in hand; with bun and sausage on it the plate becomes the hot_dog Tool (same ticket,
+	-- "assembled" emitted). false = refused (not that player's plate, part already on it, the Tool could not be made)
+	FillPlate: (player: Player, plate: Tool, part: PlatePart, fill: PlateFill) -> boolean,
 	Modifier: (player: Player, stat: string, base: number?) -> number, -- ClassService (base: the class applies over it)
 	Effect: (stat: string) -> number, -- UpgradeService, current vehicle
 	Publish: (station: Station) -> (), -- KitchenService writes the Stations set from station.Records

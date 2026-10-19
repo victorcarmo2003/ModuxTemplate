@@ -1,15 +1,13 @@
 --!strict
 -- Bun crate (FEAT-006 step 4; DEC-190, DEC-215; architecture.md §18.4, §18.12; TASK-027). StationKind "bun_crate".
---   bun_cut (Prompt_Take, hold 0.5 s "Slice Bun")  1 bun from stock -> lowest free slot of the vehicle's board
---           (Board.luau), sliced in Content.Stations.bun_crate.Params.CutTime (0.8 s). The unit leaves the stock only
---           together with a free slot (never one without the other).
+--   bun_cut (Prompt_Take, hold 0.8 s "Slice Bun")  1 bun from stock -> lowest free place of the cut-bun pile TLR_BUN_CUT
+--           (Board.luau, 8 places; kitchen-world.md §1 #4, TASK-568), sliced in Content.Stations.bun_crate.Params.CutTime
+--           (0.8 s). The unit leaves the stock only together with a free place (never one without the other).
 -- Restock on Prompt_Restock is the core's (KitchenService). No Stations record: the board slot carries the state.
 -- Prompts (Provisional, TASK-027, same rule as "Grill"): "Slice Bun" off while the board has no free slot or the bun
 -- stock is 0. Snapshot: nothing kept (the amount is "Stk").
 -- Refusal toasts (D-04, TASK-080, via Refusal.luau): no bun in stock -> out_of_stock {item}; board without a free slot
 -- -> board_full. A vehicle without a board stays silent (map problem, not the player's).
--- Conveyor (TASK-496; prep-conveyor.md §1.1; Content.Prep.Rules.Mode = "Conveyor"): the bun is cut by a gesture at the
--- Board stop of the belt. "Slice Bun" stays off and bun_cut is refused (silent); the crate is scenery.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local StationApi = require(script.Parent.Parent.StationApi)
@@ -24,7 +22,6 @@ const CUT = "bun_cut"
 const BUN = "bun"
 const DURATION_STEP = 0.1 -- Stations.Duration is quant(0, 120, 0.1)
 const DURATION_MAX = 120
-const CONVEYOR = "Conveyor"
 
 local function ingredientOf(station: Station): string
 	return station.Ingredient or BUN
@@ -39,7 +36,7 @@ end
 
 -- (ok, notice?): stock first (restocking is what the player can do), then a free board slot.
 local function canCut(ctx: Context, station: Station): (boolean, string?)
-	if Content.Prep.Rules.Mode == CONVEYOR or station.Kind ~= KIND or Board.Find(station.Vehicle) == nil then
+	if station.Kind ~= KIND or Board.Find(station.Vehicle) == nil then
 		return false, nil
 	end
 	if ctx.GetStock(ingredientOf(station)) < 1 then

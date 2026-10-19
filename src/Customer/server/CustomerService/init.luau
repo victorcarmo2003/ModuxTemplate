@@ -80,10 +80,12 @@
 -- +4 s, Messy = no tip and the mood one band worse (Conclude), Good = as before. The price and the verdicts of
 -- DEC-072 are untouched. TakeOrderFor / ServeFor are the same paths as the world prompt (same checks, same pay) for the
 -- prep mode tabs (PrepService), which have no customer anchor.
--- Conveyor (TASK-517; Content.Prep.Rules.Mode = "Conveyor"; DEC-305, prep-conveyor.md §8): SellLine applies
--- Grade.SaleEffect instead: Perfect = base tip + Grades.Effects.Perfect.TipExtra (not the fixed $2), Good = base, Messy =
--- no base tip and a mood band worse; the plate's FlipBonus attribute adds Conveyor.Grill.FlipBonus once per plate. All of
--- it inside the tip window, on a Complete sale only.
+-- World kitchen (TASK-569; kitchen-world.md §4; DEC-305): a hot dog that was a plate (PlateId) is graded at the sale by
+-- Grade.Assembly against the line it answers: exact toppings and ready within Grade.PerfectTime of the order (party size) or
+-- with a sausage flipped in the window (attribute Flipped) = Perfect, exact = Good, anything else = Messy. Grade.SaleEffect:
+-- Perfect = base tip + Grades.Effects.Perfect.TipExtra, Good = base, Messy = no base tip and a mood band worse. All of it
+-- inside the tip window, on a Complete sale only (Incomplete never looks at the grade). Any other hot dog keeps its Quality
+-- attribute (nil = no grade, the base tip).
 --
 -- TASK-354 (owner request 2026-10-17, Provisional): no "Refuse" prompt or button any more. Refusing = closing the
 -- service window (VehicleService.ShutterChanged -> SendLineAway: Refused, Acted "refuse" with who closed); anomaly
@@ -267,9 +269,9 @@ const PICKUP_SERVE = "pickup_serve" -- Content.Actions key (PICKUP Prompt_Serve)
 const PICKUP_FULL = "pickup_full" -- Content.Notices key
 const CARRYING = "Carrying" -- rig attribute: the customer carries its plate (Seating client, R1-J)
 const TICKET = "Ticket" -- hot_dog Tool attribute written by PlateService (NpcId of the plate's order)
--- plate / hot_dog Tool attribute written by PlateService: the sausage was flipped in the window (prep-conveyor.md §6.3)
-const FLIP_BONUS = "FlipBonus"
-const CONVEYOR = "Conveyor" -- Content.Prep.Rules.Mode of the restaurant conveyor (prep-conveyor.md §1)
+-- hot_dog Tool attributes of a plate (shared/Plate/PlateTool): the sausage was flipped in the window; the plate's id
+const FLIPPED = "Flipped"
+const PLATE_ID = "PlateId"
 const SERVED_SEAT_MODE = "Served" -- Content.Seating.SitAt: the Seater is offered the party at the sale
 const NUMBER_MAX = 255 -- Net Customers.Number wire range
 -- Exit split by shift: Content.Flow.Spawns.Exits (MAP-01 §9.8, Provisional; EX-E 60 / D1 40).
@@ -2050,15 +2052,11 @@ function CustomerService:SellLine(
 	local result: SaleResult = verdict
 	local amount = 0
 	if verdict ~= "Wrong" then
-		-- Prep quality (TASK-171): read before the Tool goes away. Only tip and mood, never the price (Q-219 B).
-		-- Conveyor (TASK-517): Perfect = base tip + TipExtra, plus the flip bonus of the plate; the Tool is consumed below,
-		-- so the bonus is paid once per plate (a Wrong plate keeps it and pays nothing here)
-		const quality = items:QualityOf(tool)
-		const conveyor = Content.Prep.Rules.Mode == CONVEYOR
-		const flip = if conveyor and tool:GetAttribute(FLIP_BONUS) == true then Content.Prep.Conveyor.Grill.FlipBonus else 0
-		const effect = Grade.SaleEffect(Content.Prep, quality :: any, conveyor, flip)
-		-- conveyor: Incomplete does not look at the grade (FEAT-045 rev. 3, DEC-072); trailer as before
-		line.Mood = if effect ~= nil and (verdict == "Complete" or not conveyor) then effect.Mood else nil
+		-- Grade (TASK-569; kitchen-world.md §4): read before the Tool goes away. Only tip and mood, never the price (Q-219 B)
+		const band = self:GradeOf(tool, line, ticket, at)
+		const effect = Grade.SaleEffect(Content.Prep, band :: any)
+		-- Incomplete does not look at the grade (FEAT-045 rev. 3, DEC-072)
+		line.Mood = if effect ~= nil and verdict == "Complete" then effect.Mood else nil
 		-- Wrong: $0; the hot dog stays in the server's hand (FEAT-011 "Errado devolvido")
 		items:Consume(player, tool)
 		amount += economy:AddSale(Orders.Pay(verdict, line.Price), "Sale")
@@ -2076,6 +2074,19 @@ function CustomerService:SellLine(
 		self.Acted:Fire(id, SERVE, player, result)
 	end
 	return result
+end
+
+-- Band of a served hot dog (kitchen-world.md §4): a plate's hot dog (PlateId) by Grade.Assembly against the line, from the time
+-- the order was taken (the ticket's TakenAt) to `at`, with the party size; any other hot dog = its Quality attribute (nil = none).
+function CustomerService:GradeOf(tool: Tool, line: Orders.Line, ticket: Orders.Ticket, at: number): string?
+	const items = self.Dependencies.ItemService
+	const id = tool:GetAttribute(PLATE_ID)
+	if type(id) ~= "number" or id <= 0 then
+		return items:QualityOf(tool)
+	end
+	const seconds = if ticket.TakenAt > 0 then at - ticket.TakenAt else -1
+	const plate: Grade.Plate = { Toppings = items:Toppings(tool), Flipped = tool:GetAttribute(FLIPPED) == true }
+	return Grade.Assembly(Content.Prep, line.Toppings, plate, seconds, self.Party)
 end
 
 -- Line a served hot dog answers and its verdict: the order check (Orders.Match), or an AddServeRule override on the
