@@ -618,62 +618,83 @@ const hush: Scene = {
 	},
 }
 
--- ANM-009 The knock, "it's me, Walt" (owner 2026-10-18; restaurant only: the pantry's exit door DOOR-B is opened by hand,
--- Vehicle/RestaurantDoorService). Fitted to Rules/ANM-009 with the restaurant on: Active from the first series of
--- knocks (Walt's voice, Effects/ANM-009), the second at 9 s, Window 20 s + DoorGrace 2; whoever OPENS the back door in
--- that time gets the face (Failed). The answer is the simplest thing - do nothing - and the scene makes it hard: the
--- handle tried, the door pushed, a dead silence, the voice again, the latch holding. Then the steps leave.
+-- ANM-009 The knock, "it's me, Walt" (owner 2026-10-18; TASK-561; restaurant only: the pantry's exit door DOOR-B is
+-- opened by hand, Vehicle/RestaurantDoorService; design/anomalies-v3-restaurant.md §8.3, horror-cinematic.md §2 curve).
+-- Fitted to Rules/ANM-009 with the restaurant on: Active 20 s + DoorGrace 2 (Resolved at 22 when nobody opened). The
+-- knocks and the voice are Effects/ANM-009 (server cues at 0 / 4.5 / 8.5 / 12.5): far and soft, closer and rhythmic,
+-- Walt's voice, the voice wrong. The scene builds around them: the room goes quiet, cold and narrow; the words say
+-- don't open; after the wrong voice a dead silence (no heart, no words); then the handle, a push, the latch holds;
+-- two seconds of nothing. The answer is the simplest thing - do nothing - and the scene makes it hard.
+-- Opened (Failed): the face (Effects/ANM-009 jumpscare) with a white-out blur, red, a lunge of the view and the sting
+-- for who opened; the others hear the door bang and the sting from the pantry. Ignored (Resolved): one last soft
+-- knock, the steps walk away, the room and the colour come back, a breath out.
 const knock: Scene = {
 	Key = "anm_009_knock",
 	Name = "The knock",
 	Live = Restaurant.Rules.Enabled,
 	Steps = {
-		{ At = 0, Phase = "Active", Kind = "Silence", Value = 1, To = 0.35, Duration = 0.6 },
-		{ At = 0.3, Phase = "Active", Kind = "Cinema", Value = 0.1, Duration = 1.2 },
-		{ At = 0.5, Phase = "Active", Kind = "Grade", Target = "Cold", Value = 0, To = 0.55, Duration = 18 },
-		{ At = 0.5, Phase = "Active", Kind = "Heartbeat", Value = 66, To = 150, Duration = 17 },
-		{ At = 0.5, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.38, Duration = 17 },
-		{ At = 2, Phase = "Active", Kind = "Whispers", Target = "knock", Value = 0.3, To = 1.4, Duration = 5.5 },
-		-- it tries the handle
-		{ At = 5.5, Phase = "Active", Kind = "Door", Target = "Rattle", Point = "SCENE-DOOR", Duration = 0.9 },
-		{ At = 5.5, Phase = "Active", Kind = "Sound", Target = "handle_rattle", Point = "SCENE-DOOR" },
-		{ At = 5.5, Phase = "Active", Kind = "Shake", Target = "Door", Point = "SCENE-DOOR" },
-		-- a dead silence before the voice again
-		{ At = 7.5, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
-		{ At = 7.6, Phase = "Active", Kind = "Silence", Value = 0.35, To = 0.03, Duration = 0.5 },
-		{ At = 8, Phase = "Active", Kind = "Sound", Target = "breath_held" },
-		{ At = 9, Phase = "Active", Kind = "Silence", Value = 0.03, To = 0.5, Duration = 0.3 },
-		{ At = 9, Phase = "Active", Kind = "Blur", Value = 3, To = 0, Duration = 1 },
-		-- it pushes, hard, then the words come en masse
-		{ At = 12.5, Phase = "Active", Kind = "Door", Target = "Push", Point = "SCENE-DOOR", Duration = 0.6 },
-		{ At = 12.5, Phase = "Active", Kind = "Sound", Target = "door_force", Point = "SCENE-DOOR", Value = 1.2 },
-		{ At = 12.5, Phase = "Active", Kind = "Shake", Target = "Jolt" },
-		{ At = 12.6, Phase = "Active", Kind = "Whispers", Target = "knock", Value = 2.2, To = 3, Duration = 3.5 },
-		{ At = 14, Phase = "Active", Kind = "Door", Target = "Push", Point = "SCENE-DOOR", Duration = 0.6 },
-		{ At = 14, Phase = "Active", Kind = "Sound", Target = "door_force", Point = "SCENE-DOOR" },
-		{ At = 15.5, Phase = "Active", Kind = "Door", Target = "Hold", Point = "SCENE-DOOR", Duration = 0.4 },
-		{ At = 15.5, Phase = "Active", Kind = "Sound", Target = "latch_hold", Point = "SCENE-DOOR" },
-		{ At = 16.1, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
-		{ At = 16.2, Phase = "Active", Kind = "Silence", Value = 0.5, To = 0.05, Duration = 0.3 },
-		{ At = 18, Phase = "Active", Kind = "Heartbeat", Value = 150, To = 110, Duration = 4 },
-		-- nobody opened (Resolved): the steps go away, the room comes back
-		{ At = 0, Phase = "Resolved", Kind = "Sound", Target = "walker_step", Point = "SCENE-DOOR-OUT", To = "SCENE-STEPS-FAR", Duration = 4 },
+		-- 0 s, first series far and soft: the room starts to hush, bars close in
+		{ At = 0, Phase = "Active", Kind = "Silence", Value = 1, To = 0.55, Duration = 2 },
+		{ At = 0.5, Phase = "Active", Kind = "Cinema", Value = 0.1, Duration = 1.5 },
+		{ At = 0.5, Phase = "Active", Kind = "Grade", Target = "Cold", Value = 0, To = 0.6, Duration = 16 },
+		{ At = 1, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.3, Duration = 13 },
+		-- 4.5 s, second series closer: the heart starts, a few words
+		{ At = 4.5, Phase = "Active", Kind = "Heartbeat", Value = 64, To = 128, Duration = 11 },
+		{ At = 5, Phase = "Active", Kind = "Whispers", Target = "knock", Value = 0.3, To = 1.6, Duration = 8 },
+		{ At = 5, Phase = "Active", Kind = "Silence", Value = 0.55, To = 0.3, Duration = 3 },
+		-- 8.5 s, Walt's voice: a small push of the view towards the door
+		{ At = 8.5, Phase = "Active", Kind = "Nudge", Value = 3, Point = "SCENE-DOOR", Duration = 0.8 },
+		{ At = 8.5, Phase = "Active", Kind = "Fov", Value = -2, To = 0, Duration = 4 },
+		-- 12.5 s, the voice wrong: the words en masse, a blur that breathes
+		{ At = 12.5, Phase = "Active", Kind = "Whispers", Target = "knock", Value = 2.4, To = 3, Duration = 2 },
+		{ At = 12.5, Phase = "Active", Kind = "Blur", Value = 0, To = 2.5, Duration = 2 },
+		{ At = 12.5, Phase = "Active", Kind = "Vignette", Value = 0.3, To = 0.42, Duration = 2 },
+		-- 14.6 s, silence before the peak: no words, no heart, the world muted; only a held breath
+		{ At = 14.6, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 14.6, Phase = "Active", Kind = "Silence", Value = 0.3, To = 0.02, Duration = 0.6 },
+		{ At = 14.6, Phase = "Active", Kind = "Blur", Value = 2.5, To = 0, Duration = 1.5 },
+		{ At = 15.4, Phase = "Active", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 15.6, Phase = "Active", Kind = "Sound", Target = "breath_held" },
+		-- 17 s, it tries the handle; 18.3 s it pushes, hard; 19.3 s the latch holds
+		{ At = 17, Phase = "Active", Kind = "Door", Target = "Rattle", Point = "SCENE-DOOR", Duration = 0.9 },
+		{ At = 17, Phase = "Active", Kind = "Sound", Target = "handle_rattle", Point = "SCENE-DOOR" },
+		{ At = 17, Phase = "Active", Kind = "Shake", Target = "Door", Point = "SCENE-DOOR" },
+		{ At = 18.3, Phase = "Active", Kind = "Door", Target = "Push", Point = "SCENE-DOOR", Duration = 0.6 },
+		{ At = 18.3, Phase = "Active", Kind = "Sound", Target = "door_force", Point = "SCENE-DOOR", Value = 1.3 },
+		{ At = 18.3, Phase = "Active", Kind = "Shake", Target = "Jolt" },
+		{ At = 18.3, Phase = "Active", Kind = "Blur", Value = 4, To = 0, Duration = 0.8 },
+		{ At = 18.3, Phase = "Active", Kind = "Vignette", Value = 0.42, To = 0.5, Duration = 1 },
+		{ At = 19.3, Phase = "Active", Kind = "Door", Target = "Hold", Point = "SCENE-DOOR", Duration = 0.4 },
+		{ At = 19.3, Phase = "Active", Kind = "Sound", Target = "latch_hold", Point = "SCENE-DOOR" },
+		-- 19.8 s, the grace: the heart comes back slow, nothing else; it is still out there
+		{ At = 19.8, Phase = "Active", Kind = "Heartbeat", Value = 120, To = 90, Duration = 2.5 },
+		-- nobody opened (Resolved): one last soft knock, the steps go away, the room comes back, a breath out
+		{ At = 0, Phase = "Resolved", Kind = "Sound", Target = "door_knock", Point = "SCENE-DOOR-OUT", Value = 0.25 },
+		{ At = 0.8, Phase = "Resolved", Kind = "Sound", Target = "walker_step", Point = "SCENE-DOOR-OUT", To = "SCENE-STEPS-FAR", Duration = 4 },
 		{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
-		{ At = 0, Phase = "Resolved", Kind = "Silence", Value = 0.1, To = 1, Duration = 3 },
+		{ At = 0, Phase = "Resolved", Kind = "Blur", Value = 0, To = 0, Duration = 0 },
 		{ At = 1, Phase = "Resolved", Kind = "Heartbeat", Value = 0, To = 0 },
-		{ At = 1, Phase = "Resolved", Kind = "Grade", Value = 0.55, To = 0, Duration = 2.5 },
-		{ At = 1, Phase = "Resolved", Kind = "Vignette", Value = 0.38, To = 0, Duration = 2.5 },
-		{ At = 1.5, Phase = "Resolved", Kind = "Cinema", Value = 0, Duration = 1 },
-		-- someone opened it (Failed): the face (Effects/ANM-009), red, the others hear it
+		{ At = 1.5, Phase = "Resolved", Kind = "Silence", Value = 0.05, To = 1, Duration = 3 },
+		{ At = 2, Phase = "Resolved", Kind = "Sound", Target = "breath_held", Value = 0.6 },
+		{ At = 2, Phase = "Resolved", Kind = "Grade", Value = 0.6, To = 0, Duration = 3 },
+		{ At = 2, Phase = "Resolved", Kind = "Vignette", Value = 0.5, To = 0, Duration = 3 },
+		{ At = 2.5, Phase = "Resolved", Kind = "Cinema", Value = 0, Duration = 1.2 },
+		-- someone opened it (Failed): the climax for who opened, the bang for the others
 		{ At = 0, Phase = "Failed", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 0, Phase = "Failed", Kind = "Heartbeat", Value = 0, To = 0 },
 		{ At = 0, Phase = "Failed", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
-		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Grade", Target = "Red", Value = 0.9, To = 0, Duration = 3 },
-		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Blur", Value = 14, To = 0, Duration = 1.4 },
-		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Heartbeat", Value = 0, To = 0 },
-		{ At = 0, Phase = "Failed", Who = "Safe", Kind = "Sound", Target = "door_force", Point = "SCENE-DOOR", Value = 1.3 },
-		{ At = 3, Phase = "Failed", Kind = "Heartbeat", Value = 0, To = 0 },
-		{ At = 1, Phase = "Failed", Kind = "Vignette", Value = 0.5, To = 0, Duration = 3 },
-		{ At = 1.5, Phase = "Failed", Kind = "Grade", Value = 0.5, To = 0, Duration = 2.5 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Sound", Target = "horror_sting", Value = 2.5 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Blur", Value = 20, To = 0, Duration = 1.6 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Grade", Target = "Red", Value = 1, To = 0, Duration = 3.2 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Fov", Value = -6, To = 0, Duration = 1.2 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Shake", Target = "Jolt", Value = 1.5 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Vignette", Value = 0.55, To = 0, Duration = 3.5 },
+		{ At = 0, Phase = "Failed", Who = "Safe", Kind = "Sound", Target = "door_force", Point = "SCENE-DOOR", Value = 1.4 },
+		{ At = 0.1, Phase = "Failed", Who = "Safe", Kind = "Sound", Target = "horror_sting", Value = 0.8 },
+		{ At = 0.1, Phase = "Failed", Who = "Safe", Kind = "Shake", Target = "Door", Point = "SCENE-DOOR" },
+		{ At = 0, Phase = "Failed", Who = "Safe", Kind = "Blur", Value = 0, To = 0, Duration = 0 },
+		{ At = 1, Phase = "Failed", Who = "Safe", Kind = "Vignette", Value = 0.5, To = 0, Duration = 3 },
+		{ At = 1.5, Phase = "Failed", Who = "Safe", Kind = "Grade", Value = 0.6, To = 0, Duration = 2.5 },
 		{ At = 3, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
 	},
 }

@@ -253,7 +253,7 @@ Campos de todas: **Aceite** inclui sempre o teste da regra 13 (≤ 3 s, 2 postos
 | ANM-006 | **Adapta** | ponto de ônibus → vitrine; resposta NÃO OLHAR |
 | ANM-007 Walker | **Sai** | "esconder" sai (loja = ponto seguro, `Q-331`); figura alta já é a 006 |
 | ANM-008 | **Adapta** | vai para o drive-thru; DRIVE |
-| ANM-009 A batida | **Sai** | sem porta (DEC-280); vira susto D sem verbo (batida no vidro) |
+| ANM-009 A batida | ~~Sai~~ **Volta (dono 2026-10-18, TASK-561)** | a porta dos fundos DOOR-B passou a abrir na mão (`RestaurantDoorService`): Walt bate, a resposta é **não abrir**; §8.3 |
 | ANM-010 | **Adapta** | luminárias das mesas; resposta = apagar a loja (era ir ao Mart) |
 | ANM-011 Tremendo | **Sai** | tremor pequeno, ilegível no celular a 15 studs (regra 3) |
 | ANM-012 | **Fica** | família A, grande; dentro da linha 1 |
@@ -277,6 +277,20 @@ Campos de todas: **Aceite** inclui sempre o teste da regra 13 (≤ 3 s, 2 postos
 | ANM-036..040 | reservadas, sem uso. IDs retirados nunca são reaproveitados |
 
 Sustos D (sem verbo, sem punição, sem prenúncio "O Frio") reapontados para as âncoras de fora: `window_face`, `street_watcher`, `post_flicker` (só flicker; o esfriar é do prenúncio), batida no vidro (ex-009), sino distante (ex-003), mesas olham (ex-030). Os sustos de dentro da loja que mexem em objeto de trabalho (`grill_hiss`, `bottle_fall`) **saem** (regra 1).
+
+### 8.3 ANM-009 "A batida" no restaurante (TASK-561)
+
+Status: **Provisório** (dono 2026-10-18 trouxe a batida de volta; tempos e falas sem DEC).
+
+- **Regra:** alguém bate na porta dos fundos da despensa (DOOR-B, aberta na mão) e às vezes fala com a voz do Walt ("Rookie? It's me. It's Walt. Open up."). **O Walt de verdade nunca bate à noite — ele tem a chave.** Ignorar é o certo. Família D com verbo `refuse` (não abrir).
+- **Erro:** quem **abrir** a porta durante as batidas (início até Window 20 s + DoorGrace 2 s) leva o jumpscare e **−35 de sanidade** (`ctx.Fail`, DEC-277; cai só se zerar). Pessoal (DEC-204): só quem abriu paga; os outros ouvem a porta bater.
+- **Início:** se a porta estiver aberta, a corrente de ar fecha (ninguém bate numa porta aberta). "Visto" = todo jogador ativo (o prédio inteiro ouve).
+- **Aviso:** a ligação da Noite 2 (estreia) e a da Noite 9 dizem "Knocks on the back door? Don't open." (`BossCalls`, variante do restaurante).
+- **Cena** (`Content.HorrorScenes` `anm_009_knock`, curva do apagão, `horror-cinematic.md` §2): 0 s batida longe e fraca → 4,5 s mais perto, ritmada (coração começa, palavras "DON'T OPEN THE DOOR") → 8,5 s a voz do Walt (puxão leve da vista para a porta) → 12,5 s a voz **errada** (batidas mais graves, intervalos tortos, a fala surge palavra por palavra) e as palavras em massa → 14,6 s **silêncio** (sem palavras, sem coração, mundo mudo, respiração presa) → 17 s maçaneta → 18,3 s empurrão forte → 19,3 s a trava segura → 2 s de nada.
+  - **Abriu (Failed):** rosto (jumpscare), blur branco 20→0, vermelho, puxão de FOV, tremor e sting alto para quem abriu; os outros ouvem a porta e um sting mais baixo.
+  - **Ignorou (Resolved):** uma última batida fraca, os passos vão embora, som e cor voltam, um suspiro.
+- **Dentro ou fora:** o vulto que bate (silhueta escura com o boné do Walt, olhos brancos) fica em `SCENE-DOOR-OUT` e só aparece nas câmeras de segurança ou para quem está **do lado de fora** perto da porta (40 studs). De dentro, ninguém à vista — só o som.
+- **Números Provisórios:** séries 0 / 4,5 / 8,5 / 12,5 s (`Rules/ANM-009` `Series2At..4At`), volumes e intervalos em `Effects/ANM-009` `SERIES`.
 
 ## 9. Ritmo das noites (dado, `Content/Nights.luau`)
 
