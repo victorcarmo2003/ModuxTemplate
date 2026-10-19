@@ -142,6 +142,7 @@ export type Binding = {
 	PlatePut: string,
 	PlateTake: string,
 	PlateTicket: string, -- BillboardGui anchor
+	CookBoard: string, -- Model name of the cutting board of the cooking focus (kitchen-focus.md §1; attribute CookStation wins)
 	PickupTag: string, -- Model PICKUP
 	PickupPrompt: string,
 	PickupPoint: string, -- MapPoint + NpcNode format, n = 1..PickupSlotsMax
@@ -285,6 +286,7 @@ const restaurant: Restaurant = {
 		PlatePut = "Prompt_Put",
 		PlateTake = "Prompt_Take",
 		PlateTicket = "Att_Ticket",
+		CookBoard = "TLR-CUTTING_BOARD",
 		PickupTag = "Pickup",
 		PickupPrompt = "Prompt_Serve",
 		PickupPoint = "PU-%d",

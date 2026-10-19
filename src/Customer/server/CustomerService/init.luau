@@ -116,6 +116,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Content = require(ReplicatedStorage.shared.Content)
 local Lync = require(ReplicatedStorage.Packages.Lync)
 local Grade = require(ReplicatedStorage.shared.Prep.Grade)
+local PlateTool = require(ReplicatedStorage.shared.Plate.PlateTool)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
@@ -2085,7 +2086,11 @@ function CustomerService:GradeOf(tool: Tool, line: Orders.Line, ticket: Orders.T
 		return items:QualityOf(tool)
 	end
 	const seconds = if ticket.TakenAt > 0 then at - ticket.TakenAt else -1
-	const plate: Grade.Plate = { Toppings = items:Toppings(tool), Flipped = tool:GetAttribute(FLIPPED) == true }
+	const plate: Grade.Plate = {
+		Toppings = items:Toppings(tool),
+		Flipped = tool:GetAttribute(FLIPPED) == true,
+		Scores = PlateTool.Scores(tool),
+	}
 	return Grade.Assembly(Content.Prep, line.Toppings, plate, seconds, self.Party)
 end
 

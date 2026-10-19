@@ -15,6 +15,7 @@ return {
 	StarterPlayer.StarterPlayerScripts.client.Class.ClassController,
 	StarterPlayer.StarterPlayerScripts.client.Coffee.CoffeeCupController,
 	StarterPlayer.StarterPlayerScripts.client.Coffee.CoffeeHandController,
+	StarterPlayer.StarterPlayerScripts.client.Cook.CookController,
 	StarterPlayer.StarterPlayerScripts.client.Crew.NameTagController,
 	StarterPlayer.StarterPlayerScripts.client.Crew.RigController,
 	StarterPlayer.StarterPlayerScripts.client.Customer.CustomerController,

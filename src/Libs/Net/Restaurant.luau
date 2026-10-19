@@ -20,6 +20,24 @@ local function restaurantPlates()
 	})
 end
 
+-- Cooking focus (kitchen-focus.md §4): one gesture of the focused station, committed by the server
+local function restaurantCook()
+	return Lync.struct({
+		Act = Lync.enum({ "Cut", "Place", "Flip", "Dog", "Topping" }),
+		Slot = Lync.int(0, 8), -- grill slot (Place, Flip, Dog); 0 otherwise
+		Score = Lync.int(0, 100), -- the gesture score the client measured (Grade.Score); Place / Flip ignore it
+		Key = Lync.optional(Lync.enum(Content.Ingredients.ToppingKeys)), -- Topping
+		Points = Lync.optional(Lync.array(Lync.int(0, 4095), 0, 24)), -- the drawn sauce (HotDogVisual.Sauce wire)
+	})
+end
+
+local function restaurantCookOpen()
+	return Lync.struct({
+		Station = Lync.enum({ "Board", "Grill", "Toppings" }),
+		Target = Lync.inst(), -- the model (or folder) the camera looks at
+	})
+end
+
 local function restaurantTablets()
 	return Lync.struct({
 		State = Lync.enum({ "Idle", "Talking", "Full" }),
@@ -66,6 +84,12 @@ return Lync.define("restaurant", {
 	-- oldest at the hand-over); Since = server time the ticket landed (oldest first), 0 = none; Bun / Sausage / Toppings = what
 	-- is on it. Every record is wide (16-bit Npc, f64), so the README drop.section floor does not apply
 	Plates = Lync.replicate(restaurantPlates()),
+
+	-- Cooking focus (kitchen-focus.md §2, §4). c -> s: one gesture; responder KitchenService (OnInit, Cook.luau); refusals by
+	-- Notice. The state answers through the Stations set and the plate Tool's attributes
+	Cook = Lync.packet(restaurantCook()),
+	-- s -> the player whose cook_focus prompt was accepted: open the focus on Station, looking at Target
+	CookOpen = Lync.packet(restaurantCookOpen()),
 
 	-- §2.4, record 1 = TAB-1 (always), 2 = TAB-2 (UPG-027 bought and bound), Content.Restaurant.Rules.DrivePcIndex = DT-PC
 	-- (wave R3). Writer: TabletService. Full = no free plate or pickup spot ("Kitchen full" lamp for everyone). The client
