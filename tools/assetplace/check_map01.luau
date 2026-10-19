@@ -244,6 +244,9 @@ local ZONES = { -- ZoneId -> Group, shape
 	["LZ-3"] = { group = "trailer_lights", shape = "Ball" },
 	["LZ-4"] = { group = "mart", shape = "Block" },
 	["LZ-5"] = { group = "mart", shape = "Ball" },
+	["LZ-6"] = { group = "trailer_interior", shape = "Block" },
+	["LZ-7"] = { group = "trailer_interior", shape = "Block" },
+	["LZ-8"] = { group = "trailer_interior", shape = "Block" },
 }
 local POSTS = { -- PostId -> Order (Hush order: NL-01 first, P-01 last; Walker step = Order - 1 for Order 1..4)
 	["NL-01"] = 1, ["NL-02"] = 2, ["NL-03"] = 3, ["NL-04"] = 4, ["P-01"] = 5,
@@ -1199,7 +1202,7 @@ local function checkWave2(points: { [string]: Instance }, vehicles: { [string]: 
 	for _, z in tagged("LightZone") do
 		local id = z:GetAttribute("ZoneId")
 		if typeof(id) ~= "string" or not ZONES[id] then
-			err(("3: LightZone %s ZoneId = %s (valid LZ-1..LZ-5)"):format(name(z), tostring(id)))
+			err(("3: LightZone %s ZoneId = %s (valid LZ-1..LZ-8)"):format(name(z), tostring(id)))
 			continue
 		end
 		if zones[id] then

@@ -28,7 +28,8 @@ return Table.new({
 		Key = "trailer_interior",
 		Kind = "Switch",
 		HushOff = true,
-		Zones = { "LZ-1", "LZ-2" },
+		-- LZ-6..8: the owner's copies of LZ-2 over the patio and the street (2026-10-19, kept on purpose)
+		Zones = { "LZ-1", "LZ-2", "LZ-6", "LZ-7", "LZ-8" },
 		Vehicle = "trailer",
 		Cooldown = 0.5, -- FEAT-020
 		Step = 0,
