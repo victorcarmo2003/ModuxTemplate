@@ -2186,6 +2186,7 @@ Cada fase termina num **Play do dono** (a meta da fase 1 é: fazer um hot dog e 
 | TASK-579 | anomalia | **Substituta da ANM-006** (Q-393): proposta com 2–3 opções no padrão do apagão. | game-designer | 576, Q-393 | Pendente |
 | TASK-580 | erros | **3 erros do gate** em `Prep/PrepService/Bridge.luau` (145, 267) e `Plate/PlateService/CenterTable.luau` (167), de edição não commitada; resolver junto com a 566 (podem sair com a esteira). | debugger | 566 | Pendente |
 | TASK-581 | remoção | **Tirar a esteira e o preparo focado** (`kitchen-world.md` §6): `src/Prep/**` menos `Grade`, mesa central do `PlateService`/`PlateController`, modo esteira de `Kitchen`, `Content.Prep` reduzido, `Restaurant.CenterTable`/`Binding.Center*`. Resolve os 3 erros do gate (TASK-580). | backend-coder + frontend-coder | 566 | Pendente |
+| TASK-583 | guia | **Setas do primeiro pedido** (dono 2026-10-19): na Noite 1 (a run começa na noite, DEC-300; hoje o tutorial só roda no Dia 1 e nunca aparece) a seta guia telefone → tablet → grelha → pães → prato → descanso → condimentos → retirada, seguindo os prompts da cozinha de mundo. A seta do telefone tocando já existe (`BossController:GuidePhone`, commit `fb234a5d`). Reescreve o tutorial (tira também os passos do Mercado). | frontend-coder | 569, 570 | Pendente |
 
 ### Remoção da intro
 
