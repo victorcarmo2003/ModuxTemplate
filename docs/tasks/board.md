@@ -2099,3 +2099,39 @@ Regras desta rodada:
 - **Onda E:** qa-tester **510** (após 504–506, 509 e 518–522).
 
 Caminho crítico: 512 → 513 → (514, 516) → 505 → 510. O Studio (504) e a arte (523) correm ao lado; a 510 roda com placeholders.
+
+
+## Tabela de tasks — Cenas no padrão do apagão e Noite-assinatura (2026-10-18; TASK-533 a TASK-554; Provisório, Q-384..Q-389)
+
+Fonte: `design/horror-cinematic.md` §3 (roteiros) e §10 (Noite-assinatura). **Bloco reservado TASK-533..TASK-560**: o maior
+id em uso era TASK-523; o bloco começa +10 acima porque sessões irmãs podem abrir tasks ao mesmo tempo. Nenhuma regra de
+anomalia muda (só apresentação), exceto os tempos curtos do eco (Q-386). Todos os números Provisórios até o Play do dono.
+
+| TASK | Item | Descrição e critério de aceite | Dono | Depende | Status |
+|---|---|---|---|---|---|
+| TASK-533 | dados | **`Content.HorrorScenes` em um módulo por cena** (`HorrorScenes/<Key>.luau` + tipos e `Rules` no `init`), para as tasks de cena correrem em paralelo sem tocar o mesmo arquivo. Aceite: `/dev scene <key>` igual antes para todas; zero mudança de tempo. | backend-coder | — | Pendente |
+| TASK-534 | §3.0 | **Campo `Where` no passo** (`Inside`/`Outside`, lê `OutsideStage` do LocalPlayer) no dispatcher `Scene/Steps`; palavras trocam para `outside` e seta 3D para a porta nos 4 s iniciais quando fora; o `OutsideController` pausa suas camadas de tela (palavras, coração, barras) enquanto uma cena de anomalia toca. Aceite: 2 jogadores, um dentro e um nas mesas, cada um vê a sua versão; nenhuma camada dobrada. | frontend-coder | 533 | Pendente |
+| TASK-535 | §3.13 | **Passo `Pose`** sobre o `CustomerActor` da anomalia: Lift, Tilt, Turn (um ou todos os clientes Night), Scale, Float, Blink; desfeito no fim da cena. Aceite: `/dev scene` de 001 e 013 mostra Lift e Turn em grupo. | frontend-coder | 533 | Pendente |
+| TASK-536 | §3.13 | **Passo `Glass`** no MapPoint do vidro: Fog, Knock, Bang, Hand, Rattle (persiana do drive). Local, desfeito no fim. | frontend-coder | 533 | Pendente |
+| TASK-537 | §3.13 | **Passos `Prop`, `Glare`, `Silhouette`**, `Lights` com Point + `Flash`, perfis `Rumble` e `Tremor` em `Rules.Shakes`; sons novos da §3.13 em `sound-list.md` com placeholder até ter Id. | frontend-coder | 533 | Pendente |
+| TASK-538 | §10 eco | **Eco no servidor**: campo `Echo: boolean` no registro `Anomalies` (Lync; architect revisa), `Params.Echo` nas `Rules/ANM-xxx` com o aviso curto; verbo, janela e penalidade iguais (Q-386). Aceite: teste estático da regra com e sem eco. | backend-coder | — | Pendente |
+| TASK-539 | §10 eco | **Eco no client**: passo `Echo = true` monta a versão curta; o player de cena toca só esses passos quando `record.Echo`. Aceite: `/dev anomaly ANM-020 echo` toca ~20 s com silêncio e pico. | frontend-coder | 533, 538 | Pendente |
+| TASK-540 | §10 agenda | **Agendador da Noite-assinatura**: campos `Signature`, `SignatureAt`, `Echoes`, `Respite`, `Finale` em `Content/Nights` + `Validate`; `BuildAgenda` marca a assinatura no pico, o prenúncio D 20–40 s antes (alimenta o `FeaturedScares` da 343), os ecos fora do respiro e sorteia o resto. Aceite: teste puro do Scheduler mostra a tabela do §10.2 nas 10 noites, respiros e `MinGap` respeitados. | backend-coder | 342, 343, 538 | Pendente |
+| TASK-541 | §3.1 | **Cena ANM-001 Sem rosto** completa (troca o `oddScene`), passos `Echo` e linha Fora. | frontend-coder | 534, 535 | Pendente |
+| TASK-542 | §3.2 | **Cena ANM-005 Raincoat Lady** (poça como prazo, silêncio da goteira), Echo e Fora. | frontend-coder | 534, 535, 537 | Pendente |
+| TASK-543 | §3.3 | **Cena ANM-006 O da parada** no padrão do apagão (Blur por passo, vidro embaçado, batida, palma), Echo e Fora. | frontend-coder | 534, 536 | Pendente |
+| TASK-544 | §3.4 | **Cena ANM-008 Carro comprido** (buzina lenta, varredura do farol, freada + silêncio, farol alto, persiana batendo), Echo e Fora. | frontend-coder | 534, 536, 537 | Pendente |
+| TASK-545 | §3.5 | **Cena ANM-010 The Hush** (silêncio progressivo, forma nas vitrines, drone que corta), Echo e Fora. | frontend-coder | 534, 537 | Pendente |
+| TASK-546 | §3.6 | **Cena ANM-011 O que treme** (ambiente tremendo, pancada na persiana). Só se Q-389 ≠ B. | frontend-coder | 534, 535, 537 | Pendente |
+| TASK-547 | §3.7 | **Cena ANM-013 Olhos brancos** (clientes viram juntos, olhos nas vitrines). | frontend-coder | 534, 535 | Pendente |
+| TASK-548 | §3.8 | **Cena ANM-014 Cabeça errada** (cresce aos degraus quando não se olha). | frontend-coder | 534, 535 | Pendente |
+| TASK-549 | §3.9 | **Cena ANM-015 Flutuando** (objetos sobem, sombra fica, queda). Só se Q-389 ≠ B. | frontend-coder | 534, 535, 537 | Pendente |
+| TASK-550 | §3.10 | **Cena ANM-016 Não pisca** (relógio que para, luzes piscam com ele). Só se Q-389 ≠ B. | frontend-coder | 534, 535, 537 | Pendente |
+| TASK-551 | §3.11 | **ANM-019: Fora + eco** (silhueta no telhado para quem está fora). | frontend-coder | 534, 537, 539 | Pendente |
+| TASK-552 | §3.11 | **ANM-021: Fora + eco** (pancadas em volta, Blur na névoa). | frontend-coder | 534, 539 | Pendente |
+| TASK-553 | §3.12 | **Mini-cenas da família D** (8 sustos da tabela) no `HallucinationController`, com o silêncio de 1 s antes do pico e versão Fora. | frontend-coder | 534, 536, 537 | Pendente |
+| TASK-554 | §10 final | **Corrente da noite 10** (Hush → eco do apagão → eco da névoa) a partir de `Nights[10].Finale`; respiros entre elos; nenhuma regra sobreposta. Só se Q-388 = A. | backend-coder | 540, 539 | Pendente |
+
+**Paralelismo:** onda 1 = 533, 538 (backend) · onda 2 = 534–537 e 539 (frontend, arquivos disjuntos depois da 533) e 540
+(backend, após 342/343) · onda 3 = 541–553, uma worktree por cena (cada uma só toca o seu `HorrorScenes/<Key>.luau`) · 554 por
+último. ANM-009 (batida do Walt) é da sessão irmã e não tem task aqui; entra na tabela do §10 só como assinatura da N2.
