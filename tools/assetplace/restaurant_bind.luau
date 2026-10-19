@@ -2197,7 +2197,7 @@ if extra then
 		end
 		t:SetAttribute("TableIndex", i)
 		t:SetAttribute("RestaurantId", "TBL-" .. i)
-		t:SetAttribute("TableGroup", "Restaurant")
+		t:SetAttribute("TableGroup", nil) -- optional; Content.Seating has one group ("Trailer"), derived from TableIndex
 	end
 	L("tables placed: " .. math.min(#tables, 4))
 	-- TBL-2 repair (2026-10-18; owner: "não foi de propósito"): a hand edit left the TBL-2 model with only its seats and put
@@ -2750,6 +2750,23 @@ end
 -- light zones
 local function zone(id, x0, x1, y0, y1, z0, z1)
 	local z = zones:FindFirstChild(id)
+	if not z and not DIFF then
+		-- a lost zone breaks VehicleService.IsInside (LZ-1: the shutter lever refuses everyone); build it again
+		local model = zones:FindFirstChildWhichIsA("BasePart")
+		if not model then
+			L("[warn] LightZone " .. id .. " missing and no zone to copy")
+			return
+		end
+		z = model:Clone()
+		for key in z:GetAttributes() do
+			z:SetAttribute(key, nil)
+		end
+		z.Name = id
+		z:SetAttribute("ZoneId", id)
+		z:SetAttribute("Group", if id == "LZ-3" then "trailer_lights" else "trailer_interior")
+		z.Parent = zones
+		L("[fix] LightZone " .. id .. " created")
+	end
 	if not z then
 		L("[warn] LightZone " .. id .. " missing")
 		return

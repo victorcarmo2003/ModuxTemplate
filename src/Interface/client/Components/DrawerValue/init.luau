@@ -35,11 +35,11 @@ export type Props = {
 	Name: string?,
 }
 
-const WIDTH = 190
-const HEIGHT = 130
-const PILL_HEIGHT = 40
-const COIN_SIZE = 36
-const TEXT_SIZE = 22
+const WIDTH = 140
+const HEIGHT = 96
+const PILL_HEIGHT = 28
+const COIN_SIZE = 24
+const TEXT_SIZE = 16
 
 -- 1234 -> "$1,234"
 local function money(value: number): string
@@ -70,7 +70,7 @@ return function(props: Props): BillboardGui
 		-- The pill sits at the bottom of the gui, right over the anchor; pops rise in the space above it.
 		SizeOffset = Vector2.new(0, 0.5),
 		StudsOffsetWorldSpace = props.Offset or Vector3.zero,
-		MaxDistance = props.MaxDistance or 40,
+		MaxDistance = props.MaxDistance or 30,
 		AlwaysOnTop = false,
 		LightInfluence = 0,
 		ResetOnSpawn = false,
@@ -113,13 +113,13 @@ return function(props: Props): BillboardGui
 					else create("Frame")({
 						Name = "Coin",
 						LayoutOrder = 1,
-						Size = UDim2.fromOffset(COIN_SIZE - 14, COIN_SIZE - 14),
+						Size = UDim2.fromOffset(COIN_SIZE - 8, COIN_SIZE - 8),
 						BackgroundColor3 = Theme.Color.Mustard,
 						create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
 						createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = Theme.Outline.Normal }),
 						CartoonLabel({
 							Box = UDim2.fromScale(1, 1),
-							TextSize = 16,
+							TextSize = 12,
 							Color = Theme.Color.Dark,
 							Stroke = 0,
 							Text = "$",

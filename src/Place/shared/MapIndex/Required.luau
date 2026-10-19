@@ -476,6 +476,28 @@ if not MART_ON then
 		end
 		list.Points = kept
 	end
+	-- the Mart's LightZones (LightGroups "mart") leave the map with it
+	const zones: { [string]: boolean } = {}
+	for _, group in Content.LightGroups.List do
+		if group.Key == "mart" then
+			for _, id in group.Zones do
+				zones[id] = true
+			end
+		end
+	end
+	for _, list in BY_WAVE do
+		for _, rule in list.Tagged do
+			if rule.Tag == "LightZone" then
+				const ids: { string } = {}
+				for _, id in rule.Ids do
+					if not zones[id] then
+						table.insert(ids, id)
+					end
+				end
+				rule.Ids = ids
+			end
+		end
+	end
 end
 
 local function freezeDeep<V>(value: V): V

@@ -50,6 +50,7 @@ const ACTION = "switch_light"
 const BREAKER_ACTION = "breaker_reset"
 const BREAKER_NAME = "Prompt_Breaker"
 const TRAILER = "trailer"
+const MART_GROUP = "mart"
 -- Runtime breaker anchor when the place has none: in the frame of the trailer pivot (local +X = the west strip, local
 -- +Z = the back wall; TrailerDoorService ANCHOR_OUT is (16.3, 3.2, 3.6)), on the outer west wall toward the back,
 -- ~8 studs from the Enter Trailer prompt so the two prompt spheres never overlap. PROVISIONAL (TASK-273)
@@ -404,6 +405,9 @@ function LightService:CheckZones()
 		seen[zone.Id] = (seen[zone.Id] or 0) + 1
 	end
 	for _, group in Content.LightGroups.List do
+		if group.Key == MART_GROUP and not Content.Restaurant.Supply.MartShelves then
+			continue -- the Mart left the map (Restaurant.Switch.MartShelves): its zones are not bound
+		end
 		for _, id in group.Zones do
 			const count = seen[id] or 0
 			if count ~= 1 then

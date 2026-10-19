@@ -114,7 +114,8 @@ end
 -- The trailer sits where the owner put it; the TRL point must say the same (anomaly zones, the trailer door and the
 -- cutscene read it). A mismatch is warned once, never fixed here.
 function VehicleService:CheckPose()
-	if not MapIndex.HasBinding() then
+	-- the restaurant shell is the vehicle (Restaurant.Switch.VehicleIsRestaurant): it never drives, TRL is only a point
+	if not MapIndex.HasBinding() or Content.Restaurant.Switch.VehicleIsRestaurant then
 		return
 	end
 	const point = MapIndex.FindPoint(TRL_POINT)

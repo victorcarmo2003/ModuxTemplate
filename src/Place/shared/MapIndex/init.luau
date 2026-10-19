@@ -5,6 +5,7 @@
 -- InteractionService and KitchenService (single owners, §4 rule 1). Validate only checks that they are authored.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
 local Content = require(ReplicatedStorage.shared.Content)
 local Graph = require(script.Graph)
@@ -338,7 +339,8 @@ function MapIndex.Validate(required: List): { string }
 			add(`1: no instance with tag {tag} in the Workspace`)
 		end
 		for _, instance in CollectionService:GetTagged(tag) do
-			if not instance:IsDescendantOf(Workspace) then
+			-- ServerStorage holds parked copies on purpose (the Mart off the map, trailer backups): not in play
+			if not instance:IsDescendantOf(Workspace) and not instance:IsDescendantOf(ServerStorage) then
 				add(`5: {nameOf(instance)} tagged {tag} outside the Workspace`)
 			end
 		end

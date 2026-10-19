@@ -27,7 +27,7 @@ export type Options = {
 const DURATION = 1.2
 const FADE_AT = 0.7
 const RISE = 60
-const TEXT_SIZE = 24
+const TEXT_SIZE = 18
 const HEIGHT = 30
 
 local function cancel(thread: thread)
