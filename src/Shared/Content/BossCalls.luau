@@ -350,7 +350,7 @@ const base = Table.new({
 	hint("hint_grill_place", "grill_place", lines("Bar full? Grab it.")),
 	hint("hint_grill_collect", "grill_collect", lines("Now slice a bun.")),
 	hint("hint_bun_cut", "bun_cut", lines("Pop a frank in the bun.")),
-	hint("hint_board_add_sausage", "board_add_sausage", lines("Hot dog's ready. Wait for orders.")),
+	hint("hint_board_add_sausage", "plate_add_sausage", lines("Hot dog's ready. Wait for orders.")),
 	-- TASK-284: the window lever opens the shop (key kept: BossCalls ids)
 	hint("hint_open_sign", "shutter_toggle", lines("We're open! Folks are lining up.", "Shut the window, shop's closed.")),
 	hint(
@@ -381,7 +381,7 @@ const rules: Rules = {
 			"grill_place",
 			"grill_collect",
 			"bun_cut",
-			"board_add_sausage",
+			"plate_add_sausage",
 			"shutter_toggle",
 			"take_order",
 			"serve",

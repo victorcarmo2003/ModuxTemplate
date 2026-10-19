@@ -114,8 +114,19 @@ local Beacon = require(script.Beacon)
 local Call = require(script.Call)
 local Steps = require(script.Steps)
 local Trail = require(script.Trail)
--- the plate of the 3D prep mode (module state shared with PrepController): the "deliver" step reads it (TASK-254)
-local PrepPlate = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Stages.Build.Session)
+-- STUB (TASK-581): the 3D prep mode left; its plate is never open, so the "deliver" branch below stays off until the tutorial
+-- is rewritten for the world kitchen
+local PrepPlate = {
+	Open = function(): boolean
+		return false
+	end,
+	Placed = function(): boolean
+		return false
+	end,
+	Toppings = function(): { { Key: string } }
+		return {}
+	end,
+}
 local Verbose = require(ReplicatedStorage.shared.Verbose)
 local Restaurant = require(ReplicatedStorage.shared.Libs.Net.Restaurant)
 
@@ -1161,7 +1172,7 @@ end
 -- Focused prep mode (Content.Prep.Rules.WorldKitchenPrompts = false): the kitchen prompts of the world are gone and the
 -- kitchen steps are done at a station of the trailer (prep-mode.md §5; shim until the rewrite, TASK-183/184)
 function TutorialController:Focused(): boolean
-	return not Content.Prep.Rules.WorldKitchenPrompts
+	return false -- STUB (TASK-581): the world kitchen prompts are always on
 end
 
 -- First topping of the order not on the 3D prep plate yet (PrepPlate.Toppings), in the order of the catalog; nil = all on

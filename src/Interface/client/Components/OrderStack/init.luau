@@ -15,7 +15,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Theme = require(script.Parent.Theme)
 local Motion = require(script.Parent.Motion)
 local CartoonLabel = require(script.Parent.CartoonLabel)
-local Chip = require(script.Parent.IngredientPanel.Chip)
+local Chip = require(script.Chip)
 local Sprites = require(script.Sprites)
 
 const create = Vide.create

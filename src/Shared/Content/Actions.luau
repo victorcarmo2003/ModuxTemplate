@@ -28,18 +28,23 @@ return Table.new({
 	-- open_sign (the red "Open Shop" wall switch) left with TASK-284: the service window below opens and closes the shop
 	{ Key = "grill_place", Text = "Grill", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },
 	{ Key = "grill_collect", Text = "Collect", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },
-	{ Key = "bun_cut", Text = "Slice Bun", Hold = 0.5, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },
-	{ Key = "board_add_sausage", Text = "Add Sausage", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },
+	-- world kitchen (kitchen-world.md §3; DEC-306, DEC-308): the bun crate slices one bun onto the cut-bun pile (TLR_BUN_CUT)
+	{ Key = "bun_cut", Text = "Slice Bun", Hold = 0.8, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },
+	-- plate in hand (ITM-025, TASK-569): the oldest cut bun of the pile / the oldest sausage of the rest rail goes on it. With
+	-- both on it the plate becomes the hot_dog Tool (same ticket), which the condiments and the hand-over take
+	{ Key = "plate_add_bun", Text = "Add Bun", Hold = 0, Radius = 7, Requires = { Held = "plate" }, Night = "Any", Wave = 1 },
+	{ Key = "plate_add_sausage", Text = "Add Sausage", Hold = 0, Radius = 7, Requires = { Held = "plate" }, Night = "Any", Wave = 1 },
 	{
 		Key = "topping_add",
 		Text = "Add {item}",
-		Hold = 1,
+		Hold = 0.5, -- DEC-299 (was 1)
 		Radius = 7,
 		Requires = { Held = "hot_dog", NotHasTopping = true },
 		Night = "Any",
 		Wave = 3,
 	},
-	{ Key = "discard", Text = "Throw Away", Hold = 0.5, Radius = 7, Requires = { Held = "hot_dog" }, Night = "Any", Wave = 1 },
+	-- the plate in hand, empty, half made (plate) or with its sausage (hot_dog): ItemRules category HotDog
+	{ Key = "discard", Text = "Throw Away", Hold = 0.5, Radius = 7, Requires = { Held = "HotDog" }, Night = "Any", Wave = 1 },
 	-- Customer prompts: 10 (was 8; owner playtest 2026-10-12, customers too far). The anchor rides on the customer rig.
 	{ Key = "take_order", Text = "Take Order", Hold = 0, Radius = 10, Requires = {}, Night = "Any", Wave = 1 },
 	-- no Requires.Held: the server picks the exact hot dog from the hotbar, or answers with a hint (2026-10-12)
@@ -120,13 +125,6 @@ return Table.new({
 	-- (ServeAnchor, SeatingService) and its PromptText names the table and the order ("Serve Table 2: Ketchup + Cheese").
 	{ Key = "serve_table", Text = "Serve Table", Hold = 0, Radius = 8, Requires = {}, Night = "Any", Wave = 3 },
 
-	-- Focused prep mode (DEC-223; prep-mode.md §2): Prompt_Work on each Station_n of the trailer; owner PrepService.
-	-- Tap, selling phases and the day Last call (Closing, DEC-240); the server revalidates seat, phase and the other station.
-	-- Conveyor (Prep.Rules.Mode = "Conveyor", prep-conveyor.md §2.2): Prompt_Work in front of the low deck = a belt seat
-	{ Key = "prep_work", Text = "Work", Hold = 0, Radius = 5, Requires = { Phase = { "Open", "Closing", "Night" } }, Night = "Any", Wave = 3 },
-	-- Conveyor (DEC-305, two prompts): Prompt_Grill = the grill seat (Conveyor.Seats.Grill); owner PrepService, same phases
-	{ Key = "prep_grill", Text = "Grill", Hold = 0, Radius = 5, Requires = { Phase = { "Open", "Closing", "Night" } }, Night = "Any", Wave = 3 },
-
 	-- Revive Kit (TASK-317; DEC-117, DEC-255; Provisional): Prompt_Revive on the HRP of a fallen mate's body (ReviveKitService);
 	-- spends one profile.ReviveCredits of who holds it. The client shows it only with credits (ReviveKitController gate).
 	{ Key = "revive_mate", Text = "Use Revive Kit", Hold = 1.5, Radius = 7, Requires = {}, Night = "Any", Wave = 3 },
@@ -144,17 +142,11 @@ return Table.new({
 	-- plate_put / plate_take by hand (PromptController/Rules.luau); the server revalidates. Texts placeholder (ui-text.md).
 	-- TAB-1 Prompt_Take (and DT-PC, R3): the talk at the tablet (TabletService). Radius = Restaurant.Rules.TakeRadius
 	{ Key = "tablet_take", Text = "Take Order", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },
-	-- CUT-n (Stations.cut): one bun -> bun_sliced stack. Hold = Restaurant.Bun.CutHold (wave 0 of the design)
-	{ Key = "bun_slice", Text = "Slice Bun", Hold = 0.6, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },
-	-- PLATE-n Prompt_Put: "Add Bun" / "Add Dog" / "Put Plate" by hand (PromptText from PlateService)
-	{ Key = "plate_put", Text = "Put Plate", Hold = 0, Radius = 5, Requires = {}, Night = "Any", Wave = 3 },
-	-- PLATE-n Prompt_Take: the plate becomes the hot_dog Tool (attribute Ticket); PromptText "Pick Up #12". Conveyor: the
-	-- Prompt_Take of a central table slot, held (DEC-302 "hold E"; 0.5 s Provisional, prep-conveyor.md §7.2)
-	{ Key = "plate_take", Text = "Take Plate", Hold = 0.5, Radius = 5, Requires = {}, Night = "Any", Wave = 3 },
+	-- the plate pile (Plates/Prompt_Plate, kitchen-world.md §1 #6): an empty plate Tool tied to the oldest ticket with no plate
+	-- yet (PlateService, TASK-569); none free = a plate with no ticket, which takes the oldest one at the hand-over
+	{ Key = "plate_take", Text = "Take Plate", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },
 	-- GRILL-n Att_Slot<n>: flip inside the window (Restaurant.Grill.FlipFrom..FlipTo); the server stamps Grill.Flip
 	{ Key = "grill_flip", Text = "Flip", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 3 },
-	-- hot pile next to the grill (Stations.rail): ready dogs -> sausage_grilled stack
-	{ Key = "rail_take", Text = "Take Dogs", Hold = 0, Radius = 7, Requires = {}, Night = "Any", Wave = 3 },
 	-- PICKUP Prompt_Serve: hand the plate over the counter (CustomerService:ServeAtPickup). Radius = Rules.ServeRadius.
 	-- Held (DEC-302; 0.5 s Provisional, prep-conveyor.md §8)
 	{ Key = "pickup_serve", Text = "Hand Over", Hold = 0.5, Radius = 7, Requires = {}, Night = "Any", Wave = 3 },

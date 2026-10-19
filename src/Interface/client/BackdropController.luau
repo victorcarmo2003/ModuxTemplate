@@ -5,7 +5,7 @@
 	The backdrop behind every lobby and in-game window: a soft camera blur (its own BlurEffect "UiBackdropBlur" in
 	Lighting, so it never fights the atmosphere / sanity effects of AtmosphereController and VitalController) and a
 	light Ink veil (ScreenGui "Backdrop", full screen, no insets, DisplayOrder 5: over the HUD, under the windows).
-	Shown while Backdrop.Held() (the windows call Backdrop.Hold), except in the focused prep mode (PrepController.Active),
+	Shown while Backdrop.Held() (the windows call Backdrop.Hold), except
 	in the security cams view (SecurityController.Open) and while a cinematic owns the screen: those have their own looks.
 	Fades in / out in FADE_IN / FADE_OUT s; with reduced motion (Motion.Reduced) it jumps.
 ]]
@@ -29,7 +29,7 @@ const FADE_OUT = 0.2 -- s
 const DISPLAY_ORDER = 5 -- over the HUD (1), under the lobby windows (6) and the in-game windows (20)
 
 const BackdropController = Modux.Controller("BackdropController", {
-	Require = { "PrepController", "SecurityController" },
+	Require = { "SecurityController" },
 	Priority = 400,
 })
 
@@ -61,7 +61,7 @@ end
 -- Reactive: the backdrop should show now.
 function BackdropController:Wanted(): boolean
 	const deps = self.Dependencies
-	return Backdrop.Held() and not deps.PrepController.Active() and not deps.SecurityController.Open() and not Cinematic.Active()
+	return Backdrop.Held() and not deps.SecurityController.Open() and not Cinematic.Active()
 end
 
 function BackdropController:Apply(on: boolean, veil: Frame)

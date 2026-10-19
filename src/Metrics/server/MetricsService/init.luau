@@ -18,7 +18,6 @@
 	  anomaly      anomaly_start / anomaly_end (key, phase, failed, party, reason) (AnomalyService)
 	  customer     customer_take_order / serve / refuse / give_up with the sale result (CustomerService.Acted)
 	  life         life_state from -> to (faint, revive, spectator) per player (VitalService)
-	  prep         prep_enter / prep_leave (reason) and every graded or refused prep act (PrepService.Replied)
 	  world        window_toggle, light_switch, discard, kitchen events, upgrades, every validated or refused action
 	  shop / ui    client UI moments (MetricUi: shop/settings opened, purchase prompts) and prompts closed unbought
 	  lobby        lobby servers only (Lobby.luau, owner request 2026-10-17): visit funnel, zones and dwell, squads
@@ -41,7 +40,6 @@ local Lobby = require(script.Lobby)
 
 const SECRET = "rometrics_key"
 const KEY_ATTRIBUTE = "RoMetricsTestKey" -- ServerStorage attribute, Studio only (place file, never in git)
-const SKIP_PREP_ACTS: { [string]: boolean } = { Tab = true } -- the keep-alive, not a player action
 
 type Props = Log.Props
 
@@ -52,7 +50,6 @@ const MetricsService = Modux.Service("MetricsService", {
 		"AnomalyService",
 		"CustomerService",
 		"VitalService",
-		"PrepService",
 		"UpgradeService",
 		"VehicleService",
 		"LightService",
@@ -193,19 +190,6 @@ function MetricsService:WireCrew()
 		if player ~= nil then
 			Log.player(player, "life_state", nil, { from = from, to = to })
 		end
-	end)
-	const prep = self.Dependencies.PrepService
-	prep.Entered:Connect(function(player, station)
-		Log.player(player, "prep_enter", station)
-	end)
-	prep.Left:Connect(function(player, station, reason)
-		Log.player(player, "prep_leave", station, { reason = reason })
-	end)
-	prep.Replied:Connect(function(player, act, ok, reason, grade, value)
-		if SKIP_PREP_ACTS[act] then
-			return
-		end
-		Log.player(player, `prep_{string.lower(act)}`, value, { ok = ok, reason = reason, grade = grade or "None" })
 	end)
 end
 

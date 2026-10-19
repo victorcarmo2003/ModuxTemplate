@@ -13,7 +13,7 @@ export type Vehicle = {
 	Name: string,
 	HasNight: boolean,
 	RailSlots: number,
-	BoardSlots: number, -- trailer 4 (DEC-215 had 3; DEC-223 prep seats, TASK-172)
+	BoardSlots: number, -- cut-bun pile places (8, kitchen-world.md §2; DEC-215 had 3)
 	HasCoffee: boolean,
 	HasSwitch: boolean,
 	HasShutter: boolean, -- service window with Prompt_Shutter / shutter_toggle (DEC-221)
@@ -28,7 +28,7 @@ return Table.new({
 		Name = "Open Late", -- upgrades.md UPG-006 / ui-text.md §3 (restaurant name, DEC-307)
 		HasNight = true, -- the night shift is worked in the trailer too
 		RailSlots = 8, -- FEAT-006, UPG-006
-		BoardSlots = 4, -- DEC-215 (3), 4 for the four prep seats (DEC-223, TASK-172, Provisional): board slot n belongs to seat n
+		BoardSlots = 8, -- the cut-bun pile of TLR_BUN_CUT, Att_Bun1..8 (kitchen-world.md §2, TASK-568; was 4 seats of DEC-223)
 		HasCoffee = true, -- UPG-007 Coffee Maker, fixed, not sold (DEC-055, DEC-125)
 		HasSwitch = true, -- "Lights" switch (DEC-189)
 		HasShutter = true, -- service window opens/closes from the button next to the switch (DEC-221)

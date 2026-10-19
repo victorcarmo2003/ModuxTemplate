@@ -1,5 +1,5 @@
 --!strict
--- IngredientPanel/Chip: the picture of one ingredient (the AST-071 icon `Ingredient/<key>` of the shared sheet, kept in
+-- OrderStack/Chip (was IngredientPanel/Chip, TASK-581): the picture of one ingredient (the AST-071 icon `Ingredient/<key>` of the shared sheet, kept in
 -- Icons) with a flat Frame fallback (food colour + three letters, never red as a UI state) for a key without an icon.
 -- Used by the ingredient boxes, the ticket and the plate. Pure: only props.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

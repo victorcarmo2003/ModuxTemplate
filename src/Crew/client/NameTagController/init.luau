@@ -18,7 +18,7 @@ local RunService = game:GetService("RunService")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local CrewColor = require(ReplicatedStorage.shared.Crew.CrewColor)
-local Mates = require(StarterPlayer.StarterPlayerScripts.client.Prep.PrepController.Mates)
+local Mates = require(script.MateTag)
 
 const TAG_NAME = "CrewTag"
 const OUTLINE_NAME = "CrewOutline"
@@ -134,9 +134,6 @@ end
 -- Outline on the MAX_OUTLINES nearest characters only (the others keep their tag)
 function NameTagController:RefreshOutlines()
 	const me = Players.LocalPlayer.Character
-	if me ~= nil and me:GetAttribute("Working") ~= nil then
-		return -- cooking: Prep/Mates owns the other characters' Highlights until it restores them
-	end
 	const myRoot = if me ~= nil then me:FindFirstChild("HumanoidRootPart") else nil
 	const origin = if myRoot ~= nil and myRoot:IsA("BasePart") then myRoot.Position else workspace.CurrentCamera.CFrame.Position
 	const low = Mates.LowQuality()

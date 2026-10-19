@@ -12,22 +12,11 @@ local Content = require(ReplicatedStorage.shared.Content)
 local function restaurantPlates()
 	return Lync.struct({
 		Npc = Lync.int(0, 65535),
-		Line = Lync.int(0, 2),
 		Bun = Lync.bool(),
 		Sausage = Lync.bool(),
-		Toppings = Lync.bitfield(Content.Ingredients.ToppingKeys), -- a plate put back after the condiments
+		Toppings = Lync.bitfield(Content.Ingredients.ToppingKeys),
 		Since = Lync.f64(),
-		Orphan = Lync.optional(Lync.bool()),
-		Altered = Lync.optional(Lync.bool()), -- ANM-002 on a plate (wave R4); nil = false
-		-- conveyor (TASK-513, network.md §19.1): grade of an assembled plate, nil = not assembled yet
-		Grade = Lync.optional(Lync.enum(Content.Prep.GradeKeys)),
-	})
-end
-
--- CenterPut (TASK-513; tech/prep-conveyor.md §7.2): the central table slot clicked
-local function restaurantCenterPut()
-	return Lync.struct({
-		Slot = Lync.int(1, 12),
+		Altered = Lync.optional(Lync.bool()), -- ANM-002 on a plate; nil = false
 	})
 end
 
@@ -72,18 +61,11 @@ return Lync.define("restaurant", {
 	-- Restaurant (DEC-269..DEC-280; tech/restaurant-flow.md rev. 2 §2.5-§2.6, design FEAT-044/047/050). Wave R0: schema only,
 	-- no writer until R1 / R3 (Content.Restaurant.Rules.Enabled). No keyBy. Every record is wide (16-bit Npc or f64), so the
 	-- README drop.section floor does not apply.
-	-- §2.2, record = plate slot 1..Content.Restaurant.Rules.PlateSlotsMax (only the slots the map binds). Writer: PlateService.
-	-- Npc = NpcId of the ticket on this plate, 0 = none; Line = which hot dog of a pair (1 leader, 2 partner), 0 = none;
-	-- Since = server time the ticket landed (oldest first), 0 = none; Orphan = its customer left (grey "?", FEAT-044).
-	-- Conveyor (Content.Prep.Rules.Mode = "Conveyor"; prep-conveyor.md §7.1): record = central table slot
-	-- 1..Content.Restaurant.CenterTable.Slots, every slot always published (free = Npc 0 and no Orphan); Grade = the band of
-	-- an assembled plate, nil = not assembled
+	-- World kitchen (kitchen-world.md §2; TASK-569), record = PlateId 1..255 of a live plate (a plate / hot_dog Tool in a hand,
+	-- from Take Plate to the hand-over or the bin). Writer: PlateService. Npc = NpcId of its ticket, 0 = none yet (it takes the
+	-- oldest at the hand-over); Since = server time the ticket landed (oldest first), 0 = none; Bun / Sausage / Toppings = what
+	-- is on it. Every record is wide (16-bit Npc, f64), so the README drop.section floor does not apply
 	Plates = Lync.replicate(restaurantPlates()),
-
-	-- c -> s (TASK-513; network.md §19.1, prep-conveyor.md §7.2), <= Content.Restaurant.CenterTable.PutRate per s. Put the
-	-- EQUIPPED plate / hot dog on the free central table slot Slot (the click is not a ProximityPrompt). Responder:
-	-- PlateService (OnInit): active player, within CenterTable.Reach of the slot, slot free; refusals by Notice (slot_taken)
-	CenterPut = Lync.packet(restaurantCenterPut()),
 
 	-- §2.4, record 1 = TAB-1 (always), 2 = TAB-2 (UPG-027 bought and bound), Content.Restaurant.Rules.DrivePcIndex = DT-PC
 	-- (wave R3). Writer: TabletService. Full = no free plate or pickup spot ("Kitchen full" lamp for everyone). The client

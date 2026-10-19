@@ -89,33 +89,17 @@ return Table.new({
 	{ Key = "serve_nothing", Text = "Nothing to serve yet", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	{ Key = "table_added", Text = "Table added!", Audience = "Party", ValueFrom = "Number", Wave = 3 },
 
-	-- Focused prep mode (DEC-223; Prep.Reasons points at these). Only to the player who acted; Provisional texts
-	{ Key = "prep_busy", Text = "Someone's already there.", Audience = "Player", ValueFrom = "None", Wave = 3 },
-	{ Key = "prep_locked", Text = "Not right now.", Audience = "Player", ValueFrom = "None", Wave = 3 },
-	{ Key = "prep_no_sausage", Text = "No sausage on the warmer yet.", Audience = "Player", ValueFrom = "None", Wave = 3 },
-	{ Key = "prep_too_fast", Text = "Too fast! Try again.", Audience = "Player", ValueFrom = "None", Wave = 3 },
-	{ Key = "prep_kicked", Text = "Prep interrupted.", Audience = "Player", ValueFrom = "None", Wave = 3 },
-	{ Key = "tutorial_one_sausage", Text = "One sausage is plenty for now.", Audience = "Player", ValueFrom = "None", Wave = 3 },
-	{ Key = "prep_idle", Text = "Stepped away from the station.", Audience = "Player", ValueFrom = "None", Wave = 3 },
-
 	-- Restaurant (tech/restaurant-flow.md rev. 2 §2.5, design FEAT-043..FEAT-050; wave R0 contracts, nobody emits them yet).
 	-- Only to the player who acted unless noted; placeholder texts until ui-text.md
 	{ Key = "plates_full", Text = "Kitchen full! Serve a plate first", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	{ Key = "pickup_full", Text = "Kitchen full! Serve who is waiting.", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	{ Key = "plate_full", Text = "That plate already has it.", Audience = "Player", ValueFrom = "None", Wave = 3 },
-	{ Key = "plate_not_ready", Text = "Finish it on the belt first", Audience = "Player", ValueFrom = "None", Wave = 3 },
+	{ Key = "plate_not_ready", Text = "It needs a bun and a dog first", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	{ Key = "tablet_busy", Text = "Someone's taking that order.", Audience = "Player", ValueFrom = "None", Wave = 3 },
-	-- Conveyor kitchen (prep-conveyor.md §2.2, §7.2, §8; TASK-513). Texts: docs/story/ui-text.md §17.4 (TASK-511, BELT_REF_*).
-	-- ticket_other / plate_shelved: Value = the ticket #n
-	{ Key = "need_plate", Text = "Grab a plate from the table first", Audience = "Player", ValueFrom = "None", Wave = 3 },
-	{ Key = "belt_full", Text = "Belt full. Wait for a spot", Audience = "Player", ValueFrom = "None", Wave = 3 },
-	{ Key = "slot_taken", Text = "That spot's taken", Audience = "Player", ValueFrom = "None", Wave = 3 },
-	{ Key = "plate_gone", Text = "Someone grabbed it first", Audience = "Player", ValueFrom = "None", Wave = 3 },
+	-- World kitchen (kitchen-world.md §2; TASK-569). ticket_other: Value = the ticket #n
+	{ Key = "pile_empty", Text = "Nothing on that pile yet.", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	{ Key = "ticket_other", Text = "#{value} isn't at the pickup yet", Audience = "Player", ValueFrom = "Number", Wave = 3 },
-	{ Key = "ticket_gone", Text = "They left. Set it on the table", Audience = "Player", ValueFrom = "None", Wave = 3 },
-	{ Key = "plate_shelved", Text = "Plate #{value} moved to the table", Audience = "Player", ValueFrom = "Number", Wave = 3 },
-	-- optional (the contract keeps PlateDone silent): prep_work with an assembled hot dog
-	{ Key = "plate_done", Text = "Already done. Take it to pickup", Audience = "Player", ValueFrom = "None", Wave = 3 },
+	{ Key = "ticket_gone", Text = "They left. Throw it away.", Audience = "Player", ValueFrom = "None", Wave = 3 },
 	-- drive-thru car gave up (wave R3), to the party
 	{ Key = "drive_left", Text = "A car drove off!", Audience = "Party", ValueFrom = "None", Wave = 4 },
 	-- FEAT-050 supply: a station is low on stock
