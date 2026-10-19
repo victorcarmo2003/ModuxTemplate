@@ -8,9 +8,9 @@ Fonte: `design/monetization-offers-proposal.md`; código em `src/Shop/client/Off
 
 ## 0. Ferramentas
 
-- `/dev offer status`: grupo (control / shopClick), o que bloqueia agora (tips, tutorial, calma, orçamento, `CanOffer`),
+- `/dev ui offer status`: grupo (control / shopClick), o que bloqueia agora (tips, tutorial, calma, orçamento, `CanOffer`),
   contagem do turno, pausa, ofertas caladas. Saída no Output do **client**.
-- `/dev offer list` · `/dev offer reset` (zera tudo) · `/dev offer <chave>` (força a oferta, sem orçamento).
+- `/dev ui offer list` · `/dev ui offer reset` (zera tudo) · `/dev ui offer <chave>` (força a oferta, sem orçamento).
 - Sem grupo de controle (DEC-268). Conch: comandos de estado em `design/monetization-offers-proposal.md` §9 (TASK-376, ainda não feitos).
 - Dia/Noite 1 bloqueiam por regra: para os gatilhos naturais, avance (`/dev day 2`, `/dev night 2` ou o comando de
   rodada do projeto).
@@ -19,8 +19,8 @@ Fonte: `design/monetization-offers-proposal.md`; código em `src/Shop/client/Off
 
 | # | Passo | Esperado | Resultado |
 |---|---|---|---|
-| V1 | `/dev offer offer_restock` | nota Mustard abaixo do carrinho: ícone do produto + "Out of Bun! Refill · R$ n" (preço do Creator Hub) por 6 s | ok (antes do "·": "Refill R$ 23") |
-| V2 | `/dev offer offer_revive_mate` | "{nome} fainted! Revive Kit · R$ n" com ícone do kit | ok (R$ 36) |
+| V1 | `/dev ui offer offer_restock` | nota Mustard abaixo do carrinho: ícone do produto + "Out of Bun! Refill · R$ n" (preço do Creator Hub) por 6 s | ok (antes do "·": "Refill R$ 23") |
+| V2 | `/dev ui offer offer_revive_mate` | "{nome} fainted! Revive Kit · R$ n" com ícone do kit | ok (R$ 36) |
 | V3 | as 8 chaves em celular (emulador 844×390) e controle | cabe na tela, não cobre relógio/dinheiro/joystick; no controle a nota é clicável pelo cursor virtual | a fazer |
 
 ## 2. Clique
@@ -29,7 +29,7 @@ Fonte: `design/monetization-offers-proposal.md`; código em `src/Shop/client/Off
 |---|---|---|
 | C1 | jogador do braço "Prompt" clica numa oferta | abre o prompt do Roblox do produto **só depois do clique**; restock e scare já vão com o alvo (`ShopPick`) |
 | C1b | nota na tela, apertar **G** (teclado) / **Y** (controle) | mesmo efeito do clique; a nota mostra "[G]" ou a imagem do Y; fora da nota a tecla não faz nada (DEC-262) |
-| C2 | jogador do braço "Shop" (`/dev offer status` mostra `shopClick=true`) clica | abre a loja com o card do produto piscando 1 s |
+| C2 | jogador do braço "Shop" (`/dev ui offer status` mostra `shopClick=true`) clica | abre a loja com o card do produto piscando 1 s |
 | C3 | comprar pelo prompt | recibo normal (`ShopGrant`), confete (`PurchaseFxController`); 60 s sem oferta depois |
 | C4 | fechar o prompt sem comprar | 60 s sem oferta; nada é concedido |
 | C5 | uma nota de recibo / o nudge do Scare aparece em cima de uma oferta | o clique na nota nova **não** compra a oferta antiga |

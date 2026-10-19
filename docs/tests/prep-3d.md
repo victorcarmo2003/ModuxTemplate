@@ -6,7 +6,7 @@ Autor: qa-tester · 2026-10-12. Base: `docs/tech/prep-3d.md` (§2 a §13, riscos
 
 > **Estado do código em 2026-10-12.** Existem: preparo 2D (`Stages/*`), `Grade`, `PrepService`, `/dev prep grade|seats|enter|leave|finish|ui|kitchen`. **Ainda não existem** (viram testáveis quando a TASK citada fechar): `Rules.ThreeD`, `Rules.World.Stages`, abas `Board`/`Toppings` (TASK-194), `World/*` e `/dev prep ray` (TASK-196), `Stations.Flip`/`PrepTab.Plate`/`Slot` preferido (TASK-195), Grill 3D (203), Board (204), Toppings (205), Window (206). Cada caso traz a coluna **Dep.**: sem a dependência, o caso fica **Bloqueado**, não "Falhou". Compilação limpa não fecha nenhum caso **M**.
 
-Tipos: **E** estático (diff, grep), **S** script/Command Bar (`/dev ...`, `Grade` em Luau puro), **M** manual no Studio, **R** rede (Output do servidor, Network Monitor / contagem de pacotes), **P** perf (MicroProfiler, Stats). Ambiente padrão: `rogen build` → `modux generate` → `rojo serve`; place **dev** com loja aberta, estoque de salsicha e pão, tutorial pulado (`/dev intro skip`, `/dev tutorial reset` só quando o caso pedir). Sempre `list_roblox_studios` antes de usar o MCP; **nunca `Place.run`**; antes de qualquer sync, `Place.diff` = 0 e o dono salva (memória `studio-hand-edits`).
+Tipos: **E** estático (diff, grep), **S** script/Command Bar (`/dev ...`, `Grade` em Luau puro), **M** manual no Studio, **R** rede (Output do servidor, Network Monitor / contagem de pacotes), **P** perf (MicroProfiler, Stats). Ambiente padrão: `rogen build` → `modux generate` → `rojo serve`; place **dev** com loja aberta, estoque de salsicha e pão, tutorial pulado (`/dev tutorial intro`, `/dev tutorial reset` só quando o caso pedir). Sempre `list_roblox_studios` antes de usar o MCP; **nunca `Place.run`**; antes de qualquer sync, `Place.diff` = 0 e o dono salva (memória `studio-hand-edits`).
 
 IDs: `G-n` grelha, `B-n` tábua, `T-n` toppings, `S-n` servir/janela, `GE-n` gesto, `FE-n` ferramenta, `PL-n` plataforma, `AIM-n` ponteiro, `FR-n` enquadramento, `RB-n` rollback, `CO-n` co-op, `AB-n` abuso, `PF-n` perf, `OUT-n` Output, `HUD-n` HUD. Esperado de nota: Perfect/Good/Messy por `Content.Prep.Tolerances`; nunca copie número deste plano para o código.
 
@@ -249,8 +249,8 @@ Ambiente: Test > Clients and Servers, N = 2, 3, 4. `PrepSeats` ativa `clamp(memb
 | CO-7 | Jogador 1 vira a salsicha | Jogador 2 **vê** virada (`Stations.Flip`), inclusive entrando depois | 195, 203 |
 | CO-8 | Jogador 1 sai (Leave) no meio do prato / desconecta / vai Away | Assento liberado; **pão reservado devolvido**; marionete some nos outros; sem modelo órfão; `SeatIdle` 60 s sem heartbeat também libera | 170, 208 |
 | CO-9 | 2j disputam o mesmo ticket | Chip de conflito, sem trava; o servidor serve o primeiro, o 2º recebe recusa limpa | 206 |
-| CO-10 | **Kick por anomalia** (`/dev anomaly <ANM-###>` com os jogadores no modo, fase Night) | Sinal expulsa em ~0,4 s com tremor curto e 0,5 s sem input; `PrepResult Kick` (`KickSignal`); prato `Parked`/pão devolvido; ferramenta e hitboxes **destruídos**; reentrada travada só durante `Signal` + `CueLock` (6 s) | 181 |
-| CO-11 | Kick: sanidade troca de faixa (`KickSanity`), `Down` (`KickDown`), cutscene/ligação (`KickCutscene`/`KickCall`), fim de turno (`KickClosing`), ladrão (`/dev thief`, `KickThief`) | Cada um expulsa e limpa o 3D; a câmera volta ao normal; o jogador **não** fica com controle travado | 181 |
+| CO-10 | **Kick por anomalia** (`/dev trigger <ANM-###>` com os jogadores no modo, fase Night) | Sinal expulsa em ~0,4 s com tremor curto e 0,5 s sem input; `PrepResult Kick` (`KickSignal`); prato `Parked`/pão devolvido; ferramenta e hitboxes **destruídos**; reentrada travada só durante `Signal` + `CueLock` (6 s) | 181 |
+| CO-11 | Kick: sanidade troca de faixa (`KickSanity`), `Down` (`KickDown`), cutscene/ligação (`KickCutscene`/`KickCall`), fim de turno (`KickClosing`), ladrão (`/dev street thief`, `KickThief`) | Cada um expulsa e limpa o 3D; a câmera volta ao normal; o jogador **não** fica com controle travado | 181 |
 | CO-12 | Kick **durante um arrasto** (salsicha na mão / gesto em curso) | Gesto cancelado sem nota parcial; nada enviado após o Kick; nenhum erro de "alvo destruído" | 181, 203 |
 | CO-13 | Kick de um jogador não afeta os outros assentos | Só quem estava sob o sinal sai (ou todos, se o sinal for global); os demais continuam | 181 |
 | CO-14 | Saída por inatividade (`ClientIdle` 20 s sem input) | `Parked` local (`KickIdle`); retomar sem perder o prato | 170 |
@@ -287,7 +287,7 @@ Forjar eventos: no Studio, no **cliente** (Command Bar do cliente, `Players.Loca
 | AB-21 | Spam de pacote após Kick/Leave | Descartado `NoSession`; sem reentrada | 181 |
 | AB-22 | Estoque: dois clientes `Place` simultâneo com 1 salsicha em estoque | Um vence; estoque 0, nunca negativo | 170 |
 
-Todos os casos AB: conferir **dinheiro, estoque, trilho e hotbar** antes e depois (`/dev kitchen`, `/dev economy`); a diferença deve ser exatamente o das ações legítimas.
+Todos os casos AB: conferir **dinheiro, estoque, trilho e hotbar** antes e depois (`/dev kitchen`, `/dev money ledger`); a diferença deve ser exatamente o das ações legítimas.
 
 ---
 
@@ -366,7 +366,7 @@ Em **cada** resolução (667x375, 844x390, 1280x720), 1j e 4j, dia e noite, com 
 
 ## 13. Roteiro de teste manual para o dono (10 minutos, pt-BR)
 
-**Antes de começar (1 min).** Abra o Studio com o projeto sincronizado (`rojo serve`), salve suas edições à mão. **Não rode `Place.run`.** Abra o Output (View > Output) e deixe-o visível. Para começar limpo: `/dev intro skip` e `/dev tutorial reset` só se quiser ver o tutorial; senão, pule. Garanta loja **aberta** e salsicha e pão no estoque (`/dev kitchen` mostra o estoque).
+**Antes de começar (1 min).** Abra o Studio com o projeto sincronizado (`rojo serve`), salve suas edições à mão. **Não rode `Place.run`.** Abra o Output (View > Output) e deixe-o visível. Para começar limpo: `/dev tutorial intro` e `/dev tutorial reset` só se quiser ver o tutorial; senão, pule. Garanta loja **aberta** e salsicha e pão no estoque (`/dev kitchen` mostra o estoque).
 
 Marque `[ok]` ou `[falhou: o que viu]` em cada linha. Anote o **horário** do que falhar.
 
@@ -400,7 +400,7 @@ Marque `[ok]` ou `[falhou: o que viu]` em cada linha. Anote o **horário** do qu
 17. Test > Clients and Servers, 2 clientes. Os dois entram no modo ao mesmo tempo. Esperado: **assentos diferentes**, cada um vê o nome do outro (`StationTag`).
 18. Jogador 1 vira uma salsicha. Esperado: o jogador 2 **vê a salsicha virada**. Jogador 1 monta um prato: o jogador 2 vê o prato na tábua dele (cru, só modelos prontos).
 19. Os dois tocam a mesma salsicha ao mesmo tempo: só um leva; o outro vê um tremor.
-20. À noite, `/dev anomaly <ANM-###>` (ou `/dev anomaly agenda` e o nome que aparecer): em ~0,4 s os jogadores **saem do modo** (tremor curto). Aguarde ~6 s e tente reentrar: só então volta a deixar. Esperado: nada ficou travado nem no mundo.
+20. À noite, `/dev trigger <ANM-###>` (ou `/dev trigger list` e o nome que aparecer): em ~0,4 s os jogadores **saem do modo** (tremor curto). Aguarde ~6 s e tente reentrar: só então volta a deixar. Esperado: nada ficou travado nem no mundo.
 
 ### Fechamento (30 s)
 

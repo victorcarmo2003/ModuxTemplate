@@ -363,7 +363,7 @@ Feedback do usuário (2026-10-11): o momento ideal de comprar é o **fim do expe
 - **Trailer:** o cooldown é por veículo; a troca carrinho → trailer começa com todas as linhas livres.
 - **Turno repetido:** um turno é identificado por (dia, noite, noturno?); repetir a noite perdida não conta como turno novo, e a restauração do snapshot desfaz a compra **e** o cooldown.
 - **Dica de fechamento:** no início do Closing, uma vez por turno, toast "Closing time. Upgrades are on sale at the Mart." (só com caixa + gaveta para a linha mais barata à venda, ou se nunca comprou) e seta guia ao Mart até o início do Open ou até o jogador chegar. Nunca bloqueia compra durante o turno.
-- **Dev:** `/dev market` lista pedestais, contador de turnos e cooldowns; `/dev market reset` zera os cooldowns.
+- **Dev:** `/dev shop market` lista pedestais, contador de turnos e cooldowns; `/dev shop market reset` zera os cooldowns.
 
 ## Critérios de aceite (balanceamento)
 

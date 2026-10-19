@@ -1,4 +1,4 @@
-Status: Rascunho (Provisório) — inventário dos comandos de dev antes da reescrita (pedido do dono, 2026-10-18)
+Status: Rascunho (Provisório) — conjunto de comandos de dev reescrito a pedido do dono (2026-10-18)
 
 # Comandos de dev (`/dev`)
 
@@ -7,7 +7,85 @@ Código: `src/Dev/server/DevService` (`init.luau`, `Api.luau`, `Commands/*.luau`
 Conch `dev <comando>` (`AdminService`), painel do showcase (`ShowcaseService:Dev`, lista `DEV_ALLOWED`) e a linha dev
 do painel de configurações (`Net.DevTool`, roda `mycoffee` / `infsanity`).
 
-## 1. Inventário (antes, 2026-10-18)
+Estrutura: cada arquivo de `Commands/` registra verbos vivos; os comandos antigos de um sistema só viraram
+`Parts/*.luau` (não carregados sozinhos) e o verbo repassa o subcomando para eles (`Kit.luau`: `group`, `forward`,
+`alias`). `help` lista só os vivos (uma linha cada); `help <cmd>` mostra um; nomes `Hidden` rodam mas não aparecem.
+
+## 2. Comandos atuais
+
+Anomalia = key, `ANM-###`, número (o do ANM) ou parte do nome (`blackout`, `knock`, `crawler`, `red fog`).
+`trigger` e `scene` fora da fase Night pulam para ela antes (noite do turno atual, ou a noite do dia).
+
+| Comando | O quê |
+|---|---|
+| `help [cmd]` | lista viva, ou uso de um comando |
+| `night [n] [prep]` | direto na fase Night da noite n (padrão: a atual); `prep` = para no começo do turno |
+| `day [n]` | turno do Dia n (padrão 1 = turno de dia, já em Open; Dia n ≥ 2 = Noite n − 1) |
+| `skip` | encerra a fase atual pelo caminho do timer |
+| `time <h:mm>` | move o relógio da fase (24 h; `3:30` na Night = 3:30 da manhã) |
+| `win` · `lose [wipe\|critical]` | resolve a noite atual |
+| `trigger <anomalia> [example]` (`t`) | dispara agora; `trigger stop [anomalia]`; `trigger list` = agenda + catálogo (cortes do restaurante marcados); sem args = o que roda |
+| `scene <anomalia>` · `scene stop` · `scene score <stage\|auto>` | cena de horror da anomalia; estágio da trilha (era `score`) |
+| `scare [list\|all\|<key>...]` | susto família D |
+| `atm <ATM-#\|n\|nome\|off\|auto>` | atmosfera da noite (era `atmosphere`) |
+| `suspense [list\|status\|<spot>\|<event> [spot]]` | evento de suspense agora |
+| `sanity [<n>\|hint\|dark on\|off\|auto] [player]` | sanidade |
+| `god [on\|off]` · `god me [on\|off] [player]` | ninguém desmaia (party) · sanidade infinita de um jogador |
+| `revive [player]` · `revive auto [on\|off] [player]` | volta Active · levanta 2 s após desmaio |
+| `faint [spectator] [player]` | cai agora como Down (ou Spectator) |
+| `coffee [n \| give \| take \| cup fill\|empty\|sip\|give\|auto]` | doses da máquina, café na mão, pegar o pronto, copo do balcão |
+| `kitchen rail [n] \| gift [topping\|all] \| stock [state\|take <pkg>\|test]` | trilho, potes de brinde, estoque |
+| `prep grade\|ray\|kitchen\|plate\|seats\|ui\|enter\|leave\|finish` | modo focado (inalterado; `/dev prep grade` segue valendo) |
+| `plate` · `tablet` · `pickup` | pratos, tablet, retirada (inalterados) |
+| `customer pair\|group\|sit\|quality \| on\|off \| spawns \| tables [buy\|sit]` | clientes |
+| `money cash <n> \| gems <n> [player] \| tips ... \| ledger` | dinheiro |
+| `shop receipt\|code\|reward\|market\|gear ...` | loja, códigos, recompensas, Gear Stand |
+| `upgrade [key] [level]` | upgrade grátis (inalterado) |
+| `call [<key>\|answer\|stop\|list]` · `cutscene [play\|vote\|skip\|stop]` | telefone do chefe · cutscenes |
+| `tutorial [reset\|step <k>\|intro\|voice ...\|debug]` | tutorial (`intro skip`, `voice`, `tutdebug` entraram aqui) |
+| `ui hud\|offer\|journal\|rejoin\|showcase ...` | interface |
+| `street cars\|walkers\|thief ...` | rua: carros, pedestres, ladrão |
+| `debug audio\|interact\|movement\|drop\|light ...` | leituras de debug |
+| `smoke [status]` | smoke do loop do restaurante |
+
+## 3. Renomeados, fundidos e removidos
+
+| Antes | Agora |
+|---|---|
+| `anomaly ...` · `anomaly agenda` | `trigger ...` · `trigger list` (`anomaly` segue como nome oculto) |
+| `blackout` · `blackout stop` | `trigger blackout` · `trigger stop blackout` |
+| `atmosphere` | `atm` |
+| `score <stage>` | `scene score <stage>` |
+| `down` · `spectate` | `faint` · `faint spectator` |
+| `autorevive` · `infsanity` | `revive auto` · `god me` |
+| `mycoffee` · `coffeemachine take` · `coffeecup ...` | `coffee give` · `coffee take` · `coffee cup ...` |
+| `railfeed` · `gift` · `supply` | `kitchen rail` · `kitchen gift` · `kitchen stock` |
+| `arrivals on\|off` · `spawns` · `seating [buy\|sit]` | `customer on\|off` · `customer spawns` · `customer tables [buy\|sit]` |
+| `cash` · `gems` · `tips` · `economy ledger` | `money cash` · `money gems` · `money tips` · `money ledger` |
+| `receipt` · `code` · `reward` · `market` · `gear` | `shop receipt` · `shop code` · `shop reward` · `shop market` · `shop gear` |
+| `intro skip` · `voice` · `tutdebug` | `tutorial intro` · `tutorial voice` · `tutorial debug` |
+| `hud` · `offer` · `journal` · `rejoin` · `showcase` | `ui hud` · `ui offer` · `ui journal` · `ui rejoin` · `ui showcase` |
+| `traffic` · `walkers` · `thief` | `street cars` · `street walkers` · `street thief` |
+| `audio` · `interactlog` · `movement` · `drop` · `light` | `debug audio` · `debug interact` · `debug movement` · `debug drop` · `debug light` |
+| `day <n>` / `night <k>` | `day [n]` (padrão Dia 1, já em Open) / `night [n]` (cai na fase Night; `night n prep` = antigo) |
+| `lose wipe\|critical` | `lose [wipe\|critical]` (padrão wipe) |
+
+**Removidos** (sistema cortado com o restaurante ou só do trailer): `walker` (ANM-007 cortada), `alter` (ANM-002
+cortada), `closed` (interruptor da loja do trailer; use `customer off`), `shutter` (janela de serviço), `trailer`
+(status/reset do veículo), `trash` e `seating trailer|dirty|clean` (mesas não sujam), e os passos do trailer do `smoke`
+(boot, trailer ready, trailer seating, tip jar + ledger — `smoke restaurant` virou o `smoke`).
+
+**Nomes ocultos** (rodam, fora do `help`; mantidos por quem chama pelo nome): `t`, `anomaly` (docs e planos de teste);
+`down`, `spectate`, `light`, `traffic`, `thief` (botões do showcase, `ShowcaseService` `DEV_ALLOWED` / `Catalog`);
+`cash`, `gems`, `arrivals`, `autorevive` (atalhos do console Conch, `AdminService`); `mycoffee`, `infsanity` (linha dev
+do painel de configurações, `Net.DevTool`).
+
+Os documentos históricos (`docs/tasks/board.md`, playtests, `docs/tests/wave-*.md`, `decisions.md`) citam os nomes
+antigos; a tabela acima traduz.
+
+## 4. Inventário anterior
+
+### Antes da reescrita (2026-10-18)
 
 53 arquivos, 69 comandos. Modo restaurante ligado (`Content.Restaurant.Rules.Enabled = true`): anomalias cortadas
 ANM-002, ANM-003, ANM-007, ANM-018 (`Restaurant.Switch.CutAnomalies`); sem porta dos fundos do trailer, sem janela de

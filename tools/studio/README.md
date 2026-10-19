@@ -20,7 +20,7 @@ Regras: só snippets idempotentes (ver `STUDIO_LAYER.md`); nunca `Place.run` sem
 
 ## Teste de fumaça
 
-`smoke.md`: `/dev smoke` roda boot, intro, tutorial, dia, mesas, noite 1, anomalia, troca de trailer e imprime `SMOKE: N ok, M falhas, K avisos`.
+`smoke.md`: `/dev smoke` roda o loop do restaurante (um cliente de ponta a ponta) e imprime `RESTAURANT SMOKE: N/M PASS`.
 
 ## Teste de sobreposição do chrome do preparo (puro, sem Studio)
 

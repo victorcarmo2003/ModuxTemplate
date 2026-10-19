@@ -1,7 +1,7 @@
 # Roteiro do agente: teste de fumaça no Studio
 
-Código: `src/Dev/server/DevService/Commands/Smoke.luau` (comando `/dev smoke`). Muda o estado da run (dia, noite, veículo, mesas, tutorial): só em Play descartável, o place não é salvo.
-Duração: cerca de 30 s no servidor. Passos: boot, intro skip, tutorial reset e `tutorial step` (phone, order, grill, assemble, serve, mart, auto), `day 2`, spawn + Take Order, `seating buy` + `customer sit`, `night 1`, café + sanidade, anomalia ANM-002 (trigger e stop pelo `ShowcaseService`), `trailer swap`, mesas do trailer, gorjetas + ledger (`economy ledger` precisa fechar `N/N ok`), limpeza.
+Código: `src/Dev/server/DevService/Commands/Smoke.luau` (comando `/dev smoke`) + `Scenarios/RestaurantSmoke.luau`. Muda o estado da run (dia, pratos, mesas): só em Play descartável, o place não é salvo.
+Desde 2026-10-18 (`docs/tech/dev-commands.md`) o smoke é só o loop do restaurante, um cliente de ponta a ponta: setup (`tutorial intro`, `day 2`, `customer off`, `skip`, `plate clear`), customer, tablet, cut, plate bun, grill, rail, plate dog, condiments, pickup, table. Os passos do trailer (troca de veículo, mesas do trailer, gorjeta + ledger) saíram; o ledger roda à parte com `/dev money ledger` (precisa fechar `N/N ok`).
 
 ## Passos
 
@@ -17,16 +17,15 @@ task.wait(50)   -- smoke leva ~35 s; chamadas acima de ~60 s podem cair, nesse c
 return started .. "\n" .. tostring(D.Run("smoke", "status"))
 ```
 
-4. `get_console_output`: o relatório está no fim (`SMOKE: N ok, M failures, K warnings`, mais uma linha por passo que falhou, erro e aviso do servidor). Passos aparecem como `[Dev] [Smoke] ok|FAIL <passo>`.
+4. `get_console_output`: o relatório está no fim (`RESTAURANT SMOKE: N/M PASS`, uma linha `PASS|FAIL <passo>` por passo; um FAIL pula os seguintes).
 5. **Erros de cliente não passam pelo servidor.** No mesmo console procure: `Requested module experienced an error`, `Stack Begin`, `Expected`, `attempt to`, `is not a valid member`, `Infinite yield`, `Failed to load sound : NotEnoughQuota` (cota de áudio, pedido 15 do playtest; hoje aparece dezenas de vezes). Qualquer um conta como falha (ex.: boot do cliente quebrado por tipo gerado inválido deixa o smoke do servidor verde).
 6. `start_stop_play(false)`.
 
-Resultado a anotar no registro do dia (seção Smoke): `SMOKE: N ok, M falhas, K avisos` + erros de cliente.
+Resultado a anotar no registro do dia (seção Smoke): `RESTAURANT SMOKE: N/M PASS` + erros de cliente.
 
 ## Falhas conhecidas / dicas
 
 - `no player in the server`: o Play abriu sem cliente; pare e reinicie.
-- `customer take order`: precisa da fase Open; o passo faz `skip` sozinho. Falhar aqui costuma ser fila/NpcNodes. A fila padrão tem 1 vaga (DEC-241): `skipped_queue_full` não é falha, o passo espera quem já está no balcão.
-- `day 2` depois de `tutorial reset` é de propósito: o smoke não testa o fluxo do tutorial até o fim, só os pulos.
+- `setup`: precisa chegar a uma fase de venda com a gaveta aberta; falhar aqui costuma ser fase presa (veja `/dev night` / `/dev skip`).
 
-Última execução real (2026-10-12, Play no Studio): `SMOKE: 13 ok, 0 failures, 0 warnings`. No cliente: só `NotEnoughQuota` (áudio) e `LoadQueue ... still running after 8 s`.
+Última execução real do smoke antigo (2026-10-12, trailer): `SMOKE: 13 ok, 0 failures, 0 warnings`. No cliente: só `NotEnoughQuota` (áudio) e `LoadQueue ... still running after 8 s`.

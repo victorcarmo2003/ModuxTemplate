@@ -68,7 +68,7 @@ Tipos de passo: `Sound`, `Music`, `Lights`, `Lightning`, `Whispers` (palavras HI
   `(ctx, state, step, late)`; `late` > 0 = aplicar estado de onde a cena está.
 - **Flag `Live`** por cena (`Content.HorrorScenes`): `nil` = só toca via `/dev scene`. A cena do apagão fica sem `Live`
   até a TASK-467, porque `Effects/ANM-020` + `Kit/Blackout` + `Score/` já fazem luz/som/legenda (evita duplicar).
-- `/dev scene [<key|ANM-###|n>|stop]` (`Dev/Commands/Scene.luau`): marca o atributo `ReplicatedStorage.DevHorrorScene`
+- `/dev scene [<anomalia>|stop]` (`Dev/Commands/Scene.luau`; anomalia = key, ANM-###, número ou nome, e pula para a fase Night): marca o atributo `ReplicatedStorage.DevHorrorScene`
   e força a anomalia (fase Night). No dev o efeito do ANM-020 roda junto, então alguns sons/luzes saem dobrados até a
   TASK-467.
 - QA pendente (Play, 2 clients): passos < 150 ms de diferença; entrar atrasado aplica luz/música; cancelar limpo ao

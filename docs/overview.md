@@ -116,7 +116,7 @@ cutscene -> dia 1 (tutorial) -> dia 2 -> noite 1 (carrinho) -> dia 3 -> noite 2 
 - O dia 1 começa com o **telefone do carrinho tocando**. O prompt "Answer" é a primeira lição.
 - Walt **fica na linha em viva-voz** durante o dia 1. Cada dica sai uma vez, quando a party chega ao passo: placa OPEN, salsicha, grelha, pão, pedido, entrega, estoque, "olhe os dois lados" antes de atravessar.
 - Sem painel e sem botões em tela: a ação é sempre o **prompt no mundo**.
-- A implementação atual usa uma única ligação para o tutorial inteiro, com ferramentas de dev (comandos `/dev tutorial`, `/dev voice`, painel F8) e vozes pré-carregadas (commit `44131a7`). Desde 2026-10-11 (Provisório, Q-193) ele roda sempre no dia 1 de toda run e não é salvo (`TutorialDone` virou campo legado).
+- A implementação atual usa uma única ligação para o tutorial inteiro, com ferramentas de dev (comandos `/dev tutorial`, `/dev tutorial voice`, painel F8) e vozes pré-carregadas (commit `44131a7`). Desde 2026-10-11 (Provisório, Q-193) ele roda sempre no dia 1 de toda run e não é salvo (`TutorialDone` virou campo legado).
 
 ## 5. Progressão e economia
 

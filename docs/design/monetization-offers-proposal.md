@@ -12,7 +12,7 @@ Autor: game-designer (via sessão de planejamento). Tudo aqui é **Provisório**
 `open-questions.md` **Q-293 a Q-299**; tasks **TASK-361 a TASK-369** (`tasks/board.md`).
 
 **2026-10-17, implementação:** o dono mandou seguir o plano ("pode seguir com esse plano") sem responder Q-293 a Q-299;
-a P0 (O1–O8, orçamento, métricas, grupo de controle, A/B do clique, "Shop tips", `/dev offer`) foi feita com as
+a P0 (O1–O8, orçamento, métricas, grupo de controle, A/B do clique, "Shop tips", `/dev ui offer`) foi feita com as
 recomendações deste documento como **Provisórias** (TASK-361 a TASK-366; teste em `tests/offers.md`). Diferenças do
 texto: o clique manda só `offer_click` (no lugar do `product_prompt`, que o limite de 0,5 s do `MetricUi` derrubaria);
 o O7 conta os registros `Failed` do set `Anomalies` no client (sem aviso novo do servidor). Fora: produtos novos
@@ -190,7 +190,7 @@ grupo de controle. Abaixo disso: muda o texto/momento uma vez; se continuar ruim
   compra) e, se precisar, o aviso de falha de anomalia para O7. O recibo continua todo no `ShopService` /
   `ShopUtilityService` (autoridade do servidor; o client nunca concede nada).
 - **Configuração:** "Shop tips" no painel de configurações.
-- **Dev:** `/dev offer <chave>` força uma oferta para testar no Studio.
+- **Dev:** `/dev ui offer <chave>` força uma oferta para testar no Studio.
 
 Fora do escopo das tasks P0: `src/Lobby`, `src/Session`, `src/Round`, `src/Run` e `ClassSelect` (outras sessões).
 As ofertas de lobby (N3, N6) ficam para depois (TASK-369).
@@ -235,18 +235,18 @@ lógica nova no AdminService. Argumentos tipados em `AdminArguments` a partir do
 
 | Comando Conch | Faz | Encaminha para |
 |---|---|---|
-| `offer <chave>` | mostra a nota dessa oferta na hora, ignorando orçamento e cooldown (`offer_coffee`, `offer_restock`, …) | `/dev offer <chave>` (já existe, TASK-366) |
-| `offer list` / `offer status` / `offer reset` | lista as chaves e os gatilhos; mostra o que bloqueia agora (tips, tutorial, calma, orçamento); zera contadores | `/dev offer …` (já existe) |
+| `offer <chave>` | mostra a nota dessa oferta na hora, ignorando orçamento e cooldown (`offer_coffee`, `offer_restock`, …) | `/dev ui offer <chave>` (já existe, TASK-366) |
+| `offer list` / `offer status` / `offer reset` | lista as chaves e os gatilhos; mostra o que bloqueia agora (tips, tutorial, calma, orçamento); zera contadores | `/dev ui offer …` (já existe) |
 | `stock <ingrediente> <n>` | põe o estoque de um ingrediente em n (0 = acabou: dispara O2 de verdade) | **novo** `/dev stock` (KitchenService, só dev) |
 | `stock empty <n>` / `stock low` | zera n ingredientes abertos / deixa todos abaixo de 20% (dispara O3) | **novo** `/dev stock` |
 | `sanity <n>` | sanidade do jogador (ex.: 20 = abaixo de 35%, dispara O1 à noite) | `/dev sanity` (já existe) |
 | `coffee <n>` | doses da cafeteira (café da máquina baixo) | `/dev coffee` (já existe) |
 | `cash <n>` | caixa da party (0 + tentar comprar = O4) | Conch `cash` (já existe) |
-| `down [player]` | o jogador desmaia (num segundo jogador, dispara O5 para quem está de pé) | `/dev down` (já existe) |
+| `down [player]` | o jogador desmaia (num segundo jogador, dispara O5 para quem está de pé) | `/dev faint` (já existe) |
 | `night <n>` | pula para a noite n (a partir da 2 as ofertas valem; 3+ = Night Kit) | Conch `night` (já existe, feito pela sessão do tablet) |
 | `scareme [player]` | simula receber um Scare de um colega (dispara O8 em 20 s) | **novo**: `ShopGrant` falso só no dev |
 | `failanomaly` | marca 2 anomalias como erradas na noite (dispara O7) | `anomaly <id> wrong` (já existe) 2× |
-| `receipt <chave>` | concede um produto sem Robux (Night Kit, Starter Crate…) para ver o efeito | `/dev receipt` (já existe, `ShopService:DevReceipt`) |
+| `receipt <chave>` | concede um produto sem Robux (Night Kit, Starter Crate…) para ver o efeito | `/dev shop receipt` (já existe, `ShopService:DevReceipt`) |
 
 Novos de fato: `stock` e `scareme` (DevService) e os atalhos Conch `offer`, `stock`, `sanity`, `coffee`, `down`,
 `scareme`, `receipt`. O resto já existe e só ganha atalho tipado.
