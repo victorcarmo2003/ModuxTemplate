@@ -196,7 +196,11 @@ local function run(api: Api.Context, dev: Dev, caller: Player?): string
 				dev("day", "2")
 				task.wait(1)
 				dev("customer", "off")
-				if round:GetPhase() == "Prep" then
+				-- "day 2" is Night 1 since DEC-300: Call (boss) then Night; skip until the shop takes customers
+				for _ = 1, 3 do
+					if economy:IsDrawerOpen() then
+						break
+					end
 					dev("skip")
 					task.wait(1)
 				end
@@ -249,6 +253,10 @@ local function run(api: Api.Context, dev: Dev, caller: Player?): string
 				if tablet == nil or tablet.Anchor == nil then
 					error("TAB-1 not bound", 0)
 				end
+				-- the customer may still be walking up at Q1: the tablet only takes an Ordering head
+				waitFor(function(): boolean
+					return customerState() == "Ordering"
+				end, 10)
 				act(tablet.Anchor, "tablet_take")
 				if tablet.State ~= "Talking" or tablet.Npc ~= npc then
 					error(`tablet {tablet.State} with {tablet.Npc} after tablet_take{why()}`, 0)
