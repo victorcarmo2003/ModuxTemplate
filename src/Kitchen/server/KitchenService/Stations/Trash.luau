@@ -6,21 +6,27 @@
 -- No record, no snapshot. Discardable is the hand rule, shared with the street bin (KitchenService, T60; Q-166 a
 -- Provisional: hot dog only): widening what may be thrown away changes only this function. World kitchen (kitchen-world.md
 -- §1; TASK-569): the plate in hand goes too, empty or half made (`plate`); with bun and sausage it already is the hot dog.
+-- Owner request 2026-10-19: a box in hand goes too (Items category Package: the stock room's stock_box, a Mart package),
+-- its units lost. Same rule for the street bin (KitchenService reads Discardable).
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Content = require(ReplicatedStorage.shared.Content)
 local StationApi = require(script.Parent.Parent.StationApi)
 
 const ACTION = "discard"
 const HOT_DOG = "hot_dog"
 const PLATE = "plate"
+const PACKAGE = "Package" -- Items category of a box
 
 export type TrashModule = StationApi.Module & {
 	Discardable: (ctx: StationApi.Context, player: Player) -> Tool?,
 }
 
--- Tool in the player's hand that may be thrown away: the hot dog or the plate (ctx.Held only returns ItemService Tools).
+-- Tool in the player's hand that may be thrown away: the hot dog, the plate or a box (ctx.Held only returns ItemService Tools).
 local function heldHotDog(ctx: StationApi.Context, player: Player): Tool?
 	const tool = ctx.Held(player)
 	const item = if tool ~= nil then tool:GetAttribute("Item") else nil
-	if tool ~= nil and (item == HOT_DOG or item == PLATE) then
+	const row = if type(item) == "string" then Content.Items.ByKey[item] else nil
+	if tool ~= nil and (item == HOT_DOG or item == PLATE or (row ~= nil and row.Category == PACKAGE)) then
 		return tool
 	end
 	return nil

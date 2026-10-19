@@ -43,8 +43,9 @@ return Table.new({
 		Night = "Any",
 		Wave = 3,
 	},
-	-- the plate in hand, empty, half made (plate) or with its sausage (hot_dog): ItemRules category HotDog
-	{ Key = "discard", Text = "Throw Away", Hold = 0.5, Radius = 7, Requires = { Held = "HotDog" }, Night = "Any", Wave = 1 },
+	-- the plate in hand, empty, half made (plate) or with its sausage (hot_dog), or a box (category Package, owner 2026-10-19).
+	-- Two categories: no Requires.Held; the client rule (PromptController/Rules) and Trash.Discardable check the hand
+	{ Key = "discard", Text = "Throw Away", Hold = 0.5, Radius = 7, Requires = {}, Night = "Any", Wave = 1 },
 	-- Customer prompts: 10 (was 8; owner playtest 2026-10-12, customers too far). The anchor rides on the customer rig.
 	{ Key = "take_order", Text = "Take Order", Hold = 0, Radius = 10, Requires = {}, Night = "Any", Wave = 1 },
 	-- no Requires.Held: the server picks the exact hot dog from the hotbar, or answers with a hint (2026-10-12)

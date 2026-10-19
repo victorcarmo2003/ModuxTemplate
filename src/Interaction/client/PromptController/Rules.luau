@@ -200,6 +200,10 @@ function Rules.Allows(target: Target, context: Context): boolean
 	if requires.Held and not Rules.Holds(held, requires.Held) then
 		return false
 	end
+	-- Throw Away: a plate / hot dog or a box (Trash.Discardable)
+	if target.Action == "discard" and not (Rules.Holds(held, "HotDog") or Rules.Holds(held, "Package")) then
+		return false
+	end
 
 	const ingredient = target.Ingredient
 	if requires.NotHasTopping and held and ingredient and held.Toppings[ingredient] then
