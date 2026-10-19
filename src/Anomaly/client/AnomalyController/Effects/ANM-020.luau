@@ -42,8 +42,8 @@ local Effect = require(script.Parent.Parent.Effect)
 local Blackout = require(script.Parent.Kit.Blackout)
 local Jumpscare = require(script.Parent.Kit.Jumpscare)
 local Watch = require(script.Parent.Kit.Watch)
+local VehicleRoot = require(ReplicatedStorage.shared.Vehicle.VehicleRoot)
 
-const VEHICLE_TAG = "Vehicle"
 const ANCHOR_TAG = "Interactable"
 const BREAKER_ACTION = "breaker_reset"
 const ZONE_POINT = "TRL"
@@ -162,14 +162,8 @@ end
 
 -- Vehicle lights --------------------------------------------------------------------------------------------------
 
-local function vehicleModel(ctx: Effect.Context): Model?
-	const key = Vide.untrack(ctx.Round.Vehicle)
-	for _, instance in CollectionService:GetTagged(VEHICLE_TAG) do
-		if instance:GetAttribute("Vehicle") == key and instance:IsA("Model") then
-			return instance
-		end
-	end
-	return nil
+local function vehicleModel(ctx: Effect.Context): Instance?
+	return VehicleRoot.Find(Vide.untrack(ctx.Round.Vehicle))
 end
 
 -- Lights and lamp parts LightController owns (it repaints them from the Lights set; never touched here)

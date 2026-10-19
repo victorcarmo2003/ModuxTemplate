@@ -966,13 +966,17 @@ root:SetAttribute("Task", "TASK-382")
 root:SetAttribute("Mode", if ART then "art" else "blockout")
 
 local PIVOT = face(F(42.5, FLOOR, 63), DIR.N)
-local trl = root:FindFirstChild("TRL")
+-- The restaurant root is the Folder "Trailer" (owner 2026-10-18: a Folder keeps the shell, kitchen and pantry easy to
+-- pick in Studio; code reads it through shared/Vehicle/VehicleRoot). An old Model "TRL" is still accepted.
+local trl = root:FindFirstChild("Trailer") or root:FindFirstChild("TRL")
 if not trl then
-	trl = Instance.new("Model")
-	trl.Name = "TRL"
+	trl = Instance.new("Folder")
+	trl.Name = "Trailer"
 	trl.Parent = root
 end
-trl.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+if trl:IsA("Model") then
+	trl.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+end
 for k, v in source:GetAttributes() do
 	if k ~= "OrigPath" and k ~= "OrigTags" and k ~= "TrailerLoweredV1" and k ~= "TrailerGroundV1" then
 		trl:SetAttribute(k, v)
@@ -982,6 +986,7 @@ trl:SetAttribute("MapId", "TRL")
 trl:SetAttribute("Vehicle", "trailer")
 trl:SetAttribute("Restaurant", true)
 trl:SetAttribute("Asset", "AST-140_RestaurantShell")
+-- a Folder has no pivot: VehicleRoot.Pivot reads this (MapPoint TRL is set below; refreshed at the end)
 if not DIFF then
 	CS:AddTag(trl, "Vehicle")
 end
@@ -2491,7 +2496,12 @@ local function newPoint(id, template, x, y, z, dir)
 	return p
 end
 local PY = FLOOR + 0.05
-setPoint("TRL", 42.5, FLOOR, 63, DIR.N)
+do
+	local trlPoint = setPoint("TRL", 42.5, FLOOR, 63, DIR.N)
+	if trlPoint and not DIFF then
+		trl:SetAttribute("Pivot", trlPoint.CFrame)
+	end
+end
 setPoint("CART", 56.5, FLOOR, 53.3, DIR.N)
 setPoint("Q1", 56.5, FLOOR, 52.3, DIR.S) -- 52.3 (was 52.6, 2026-10-18): a rig walking off it no longer brushes the counter top (Z 53.55)
 for i, x in { 54, 51.5, 49, 46.5 } do

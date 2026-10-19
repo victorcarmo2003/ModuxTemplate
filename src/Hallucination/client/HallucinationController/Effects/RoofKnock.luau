@@ -3,6 +3,8 @@
 -- pause, one more. Audio only (`door_knock` played from the roof, a bit lower). Only with the player inside or right
 -- next to the trailer. Sibling of roof_steps (steps walk across, knocks stay on one spot).
 local Context = require(script.Parent.Parent.Context)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VehicleRoot = require(ReplicatedStorage.shared.Vehicle.VehicleRoot)
 
 const VEHICLE = "trailer"
 const KEY = "door_knock" -- Provisional: a dedicated roof knock has no key yet
@@ -17,10 +19,10 @@ local function box(env: Context.Env): (CFrame?, Vector3?)
 		return nil, nil
 	end
 	const vehicle = env.Vehicle()
-	if vehicle == nil or not vehicle:IsA("Model") then
+	if vehicle == nil or not (vehicle:IsA("Model") or vehicle:IsA("Folder")) then
 		return nil, nil
 	end
-	const frame, size = vehicle:GetBoundingBox()
+	const frame, size = VehicleRoot.Box(vehicle)
 	return frame, size
 end
 

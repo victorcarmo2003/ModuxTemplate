@@ -3,6 +3,8 @@
 -- Only on the trailer with the player inside or right next to it. The key `roof_step` is not in Content.Sounds yet
 -- (Q-168): until then the effect plays silently (Provisional).
 local Context = require(script.Parent.Parent.Context)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VehicleRoot = require(ReplicatedStorage.shared.Vehicle.VehicleRoot)
 
 const VEHICLE = "trailer"
 const KEY = "roof_step"
@@ -16,10 +18,10 @@ local function box(env: Context.Env): (CFrame?, Vector3?)
 		return nil, nil
 	end
 	const vehicle = env.Vehicle()
-	if vehicle == nil or not vehicle:IsA("Model") then
+	if vehicle == nil or not (vehicle:IsA("Model") or vehicle:IsA("Folder")) then
 		return nil, nil
 	end
-	const frame, size = vehicle:GetBoundingBox()
+	const frame, size = VehicleRoot.Box(vehicle)
 	return frame, size
 end
 

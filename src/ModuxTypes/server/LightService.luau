@@ -57,7 +57,7 @@ export type Public = {
 	IsSwitchAnchor: (self: Public, anchor: Instance) -> boolean,
 	RefreshSwitches: (self: Public) -> (),
 	AddSwitch: (self: Public, anchor: Instance) -> (),
-	TrailerModel: (self: Public) -> Model?,
+	TrailerModel: (self: Public) -> Instance?,
 	AddBreaker: (self: Public, anchor: Instance) -> (),
 	RefreshBreakers: (self: Public) -> (),
 	EnsureBreaker: (self: Public) -> boolean,

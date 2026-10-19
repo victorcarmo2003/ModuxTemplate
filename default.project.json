@@ -171,6 +171,12 @@
 						"optional": "src/Shared/Types"
 					}
 				},
+				"Vehicle": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Vehicle/shared"
+					}
+				},
 				"Verbose": {
 					"$path": {
 						"optional": "src/Shared/Verbose.luau"

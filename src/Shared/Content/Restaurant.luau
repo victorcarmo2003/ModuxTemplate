@@ -285,7 +285,7 @@ const restaurant: Restaurant = {
 		PetMax = 1,
 	},
 	Supply = {
-		Enabled = false,
+		Enabled = false, -- derived: overwritten from Rules.Enabled below (never edit by hand)
 		LowAt = 0.25,
 		MartShelves = true, -- derived: overwritten from Switch.MartShelves below (never edit by hand)
 	},
@@ -403,6 +403,8 @@ const switch: Switch = {
 }
 
 restaurant.Supply.MartShelves = switch.MartShelves
+-- the stock room replaces the Mart (FEAT-050): on with the restaurant, else nothing would give a box (DEC-306 playtest)
+restaurant.Supply.Enabled = on
 
 export type Module = Restaurant & { PickupPoints: (count: number?) -> { string }, Switch: Switch }
 

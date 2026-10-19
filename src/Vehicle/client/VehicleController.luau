@@ -75,7 +75,7 @@ const PANEL_TICK = 4 -- Hz: shop open / closed against the flap pose
 const LEVER_PHASES: { string } = Content.Actions.ByKey.shutter_toggle.Requires.Phase or {}
 
 type Shutter = {
-	Model: Model,
+	Model: Instance, -- vehicle root (Model, or the restaurant's Folder: VehicleRoot)
 	Part: BasePart,
 	Hinge: Attachment,
 	HingeOffset: CFrame, -- hinge in part space (authored)
@@ -105,7 +105,7 @@ end
 
 -- Shutter_Hinge Attachments of a vehicle: every one on a Shutter_Panel* part (main + linked flaps, TASK-480); with no
 -- panel at all, the first one on any BasePart (P51: the Awning mesh)
-local function findHinges(model: Model): { Attachment }
+local function findHinges(model: Instance): { Attachment }
 	const hinges: { Attachment } = {}
 	local fallback: Attachment? = nil
 	for _, descendant in model:GetDescendants() do
@@ -149,8 +149,8 @@ end
 -- moves when the flaps themselves swing (TASK-480: the closed flaps slid ~2 studs into the windows). PrimaryPart when
 -- there is one, else the biggest anchored BasePart of the vehicle that is not a flap (shell/floor: no door leaf or prop
 -- that other controllers move).
-local function baseOf(model: Model): BasePart?
-	if model.PrimaryPart ~= nil then
+local function baseOf(model: Instance): BasePart?
+	if model:IsA("Model") and model.PrimaryPart ~= nil then
 		return model.PrimaryPart
 	end
 	local best: BasePart? = nil
@@ -206,7 +206,7 @@ end
 
 -- Tagged Vehicle model: service window flap
 function VehicleController:WatchVehicle(model: Instance)
-	if model:IsA("Model") then
+	if model:IsA("Model") or model:IsA("Folder") then
 		self:WatchShutter(model, true)
 	end
 end
@@ -223,7 +223,7 @@ function VehicleController:UnwatchVehicle(model: Instance)
 	end
 end
 
-function VehicleController:HasShutter(model: Model): boolean
+function VehicleController:HasShutter(model: Instance): boolean
 	for _, shutter in self.Shutters do
 		if shutter.Model == model then
 			return true
@@ -234,7 +234,7 @@ end
 
 -- Binds the flap of a vehicle with HasShutter. `retry`: the Model may replicate before its children, so a missing
 -- hinge is looked for once more HINGE_RETRY s later before the warn.
-function VehicleController:WatchShutter(model: Model, retry: boolean)
+function VehicleController:WatchShutter(model: Instance, retry: boolean)
 	if self:HasShutter(model) then
 		return
 	end
@@ -269,7 +269,7 @@ function VehicleController:WatchShutter(model: Model, retry: boolean)
 end
 
 -- One flap (hinge on its part) of a watched vehicle
-function VehicleController:WatchFlap(model: Model, hinge: Attachment)
+function VehicleController:WatchFlap(model: Instance, hinge: Attachment)
 	const part = hinge.Parent :: BasePart
 	if not part.Anchored or #part:GetJoints() > 0 then
 		self:WarnOnce(
@@ -335,7 +335,7 @@ end
 
 -- The flap is down when the window is closed (server attribute) or, outside the lever phases, the shop is not selling
 -- (panel). A phase this client does not know yet counts as selling: the flap never closes on a guess.
-function VehicleController:WantClosed(model: Model): boolean
+function VehicleController:WantClosed(model: Instance): boolean
 	if model:GetAttribute(SHUTTER_ATTRIBUTE) == true then
 		return true
 	end
@@ -348,7 +348,7 @@ function VehicleController:WantClosed(model: Model): boolean
 end
 
 -- The vehicle's window is worked by a wall lever (a shutter_toggle anchor whose model holds a `Lever` part)
-local function hasLever(model: Model): boolean
+local function hasLever(model: Instance): boolean
 	for _, d in model:GetDescendants() do
 		if d:GetAttribute("PromptAction") == "shutter_toggle" then
 			const holder = d.Parent

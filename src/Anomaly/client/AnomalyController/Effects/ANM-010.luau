@@ -41,6 +41,7 @@ local Effect = require(script.Parent.Parent.Effect)
 local Jumpscare = require(script.Parent.Kit.Jumpscare)
 local Radio = require(script.Parent.Kit.Radio)
 local Watch = require(script.Parent.Kit.Watch)
+local VehicleRoot = require(ReplicatedStorage.shared.Vehicle.VehicleRoot)
 
 -- "Run" warning (TASK-334; PROVISIONAL)
 const RUN_FRESH = 4 -- s: a record older than this when mounted does not replay the radio line
@@ -73,7 +74,6 @@ const FOG_TEXTURE = "rbxasset://textures/particles/smoke_main.dds" -- placeholde
 const FOG_COLOR = Color3.fromHex("#9AA3C0")
 const GROUND_POINT = "SS" -- ground reference (MAP-01: Y 0); fallback 0
 const POST_GROUP = "juniper_posts"
-const VEHICLE_TAG = "Vehicle"
 
 -- Atmosphere over the night preset (AST-084 values pending; never darker than the §5.3 reading minimum: only
 -- density/haze/colour move, Ambient is untouched)
@@ -247,14 +247,8 @@ local function step(state: FogState, dt: number)
 end
 
 -- Current vehicle of the party (Vehicle tag with the RoundController Vehicle key)
-local function vehicleModel(ctx: Effect.Context): Model?
-	const key = Vide.untrack(ctx.Round.Vehicle)
-	for _, instance in CollectionService:GetTagged(VEHICLE_TAG) do
-		if instance:GetAttribute("Vehicle") == key and instance:IsA("Model") then
-			return instance
-		end
-	end
-	return nil
+local function vehicleModel(ctx: Effect.Context): Instance?
+	return VehicleRoot.Find(Vide.untrack(ctx.Round.Vehicle))
 end
 
 -- Error flavor: a bank of fog drifts through the vehicle (one shot)
@@ -263,7 +257,7 @@ local function seep(ctx: Effect.Context, cue: Effect.Cue)
 	if vehicle == nil then
 		return
 	end
-	const cf, size = vehicle:GetBoundingBox()
+	const cf, size = VehicleRoot.Box(vehicle)
 	const box = invisibleBox("HushSeep", Vector3.new(size.X, 1, size.Z))
 	const across = if cue.Rng:NextNumber() < 0.5 then cf.RightVector else -cf.RightVector
 	box.CFrame = CFrame.lookAt(cf.Position - Vector3.new(0, size.Y / 2 - FOG_HEIGHT, 0), cf.Position + across)

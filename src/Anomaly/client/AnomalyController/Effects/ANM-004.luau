@@ -44,6 +44,7 @@ local Effect = require(script.Parent.Parent.Effect)
 local Fade = require(script.Parent.Kit.Fade)
 local Kit = require(script.Parent.Kit.CustomerActor)
 local Haptics = require(StarterPlayer.StarterPlayerScripts.client.Input.Haptics)
+local VehicleRoot = require(ReplicatedStorage.shared.Vehicle.VehicleRoot)
 
 const VARIANT = "mirror"
 const ACCESSORY_ATTRIBUTE = "Accessory" -- CrewRig.Build marks every accessory piece
@@ -54,7 +55,6 @@ const HOLD_EXTRA = 1 -- s: "o sorriso fica parado um segundo a mais"
 const HOLD_STEP = 0.1
 const BACKWALK = "copy_backwalk" -- Content.Animations (N4)
 -- Door flow (DEC-247, Provisional numbers)
-const VEHICLE_TAG = "Vehicle"
 const DOOR_NAME = "Door_Back"
 const INTERIOR_ZONE = "LZ-1" -- LightZone volume of the trailer interior (VehicleService:IsInside)
 const KNOCK_SOUND = "door_knock"
@@ -203,14 +203,8 @@ local function insideTrailer(): boolean
 	return false
 end
 
-local function vehicleModel(ctx: Effect.Context): Model?
-	const key = Vide.untrack(ctx.Round.Vehicle)
-	for _, instance in CollectionService:GetTagged(VEHICLE_TAG) do
-		if instance:GetAttribute("Vehicle") == key and instance:IsA("Model") then
-			return instance
-		end
-	end
-	return nil
+local function vehicleModel(ctx: Effect.Context): Instance?
+	return VehicleRoot.Find(Vide.untrack(ctx.Round.Vehicle))
 end
 
 -- Door leaf and the outside direction (the vehicle axis that points from its centre toward the door)
@@ -230,7 +224,7 @@ local function doorGeo(ctx: Effect.Context): DoorGeo?
 	else
 		return nil
 	end
-	const frame = vehicle:GetPivot()
+	const frame = VehicleRoot.Pivot(vehicle)
 	const toDoor = Vector3.new(centre.X - frame.Position.X, 0, centre.Z - frame.Position.Z)
 	local best = frame.RightVector
 	local bestDot = -math.huge

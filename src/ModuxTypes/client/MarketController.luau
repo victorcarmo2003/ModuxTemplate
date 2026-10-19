@@ -53,7 +53,7 @@ export type Public = {
 	Waits: { [string]: Vide.Source<number> },
 	Setup: (self: Public) -> (),
 	BenchAnchor: (self: Public, slot: string) -> Instance?,
-	CurrentVehicle: (self: Public) -> Model?,
+	CurrentVehicle: (self: Public) -> Instance?,
 	Cue: (self: Public, key: string, at: Instance) -> (),
 	Celebrate: (self: Public, slot: string) -> (),
 	OnLevel: (self: Public, upgrade: Content.Upgrade, level: number) -> (),

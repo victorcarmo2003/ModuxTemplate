@@ -5,6 +5,8 @@
 -- Source: a part named like "Radio" in the vehicle; else the vehicle's centre (the trailer has no radio model yet).
 -- Static = `phone_glitch` (Provisional until a radio static key exists). Lines are original, short and Mild.
 local Context = require(script.Parent.Parent.Context)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VehicleRoot = require(ReplicatedStorage.shared.Vehicle.VehicleRoot)
 
 const STATIC_KEY = "phone_glitch"
 const SPEAKER = "Radio"
@@ -35,10 +37,10 @@ end
 local function near(env: Context.Env): boolean
 	const vehicle = env.Vehicle()
 	const root = Context.Root()
-	if vehicle == nil or root == nil or not vehicle:IsA("Model") then
+	if vehicle == nil or root == nil or not (vehicle:IsA("Model") or vehicle:IsA("Folder")) then
 		return false
 	end
-	const frame, size = vehicle:GetBoundingBox()
+	const frame, size = VehicleRoot.Box(vehicle)
 	const point = frame:PointToObjectSpace(root.Position)
 	const half = size / 2 + Vector3.new(NEAR, NEAR, NEAR)
 	return math.abs(point.X) <= half.X and math.abs(point.Y) <= half.Y and math.abs(point.Z) <= half.Z

@@ -56,6 +56,7 @@ local Hint = require(script.Hint)
 local Kiosk = require(script.Kiosk)
 local Labels = require(script.Labels)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
+local VehicleRoot = require(ReplicatedStorage.shared.Vehicle.VehicleRoot)
 local Minis = require(script.Minis)
 -- shared VFX budget (AST-092 ceiling counts the whole screen)
 local Fx = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Fx)
@@ -70,8 +71,6 @@ const SHELF_OFFSET = Vector3.new(0, -1.3, 0)
 const SHELF_LIFTED = Vector3.new(0, 1.3, 0)
 const SHELF_CLEARANCE = 0.6 -- studs: half the ShelfTag height (0.475) + a small margin under it
 const SHELF_DISTANCE = 30
-const VEHICLE_TAG = "Vehicle"
-const VEHICLE_ATTRIBUTE = "Vehicle"
 const SETTLE = 0.5 -- s before an upgrade sound is decided (swap guard)
 const SWAP_GUARD = 2 -- s: level changes this close to a vehicle swap are the swap, not a purchase
 const CONFETTI = 14 -- AST-092 upgrade Emit(14)
@@ -181,14 +180,8 @@ function MarketController:BenchAnchor(slot: string): Instance?
 	return nil
 end
 
-function MarketController:CurrentVehicle(): Model?
-	const key = Vide.untrack(self.Dependencies.RoundController.Vehicle)
-	for _, vehicle in CollectionService:GetTagged(VEHICLE_TAG) do
-		if vehicle:IsA("Model") and vehicle:GetAttribute(VEHICLE_ATTRIBUTE) == key and vehicle:IsDescendantOf(workspace) then
-			return vehicle
-		end
-	end
-	return nil
+function MarketController:CurrentVehicle(): Instance?
+	return VehicleRoot.Find(Vide.untrack(self.Dependencies.RoundController.Vehicle))
 end
 
 -- One-shot; a key still missing from Content.Sounds is skipped quietly
@@ -237,7 +230,7 @@ function MarketController:OnLevel(upgrade: Content.Upgrade, level: number)
 		const model = self:CurrentVehicle()
 		if model then
 			self:Cue("upgrade_done", model)
-			const frame, size = model:GetBoundingBox()
+			const frame, size = VehicleRoot.Box(model)
 			Fx.Burst(frame.Position + Vector3.new(0, size.Y / 2, 0), "Confetti", CONFETTI)
 		end
 	end)

@@ -2136,3 +2136,55 @@ anomalia muda (só apresentação), exceto os tempos curtos do eco (Q-386). Todo
 **Paralelismo:** onda 1 = 533, 538 (backend) · onda 2 = 534–537 e 539 (frontend, arquivos disjuntos depois da 533) e 540
 (backend, após 342/343) · onda 3 = 541–553, uma worktree por cena (cada uma só toca o seu `HorrorScenes/<Key>.luau`) · 554 por
 último. ANM-009 (batida do Walt) é da sessão irmã e não tem task aqui; entra na tabela do §10 só como assinatura da N2.
+
+## Tabela de tasks — Limpeza, cozinha de mundo e jogo jogável (2026-10-18; TASK-562 a TASK-580; DEC-306)
+
+Fonte: fala do dono (DEC-306). Ordem do dono: **limpar → cozinha e estoque funcionando → testar anomalias → dificuldade**.
+Cada fase termina num **Play do dono** (a meta da fase 1 é: fazer um hot dog e servir um cliente).
+
+### Fase 0 — destravar o Studio e limpar o que não usamos
+
+| TASK | Item | Descrição e critério de aceite | Dono | Depende | Status |
+|---|---|---|---|---|---|
+| TASK-562 | place | **O modelo do restaurante voltou a ser pasta.** No Studio, `MAP01_Restaurant.TRL` (Model, tag `Vehicle`, `Vehicle=trailer`, `Restaurant=true`, `Shutter`) virou a pasta `Trailer` sem tag nem atributo (edição à mão). Sem o `Vehicle`, persiana, cozinha, estoque e luzes não ligam. Trazer as edições da bancada para o binding (`restaurant_bind`) e recriar o Model com tag e atributos. Aceite: boot sem `0 Vehicle 'trailer'`; `/dev debug interact` mostra a persiana ligada. **Feito (2026-10-18): a pasta fica (dono); `VehicleRoot` lê Model ou Folder; `Supply.Enabled` segue o restaurante (depósito ligava nada).** | level-designer + orquestrador | — | Em QA |
+| TASK-563 | inventário | **Inventário dos resquícios** em `docs/tech/legacy-cleanup.md`: tutorial do Mercado (`mart_go/mart_buy/mart_back`, `Content.Mart.FirstShiftClosed`), Mart e Gear Stand (`ServerStorage.Mart`, `MartController`, `LightGroups.mart`, pontos OP-1/MKT-DOOR), preparo focado do trailer (`Prep/PT_Hatch`, `PT_Bin`, `Station_1..4`, `PrepStationsV1/V2`), porta dos fundos e `HideZone` do trailer, anomalias cortadas (002, 003, 007, 018), falas e sons que citam trailer/Mercado, `Dev/Parts` sem uso. Cada linha: arquivo, quem ainda chama, "remover / manter (por quê)". **Feito: `tech/legacy-cleanup.md`; remoção depende da Q-394.** | architect | — | Em QA |
+| TASK-564 | remoção | **Remover o que o inventário marcou** (servidor), em lotes por sistema, gate limpo a cada lote. | backend-coder | 563, Q-394 | Pendente |
+| TASK-565 | remoção | **Remover o que o inventário marcou** (client, tutorial, áudio): o tutorial deixa de mandar ao Mercado; falas e sons de trailer/Mercado saem de `VoiceLines`, `BossCalls`, `Sounds`. | frontend-coder + narrative-writer | 563, Q-394 | Pendente |
+
+### Fase 1 — fazer um hot dog e servir
+
+| TASK | Item | Descrição e critério de aceite | Dono | Depende | Status |
+|---|---|---|---|---|---|
+| TASK-566 | contrato | **Contrato da cozinha de mundo** (DEC-306) em `tech/restaurant-flow.md`: pilha de salsichas no descanso (`TRL-R`), pilha de pães cortados (`TLR_BUN_CUT`), pegar do monte, prato na mão (pão + salsicha), mesa de condimentos (`PRODUCTION`, `Pan_*`), entrega com o ticket; o que sai da esteira (Q-390). Aceite: architect revisa; tabela de prompts por estação. | architect | 562, Q-390 | Pendente |
+| TASK-567 | binding | **Binding da bancada nova**: `MapId`/`StationKind` coerentes (hoje `TLR_BUN_CUT` e `TLR-BUN_CRATE` têm o mesmo `MapId=TRL-B`; `TLR-CUTTING_BOARD` tem `PendingStationKind=cut`), mesa de condimentos ligada, marcas `Plates/Mark1..8` na frente. `check_map01` e `restaurant_bind` atualizados. | level-designer | 562, 566 | Pendente |
+| TASK-568 | servidor | **Grelha → descanso → pilha** e **pão → tábua → pilha de cortados** com as regras do contrato (quantidade, tempo, quem pega). | backend-coder | 566 | Pendente |
+| TASK-569 | servidor | **Prato na mão**: pegar prato, pôr pão e salsicha da pilha, levar à mesa de condimentos, aplicar condimento, entregar ao cliente (ticket, nota no `Grade`). | backend-coder | 566, 568 | Pendente |
+| TASK-570 | client | **Prompts, prato visível na mão e feedback** de cada estação e da mesa de condimentos (sem minigame da esteira se Q-390 = A). | frontend-coder | 568, 569 | Pendente |
+| TASK-571 | estoque | **Depósito: pegar caixa não funciona.** Os `Prompt_TakeBox` dos `STOCK-*` (Pantry/StockBays) estão sem tag `Interactable` no place; conferir quem põe a tag (binder) e o fluxo `take_box` → repor estação. Aceite: pegar caixa de salsicha, repor a caixa da grelha, no Play. **Causa achada e corrigida com a 562: `Supply.Enabled` desligado; as 9 prateleiras ligam (bacon, queijo, cream cheese e batata palha bloqueados pelo desbloqueio por dia). Falta o Play do dono.** | debugger | 562 | Em QA |
+| TASK-572 | QA | **Play do dono: um hot dog do começo ao fim** (solo e 2 jogadores): fritar, cortar, montar, condimentos, servir, receber; repor do depósito. Checklist em `docs/tests/kitchen-world.md`. | qa-tester | 567–571 | Pendente |
+
+### Fase 2 — clientes por jogador e drive-thru
+
+| TASK | Item | Descrição e critério de aceite | Dono | Depende | Status |
+|---|---|---|---|---|---|
+| TASK-573 | números | **Escala de clientes por jogador** (1–4): clientes simultâneos, intervalo, `MaxCustomers`, parte do drive-thru; tabela em `design/restaurant-flow.md`. Meta: com 4 jogadores ninguém fica parado. | game-designer | 566 | Pendente |
+| TASK-574 | drive-thru | **Drive-thru ligado e testado** (`Restaurant.Drive.Enabled`, `UnlockNight`, filas por party). Aceite: carro chega, pede, recebe e sai, no Play. | backend-coder + frontend-coder | 573, 572 | Pendente |
+| TASK-575 | QA | **Play com 4 jogadores** (Local Server): todos ocupados, sem fila travada. | qa-tester | 573, 574 | Pendente |
+
+### Fase 3 — testar as anomalias
+
+| TASK | Item | Descrição e critério de aceite | Dono | Depende | Status |
+|---|---|---|---|---|---|
+| TASK-576 | QA | **Play do dono nas anomalias** pelo checklist de `tests/anomalies-status.md` com `/dev trigger <nome>` (primeiro as 8 "Pronta sem teste": 009, 019, 017, 012, 006, 008, 010, 021). Nota por anomalia: entende / dá medo / quebra. | qa-tester + dono | 572 | Pendente |
+
+### Fase 4 — dificuldade e direção (depois do Play)
+
+| TASK | Item | Descrição e critério de aceite | Dono | Depende | Status |
+|---|---|---|---|---|---|
+| TASK-577 | apagão | **Dois quadros de energia** (Q-391): segundo quadro no mapa, regra com 2+ jogadores, cena. | game-designer → backend + frontend | 576, Q-391 | Pendente |
+| TASK-578 | ligação | **Close na caixa de fusíveis ao atender a ligação** da noite do apagão (Q-392): campo `Focus` na ligação, câmera ~3 s, respeita "Reduzir movimento". | frontend-coder | 576, Q-392 | Pendente |
+| TASK-579 | anomalia | **Substituta da ANM-006** (Q-393): proposta com 2–3 opções no padrão do apagão. | game-designer | 576, Q-393 | Pendente |
+| TASK-580 | erros | **3 erros do gate** em `Prep/PrepService/Bridge.luau` (145, 267) e `Plate/PlateService/CenterTable.luau` (167), de edição não commitada; resolver junto com a 566 (podem sair com a esteira). | debugger | 566 | Pendente |
+
+**Paralelismo:** 562 e 563 em paralelo · 564 e 565 depois da 563 (arquivos disjuntos) · 566 após 562 · 567, 568, 571 em paralelo após a 566 · 569 → 570 · 572 fecha a fase 1 · 573 pode começar com a 566.
+

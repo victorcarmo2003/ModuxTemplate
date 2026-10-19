@@ -11,6 +11,7 @@ export type Public = {
 	Add: (self: Public, command: Api.Command, source: string) -> (),
 	Load: (self: Public) -> (),
 	Help: (self: Public) -> string,
+	HelpOf: (self: Public, name: string) -> string,
 	Execute: (self: Public, name: string, args: { string }, caller: Player?) -> string?,
 	BindBridge: (self: Public) -> (),
 	BindChat: (self: Public) -> (),

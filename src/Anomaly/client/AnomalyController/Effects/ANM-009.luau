@@ -51,6 +51,7 @@ local Haptics = require(StarterPlayer.StarterPlayerScripts.client.Input.Haptics)
 local Effect = require(script.Parent.Parent.Effect)
 local Jumpscare = require(script.Parent.Kit.Jumpscare)
 local Watch = require(script.Parent.Kit.Watch)
+local VehicleRoot = require(ReplicatedStorage.shared.Vehicle.VehicleRoot)
 
 const create = Vide.create
 const spring = Vide.spring
@@ -66,7 +67,6 @@ const SERIES_RESET = 20 -- seconds without a knock: the next one starts a new co
 
 const KNOCKS = 3
 const KNOCK_GAP = 0.42
-const VEHICLE_TAG = "Vehicle"
 const DOOR_NAMES = { "Door_Back", "Door_Glass" }
 const NAPKIN_ANCHOR = "VFX_Napkins"
 -- restaurant (owner 2026-10-18, Walt knocking on the back door): the pantry's exit door DOOR-B, from outside
@@ -247,18 +247,12 @@ end
 
 -- World -------------------------------------------------------------------------------------------------------------
 
-local function vehicleModel(ctx: Effect.Context): Model?
-	const key = Vide.untrack(ctx.Round.Vehicle)
-	for _, instance in CollectionService:GetTagged(VEHICLE_TAG) do
-		if instance:GetAttribute("Vehicle") == key and instance:IsA("Model") then
-			return instance
-		end
-	end
-	return nil
+local function vehicleModel(ctx: Effect.Context): Instance?
+	return VehicleRoot.Find(Vide.untrack(ctx.Round.Vehicle))
 end
 
 -- Door glass position (AN-05, inside); falls back to the door part, then the vehicle
-local function doorPoint(ctx: Effect.Context, vehicle: Model?): Vector3?
+local function doorPoint(ctx: Effect.Context, vehicle: Instance?): Vector3?
 	const point = ctx.Point(DOOR_POINT)
 	if point then
 		return point.Position
@@ -268,7 +262,7 @@ local function doorPoint(ctx: Effect.Context, vehicle: Model?): Vector3?
 		if door and door:IsA("PVInstance") then
 			return door:GetPivot().Position
 		end
-		return vehicle:GetPivot().Position
+		return VehicleRoot.Pivot(vehicle).Position
 	end
 	return nil
 end
@@ -338,7 +332,7 @@ type Swing = {
 	Sign: number,
 }
 
-local function doorParts(vehicle: Model): { BasePart }
+local function doorParts(vehicle: Instance): { BasePart }
 	const out: { BasePart } = {}
 	for _, name in DOOR_NAMES do
 		const found = vehicle:FindFirstChild(name, true)
@@ -357,7 +351,7 @@ local function doorParts(vehicle: Model): { BasePart }
 	return out
 end
 
-local function hingeOf(vehicle: Model): CFrame?
+local function hingeOf(vehicle: Instance): CFrame?
 	const door = vehicle:FindFirstChild("Door_Back", true)
 	if door == nil then
 		return nil
@@ -378,7 +372,7 @@ local function hingeOf(vehicle: Model): CFrame?
 	return nil
 end
 
-local function makeSwing(ctx: Effect.Context, vehicle: Model): Swing?
+local function makeSwing(ctx: Effect.Context, vehicle: Instance): Swing?
 	const parts = doorParts(vehicle)
 	const hingeFull = hingeOf(vehicle)
 	if #parts == 0 or hingeFull == nil then
@@ -386,7 +380,7 @@ local function makeSwing(ctx: Effect.Context, vehicle: Model): Swing?
 	end
 	-- rotate about the world vertical through the hinge
 	const hinge = CFrame.new((hingeFull :: CFrame).Position)
-	const centre = vehicle:GetBoundingBox().Position
+	const centre = (VehicleRoot.Box(vehicle)).Position
 	local doorCentre = Vector3.zero
 	for _, part in parts do
 		doorCentre += part.Position
@@ -444,7 +438,7 @@ end
 
 -- Napkins and wind --------------------------------------------------------------------------------------------------
 
-local function napkinOrigin(vehicle: Model?, door: Vector3?): Vector3?
+local function napkinOrigin(vehicle: Instance?, door: Vector3?): Vector3?
 	if vehicle then
 		const anchor = vehicle:FindFirstChild(NAPKIN_ANCHOR, true)
 		if anchor and anchor:IsA("Attachment") then
@@ -459,15 +453,15 @@ local function napkinOrigin(vehicle: Model?, door: Vector3?): Vector3?
 	if vehicle == nil then
 		return door - Vector3.new(0, NAPKIN_FALLBACK_DROP, 0)
 	end
-	const centre = vehicle:GetBoundingBox().Position
+	const centre = (VehicleRoot.Box(vehicle)).Position
 	const flat = Vector3.new(centre.X, door.Y, centre.Z)
 	return door:Lerp(flat, NAPKIN_FALLBACK_SHARE) - Vector3.new(0, NAPKIN_FALLBACK_DROP, 0)
 end
 
 -- Wind direction: from the door into the vehicle (flat)
-local function windDirection(vehicle: Model?, door: Vector3?): Vector3
+local function windDirection(vehicle: Instance?, door: Vector3?): Vector3
 	if vehicle and door then
-		const centre = vehicle:GetBoundingBox().Position
+		const centre = (VehicleRoot.Box(vehicle)).Position
 		const flat = Vector3.new(centre.X - door.X, 0, centre.Z - door.Z)
 		if flat.Magnitude > 1e-3 then
 			return flat.Unit
@@ -677,7 +671,7 @@ local function knockerPose(ctx: Effect.Context): CFrame?
 	if door == nil or vehicle == nil then
 		return nil
 	end
-	const centre = vehicle:GetPivot().Position
+	const centre = VehicleRoot.Pivot(vehicle).Position
 	local out = Vector3.new(door.X - centre.X, 0, door.Z - centre.Z)
 	out = if out.Magnitude > 1e-3 then out.Unit else Vector3.zAxis
 	const at = door + out * KNOCKER_OUT

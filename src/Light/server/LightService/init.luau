@@ -39,6 +39,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Content = require(ReplicatedStorage.shared.Content)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Zones = require(ReplicatedStorage.shared.Light.Zones)
+local VehicleRoot = require(ReplicatedStorage.shared.Vehicle.VehicleRoot)
 local Rules = require(script.Rules)
 local Modux = require(ServerScriptService.server.Modux)
 
@@ -454,14 +455,9 @@ end
 
 -- Breaker (ANM-020) -------------------------------------------------------------------------------------------------
 
--- Trailer Model (Vehicle tag, Vehicle = "trailer")
-function LightService:TrailerModel(): Model?
-	for _, instance in CollectionService:GetTagged(VEHICLE_TAG) do
-		if instance:IsA("Model") and instance:GetAttribute(VEHICLE_ATTRIBUTE) == TRAILER and instance:IsDescendantOf(workspace) then
-			return instance
-		end
-	end
-	return nil
+-- Trailer root (Vehicle tag, Vehicle = "trailer"): a Model, or the restaurant's Folder (VehicleRoot)
+function LightService:TrailerModel(): Instance?
+	return VehicleRoot.Find(TRAILER)
 end
 
 function LightService:AddBreaker(anchor: Instance)
@@ -509,7 +505,7 @@ function LightService:EnsureBreaker(): boolean
 		self:WarnOnce("breaker", "no trailer Model: ANM-020 has no breaker to reset")
 		return false
 	end
-	local host: BasePart? = model.PrimaryPart
+	local host: BasePart? = if model:IsA("Model") then model.PrimaryPart else nil
 	if host == nil then
 		local best = 0
 		for _, d in model:GetDescendants() do
@@ -530,7 +526,7 @@ function LightService:EnsureBreaker(): boolean
 	anchor:SetAttribute("PromptAction", BREAKER_ACTION)
 	anchor:SetAttribute("PromptEnabled", false)
 	anchor.Parent = host
-	anchor.WorldPosition = model:GetPivot():PointToWorldSpace(BREAKER_OFFSET)
+	anchor.WorldPosition = VehicleRoot.Pivot(model):PointToWorldSpace(BREAKER_OFFSET)
 	self.Breakers[anchor] = true
 	CollectionService:AddTag(anchor, ANCHOR_TAG)
 	self:WarnOnce(

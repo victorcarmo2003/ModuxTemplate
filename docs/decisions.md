@@ -4029,3 +4029,24 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
   - **DEC-298** (sem queima): o UPG-016 fica fora de venda até a queima voltar.
   - `tech/prep-conveyor.md` P3/P5: rejeitadas; o dono do doc (architect) atualiza.
 - Impacto: **architect** (`prep-conveyor.md` P3/P5 e §12), **game-designer** (UPG-016, `TipExtra`, FEAT-045 8 salsichas), **level-designer** (`Prompt_Grill`), **backend-coder**, **frontend-coder**, **task-planner**, **qa-tester**.
+
+### DEC-306 — 2026-10-18 — Limpar os sistemas antigos antes de tudo; cozinha de mundo com pilhas e prato levado aos condimentos; clientes e drive-thru escalam com o número de jogadores
+
+- Origem: fala do dono ao orquestrador em chat (2026-10-18), depois de um playtest em que não conseguiu fazer um hot dog nem pegar caixa no depósito.
+- Decidido pelo dono:
+  - **Ordem:** antes de qualquer feature nova, **remover os resquícios dos sistemas que não usamos mais** (exemplos dele: o tutorial que manda o jogador ao Mercado, áudio desatualizado). Depois: a **linha de produção de comida** e o **estoque do depósito** funcionando, e só então testar as anomalias.
+  - **Fluxo da cozinha** (bancada como ele reorganizou no Studio, oeste → leste na bancada de trás): caixa de salsichas → **grelha no centro** → **descanso de salsichas** → bandeja de **pães para cortar** (virados para baixo) → **tábua** → bandeja de **pães cortados** → **mesa de condimentos** à direita.
+    O jogador **frita salsichas e empilha no descanso**; **corta pães e empilha na bandeja de cortados**; para montar: **pega um pão e põe no prato, pega uma salsicha e põe no prato**, **leva o prato à mesa de condimentos**, põe os condimentos que quiser e **serve**.
+    Papéis para até **4 jogadores**: um fritando, um cortando, um nos condimentos/montagem, um servindo.
+  - **Clientes escalam com os jogadores:** mais jogadores = mais clientes ao mesmo tempo (2, 3, 4…), para ninguém ficar parado. **Drive-thru também** entra nessa escala (hoje `Restaurant.Drive.Enabled = false`).
+- Provisório (ideias do dono para depois, viram Q): apagão com **dois quadros de energia** que dois jogadores consertam juntos; na ligação do Walt da noite que estreia um evento com lugar fixo (apagão), **close de câmera na caixa de fusíveis**; **substituir a ANM-006** por uma anomalia nova (ainda não definida).
+- Emendas (append-only):
+  - **DEC-302 / DEC-304 / DEC-305** (esteira com paradas, prato que nasce na mesa central, dois prompts): o fluxo acima **substitui o minigame da esteira** como forma de montar o hot dog no restaurante, até o dono confirmar o contrário (Q-390). A nota (`Prep/shared/Grade.luau`) e o ticket continuam.
+- Impacto: **architect** (contrato da cozinha de mundo: pilhas, prato na mão, mesa de condimentos), **backend-coder**, **frontend-coder**, **level-designer** (binding da bancada nova), **game-designer** (escala de clientes e drive-thru por jogador), **qa-tester**.
+
+### DEC-307 — 2026-10-18 — O modo trailer sai do código: o restaurante é o único fluxo (Q-394 A)
+
+- Origem: resposta do dono em chat (2026-10-18) à Q-394, depois do inventário `tech/legacy-cleanup.md` (TASK-563).
+- Decidido pelo dono: **o modo trailer sai**. `Content.Restaurant.Rules.Enabled` deixa de ser chave de rollback; tudo que só existe para o trailer é removido em lotes (TASK-564/565): Mercado e Opal, entrega arrastando até a janela, mesas sujas, porta dos fundos do trailer, anomalias cortadas (002, 003, 007, 018), preparo focado do trailer (`PT_Hatch`, `PT_Bin`, `Station_1..4`) e o tutorial do Mercado.
+- Emendas (append-only): **DEC-280** e TASK-390 ("a chave única liga e desliga o restaurante; o trailer é o rollback"): não há mais rollback. A pasta `Trailer` do Studio é o restaurante (nome mantido pelo dono).
+- Fica para decidir: Gear Stand (Q-395), esteira (Q-390).
