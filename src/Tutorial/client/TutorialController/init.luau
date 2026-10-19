@@ -200,11 +200,9 @@ const DEV_PREFIX = "[TutorialDev]"
 -- Restaurant (TASK-393; design/tutorial-restaurant.md): actions and items of the restaurant loop and of the restock
 const RESTAURANT = Content.Restaurant
 const TABLET_TAKE = "tablet_take"
-const BUN_CUT = "bun_cut"
 const PLATE_TAKE = "plate_take"
-const ADD_BUN = "plate_add_bun"
-const ADD_SAUSAGE = "plate_add_sausage"
-const GRILL_FLIP = "grill_flip"
+const COOK_ACTION = "cook_focus"
+const COOK_FOCUS = "CookStation" -- local Player attribute: the cooking focus station open now (CookController)
 const PLATE = "plate"
 const PICKUP_SERVE = "pickup_serve"
 const TAKE_BOX = "take_box"
@@ -926,7 +924,7 @@ function TutorialController:DecideLive(): (string, Instance?, string)
 
 	const kitchen = self:Kitchen()
 	if kitchen.Rail > 0 and kitchen.BoardReady then
-		return "assemble", self:KitchenAnchor(ADD_SAUSAGE, false), ""
+		return "assemble", self:KitchenAnchor("plate_add_sausage", false), ""
 	end
 	if kitchen.GrillReady then
 		return "collect", self:KitchenAnchor("grill_collect", true), ""
@@ -998,48 +996,69 @@ function TutorialController:DecideRestaurant(guestId: number, guest: GuestRecord
 		for _, key in Content.Ingredients.ToppingKeys do
 			if guest.Order[key] and not held.Toppings[key] then
 				const row = Content.Ingredients.ByKey[key]
-				return "r_toppings",
-					self:Anchor("topping_add", false, function(anchor)
-						return anchor:GetAttribute("Ingredient") == key
-					end),
-					if row then row.Name else key
+				-- inside the condiment focus the HUD guides (the pan of the order is lit)
+				const focused = Players.LocalPlayer:GetAttribute(COOK_FOCUS) == "Toppings"
+				return "r_toppings", if focused then nil else self:CookAnchor("Toppings"), if row then row.Name else key
 			end
 		end
 		return "r_pickup", self:Anchor(PICKUP_SERVE, false) or self:Anchor("serve", false, onGuest) or rig, ""
 	end
-	-- world kitchen (TASK-581; kitchen-world.md §1): the piles first, then the plate (Take Plate, Add Bun, Add Sausage)
-	const plateHeld = held ~= nil and held.Item == PLATE
-	const plate = if plateHeld then self:HeldPlate() else nil
+	-- cooking focus (kitchen-focus.md §1; owner 2026-10-19): plate -> cut the bun on it -> grill, flip, drag the sausage onto it ->
+	-- toppings. Outside the focus the arrow points at the station's Prompt_Cook; inside it the focus HUD and these hints guide.
+	const plate = self:HeldPlate()
 	if plate == nil and crewHasHotDog() then
 		return "r_crew", self:Anchor(PICKUP_SERVE, false), ""
 	end
-	const kitchen = self:Kitchen()
-	const needBun = not (plate and plate.Bun)
-	const needDog = not (plate and plate.Sausage)
-	if plateHeld and needBun and kitchen.BoardReady then
-		return "r_bun_plate", self:Anchor(ADD_BUN, false), ""
+	if plate == nil then
+		return "r_take_plate", self:Anchor(PLATE_TAKE, false), ""
 	end
-	if plateHeld and needDog and kitchen.Rail > 0 then
-		return "r_dog_plate", self:Anchor(ADD_SAUSAGE, false), ""
+	const focus = Players.LocalPlayer:GetAttribute(COOK_FOCUS)
+	if not plate.Bun then
+		return "r_cut", if focus == "Board" then nil else self:CookAnchor("Board"), ""
 	end
-	if needBun and not kitchen.BoardReady then
-		return "r_cut", self:Anchor(BUN_CUT, true) or self:Anchor(BUN_CUT, false), ""
+	if focus ~= "Grill" then
+		return "r_grill", self:CookAnchor("Grill"), ""
 	end
-	if needDog and kitchen.Rail == 0 then
-		-- the dog: grill -> flip (optional) -> collect onto the rest rail
-		if kitchen.GrillReady then
-			return "r_collect", self:Anchor("grill_collect", true) or self:Anchor("grill_collect", false), ""
+	-- inside the grill focus: what the sausages want
+	const grill = self:GrillState()
+	if grill.Ready then
+		return "r_dog_plate", nil, ""
+	elseif grill.FlipNow then
+		return "r_flip", nil, ""
+	elseif grill.Working then
+		return "r_cooking", nil, ""
+	end
+	return "r_grill", nil, ""
+end
+
+-- The Prompt_Cook of a cooking focus station ("Board" | "Grill" | "Toppings")
+function TutorialController:CookAnchor(station: string): Instance?
+	return self:Anchor(COOK_ACTION, false, function(anchor: Instance): boolean
+		return anchor:GetAttribute("Cook") == station
+	end)
+end
+
+-- The grill now: a Ready sausage, one in the flip window not flipped yet, one cooking
+function TutorialController:GrillState(): { Ready: boolean, FlipNow: boolean, Working: boolean }
+	const out = { Ready = false, FlipNow = false, Working = false }
+	const now = workspace:GetServerTimeNow()
+	const window = Content.Restaurant.Grill
+	for _, raw in self.Libs.Net.Stations:entries() do
+		const record = raw :: any
+		if record.Kind ~= "grill" then
+			continue
 		end
-		const flip = self:Anchor(GRILL_FLIP, true)
-		if flip then
-			return "r_flip", flip, ""
+		if record.State == "Ready" then
+			out.Ready = true
+		elseif record.State == "Working" then
+			out.Working = true
+			const fraction = if record.Duration > 0 then (now - record.StartedAt) / record.Duration else 0
+			if (record.Flip or 0) == 0 and fraction >= window.FlipFrom and fraction <= window.FlipTo then
+				out.FlipNow = true
+			end
 		end
-		if kitchen.GrillWorking then
-			return "r_cooking", self:Anchor("grill_collect", false), ""
-		end
-		return "r_grill", self:Anchor("grill_place", false), ""
 	end
-	return "r_take_plate", self:Anchor(PLATE_TAKE, false), ""
+	return out
 end
 
 -- Restock steps start after the first sale: Supply on and a stock room bay (take_box) in the map

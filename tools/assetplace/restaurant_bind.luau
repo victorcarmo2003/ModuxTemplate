@@ -225,7 +225,9 @@ if MODE == "kitchen_world" or MODE == "kitchen_world_dry" then
 		end
 	end
 
-	-- grill: Collect / Flip per slot on the PT_GrillSlot_n hitboxes (stowed below, read first)
+	-- grill: Collect / Flip per slot ON THE BARS of the level-1 grill (owner 2026-10-19: the grills were centred and the old
+	-- PT_GrillSlot line left sausages floating past the L1 bars). The bars run along X; a sausage lies across them (along Z);
+	-- the 4 places sit 0.45 apart around the bars' centre, slots 1 and 2 in the middle (the 2 active at L1, GrillSlots 2/3/4)
 	local grill = kitchen:FindFirstChild("TLR-GRILLS")
 	if grill then
 		local host = grill:FindFirstChild("KW_Slots")
@@ -242,19 +244,29 @@ if MODE == "kitchen_world" or MODE == "kitchen_world_dry" then
 			host:SetAttribute("KW", true)
 			host.Parent = grill
 		end
-		for n = 1, 4 do
-			local hit = grill:FindFirstChild("PT_GrillSlot_" .. n)
-			if hit and hit:IsA("BasePart") then
-				local at = topOf(hit)
-				local slot = host and anchor(host, "Att_Slot" .. n, at, { PromptAction = "grill_collect", Slot = n })
+		local level1 = grill:FindFirstChild("Grill_L1", true)
+		local bars = {}
+		for _, d in (level1 or grill):GetDescendants() do
+			if d:IsA("BasePart") and d.Name:match("^Bar_%d") then
+				table.insert(bars, d)
+			end
+		end
+		if #bars == 0 then
+			say("WARN TLR-GRILLS: no Bar_n parts (Grill_L1): grill slots not placed")
+		else
+			local cx, top = bars[1].Position.X, bars[1].Position.Y + bars[1].Size.Y / 2
+			local zmin, zmax = math.huge, -math.huge
+			for _, bar in bars do
+				zmin = math.min(zmin, bar.Position.Z)
+				zmax = math.max(zmax, bar.Position.Z)
+			end
+			local offsets = { -0.225, 0.225, -0.675, 0.675 }
+			for n = 1, 4 do
+				local at = Vector3.new(cx + offsets[n], top, (zmin + zmax) / 2)
 				if host then
+					anchor(host, "Att_Slot" .. n, at, { PromptAction = "grill_collect", Slot = n })
 					anchor(host, "Att_Flip" .. n, at + Vector3.new(0, 0.35, 0), { PromptAction = "grill_flip", FlipSlot = n })
 				end
-				if slot == nil and not dry then
-					say("WARN grill slot " .. n .. " not made")
-				end
-			elseif grill:FindFirstChild("Att_Slot" .. n, true) == nil then
-				say("WARN TLR-GRILLS: no PT_GrillSlot_" .. n .. " and no Att_Slot" .. n)
 			end
 		end
 	end

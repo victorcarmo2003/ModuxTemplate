@@ -51,6 +51,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local StationApi = require(script.StationApi)
 local Refusal = require(script.Refusal)
+local Cook = require(script.Cook)
 local Board = require(script.Stations.Board)
 local Grill = require(script.Stations.Grill)
 local Rail = require(script.Stations.Rail)
@@ -99,9 +100,66 @@ const HOT_DOG = "hot_dog"
 const COFFEE = "coffee"
 const PLATE = PlateTool.Plate
 const PLATE_ATTR = PlateTool.Attr
+-- Cooking focus (kitchen-focus.md §5; owner 2026-10-19): the focus does these; their world prompts stay off and a prompt request
+-- for them is refused (the station modules keep the handlers; the focus calls the stations through Cook.luau)
+const FOCUS_ONLY: { [string]: boolean } = {
+	grill_place = true,
+	grill_flip = true,
+	grill_collect = true,
+	bun_cut = true,
+	plate_add_bun = true,
+	plate_add_sausage = true,
+	topping_add = true,
+}
 -- StationKinds of the old flows still on the map (kitchen-world.md §5): skipped quietly, scenery until the binding removes them
 const LEGACY_KINDS: { [string]: boolean } = { prep = true, cut = true }
 const PENDING_KIND = "PendingStationKind"
+
+-- The dish of the kit plate (ReplicatedStorage.Assets.Items.Tools.plate) welded under a hot dog Tool that was a plate, so the
+-- plate never vanishes from the hand (owner 2026-10-19). Its top meets the bottom of the hot dog Handle. Idempotent.
+const DISH = "Dish"
+local function attachDish(hotDog: Tool)
+	if hotDog:FindFirstChild(DISH) ~= nil then
+		return
+	end
+	const assets = ReplicatedStorage:FindFirstChild("Assets")
+	const items = if assets then assets:FindFirstChild("Items") else nil
+	const tools = if items then items:FindFirstChild("Tools") else nil
+	const kit = if tools then tools:FindFirstChild(PlateTool.Plate) else nil
+	const handle = hotDog:FindFirstChild("Handle")
+	const kitHandle = if kit then kit:FindFirstChild("Handle") else nil
+	if kit == nil or handle == nil or not handle:IsA("BasePart") or kitHandle == nil or not kitHandle:IsA("BasePart") then
+		return
+	end
+	const folder = Instance.new("Model")
+	folder.Name = DISH
+	-- the kit plate's top (Handle +Y) under the hot dog's bottom
+	const base = handle.CFrame * CFrame.new(0, -handle.Size.Y / 2, 0)
+	const kitTop = kitHandle.CFrame * CFrame.new(0, kitHandle.Size.Y / 2, 0)
+	for _, part in kit:GetDescendants() do
+		if part:IsA("BasePart") then
+			const copy = part:Clone()
+			for _, child in copy:GetChildren() do
+				if not child:IsA("DataModelMesh") and not child:IsA("SurfaceAppearance") and not child:IsA("Decal") then
+					child:Destroy()
+				end
+			end
+			copy.Name = if part == kitHandle then "DishBase" else part.Name
+			copy.Anchored = false
+			copy.CanCollide = false
+			copy.CanQuery = false
+			copy.CanTouch = false
+			copy.Massless = true
+			copy.CFrame = base * kitTop:ToObjectSpace(part.CFrame)
+			const weld = Instance.new("WeldConstraint")
+			weld.Part0 = handle
+			weld.Part1 = copy
+			weld.Parent = copy
+			copy.Parent = folder
+		end
+	end
+	folder.Parent = hotDog
+end
 
 -- Package Tool item key -> package row (what a held package restocks).
 const packageByItem: { [string]: Content.Package } = {}
@@ -208,6 +266,8 @@ function KitchenService:Setup()
 	-- Wave 3 (TASK-109). Context.Emit of a station module: (event name, player or nil, data or nil).
 	self.Emitted = self.Libs.Signal.new() :: SignalLib.Signal<string, Player?, { [string]: any }?>
 	self.Context = self:BuildContext() :: StationApi.Context
+	-- the cooking focus (kitchen-focus.md): focus prompts and the Cook packet
+	self.Cook = Cook.new(self) :: Cook.Cook
 end
 
 -- Stock reads ---------------------------------------------------------------------------------------------------
@@ -837,6 +897,12 @@ function KitchenService:RefreshPrompts(station: StationApi.Station)
 				self.Gated[anchor] = true
 				interaction:SetPrompt(anchor, false, nil)
 			end
+		elseif FOCUS_ONLY[action :: any] then
+			-- cooking focus: the gesture replaces the prompt
+			self.Gated[anchor] = nil
+			if anchor:GetAttribute("PromptEnabled") ~= false then
+				interaction:SetPrompt(anchor, false, nil)
+			end
 		elseif action == RESTOCK or action == UNWRAP then
 			-- restock waits for an open bowl; "Open" only exists on a closed gift bowl (owner request 2026-10-14)
 			self.Gated[anchor] = nil
@@ -1006,6 +1072,9 @@ function KitchenService:Evaluate(key: string, player: Player, anchor: Instance):
 	if key == RESTOCK then
 		return self:CheckRestock(player, station, anchor)
 	end
+	if FOCUS_ONLY[key] then
+		return false, nil, nil -- the cooking focus does it (kitchen-focus.md §5)
+	end
 	const module = self.Modules[station.Kind]
 	const action = if module then module.Actions[key] else nil
 	if action == nil then
@@ -1156,7 +1225,9 @@ function KitchenService:BuildContext(): StationApi.Context
 				const wanted: Wanted = { Enabled = enabled, Text = text }
 				self.Wanted[anchor] = wanted
 			end
-			const on = enabled and (station == nil or self:IsCurrent(station))
+			const on = enabled
+				and (station == nil or self:IsCurrent(station))
+				and not FOCUS_ONLY[anchor:GetAttribute("PromptAction") :: any]
 			self.Dependencies.InteractionService:SetPrompt(anchor, on, text)
 		end,
 		-- Deferred: modules emit from inside the station lock; listeners run after it.
@@ -1265,9 +1336,11 @@ end
 
 -- Plate in hand (TASK-569; kitchen-world.md §2) -------------------------------------------------------------------------
 
--- Puts `part` on the player's `plate` Tool (synchronous, inside the station lock). With bun and sausage on it the plate becomes
--- the hot_dog Tool in the same hand: the plate goes first (the HotDog category has room then), the hot dog carries the plate's
--- PlateTool.Carried attributes and Altered. A hot dog that cannot be made (no kit Tool) gives the plate back as it was.
+-- Puts `part` on the player's `plate` Tool (synchronous, inside the station lock). Order (owner 2026-10-19): plate, bun, then
+-- sausage; a sausage on a plate with no bun is refused (`plate_needs_bun`, sent by the caller). With bun and sausage on it the
+-- plate becomes the hot_dog Tool in the same hand: the plate goes first (the HotDog category has room then), the hot dog carries
+-- the plate's PlateTool.Carried attributes and Altered, and the DISH of the kit plate stays under it (Dish, AttachDish). A hot
+-- dog that cannot be made (no kit Tool) gives the plate back as it was.
 function KitchenService:FillPlate(player: Player, plate: Tool, part: StationApi.PlatePart, fill: StationApi.PlateFill): boolean
 	const items = self.Dependencies.ItemService
 	if items.Owners[plate] ~= player or items:ItemOf(plate) ~= PLATE or plate:GetAttribute(part) == true then
@@ -1276,6 +1349,9 @@ function KitchenService:FillPlate(player: Player, plate: Tool, part: StationApi.
 	const altered = fill.Altered == true or plate:GetAttribute(PLATE_ATTR.Altered) == true
 	if part == "Sausage" and fill.Flipped == true then
 		plate:SetAttribute(PLATE_ATTR.Flipped, true)
+	end
+	if part == "Sausage" and plate:GetAttribute(PLATE_ATTR.Bun) ~= true then
+		return false
 	end
 	const other = if part == "Bun" then PLATE_ATTR.Sausage else PLATE_ATTR.Bun
 	if plate:GetAttribute(other) ~= true then
@@ -1307,6 +1383,7 @@ function KitchenService:FillPlate(player: Player, plate: Tool, part: StationApi.
 	for name, value in carried do
 		hotDog:SetAttribute(name, value)
 	end
+	attachDish(hotDog)
 	items.Changed:Fire(player)
 	self.Context.Emit("assembled", player, { Altered = altered })
 	return true
@@ -1424,6 +1501,7 @@ KitchenService:OnInit(function(self)
 	-- InteractionService (730) built its handler table in its own OnInit, before this one (650).
 	self:LoadModules()
 	self:RegisterActions()
+	self.Cook.Register()
 	self.Dependencies.ItemService:SetStockSink(function(ingredient: string, amount: number): number
 		return self:StockFree(ingredient, amount)
 	end)
@@ -1526,6 +1604,7 @@ KitchenService:OnStart(function(self)
 	end)
 
 	self:RememberBlocked()
+	self.Cook.Start()
 end)
 
 KitchenService:OnTick(function(self)

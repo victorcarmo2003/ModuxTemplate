@@ -598,6 +598,12 @@
 							"optional": "src/Coffee/client"
 						}
 					},
+					"Cook": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Cook/client"
+						}
+					},
 					"Crew": {
 						"$ignoreUnknownInstances": false,
 						"$path": {

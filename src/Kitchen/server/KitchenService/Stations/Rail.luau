@@ -6,7 +6,8 @@
 -- (Slot 0): State Ready with >= 1 sausage, Count = how many. Capacity = Content.Vehicles[station.Vehicle].RailSlots (8).
 -- Other station modules use the functions below (require(script.Parent.Rail)); KitchenService serializes per station, and
 -- every call here is synchronous, so a Push/Pop never interleaves with another one.
--- Refusals (toasts via Refusal.luau): empty pile -> pile_empty; the plate already has a sausage -> plate_full. No plate in
+-- Refusals (toasts via Refusal.luau): empty pile -> pile_empty; the plate already has a sausage -> plate_full; no bun on it yet
+-- -> plate_needs_bun. No plate in
 -- hand stays silent (the client shows the prompt only with one, Requires.Held = plate).
 -- Snapshot: nothing kept (data.md §2.2: the shift restarts with an empty rail).
 -- Wave 3 (TASK-109, ANM-002, ITM-020): Alter puts one gray sausage at the FRONT of the queue (the next "Add Sausage" of any
@@ -99,6 +100,9 @@ local function canAdd(ctx: Context, station: Station, player: Player): (Tool?, s
 	end
 	if plate:GetAttribute(SAUSAGE) == true then
 		return nil, "plate_full"
+	end
+	if plate:GetAttribute("Bun") ~= true then
+		return nil, "plate_needs_bun" -- plate, bun, then sausage (owner 2026-10-19)
 	end
 	if #stateOf(station).Queue < 1 then
 		return nil, "pile_empty"

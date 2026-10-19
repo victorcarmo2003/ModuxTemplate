@@ -5,6 +5,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Charm = require(ReplicatedStorage.Packages.Charm)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local StationApi = require(ServerScriptService.server.Kitchen.KitchenService.StationApi)
+local Cook = require(ServerScriptService.server.Kitchen.KitchenService.Cook)
 
 export type Amounts = { [string]: number }
 export type StockRecord = { Amount: number, Capacity: number, Blocked: boolean, Wrapped: boolean? }
@@ -19,6 +20,7 @@ export type Public = {
 	ByInstance: { [Instance]: StationApi.Station },
 	CoffeeSeeded: boolean,
 	Context: StationApi.Context,
+	Cook: Cook.Cook,
 	DevUnlocked: Charm.Atom<{ [string]: boolean }>,
 	Discarded: SignalLib.Signal<Player, string, boolean, DiscardWhere>,
 	Emitted: SignalLib.Signal<string, Player?, { [string]: any }?>,
