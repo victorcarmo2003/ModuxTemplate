@@ -102,3 +102,29 @@ erros de tipo do gate (`Prep/Bridge`, `Plate/CenterTable`) saem junto.
 - Nenhum prompt da esteira ou do preparo focado aparece; nenhuma tela focada abre.
 - A HUD do ticket mostra o pedido do prato na mão; as panelas certas acendem.
 - Repor do depósito: caixa de salsicha → Restock na caixa de salsichas; idem pães e cada condimento.
+
+## 8. Como ficou no código (TASK-568/569/570/581, 2026-10-19)
+
+Onde a implementação difere do contrato acima (Provisório, até o Play do dono):
+
+- **O prato vira o Tool `hot_dog` quando recebe pão e salsicha** (mesma mão, mesmo ticket). Até lá é o Tool `plate` com os
+  atributos `PlateId`, `Ticket`, `TicketLine`, `Since`, `Bun`, `Sausage`, `Flipped`, `Altered` (`src/Plate/shared/PlateTool.luau`).
+  Por isso `topping_add` continua `Requires.Held = hot_dog` (só com pão e salsicha, como o §2 pede) e o Hand Over, a lixeira,
+  o arrastar até o cliente e o tutorial seguem funcionando com o `hot_dog`. A troca é `KitchenService:FillPlate` (emite
+  `assembled`, como a tábua do trailer).
+- O bônus de virar é o atributo `Flipped` (não `FlipBonus`), vindo da salsicha do descanso.
+- `plate_take` é toque (Hold 0); `discard` exige `Requires.Held = HotDog` (categoria: prato ou cachorro-quente).
+- Prato sem ticket também **ganha o ticket mais antigo quando um pedido novo é anotado** (além do Hand Over), para a HUD mostrar
+  o pedido o quanto antes. Cliente que sai deixa o prato sem ticket (`Ticket` 0).
+- `Restaurant.Plates`: registro = `PlateId` 1..255 de cada prato vivo (`Npc`, `Bun`, `Sausage`, `Toppings`, `Since`, `Altered`).
+- Nota (`Grade.Assembly`, na venda em `CustomerService:SellLine`): o tempo conta de quando o pedido foi anotado
+  (`ticket.TakenAt`) até o Hand Over; jogadores = `CustomerService.Party`; `PerfectMin` = 25 s (piso do Perfect com 4).
+  Incomplete não olha a nota. Testes: `/dev plate test`.
+- Grelha: sem pausa (como a esteira), virar opcional enquanto cozinha, **Collect manual** para o descanso; barras de progresso de
+  volta no mundo.
+- `KitchenService` ignora em silêncio estações `prep` e `cut` (e `PendingStationKind = cut`) até o binding tirá-las do mapa.
+- Mapa (lido no Studio em 2026-10-19): a grelha `TLR-GRILLS` **não tem `Att_Slot`** (só os `PT_GrillSlot_n` do preparo focado):
+  sem o binding nenhuma salsicha vai para a grelha. Cada `PRODUCTION/Pan_*` vira uma estação `toppings` própria (a pasta não é
+  Model). Tudo isso está no modo `kitchen_world` de `tools/assetplace/restaurant_bind.luau` (não rodado; dry: `kitchen_world_dry`).
+- Tutorial: só um stub (o prato do preparo 3D nunca abre; `Focused()` = false). A reescrita do tutorial para a cozinha de mundo
+  fica para depois (a sessão da intro mexe nesses arquivos).
