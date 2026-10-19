@@ -1,12 +1,13 @@
 --!strict
 --[[
-	TicketHud (TASK-522; DEC-304; tech/prep-conveyor.md §6.3 / §6.4; ui-text.md §17.5, Provisional)
+	TicketHud (TASK-522, TASK-570; kitchen-world.md §1-§2; ui-text.md §17.5, Provisional)
 
 	The ticket of the plate the local player holds, on the HUD, and the "#n" tag over a plate in a crewmate's hand.
 	Presents only: the plate Tool attributes are written by PlateService, the order comes from the Customers set.
 
-	  Read(tool)   the plate / hot dog Tool as a record (Item, PlateId, Ticket, TicketLine, Orphan, Bun, Dog, Toppings,
-	               Quality, FlipBonus); nil = not a plate (Content.Items Category HotDog)
+	  Read(tool)   the plate / hot dog Tool as a record (Item, PlateId, Ticket, TicketLine, Bun, Dog, Toppings, Quality,
+	               Flipped of shared/Plate/PlateTool); Orphan = a plate with no ticket (yet, or its customer left); nil = not a
+	               plate (Content.Items Category HotDog)
 	  Track(p)     Vide sources of the local hands: Held = the EQUIPPED plate (or false), Hands = plates + hot dogs carried
 	               (character and backpack). Follows respawns, backpack swaps and attribute writes at once (the HUD and the
 	               prompts swap with the equipped plate well inside 0.2 s)
@@ -48,7 +49,7 @@ const TEXT = table.freeze({
 	Drive = "Drive-thru", -- BELT_HUD_DRIVE
 	NoToppings = "No toppings", -- BELT_HUD_NOTOP
 	Flip = "Flip bonus", -- BELT_HUD_FLIP
-	Orphan = "Customer left", -- BELT_HUD_ORPHAN
+	Orphan = "No ticket yet", -- the plate takes the oldest order (kitchen-world.md §2)
 	More = "+%d plate", -- BELT_HUD_MORE
 })
 
@@ -189,12 +190,12 @@ function TicketHud.Read(instance: Instance?): HeldPlate?
 		PlateId = numberAttr(tool, "PlateId"),
 		Ticket = numberAttr(tool, "Ticket"),
 		Line = if line == 2 then 2 else 1,
-		Orphan = tool:GetAttribute("Orphan") == true,
+		Orphan = numberAttr(tool, "PlateId") > 0 and numberAttr(tool, "Ticket") == 0,
 		Bun = assembled or tool:GetAttribute("Bun") == true,
-		Dog = assembled or tool:GetAttribute("Dog") == true,
+		Dog = assembled or tool:GetAttribute("Sausage") == true,
 		Toppings = parseToppings(stringAttr(tool, "Toppings")),
 		Quality = if quality ~= nil and quality ~= NO_GRADE and GRADE_LABELS[quality] ~= nil then quality else nil,
-		FlipBonus = tool:GetAttribute("FlipBonus") == true,
+		FlipBonus = tool:GetAttribute("Flipped") == true,
 	}
 end
 
@@ -757,9 +758,9 @@ function TicketHud.TagHands(parent: Instance, number: (npc: number) -> number?):
 		end
 		const plate = tool :: Tool
 		const handle = plate:FindFirstChild("Handle")
-		const record = Vide.source(TicketHud.Read(plate)) :: Vide.Source<HeldPlate?>
+		const record = Vide.source(TicketHud.Read(plate) or false) :: Vide.Source<HeldPlate | false>
 		const connection = plate.AttributeChanged:Connect(function()
-			record(TicketHud.Read(plate))
+			record(TicketHud.Read(plate) or false)
 		end)
 		const unmount, gui = Vide.root(function()
 			return TicketHud.Tag({
@@ -768,19 +769,19 @@ function TicketHud.TagHands(parent: Instance, number: (npc: number) -> number?):
 				StudsOffset = Vector3.new(0, 1.2, 0),
 				Visible = function()
 					const read = record()
-					return read ~= nil and (read.Ticket ~= 0 or read.Orphan)
+					return read ~= false and (read.Ticket ~= 0 or read.Orphan)
 				end,
 				Number = function(): number?
 					const read = record()
-					return if read ~= nil and read.Ticket ~= 0 then number(read.Ticket) else nil
+					return if read ~= false and read.Ticket ~= 0 then number(read.Ticket) else nil
 				end,
 				Grade = function(): string?
 					const read = record()
-					return if read ~= nil then read.Quality else nil
+					return if read ~= false then read.Quality else nil
 				end,
 				Orphan = function(): boolean
 					const read = record()
-					return read ~= nil and read.Orphan
+					return read ~= false and read.Orphan
 				end,
 			})
 		end)
