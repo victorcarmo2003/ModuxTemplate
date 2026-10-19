@@ -56,6 +56,18 @@ tudo). Ficam `cook_focus`, `plate_take`, `restock`, `topping_unwrap`, `discard`,
 
 ## 6. Mapa
 
-`Prompt_Cook` (PromptAction `cook_focus`, atributo `Cook` = Board / Grill / Toppings) num ponto de cada estação; o modelo do foco
-é o ancestral com o atributo `CookStation` (= o mesmo nome). `restaurant_bind` modo `kitchen_world` cria (a pasta `PRODUCTION`
-ganha um Model `COOK-TOPPINGS` só para o foco? não: o foco mira a pasta pela caixa das panelas).
+Nada obrigatório no Studio: o servidor acha as estações e cria um `Prompt_Cook` (PromptAction `cook_focus`, atributo `Cook`)
+sobre o meio de cada uma — grelha = a estação `grill`; condimentos = a pasta que guarda as estações `toppings` (`PRODUCTION`);
+tábua = Model com `CookStation = "Board"`, senão o de nome `Restaurant.Binding.CookBoard` (`TLR-CUTTING_BOARD`). Um
+`Prompt_Cook` autorado dentro da estação vence; `CamAnchor_Cook` / `Focus_Cook` (Attachments) fixam a câmera.
+As vagas da grelha ficam sobre as barras do nível 1 (`restaurant_bind` modo `kitchen_world`; aplicado no Studio em 2026-10-19).
+
+## 7. Código
+
+| Lado | Onde |
+|---|---|
+| servidor | `Kitchen/server/KitchenService/Cook.luau` (prompts, pacote `Cook`, gestos), `Stations/Grill.luau` (`PlaceAt`, `FlipAt`, `TakeReady`, nota do virar) |
+| cliente | `Cook/client/CookController/` (`init` foco/câmera/saída, `Board`, `Grill`, `Toppings`, `Pointer`, `Gestures`, `Kit`, `Hud`) |
+| nota | `Prep/shared/Grade.luau` (`Score`, `Mean`, `Assembly`), `Content.Prep` (`Tolerances`, `Build`), atributo `Scores` (`Plate/shared/PlateTool`) |
+| tutorial | `r_take_plate` → `r_cut` → `r_grill`/`r_cooking`/`r_flip`/`r_dog_plate` → `r_toppings` → `r_pickup`; a seta aponta o `Prompt_Cook`, dentro do foco o HUD guia |
+| dev | `/dev smoke restaurant` faz o fluxo pelo mesmo caminho do pacote (`KitchenService.Cook.Act`) |

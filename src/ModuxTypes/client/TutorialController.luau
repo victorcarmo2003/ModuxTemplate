@@ -108,6 +108,8 @@ export type Public = {
 	Decide: (self: Public) -> (string, Instance?, string),
 	DecideLive: (self: Public) -> (string, Instance?, string),
 	DecideRestaurant: (self: Public, guestId: number, guest: GuestRecord, rig: Model?) -> (string, Instance?, string),
+	CookAnchor: (self: Public, station: string) -> Instance?,
+	GrillState: (self: Public) -> { Ready: boolean, FlipNow: boolean, Working: boolean },
 	CanRestock: (self: Public) -> boolean,
 	StockAll: (self: Public) -> { [string]: number },
 	Restocked: (self: Public) -> boolean,

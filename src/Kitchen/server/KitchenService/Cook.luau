@@ -29,10 +29,15 @@ local Grill = require(script.Parent.Stations.Grill)
 
 export type Station = "Board" | "Grill" | "Toppings"
 
+-- One gesture as the Cook packet carries it
+export type Act = { Act: string, Slot: number, Score: number, Key: string?, Points: { number }? }
+
 export type Cook = {
 	Start: () -> (),
 	Register: () -> (),
 	Target: (station: Station) -> Instance?,
+	-- the Cook packet's path (reach and rate checked); the dev smoke calls it too
+	Act: (player: Player, data: Act) -> (),
 }
 
 const ACTION = "cook_focus"
@@ -348,6 +353,27 @@ function Cook.new(kitchen: any): Cook
 		end
 	end
 
+	local function act(player: Player, data: Act)
+		if not kitchen.Active or not kitchen.Dependencies.RunStateService:IsActive(player) or not allow(player) then
+			return
+		end
+		const kind = data.Act
+		const station: Station = if kind == "Cut" then "Board" elseif kind == "Topping" then "Toppings" else "Grill"
+		if not near(player, station) then
+			return
+		end
+		const score = math.clamp(math.floor(data.Score), 0, 100)
+		if kind == "Cut" then
+			cut(player, score)
+		elseif kind == "Topping" then
+			if data.Key ~= nil then
+				topping(player, data.Key, score, data.Points)
+			end
+		elseif data.Slot >= 1 then
+			grillCall(player, kind, data.Slot, score)
+		end
+	end
+
 	-- API ------------------------------------------------------------------------------------------------------------
 
 	const self: Cook = {
@@ -377,24 +403,7 @@ function Cook.new(kitchen: any): Cook
 				end,
 			})
 			Restaurant.Cook:onServer(function(data, player: Player)
-				if not kitchen.Active or not kitchen.Dependencies.RunStateService:IsActive(player) or not allow(player) then
-					return
-				end
-				const act = data.Act
-				const station: Station = if act == "Cut" then "Board" elseif act == "Topping" then "Toppings" else "Grill"
-				if not near(player, station) then
-					return
-				end
-				const score = math.clamp(math.floor(data.Score), 0, 100)
-				if act == "Cut" then
-					cut(player, score)
-				elseif act == "Topping" then
-					if data.Key ~= nil then
-						topping(player, data.Key, score, data.Points)
-					end
-				elseif data.Slot >= 1 then
-					grillCall(player, act, data.Slot, score)
-				end
+				act(player, data :: any)
 			end)
 			Players.PlayerRemoving:Connect(function(player: Player)
 				buckets[player] = nil
@@ -403,6 +412,7 @@ function Cook.new(kitchen: any): Cook
 		Target = function(station: Station): Instance?
 			return targets[station]
 		end,
+		Act = act,
 	}
 	return self
 end
