@@ -1,4 +1,4 @@
-Status: Rascunho (TASK-563, 2026-10-18; DEC-306). Inventário para a limpeza; nada foi removido ainda.
+Status: Rascunho (TASK-563, 2026-10-18; DEC-306, DEC-307). Remoção em andamento (TASK-564/565): ver §5.
 
 # Limpeza dos sistemas antigos
 
@@ -49,3 +49,26 @@ antigo), **Manter**.
 1. Sem esperar decisão: tutorial do Mercado, `LightGroups.mart`, `van_arrive`, alvos `PT_Hatch`/`PT_Bin` e `Station_1..4` só se Q-394 = sai.
 2. Com Q-394 = sai: um lote por sistema (Mercado+Opal, Entrega, Trash, Porta, Anomalias cortadas, Prep modo Trailer), gate limpo e boot no Studio a cada lote.
 3. Com Q-390: a esteira.
+
+## 5. Andamento (2026-10-19, DEC-307: o trailer sai)
+
+Feito (commits na `feat/anomalies-v2-shop-2026-10-14`, gate sem erro novo e boot limpo no Studio a cada um):
+
+| Commit | O quê |
+|---|---|
+| `4cb29f00` | Ramos `if Restaurant.Rules.Enabled` colapsados para o restaurante (anomalias, clientes, cozinha, tablet, depósito, HUD, prompts); textos do Mercado/trailer que o jogador via (dica de servir, Gear Stand, nomes de upgrade) |
+| `7580325c` | `Restaurant.Rules.Enabled` e o `Switch` derivado saem; Prep, Seating, Vehicles e Supply guardam os valores do restaurante |
+| `11d4923f` | Anomalias cortadas ANM-002, 003, 007, 018 removidas (módulos, regras, efeitos, Journal, imagens, cues); catálogo = 17 |
+| `5d783d8a` | Porta dos fundos do trailer (`TrailerDoorService`, `trailer_exit/enter`) e o fluxo da cópia batendo nela (ANM-004) |
+| `2dfa657d` | `/dev smoke` sem a chave |
+
+Falta (código morto, o jogador não vê):
+
+| Sistema | Por que ainda não | Esforço |
+|---|---|---|
+| Mesas sujas (`Dirty`, `clean_table`, `TrashController`) e `SitAt = "Order"` | `Dirty` está no tipo de rede e no client de Seating (1356 linhas); remoção pede Play de mesas | médio |
+| Mercado (`MarketService` prateleiras, `BUY-*`, Opal no Mercado) | depende da **Q-395** (a Gear Stand e a Opal ficam?) | médio |
+| Preparo focado `Mode = "Trailer"` e o minigame da esteira | depende da **Q-390** (a cozinha de mundo da DEC-306 substitui a esteira?) | grande (`Prep` tem ~27 mil linhas) |
+| Tutorial: ramo trailer (`DecideLive`), compras no Mercado (`mart_*`, `Trail`) | o tutorial será reescrito na cozinha nova (depois da TASK-566); o ramo não roda no restaurante | médio |
+| Item alterado (`Altered`, ANM-002) em Kitchen/Plate/Net | plumbing sem dono; sai junto com a cozinha nova | pequeno |
+| Cues `copy_knock/grab/vanish` no client da ANM-004 | sem servidor que mande; sai com a cena da ANM-004 | pequeno |
