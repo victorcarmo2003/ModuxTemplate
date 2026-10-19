@@ -688,7 +688,7 @@ const knock: Scene = {
 		{ At = 0, Phase = "Failed", Kind = "Heartbeat", Value = 0, To = 0 },
 		{ At = 0, Phase = "Failed", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
 		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Sound", Target = "horror_sting", Value = 2.5 },
-		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Blur", Value = 20, To = 0, Duration = 1.6 },
+		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Blur", Value = 18, To = 0, Duration = 1.6 },
 		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Grade", Target = "Red", Value = 1, To = 0, Duration = 3.2 },
 		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Fov", Value = -6, To = 0, Duration = 1.2 },
 		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Shake", Target = "Jolt", Value = 1.5 },
