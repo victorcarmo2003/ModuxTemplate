@@ -17,6 +17,7 @@ local SquadSetup = require(StarterPlayer.StarterPlayerScripts.client.Interface.C
 local PadTag = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PadTag)
 local ToastStack = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Toast.Stack)
 local Pads = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Pads)
+local Signs = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Signs)
 local Rings = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Rings)
 local Extras = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Extras)
 local Stage = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Stage)
@@ -75,6 +76,7 @@ export type Public = {
 	Roster: Vide.Source<{ Player }>,
 	Scale: Vide.Source<number>,
 	Sent: Vide.Source<{ [number]: boolean }>,
+	Signs: Signs.Signs?,
 	SkinFocus: Vide.Source<string>,
 	Stage: Stage.Stage?,
 	StagePoint: CFrame?,

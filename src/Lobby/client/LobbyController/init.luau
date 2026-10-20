@@ -63,6 +63,9 @@
 	breathing while starting), a round run seal under it (Content.Lobby.Squad.Pad.Badge, "D1" Provisional) and the
 	leader's name; all read from the Party set (Platform, Members, MaxPlayers, StartAt). The pill pops when someone
 	steps on / off (+ ui click, ring shiver).
+	Zone signs (Signs.luau + Interface/Components/ZoneSign, owner request 2026-10-20): over every non-squad zone a
+	studs-sized floating sign, icon disc + name (CLASSES / GEMS / CODES), tones of the HUD tiles; hidden while its panel
+	is open.
 	Zone VFX (Rings.luau): local Neon frames on the floor edges (square / ring) with rising ghost frames, one Heartbeat
 	for every zone; pad rings follow the room state (colour, breath speed, floor glow discs, sparks while occupied).
 	Camera: normal third person in the lobby (CameraController External; CameraMode Classic). While the class screen
@@ -108,6 +111,7 @@ local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Compon
 local UiScale = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.UiScale)
 local ToastStack = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Toast.Stack)
 local Pads = require(script.Pads)
+local Signs = require(script.Signs)
 local Rings = require(script.Rings)
 local Extras = require(script.Extras)
 local Stage = require(script.Stage)
@@ -315,6 +319,7 @@ function LobbyController:Setup()
 	self.Rings = nil :: Rings.Rings?
 	self.Extras = nil :: Extras.Extras? -- TASK-452: set-dressing NPCs (crew at the HQ cart, shopkeeper, food court)
 	self.Pads = nil :: Pads.Pads?
+	self.Signs = nil :: Signs.Signs?
 	self.Hiding = false :: boolean
 
 	self.Gui = nil :: ScreenGui?
@@ -1257,6 +1262,10 @@ function LobbyController:RunZones()
 		if pads then
 			pads.Step()
 		end
+		const signs = self.Signs
+		if signs then
+			signs.Step()
+		end
 		const now = os.clock()
 		if now >= nextZones then
 			nextZones = now + LOBBY.Trigger.Poll
@@ -2068,6 +2077,16 @@ function LobbyController:Mount(playerGui: Instance)
 		Badge = LOBBY.Squad.Pad.Badge,
 		OnCount = function(n: number, from: number, to: number)
 			self:OnPadCount(n, from, to)
+		end,
+		Visible = function()
+			return self.Panel() ~= "Classes"
+		end,
+	})
+	-- floating name signs over the Classes / Gems / Codes zones (Signs.luau, owner request 2026-10-20)
+	self.Signs = Signs({
+		Parent = playerGui,
+		Panel = function()
+			return self.Panel()
 		end,
 		Visible = function()
 			return self.Panel() ~= "Classes"
