@@ -34,13 +34,13 @@ local RunParams = require(script.Parent.RunParams)
 local Sanity = require(script.Parent.Sanity)
 local Seating = require(script.Parent.Seating)
 local Shift = require(script.Parent.Shift)
+local ShopWindow = require(script.Parent.ShopWindow)
 local Sounds = require(script.Parent.Sounds)
 local Species = require(script.Parent.Species)
 local Stations = require(script.Parent.Stations)
 local Stats = require(script.Parent.Stats)
 local Suspense = require(script.Parent.Suspense)
 local Table = require(script.Parent.Table)
-local Thief = require(script.Parent.Thief)
 local TipJar = require(script.Parent.TipJar)
 local Traffic = require(script.Parent.Traffic)
 local Upgrades = require(script.Parent.Upgrades)
@@ -592,11 +592,34 @@ local function kindStats(kind: BossCalls.TriggerKind): (number, number)
 	return priority, count
 end
 
+const SHUT_LINE_MAX = 28 -- chars: the bubble over a customer's head
+
+local function checkShopWindow()
+	inRange("ShopWindow", nil, nil, "ShutGrace", ShopWindow.ShutGrace, 0, 30)
+	inRange("ShopWindow", nil, nil, "ComplainTime", ShopWindow.ComplainTime, 0.5, 10)
+	inRange("ShopWindow", nil, nil, "LeaveJitter", ShopWindow.LeaveJitter, 0, 5)
+	if not Moods.ByKey[ShopWindow.LeaveMood] then
+		fail("ShopWindow", nil, nil, `LeaveMood '{ShopWindow.LeaveMood}' is not a Moods key`)
+	end
+	const count = #ShopWindow.ShutLines
+	if count == 0 then
+		fail("ShopWindow", nil, nil, "ShutLines is empty")
+	elseif count > 64 then
+		fail("ShopWindow", nil, nil, `ShutLines has {count} lines, the CustomerComplain packet carries 1..64`)
+	end
+	for index, text in ShopWindow.ShutLines do
+		if text == "" or #text > SHUT_LINE_MAX then
+			fail("ShopWindow", index, nil, `ShutLines[{index}] must be 1..{SHUT_LINE_MAX} chars`)
+		end
+	end
+end
+
 local function checkBossCalls()
 	checkKeys("BossCalls", BossCalls, KEY_PATTERN)
 	const rules = BossCalls.Rules
 	inRange("BossCallRules", nil, nil, "LineTime", rules.LineTime, 0.5, 10)
 	inRange("BossCallRules", nil, nil, "AutoAnswer", rules.AutoAnswer, 1, 120)
+	inRange("BossCallRules", nil, nil, "ReadyWait", rules.ReadyWait, 0, 60)
 	if BossCalls.Keys[1] ~= "none" or BossCalls.List[1].Trigger.Kind ~= "None" then
 		fail("BossCalls", 1, BossCalls.Keys[1], "first row must be the sentinel 'none' (Trigger None)")
 	end
@@ -657,7 +680,8 @@ local function checkBossCalls()
 			repeatKey = row.Key
 		elseif kind == "Hint" then
 			const action = trigger.Action or ""
-			if not Actions.ByKey[action] then
+			-- a hint rides on an Actions key, or on a game event that is not a prompt (topping_wrong: BossService:OnTopping)
+			if not Actions.ByKey[action] and action ~= "topping_wrong" then
 				fail("BossCalls", index, row.Key, `Hint Trigger.Action '{action}' not in Actions`)
 			end
 			if hints[action] then
@@ -691,8 +715,9 @@ local function checkBossCalls()
 	const callCap = Shift.ByKey.Call.Duration
 	const firstNight = BossCalls.ByKey[nightCalls[1]]
 	const _, coffeeN = kindStats("NightCoffee")
-	if (#firstNight.Lines + coffeeN) * rules.LineTime > callCap then
-		fail("BossCalls", nil, nil, `{firstNight.Key} + coffee call exceed the Call cap ({callCap} s)`)
+	-- the first ring may wait ReadyWait (clients loading) and ring AutoAnswer before the lines start
+	if (#firstNight.Lines + coffeeN) * rules.LineTime + rules.ReadyWait + rules.AutoAnswer > callCap then
+		fail("BossCalls", nil, nil, `{firstNight.Key} + coffee call + wait + ring exceed the Call cap ({callCap} s)`)
 	end
 	const repeatRow = BossCalls.ByKey[repeatKey]
 	const criticalP, criticalN = kindStats("LostCritical")
@@ -872,22 +897,7 @@ local function checkLightsAndSanity()
 	inRange("Revive", nil, nil, "BodyFallback", Revive.BodyFallback, 0, 600)
 end
 
-local function checkThiefAndRewards()
-	for day, chance in Thief.ChanceByDay.Days do
-		inRange("Thief", nil, nil, `ChanceByDay.Days[{day}]`, chance, 0, 1)
-	end
-	inRange("Thief", nil, nil, "ChanceByDay.Default", Thief.ChanceByDay.Default, 0, 1)
-	const window = Thief.WindowClock
-	const open = Shift.ByKey.Open
-	if #window ~= 2 or window[1] < open.ClockFrom or window[2] > open.ClockTo or window[2] <= window[1] then
-		fail("Thief", nil, nil, "WindowClock must be {from, to} inside the Open phase")
-	end
-	inRange("Thief", nil, nil, "ApproachTime", Thief.ApproachTime, 0.5, 30)
-	inRange("Thief", nil, nil, "CapRetry", Thief.CapRetry, 1, 600)
-	if #Thief.Lurks == 0 or #Thief.Exits == 0 then
-		fail("Thief", nil, nil, "Lurks and Exits cannot be empty")
-	end
-
+local function checkRewards()
 	checkKeys("Achievements", Achievements, KEY_PATTERN)
 	for index, row in Achievements.List do
 		inRange("Achievements", index, row.Key, "Target", row.Target, 1, 100000)
@@ -1214,6 +1224,36 @@ local function checkHallucinations()
 	if not (hasHigh and hasMid and hasLow) then
 		fail("Hallucinations", nil, nil, `needs effects below {bands.High}, below {bands.Mid} and lower (FEAT-019)`)
 	end
+	-- TASK-601: Walt's fake call and the radio, by night (story/walt-calls-lore.md §6, §7)
+	const ids: { [string]: boolean } = {}
+	const perNight: { [number]: number } = {}
+	for channel, lines in { Walt = Hallucinations.WaltLines, Radio = Hallucinations.RadioLines } :: { [string]: any } do
+		if lines.Default == nil or #lines.Default == 0 then
+			fail("Hallucinations", nil, channel, "Default lines must not be empty")
+		end
+		for night, list in lines :: { [any]: { { Id: string, Text: string } } } do
+			if night ~= "Default" and (type(night) ~= "number" or night < 1 or night > 10) then
+				fail("Hallucinations", nil, channel, `night '{tostring(night)}' must be 1..10 or Default`)
+			end
+			for _, entry in list do
+				if ids[entry.Id] then
+					fail("Hallucinations", nil, channel, `line Id '{entry.Id}' is used twice`)
+				end
+				ids[entry.Id] = true
+				if #entry.Text > 60 then
+					fail("Hallucinations", nil, entry.Id, `line is {#entry.Text} characters (max 60)`)
+				end
+				if type(night) == "number" then
+					perNight[night] = (perNight[night] or 0) + 1
+				end
+			end
+		end
+	end
+	for night = 1, 10 do
+		if (perNight[night] or 0) < 2 then
+			fail("Hallucinations", nil, nil, `night {night} needs at least 2 fake call / radio lines`)
+		end
+	end
 	const interval = Hallucinations.Rules.Interval
 	if #interval ~= 2 or interval[1] < 1 or interval[2] < interval[1] then
 		fail("HallucinationRules", nil, nil, "Interval must be {min, max} with 1 <= min <= max")
@@ -1272,6 +1312,17 @@ local function checkSuspense()
 	end
 	if HorrorScenes.Words.suspense == nil then
 		fail("Suspense.Rules", nil, nil, "HorrorScenes.Words needs a 'suspense' list")
+	end
+	-- the forgotten customer's jumpscare
+	const forgotten = rules.Forgotten
+	inRange("Suspense.Rules", nil, nil, "Forgotten.At", forgotten.At, 0, 1)
+	inRange("Suspense.Rules", nil, nil, "Forgotten.Duration", forgotten.Duration, 0.05, horror.MaxControlLock)
+	inRange("Suspense.Rules", nil, nil, "Forgotten.Pull", forgotten.Pull, 0, horror.MaxPull)
+	inRange("Suspense.Rules", nil, nil, "Forgotten.Fov", forgotten.Fov, -horror.MaxFov, horror.MaxFov)
+	inRange("Suspense.Rules", nil, nil, "Forgotten.Vignette", forgotten.Vignette, 0, horror.MaxVignette)
+	inRange("Suspense.Rules", nil, nil, "Forgotten.Pulse", forgotten.Pulse, 0, 0.3)
+	if horror.Shakes[forgotten.Shake] == nil then
+		fail("Suspense.Rules", nil, nil, `Forgotten.Shake '{forgotten.Shake}' is not a HorrorScenes.Rules.Shakes profile`)
 	end
 end
 
@@ -1854,6 +1905,7 @@ local function checkMart()
 	-- Business hours (owner request 2026-10-17): the warning must fit inside the stay-open window
 	const hours = Mart.Hours
 	inRange("Mart", nil, nil, "Hours.StayOpenIntoShift", hours.StayOpenIntoShift, 0, 600)
+	inRange("Mart", nil, nil, "Hours.MinOpen", hours.MinOpen, 0, 600)
 	inRange("Mart", nil, nil, "Hours.CloseWarning", hours.CloseWarning, 0, hours.StayOpenIntoShift)
 	inRange("Mart", nil, nil, "Hours.Tick", hours.Tick, 1, 60)
 	if hours.Attributes.Open == "" or hours.Attributes.ClosesAt == "" or hours.Attributes.Open == hours.Attributes.ClosesAt then
@@ -2125,11 +2177,21 @@ local function checkHorrorScenes()
 	const phases = setOf({ "Signal", "Active", "Resolved", "Failed" })
 	const whos = setOf({ "All", "Caught", "Safe" })
 	const lights = setOf({ "Off", "On", "Flicker", "Cascade" })
-	const doors = setOf({ "Rattle", "Push", "Hold", "Lock" })
+	const doors = setOf({ "Rattle", "Push", "Hold", "Lock", "Bulge" }) -- Bulge: TASK-592
 	const needPoint = setOf({ "Door", "Shadow", "Nudge" }) -- Actor: only the eyes (no Target) need one
-	const seens = setOf({ "All", "Cameras" })
-	const kinds = setOf({ "Sound", "Music", "Lights", "Lightning", "Whispers", "Heartbeat", "Cinema", "Vignette", "Shake", "Fov", "Nudge", "Text", "Actor", "Door", "Shadow", "Roof", "HeadDown", "Grade", "Blur", "Silence" })
+	const seens = setOf({ "All", "Cameras", "Eyes" })
+	const kinds = setOf({ "Sound", "Music", "Lights", "Lightning", "Whispers", "Heartbeat", "Cinema", "Vignette", "Shake", "Fov", "Nudge", "Text", "Actor", "Door", "Shadow", "Roof", "HeadDown", "Grade", "Blur", "Silence", "Pose", "Prop", "Glass", "Glare", "Silhouette", "Lantern" })
+	-- TASK-586/587 (design/horror-cinematic.md §11.3): the pieces of Scene/Kit; who may carry Seen / Sound
+	const wheres = setOf({ "Inside", "Outside" })
+	const seenKinds = setOf({ "Actor", "Pose", "Prop", "Silhouette", "Lantern" })
+	-- Glass / Glare (TASK-588): Sound overrides the piece's default, "" = silent
+	const soundKinds = setOf({ "Actor", "Roof", "Pose", "Prop", "Silhouette", "Glass", "Glare" })
+	const poses = setOf({ "Lift", "Tilt", "Turn", "Scale", "Float", "Blink", "Mimic" })
+	const props = setOf({ "Shake", "Float", "Sway", "Puddle", "Lift", "Drop" })
 	const roofs = setOf({ "Walk", "Leave", "Thud" })
+	-- TASK-593: Glass Paw (the black paw print of ANM-021); Silhouette Text names one of several shapes, "*" = all (Leave)
+	const glasses = setOf({ "Fog", "Knock", "Bang", "Hand", "Rattle", "Paw" })
+	const silhouettes = setOf({ "Pass", "Arrive", "Leave" })
 	for index, scene in HorrorScenes.List do
 		const key = scene.Key
 		if Anomalies.ByKey[key] == nil then
@@ -2166,7 +2228,7 @@ local function checkHorrorScenes()
 				end
 			elseif step.Kind == "Door" then
 				if not doors[step.Target or ""] then
-					fail("HorrorScenes", index, key, `{where} Door '{tostring(step.Target)}' is not Rattle, Push, Hold or Lock`)
+					fail("HorrorScenes", index, key, `{where} Door '{tostring(step.Target)}' is not Rattle, Push, Hold, Lock or Bulge`)
 				end
 			elseif step.Kind == "Shake" then
 				if rules.Shakes[step.Target or ""] == nil then
@@ -2259,8 +2321,46 @@ local function checkHorrorScenes()
 					fail("HorrorScenes", index, key, `{where} Actor Value is 1 (gone on arrival) or nil`)
 				end
 			end
-			if (step.Kind ~= "Actor" and step.Seen ~= nil) or (step.Kind ~= "Actor" and step.Kind ~= "Roof" and step.Sound ~= nil) then
-				fail("HorrorScenes", index, key, `{where} Sound is an Actor / Roof field, Seen an Actor field only`)
+			if step.Kind == "Pose" then
+				-- TASK-587: the actor's pose
+				if not poses[step.Target or "Lift"] then
+					fail("HorrorScenes", index, key, `{where} Pose '{tostring(step.Target)}' is not Lift, Tilt, Turn, Scale, Float, Blink or Mimic`)
+				end
+			elseif step.Kind == "Prop" then
+				-- TASK-587: the props near Point (a MapPoint, "Actor" or "Player"); Drop needs none
+				if not props[step.Target or "Shake"] then
+					fail("HorrorScenes", index, key, `{where} Prop '{tostring(step.Target)}' is not Shake, Float, Sway, Puddle, Lift or Drop`)
+				end
+				if step.Target ~= "Drop" and (step.Point == nil or step.Point == "") then
+					fail("HorrorScenes", index, key, `{where} Prop needs a Point (MapPoint, Actor or Player)`)
+				end
+			end
+			if step.Kind == "Glass" then
+				if not glasses[step.Target or "Knock"] then
+					fail("HorrorScenes", index, key, `{where} Glass '{tostring(step.Target)}' is not Fog, Knock, Bang, Hand, Rattle or Paw`)
+				end
+				if step.Point == nil or step.Point == "" then
+					fail("HorrorScenes", index, key, `{where} Glass needs a Point (MapPoint name)`)
+				end
+			elseif step.Kind == "Silhouette" then
+				if not silhouettes[step.Target or "Pass"] then
+					fail("HorrorScenes", index, key, `{where} Silhouette '{tostring(step.Target)}' is not Pass, Arrive or Leave`)
+				end
+				if step.Text == "*" and step.Target ~= "Leave" then
+					fail("HorrorScenes", index, key, `{where} Silhouette Text "*" (all of them) is only for a Leave`)
+				end
+			end
+			if step.Kind ~= "Actor" and step.Seen ~= nil and not seens[step.Seen] then
+				fail("HorrorScenes", index, key, `{where} Seen '{tostring(step.Seen)}' is not All, Cameras or Eyes`)
+			end
+			if step.Where ~= nil and not wheres[step.Where] then
+				fail("HorrorScenes", index, key, `{where} Where '{tostring(step.Where)}' is not Inside or Outside`)
+			end
+			if step.Sound ~= nil and step.Sound ~= "" and soundKinds[step.Kind] and Sounds.ByKey[step.Sound] == nil then
+				fail("HorrorScenes", index, key, `{where} {step.Kind} Sound '{step.Sound}' is not a Content.Sounds key`)
+			end
+			if (not seenKinds[step.Kind] and step.Seen ~= nil) or (not soundKinds[step.Kind] and step.Sound ~= nil) then
+				fail("HorrorScenes", index, key, `{where} Sound is an Actor / Roof / Pose / Prop / Silhouette / Glass / Glare field, Seen an Actor / Pose / Prop / Silhouette / Lantern field`)
 			end
 		end
 	end
@@ -2310,9 +2410,10 @@ return function()
 	checkRecords()
 	checkShiftWave2()
 	checkBossCalls()
+	checkShopWindow()
 	checkNights()
 	checkLightsAndSanity()
-	checkThiefAndRewards()
+	checkRewards()
 	checkMedia()
 	checkWave2Records()
 	checkAnomalies()

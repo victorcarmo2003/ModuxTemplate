@@ -471,15 +471,21 @@ end
 
 -- Phases ----------------------------------------------------------------------------------------------------------
 
--- The clock should stand still now: a day shift in Prep or Open and the hook says yes (errors are a warn and "no")
+-- The clock should stand still now: Prep, Open or Closing of a day, or Prep / Night of a night (owner 2026-10-19: the tutorial is
+-- Night 1's, the clock does not run under it), and the hook says yes (errors are a warn and "no")
 function RoundService:HoldWanted(): boolean
 	const hold = self.ClockHold
-	if hold == nil or self.NightShift() then
+	if hold == nil then
 		return false
 	end
 	const phase = self.Phase()
+	if self.NightShift() then
+		-- Summary: the upgrade lesson at the end of Night 1 (owner bug 2026-10-20: the break waits for the first purchase)
+		if phase ~= "Prep" and phase ~= "Night" and phase ~= "Summary" then
+			return false
+		end
 	-- Closing (day = Last call, 6 PM): the Day 1 upgrade lesson (owner request 2026-10-14, Provisional)
-	if phase ~= "Prep" and phase ~= "Open" and phase ~= "Closing" then
+	elseif phase ~= "Prep" and phase ~= "Open" and phase ~= "Closing" then
 		return false
 	end
 	return ask(hold, "clock hold", false)

@@ -29,7 +29,7 @@
 -- test, debug panel, step jump) to one player through the dev-only `DevClient` packet. Both refuse outside dev mode.
 -- Day 1 upgrade lesson (owner request 2026-10-14, Provisional; shared.Tutorial.Rules.Upgrade): a player who answered
 -- the tutorial call on Day 1 is a rookie of this run (Rookies, memory only). When the first shift ends (the day Closing
--- at 6 PM) with a rookie in the server and no Gear Stand line bought yet, ShouldHold also holds the Closing (clock frozen
+-- at 6 PM; the Summary of Night 1 when the run starts at night, owner bug 2026-10-20) with a rookie in the server and no Gear Stand line bought yet, ShouldHold also holds the Closing (clock frozen
 -- at 6 PM, no probe end), and once the last-call line is empty (the Closing probe) the lesson is "due": Cash is topped up
 -- to Rules.Upgrade.Cash (at least the Storage price) and BossService rings Rules.Upgrade.Call once (LessonCallDue). It
 -- ends for good (LessonOver, latched) when any Gear Stand line is bought, the run leaves Day 1 / the day shift, no rookie
@@ -62,6 +62,9 @@ const TutorialService = Modux.Service(
 			"RoundService",
 			"UpgradeService",
 			"GearStandService",
+			"AnomalyService",
+			"VitalService",
+			"RewardService",
 		},
 		Priority = 500,
 	}
@@ -99,13 +102,21 @@ function TutorialService:Complete(player: Player, how: string?)
 	end
 	self.Closed[player.UserId] = true
 	self.Revived[player.UserId] = nil
+	if how == "done" then
+		self.Dependencies.RewardService:Unlock(player, "tutorial_done") -- badge "Clocked In" (DEC-315)
+	end
 end
 
 -- Day 1 of the run still on (latches off once the day moves on or a night shift starts)
+-- The run's first shift: Day 1, or Night 1 (on Day 2) when the run starts at night (Shift.RunStartsAtNight, DEC-300). The name
+-- stays OnDayOne (the old run always opened on Day 1); latched once the run is past it.
 function TutorialService:OnDayOne(): boolean
 	if not self.Past then
-		const round = self.Dependencies.RoundService
-		if round:GetDay() > 1 or round:IsNight() then
+		const info = self.Dependencies.RoundService:Info()
+		const past = if Content.Shift.RunStartsAtNight
+			then info.Night > 1 or (info.Day > 2)
+			else info.Day > 1 or info.IsNight
+		if past then
 			self.Past = true
 		end
 	end
@@ -189,6 +200,12 @@ function TutorialService:OnDiscarded(item: string)
 	end
 end
 
+-- The coffee lesson may come (owner 2026-10-19: after the first hot dog, not on top of the kitchen lesson): no tutorial pending,
+-- or the first tutorial customer was served. BossService also waits for the first drop to Sanity.CoffeeCallAt (TASK-596)
+function TutorialService:CoffeeDue(): boolean
+	return not self:AnyPending() or (self.Dependencies.CustomerService :: any).TutorialServed >= 1
+end
+
 -- A rookie started the tutorial (answered the call): the tutorial customer comes
 function TutorialService:Begin(player: Player)
 	if not self:IsPending(player) then
@@ -228,17 +245,25 @@ function TutorialService:AnyRookie(): boolean
 	return false
 end
 
--- The upgrade lesson runs now: the day Closing of Day 1, a rookie around, nothing bought yet (latches off for good)
+-- Phase of the upgrade lesson: the end of the run's first shift. Run at night (Shift.RunStartsAtNight, DEC-300): the
+-- Summary of Night 1 (owner bug 2026-10-20: the 10 s break ran out and Night 2's call rang before any purchase); else the
+-- day Closing of Day 1 (6 PM)
+local function lessonPhase(): string
+	return if Content.Shift.RunStartsAtNight then "Summary" else "Closing"
+end
+
+-- The upgrade lesson runs now: the end of the first shift (lessonPhase), a rookie around, nothing bought yet (latches
+-- off for good). Only a real purchase ends it (BoughtGear reads UpgradeService levels), never a walk out and back.
 function TutorialService:LessonActive(): boolean
 	if not self.Enabled or self.LessonOver or not TutorialRules.Upgrade.Enabled then
 		return false
 	end
 	const round = self.Dependencies.RoundService
-	if round:GetDay() > 1 or round:IsNight() then
+	if not self:OnDayOne() then
 		self.LessonOver = true
 		return false
 	end
-	if round:GetPhase() ~= "Closing" or not self:AnyRookie() then
+	if round:GetPhase() ~= lessonPhase() or not self:AnyRookie() then
 		return false
 	end
 	if self:BoughtGear() then
@@ -248,9 +273,13 @@ function TutorialService:LessonActive(): boolean
 	return true
 end
 
--- The last-call line is empty: Walt may call (BossService polls this; the call is Once)
+-- Walt may call (BossService polls this; the call is Once): at once in the Summary, once the last-call line is empty in
+-- the day Closing
 function TutorialService:LessonCallDue(): boolean
-	return self:LessonActive() and self.Dependencies.RoundService:ProbeSaysEnd("Closing")
+	if not self:LessonActive() then
+		return false
+	end
+	return lessonPhase() ~= "Closing" or self.Dependencies.RoundService:ProbeSaysEnd("Closing")
 end
 
 -- Cash up to Rules.Upgrade.Cash (never below the price of the lesson's level) once the call goes out
@@ -306,7 +335,9 @@ function TutorialService:ShouldHold(): boolean
 	end
 	const round = self.Dependencies.RoundService
 	const phase = round:GetPhase()
-	if round:IsNight() or (phase ~= "Prep" and phase ~= "Open") or not self:AnyPending() then
+	-- the night's shop too (owner 2026-10-19): Night 1's Prep and Night phases hold for the tutorial
+	const holdable = if round:IsNight() then phase == "Prep" or phase == "Night" else phase == "Prep" or phase == "Open"
+	if not holdable or not self:AnyPending() then
 		self.HoldSince = 0
 		return false
 	end
@@ -389,6 +420,13 @@ TutorialService:OnInit(function(self)
 	end)
 	self.Dependencies.CustomerService:SetSpawnHold(function(): boolean
 		return self:ShouldHold()
+	end)
+	-- owner 2026-10-19: no anomaly and no sanity lost while a rookie's tutorial runs (the first customer is the tutorial's)
+	self.Dependencies.AnomalyService:SetHold(function(): boolean
+		return self:AnyPending()
+	end)
+	self.Dependencies.VitalService:SetHold(function(): boolean
+		return self:AnyPending()
 	end)
 	Players.PlayerRemoving:Connect(function(player: Player)
 		-- a player who comes back starts over (the client lost its session state too)

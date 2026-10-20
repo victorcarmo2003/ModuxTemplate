@@ -30,6 +30,7 @@ export type Door = {
 export type Hours = {
 	OpenAtShiftEnd: boolean, -- false = no hours: open in every phase not in KioskClosedPhases (rollback without code)
 	StayOpenIntoShift: number, -- s the stand stays open after the next shift's first selling phase starts
+	MinOpen: number, -- s the stand stays open at least from the moment it opened, before any scheduled close
 	CloseWarning: number, -- s before closing when the "closing in" toast goes out (0 = no warning)
 	Tick: number, -- Hz of the server close timer
 	Attributes: {
@@ -87,6 +88,11 @@ export type Mart = {
 		Distance: number, -- studs, BillboardGui MaxDistance of the price plate
 		Lift: number, -- studs from the miniature centre up to the plate (it floats above the miniature, never in the glass)
 		Width: number, -- px, fixed size like PatienceBar / OrderBubble (BillboardGui, UI scale does not reach it)
+		-- TASK-595 (owner Play 2026-10-19: the plates showed through the walls into the shop, stacked on each other):
+		-- only ONE plate at a time, the one looked at (or the nearest) within Focus studs of the camera, in the Cone
+		-- (cosine of the half angle) and with a clear line of sight; not AlwaysOnTop, so walls hide it too.
+		Focus: number, -- studs from the camera
+		Cone: number, -- cos of the half angle around the look direction
 	},
 	Hint: {
 		-- "Closing time" hint: toast (server, once per shift) and arrow to the stand while the phase is one of these and
@@ -121,6 +127,8 @@ const mart: Mart = {
 	Hours = {
 		OpenAtShiftEnd = true,
 		StayOpenIntoShift = 45,
+		-- owner request 2026-10-20 (Provisional, 1.5-3 min): open at least this long, time to save up for better gear
+		MinOpen = 120,
 		CloseWarning = 20,
 		Tick = 4,
 		Attributes = { Open = "GearStandOpen", ClosesAt = "GearStandClosesAt" },
@@ -164,7 +172,7 @@ const mart: Mart = {
 	},
 	-- Q-203 Provisional: one full shift off the stand after a purchase (user feedback 2026-10-11).
 	Cooldown = { Turns = 2 },
-	Plate = { Distance = 45, Lift = 1.3, Width = 190 },
+	Plate = { Distance = 18, Lift = 1.3, Width = 190, Focus = 14, Cone = 0.8 },
 	Hint = { Phases = { "Closing", "Summary", "Prep" }, Reach = 9 },
 	-- Low-bun hint (2026-10-17, Provisional): any selling phase with LowBuns buns or fewer in the crate, an arrow to the
 	-- Mart door and one toast per low spell; over on reaching the door (Reach) or once the stock is back above it

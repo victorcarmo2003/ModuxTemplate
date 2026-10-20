@@ -5,7 +5,8 @@
 --   * OPENS on RoundService.ShiftEnded (the start of Summary, the end of every shift) and stays open through the break
 --     (Summary, boss Call, Prep);
 --   * the next shift's first selling phase (Content.Shift Selling: Open on a day, Night on a night) schedules the close
---     at now + StayOpenIntoShift (45 s) so the crew can finish shopping; CloseWarning (20 s) before it a toast
+--     at now + StayOpenIntoShift (45 s) so the crew can finish shopping, never before Hours.MinOpen (120 s, owner
+--     request 2026-10-20, Provisional) after the stand opened; CloseWarning (20 s) before it a toast
 --     "Gear Stand closing in 20s" goes out; then it CLOSES;
 --   * always CLOSED in Content.Mart.KioskClosedPhases (NightLost, Resume, Intro, Finale, RunEnd): a lost night, a
 --     resume and a repeated night start with the stand down until the next shift end;
@@ -18,8 +19,9 @@
 -- Tutorial (R-2, docs/tests/restaurant-e2e.md): the Day 1 upgrade lesson runs in the day Closing (clock held), before
 -- the Summary that opens the stand; TutorialService calls OpenForLesson when Walt's lesson call goes out. Same window as
 -- a shift end (no close scheduled until the next selling phase), so the normal hours go on from the Summary.
--- Dev (`/dev gear open|close|state`): Force(open) wins until the next natural change (shift end / selling start /
--- closed phase); open during a selling phase also schedules the close (now + StayOpenIntoShift) to test the warning.
+-- Dev (`/dev gear open|hold|close|state`, Conch `gear`): Force(open) wins until the next natural change (shift end /
+-- selling start / closed phase); open during a selling phase also schedules the close (now + StayOpenIntoShift) to test
+-- the warning; hold = open with no close scheduled (stays open until a close or the next natural change).
 -- No snapshot: the state is derived again from the phase on every transition.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -48,6 +50,8 @@ function GearStandService:Setup()
 	self.Warned = false :: boolean -- the "closing in" toast of the current window went out
 	-- the shift that opened the stand already scheduled its close (one window per shift end)
 	self.Scheduled = false :: boolean
+	-- server time the stand last opened (Hours.MinOpen counts from here)
+	self.OpenedAt = 0 :: number
 end
 
 function GearStandService:IsOpen(): boolean
@@ -62,6 +66,9 @@ end
 -- open / close; notify = party toast on a real change
 function GearStandService:Set(open: boolean, notify: boolean)
 	const changed = self.Open() ~= open
+	if changed and open then
+		self.OpenedAt = Workspace:GetServerTimeNow()
+	end
 	self.Open(open)
 	if not open then
 		self.ClosesAt = 0
@@ -73,10 +80,10 @@ function GearStandService:Set(open: boolean, notify: boolean)
 	end
 end
 
--- close at now + StayOpenIntoShift (warning CloseWarning before)
+-- close at now + StayOpenIntoShift, never before OpenedAt + MinOpen (warning CloseWarning before)
 function GearStandService:Schedule(now: number)
 	self.Scheduled = true
-	self.ClosesAt = now + HOURS.StayOpenIntoShift
+	self.ClosesAt = math.max(now + HOURS.StayOpenIntoShift, self.OpenedAt + HOURS.MinOpen)
 	self.Warned = HOURS.CloseWarning <= 0
 	self:Publish()
 end
@@ -98,6 +105,7 @@ function GearStandService:OnPhase(phase: string)
 		self.ClosesAt = 0
 		self.Warned = false
 		self:Set(true, true)
+		self.OpenedAt = now -- a new window: MinOpen counts from the shift end even if the stand was still open
 		return
 	end
 	const row = Content.Shift.ByKey[phase]
@@ -133,7 +141,7 @@ function GearStandService:OpenForLesson()
 end
 
 -- Dev override (`/dev gear`): open = open now (and, in a selling phase, the close scheduled from now); close = now
-function GearStandService:Force(open: boolean)
+function GearStandService:Force(open: boolean, hold: boolean?)
 	if not self.Enabled then
 		error("Gear Stand hours run only in the Run place", 0)
 	end
@@ -146,7 +154,7 @@ function GearStandService:Force(open: boolean)
 	self.Warned = false
 	self:Set(true, true)
 	const row = Content.Shift.ByKey[self.Dependencies.RoundService:GetPhase()]
-	if HOURS.OpenAtShiftEnd and row and row.Selling then
+	if HOURS.OpenAtShiftEnd and row and row.Selling and not hold then
 		self:Schedule(Workspace:GetServerTimeNow())
 	end
 end

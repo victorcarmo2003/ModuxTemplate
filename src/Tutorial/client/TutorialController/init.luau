@@ -53,7 +53,9 @@
 	through SetDevHandler ("hud_reveal", /dev hud reveal).
 
 	End: after the talk steps (Walt finished them or "Got it"), on Skip (Q / D-pad down / the Skip tag on touch), or when
-	the day shift is over without a sale (Closing, Summary, night). Each end fires `TutorialComplete` once; the server
+	the day shift is over without a sale (Closing, Summary, night). An end that is not a skip first plays the talk step
+	"shift" (TASK-598: the shift ends at six, the screen almost black around the HUD clock; ShiftTalk), then the
+	goodbye. Each end fires `TutorialComplete` once; the server
 	(TutorialService) only remembers it in memory for this run (never saved). Past Day 1 it does not come back (FirstRun).
 
 	No progress (playtest 2026-10-11: on "Open the shop" a distracted player thought the game froze): a step with a
@@ -102,8 +104,11 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Cinematic = require(StarterPlayer.StarterPlayerScripts.client.Interface.Cinematic)
 local Objective = require(StarterPlayer.StarterPlayerScripts.client.Interface.Objective)
+local Announce = require(StarterPlayer.StarterPlayerScripts.client.Interface.Announce)
 local Spotlight = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Spotlight)
+local CallSubtitle = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.CallSubtitle)
 local TutorialPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialPanel)
+local TaskList = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TaskList)
 local TutorialPointer = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialPointer)
 local EdgePointer = require(StarterPlayer.StarterPlayerScripts.client.Interface.EdgePointer)
 local TutorialDebug = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialDebug)
@@ -125,13 +130,20 @@ const STATION_TAG = "Station"
 const HOT_DOG = "hot_dog"
 const TICK_RATE = 10
 -- Phases where the tutorial runs (day shift, before the summary)
-const RUN_PHASES: { [string]: boolean } = { Prep = true, Open = true }
--- Phases that end a tutorial still running without a sale (the day is over)
-const END_PHASES: { [string]: boolean } = { Closing = true, Summary = true }
+-- Night too (DEC-311): the run starts at night (Shift.RunStartsAtNight): the tutorial is the first night's shop
+const RUN_PHASES: { [string]: boolean } = { Prep = true, Open = true, Night = true, Call = true }
+-- Phases that end a tutorial still running without a sale (the shift is over)
+const END_PHASES: { [string]: boolean } = { Closing = true, Summary = true, NightEnd = true, NightLost = true }
+const BACK_HINT = "CookBackHint"
+const TASKS_RESET = 2 -- s the ticked list of a round stays before the next round's list (DEC-311) -- local Player attribute: the focus HUD pulses its Back button (r_leave, DEC-311)
 -- a sale of the tutorial customer with these results is the first sale (Wrong keeps the hot dog in hand)
 const SERVED: { [string]: boolean } = { Perfect = true, Complete = true, Incomplete = true }
 const REASK = 15 -- s without a tutorial customer around before TutorialBegin goes out again
 const CHECK_TIME = 0.9 -- s the panel chip shows the green check of a completed step
+-- Shop opening of the tutorial (TASK-595): leaving the "open" step shows the big title (Interface/Announce)
+const OPEN_STEP = "open"
+const OPEN_TITLE = "WE'RE OPEN"
+const OPEN_LINE = "Your first customer is on the way."
 const TUTORIAL_CALL = Content.BossCallRules.Tutorial.Call
 -- Day 1 upgrade lesson (owner request 2026-10-14, Provisional): Walt's call, the upgrade to buy, the Gear Stand reach
 const LESSON = TutorialRules.Upgrade
@@ -178,8 +190,12 @@ const PANEL_TOP_EDGE = 6 -- px at scale 1: the card hugs the top edge
 const ROBLOX_BAR = 270 -- px: width of the Roblox logo + menu / chat / mic cluster at the top left
 const PANEL_NARROW = 520
 const CASH_NAME = "Cash" -- HudPill of the money in the Hud ScreenGui
+const CLOCK_NAME = "Clock" -- HudPill of the clock in the Hud ScreenGui (HudScreen)
 const MONEY_STEP = "money"
 const MART_TALK = "mart"
+-- TASK-598: Walt's last talk step (the shift ends at six) under a dark spotlight on the clock
+const SHIFT_STEP = "shift"
+const SHIFT_DIM = 0.12 -- dim transparency around the clock (the money pill's spotlight is 0.45): almost black
 -- Shopping steps (PROVISIONAL distances, studs)
 const BUN = "bun"
 const PACK = TutorialRules.Package -- package Tool item key of the shopping steps (pack_buns)
@@ -208,6 +224,8 @@ const COOK_FOCUS = "CookStation" -- local Player attribute: the cooking focus st
 const PLATE = "plate"
 const PICKUP_SERVE = "pickup_serve"
 const TAKE_BOX = "take_box"
+const STOCK_SHELF_TAG = "StockShelf" -- stock room bays (Supply/Shelves.luau), attribute Package
+const SAUSAGE_PACKAGE = "pack_sausages"
 const RESTOCK = "restock"
 const RESTOCK_STEPS: { [string]: boolean } = { r_box = true, r_restock = true }
 -- package Tool item key -> its Packages row (a box in hand)
@@ -291,6 +309,12 @@ function TutorialController:Setup()
 	-- Tutorial customer: TutorialBegin sent (os.clock of the last one, 0 = never); its NpcId once seen (0 = none)
 	self.AskedAt = 0 :: number
 	self.GuestId = 0 :: number
+	-- DEC-311: tutorial customers served so far, the latched tasks of this round and the list on screen (top right)
+	self.Sales = 0 :: number
+	self.Flags = {} :: { [string]: boolean }
+	self.Tasks = Vide.source({}) :: Vide.Source<{ { Text: string, Done: boolean, Icon: string? } }>
+	-- the task list shows once the first order is taken (owner 2026-10-19)
+	self.TasksOn = Vide.source(false) :: Vide.Source<boolean>
 	-- Walt on the line: the tutorial call was answered (from here he leads), the greeting went out, no call came
 	self.Answered = false :: boolean
 	self.Greeted = false :: boolean
@@ -338,6 +362,8 @@ function TutorialController:Setup()
 	self.LessonOn = false :: boolean
 	self.LessonNear = false :: boolean
 	self.LessonSkipped = false :: boolean
+	-- how the tutorial ended ("done" | "skip" | "over"; "" = not yet). Set with Finished: read it after tracking Finished
+	self.EndReason = "" :: string
 end
 
 -- Reactive -------------------------------------------------------------------------------------------------------
@@ -356,9 +382,17 @@ function TutorialController:FirstRun(): boolean
 	if self.Revived() then
 		return true
 	end
-	return self.Dependencies.ProfileController.Ready()
-		and not self.PastDay1()
-		and self.Dependencies.RoundController.Day() <= 1
+	-- the run's first shift: Day 1, or Night 1 (on Day 2) when the run starts at night (Shift.RunStartsAtNight)
+	return self.Dependencies.ProfileController.Ready() and not self.PastDay1() and not self:PastFirstShift()
+end
+
+-- The run is past its first shift (reactive)
+function TutorialController:PastFirstShift(): boolean
+	const round = self.Dependencies.RoundController
+	if Content.Shift.RunStartsAtNight then
+		return round.Night() > 1 or round.Day() > 2
+	end
+	return round.Day() > 1
 end
 
 function TutorialController:Step(): Steps.Step?
@@ -788,6 +822,20 @@ function TutorialController:SpeakStep(before: Steps.Step?, after: Steps.Step?)
 		self:Trace(`step {after.Key}: greeting kept, {#say} line(s) replaced`)
 		return
 	end
+	if after.Key == SHIFT_STEP then
+		-- the closing talk (TASK-598): the line on screen finishes, then the praise of the step left ("Stocked up!", what
+		-- Finish used to say) and the end of the shift
+		const closing: { string } = {}
+		if before.Done then
+			table.insert(closing, before.Done)
+		end
+		for _, text in say do
+			table.insert(closing, text)
+		end
+		self:Trace(`step {after.Key}: closing, {#closing} line(s) replaced`)
+		self.Call.Replace(closing)
+		return
+	end
 	if #say == 0 and after.Number == before.Number then
 		return -- silent waiting row of the same step: what Walt is saying still holds
 	end
@@ -873,8 +921,9 @@ function TutorialController:DecideLive(): (string, Instance?, string)
 	end
 
 	-- Walt is on the line (or never called): the trailer is opened first (Prep: the window lever by the phone; opening the
-	-- window opens the shop, TASK-284), then the tutorial customer comes
-	if Vide.untrack(self.Dependencies.RoundController.Phase) == "Prep" then
+	-- window opens the shop, TASK-284), then the tutorial customer comes. Owner 2026-10-19: also when the window is still shut
+	-- after the call (the night's shop, a window closed again): open it first
+	if Vide.untrack(self.Dependencies.RoundController.Phase) == "Prep" or self:WindowShut() then
 		return "open", self:Anchor("shutter_toggle", false), ""
 	end
 
@@ -944,6 +993,17 @@ function TutorialController:DecideLive(): (string, Instance?, string)
 	return "cooking", self:KitchenAnchor("grill_collect", false), ""
 end
 
+-- The service window of the vehicle in use is shut (vehicle attribute Shutter, VehicleService)
+function TutorialController:WindowShut(): boolean
+	const current = Vide.untrack(self.Dependencies.RoundController.Vehicle)
+	for _, model in CollectionService:GetTagged(VEHICLE_TAG) do
+		if model:GetAttribute("Vehicle") == current then
+			return model:GetAttribute("Shutter") == true
+		end
+	end
+	return false
+end
+
 -- Restaurant (TASK-393; design/tutorial-restaurant.md) ------------------------------------------------------------
 
 -- PLATE-n index of a plate anchor (the anchor or an ancestor tagged Binding.PlateTag), nil = not a plate anchor
@@ -988,6 +1048,10 @@ function TutorialController:DecideRestaurant(guestId: number, guest: GuestRecord
 		end
 		return "r_tablet", self:Anchor(TABLET_TAKE, true) or self:Anchor(TABLET_TAKE, false) or rig, ""
 	end
+	-- the order is taken: the task list shows from here on (owner 2026-10-19)
+	if not Vide.untrack(self.TasksOn) then
+		self.TasksOn(true)
+	end
 	const held = self:Held()
 	if held and held.Item == HOT_DOG then
 		for key in held.Toppings do
@@ -1005,9 +1069,10 @@ function TutorialController:DecideRestaurant(guestId: number, guest: GuestRecord
 		end
 		return "r_pickup", self:Anchor(PICKUP_SERVE, false) or self:Anchor("serve", false, onGuest) or rig, ""
 	end
-	-- pre-prep (DEC-310): cut a bun to the cut-bun pile, grill a sausage to the rest rail, then take a plate and pick both onto it
-	-- (world prompts), then the toppings. Outside a focus the arrow points at the station's Prompt_Cook; inside it the focus HUD
-	-- and these hints guide.
+	-- DEC-311 (owner 2026-10-19): fry a sausage (grill focus, to the rest rail) -> cut a bun (board focus, to the cut-bun crate) ->
+	-- leave the focus (Back pulses) -> take the plate of this order (the slot whose card is this ticket) -> Add Bun -> Add Sausage
+	-- -> toppings (2nd customer) -> serve. Outside a focus the arrow points at the station's Prompt_Cook; inside it the paw and
+	-- these hints guide.
 	const plate = self:HeldPlate()
 	if plate == nil and crewHasHotDog() then
 		return "r_crew", self:Anchor(PICKUP_SERVE, false), ""
@@ -1015,20 +1080,14 @@ function TutorialController:DecideRestaurant(guestId: number, guest: GuestRecord
 	const kitchen = self:Kitchen()
 	const focus = Players.LocalPlayer:GetAttribute(COOK_FOCUS)
 	const buns = kitchen.BoardWorking or kitchen.BoardReady
-	if plate ~= nil and not plate.Bun and kitchen.BoardReady then
-		return "r_bun_plate", self:Anchor(PLATE_ADD_BUN, true) or self:Anchor(PLATE_ADD_BUN, false), ""
-	end
-	if plate ~= nil and plate.Bun and not plate.Sausage and kitchen.Rail > 0 then
-		return "r_dog_plate", self:Anchor(PLATE_ADD_SAUSAGE, true) or self:Anchor(PLATE_ADD_SAUSAGE, false), ""
-	end
-	if not buns and (plate == nil or not plate.Bun) then
-		return "r_cut", if focus == "Board" then nil else self:CookAnchor("Board"), ""
-	end
+	-- 1. fry
 	if kitchen.Rail == 0 and (plate == nil or not plate.Sausage) then
 		if focus ~= "Grill" then
+			if focus ~= nil then
+				return "r_leave", nil, ""
+			end
 			return "r_grill", self:CookAnchor("Grill"), ""
 		end
-		-- inside the grill focus: what the sausages want
 		const grill = self:GrillState()
 		if grill.Ready then
 			return "r_collect", nil, ""
@@ -1039,11 +1098,85 @@ function TutorialController:DecideRestaurant(guestId: number, guest: GuestRecord
 		end
 		return "r_grill", nil, ""
 	end
-	if plate == nil then
-		return "r_take_plate", self:Anchor(PLATE_TAKE, false), ""
+	-- 2. cut
+	if not buns and (plate == nil or not plate.Bun) then
+		if focus ~= "Board" then
+			if focus ~= nil then
+				return "r_leave", nil, ""
+			end
+			return "r_cut", self:CookAnchor("Board"), ""
+		end
+		return "r_cut", nil, ""
 	end
-	-- the bun is still being cut
-	return "r_bun_plate", self:Anchor(PLATE_ADD_BUN, false), ""
+	-- 3. the plate is built in the world: out of the focus first
+	if focus ~= nil then
+		return "r_leave", nil, ""
+	end
+	if plate == nil then
+		return "r_take_plate", self:Anchor(PLATE_TAKE, true, function(anchor: Instance): boolean
+			const slot = anchor.Parent
+			return slot ~= nil and slot:GetAttribute("Ticket") == guestId
+		end) or self:Anchor(PLATE_TAKE, true), ""
+	end
+	if not plate.Bun then
+		return "r_bun_plate", self:Anchor(PLATE_ADD_BUN, true) or self:Anchor(PLATE_ADD_BUN, false), ""
+	end
+	return "r_dog_plate", self:Anchor(PLATE_ADD_SAUSAGE, true) or self:Anchor(PLATE_ADD_SAUSAGE, false), ""
+end
+
+-- The task list of this round (top right, DEC-311): fry, cut, (the sauces,) serve; Flags latch what was done
+function TutorialController:TaskList(): { { Text: string, Done: boolean, Icon: string? } }
+	const flags = self.Flags
+	const order = TutorialRules.Orders[math.clamp(self.Sales + 1, 1, #TutorialRules.Orders)]
+	const list: { { Text: string, Done: boolean, Icon: string? } } = {
+		{ Text = "Fry a sausage", Done = flags.Fry == true, Icon = "Ingredient/sausage" },
+		{ Text = "Cut a bun", Done = flags.Cut == true, Icon = "Ingredient/bun" },
+	}
+	if #order > 0 then
+		const names: { string } = {}
+		for _, key in order do
+			const row = Content.Ingredients.ByKey[key]
+			table.insert(names, if row then row.Name else key)
+		end
+		table.insert(list, { Text = `Add {table.concat(names, " and ")}`, Done = flags.Sauce == true, Icon = `Ingredient/{order[1]}` })
+	end
+	table.insert(list, { Text = "Serve the customer", Done = flags.Serve == true, Icon = "Item/hot_dog" })
+	return list
+end
+
+-- Latches the tasks of this round from the world (whoever did it)
+function TutorialController:TrackTasks()
+	const flags = self.Flags
+	const kitchen = self:Kitchen()
+	const plate = self:HeldPlate()
+	const held = self:Held()
+	const hotDog = held ~= nil and held.Item == HOT_DOG
+	local changed = false
+	local function set(name: string, value: boolean)
+		if value and not flags[name] then
+			flags[name] = true
+			changed = true
+		end
+	end
+	set("Fry", kitchen.Rail > 0 or (plate ~= nil and plate.Sausage) or hotDog)
+	set("Cut", kitchen.BoardReady or (plate ~= nil and plate.Bun) or hotDog)
+	if hotDog and held ~= nil then
+		const order = TutorialRules.Orders[math.clamp(self.Sales + 1, 1, #TutorialRules.Orders)]
+		local all = #order > 0
+		for _, key in order do
+			if not held.Toppings[key] then
+				all = false
+			end
+		end
+		set("Sauce", all)
+	end
+	if changed then
+		-- a task ticked: the check pops with the step chime
+		self.Dependencies.AudioController:Play(STEP_SOUND)
+	end
+	if changed or #Vide.untrack(self.Tasks) == 0 then
+		self.Tasks(self:TaskList())
+	end
 end
 
 -- The Prompt_Cook of a cooking focus station ("Board" | "Grill" | "Toppings")
@@ -1058,6 +1191,7 @@ function TutorialController:GrillState(): { Ready: boolean, FlipNow: boolean, Wo
 	const out = { Ready = false, FlipNow = false, Working = false }
 	const now = workspace:GetServerTimeNow()
 	const window = Content.Restaurant.Grill
+	-- DEC-311: an unflipped sausage waits at HoldAt for the flip mini-game
 	for _, raw in self.Libs.Net.Stations:entries() do
 		const record = raw :: any
 		if record.Kind ~= "grill" then
@@ -1068,7 +1202,7 @@ function TutorialController:GrillState(): { Ready: boolean, FlipNow: boolean, Wo
 		elseif record.State == "Working" then
 			out.Working = true
 			const fraction = if record.Duration > 0 then (now - record.StartedAt) / record.Duration else 0
-			if (record.Flip or 0) == 0 and fraction >= window.FlipFrom and fraction <= window.FlipTo then
+			if (record.Flip or 0) == 0 and fraction >= window.HoldAt then
 				out.FlipNow = true
 			end
 		end
@@ -1138,7 +1272,18 @@ function TutorialController:DecideRestock(): (string, Instance?, string)
 	if package ~= nil then
 		return "r_restock", self:StationRestock(package.Ingredient), ""
 	end
-	return "r_box", self:Anchor(TAKE_BOX, true) or self:Anchor(TAKE_BOX, false), ""
+	return "r_box", self:SausageBay() or self:Anchor(TAKE_BOX, true) or self:Anchor(TAKE_BOX, false), ""
+end
+
+-- The sausage bay of the stock room (the first one at the front; owner 2026-10-19): the r_box arrow never hops between
+-- bays by distance. nil = no open sausage bay
+function TutorialController:SausageBay(): Instance?
+	return self:Anchor(TAKE_BOX, true, function(anchor: Instance): boolean
+		const bay = ancestorWith(anchor, function(instance)
+			return CollectionService:HasTag(instance, STOCK_SHELF_TAG)
+		end)
+		return bay ~= nil and bay:GetAttribute("Package") == SAUSAGE_PACKAGE
+	end)
 end
 
 -- Starts the restock steps (after the money step, or forced by /dev tutorial step)
@@ -1351,6 +1496,15 @@ function TutorialController:PromptAllowed(anchor: Instance): boolean
 	if step == nil then
 		return true
 	end
+	-- the restaurant steps (owner 2026-10-19: "esconder os prompts e introduzir por etapas"): only the step's own prompt, and
+	-- only on the thing the arrow points at (one plate, one station)
+	if step.Restaurant or key == "open" or key == "wait_customer" then
+		if step.Action ~= action then
+			return false
+		end
+		const target = Vide.untrack(self.Target)
+		return target == false or target == anchor or anchor:IsDescendantOf(target)
+	end
 	if step.Action == action then
 		return true
 	end
@@ -1359,6 +1513,7 @@ function TutorialController:PromptAllowed(anchor: Instance): boolean
 end
 
 function TutorialController:ClearGuidance()
+	Players.LocalPlayer:SetAttribute(BACK_HINT, nil)
 	Vide.batch(function()
 		self.Target(false)
 		self.PointerShown(false)
@@ -1480,6 +1635,10 @@ function TutorialController:SetStep(key: string, target: Instance?, item: string
 		if not Vide.untrack(self.Checked) then
 			self.Checked(true)
 		end
+		if before.Key == OPEN_STEP then
+			-- the shop just opened: the big title of the blackout (TASK-595, owner Play 2026-10-19; Provisional texts)
+			Announce.Show(OPEN_TITLE, OPEN_LINE)
+		end
 	end
 	if previous ~= key then
 		self.StepAt = os.clock()
@@ -1531,17 +1690,44 @@ function TutorialController:TickIdle(step: Steps.Step, target: Instance?)
 	end
 end
 
--- The money pill of the HUD (spotlight target of the UI step)
-local function cashPill(): GuiObject?
+-- A pill of the HUD by name (spotlight target of a UI step)
+local function hudPill(name: string): GuiObject?
 	const gui = Players.LocalPlayer:FindFirstChild("PlayerGui")
 	const hud = if gui then gui:FindFirstChild("Hud") else nil
-	const pill = if hud then hud:FindFirstChild(CASH_NAME, true) else nil
+	const pill = if hud then hud:FindFirstChild(name, true) else nil
 	return if pill and pill:IsA("GuiObject") then pill else nil
+end
+
+-- The money pill of the HUD (spotlight target of the money step)
+local function cashPill(): GuiObject?
+	return hudPill(CASH_NAME)
+end
+
+-- The clock pill of the HUD (spotlight target of the shift step, TASK-598)
+local function clockPill(): GuiObject?
+	return hudPill(CLOCK_NAME)
 end
 
 -- Sale packet: the tutorial customer paid (whoever served it) = the first sale
 function TutorialController:OnSale(npc: number, result: string)
 	if not Vide.untrack(self.Running) or not SERVED[result] or npc ~= self.GuestId or self.GuestId == 0 then
+		return
+	end
+	-- DEC-311: "Serve" ticks (the check pops); the first customer was the plain hot dog: the next one (ketchup and mustard) comes
+	-- and, a moment later, the tasks start over
+	self.Flags.Serve = true
+	self.Tasks(self:TaskList())
+	self.Dependencies.AudioController:Play(STEP_SOUND)
+	self.Sales += 1
+	if self.Sales < #TutorialRules.Orders then
+		self.GuestId = 0
+		const round = self.Sales
+		task.delay(TASKS_RESET, function()
+			if self.Sales == round then
+				self.Flags = {}
+				self.Tasks(self:TaskList())
+			end
+		end)
 		return
 	end
 	const current = Steps.ByKey[Vide.untrack(self.StepKey)]
@@ -1573,10 +1759,37 @@ function TutorialController:TickTalk()
 	end
 end
 
--- Next talk step; after the last one the tutorial is done. After "money": the shopping steps when the buns ran out
--- (the tutorial stock of one bun), else the talk step "mart".
+-- The closing talk step (TASK-598, owner request 2026-10-19, Provisional): every end of the tutorial that is not a skip
+-- comes here first. Walt says the shift ends at six while the screen goes almost black around the HUD clock (the dark
+-- spotlight: close-up intro, then the ring pulses on the clock); once he finished (TickTalk) or on "Got it", the goodbye.
+function TutorialController:ShiftTalk()
+	self.Forced = nil
+	self.Shopping = false
+	self.Restocking = false
+	self.Trail.Hide()
+	Vide.batch(function()
+		self.CashRevealed(true)
+		self.ClockRevealed(true)
+		self.Spot(false)
+	end)
+	self:SetStep(SHIFT_STEP, nil, "")
+	-- the clock may pop in this frame: spotlight it once it is laid out
+	task.defer(function()
+		if Vide.untrack(self.StepKey) == SHIFT_STEP then
+			self.Spot(clockPill() or false)
+		end
+	end)
+end
+
+-- Next talk step; after the last one the closing talk (shift), after it the tutorial is done. After "money": the
+-- shopping steps when the buns ran out (the tutorial stock of one bun), else the talk step "mart".
 function TutorialController:NextTalk()
 	const current = Vide.untrack(self.StepKey)
+	if current == SHIFT_STEP then
+		self.Spot(false)
+		self:Finish("done")
+		return
+	end
 	if current == MONEY_STEP then
 		self.Spot(false)
 		if TutorialRules.Restaurant then
@@ -1584,12 +1797,12 @@ function TutorialController:NextTalk()
 			if self:CanRestock() then
 				self:BeginRestock()
 			else
-				self:Finish("done")
+				self:ShiftTalk()
 			end
 			return
 		end
 		if not TutorialRules.Shopping then
-			self:Finish("done") -- 2026-10-17 cut: Day 1 ends on the first sale (the Mart is a low-bun hint later)
+			self:ShiftTalk() -- 2026-10-17 cut: Day 1 ends on the first sale (the Mart is a low-bun hint later)
 			return
 		end
 		if self:StockAmount(BUN) == 0 then
@@ -1610,7 +1823,7 @@ function TutorialController:NextTalk()
 		end
 	end
 	if nextKey == nil then
-		self:Finish("done")
+		self:ShiftTalk()
 		return
 	end
 	self.Spot(false)
@@ -1644,6 +1857,7 @@ function TutorialController:Finish(reason: string)
 		return
 	end
 	self.Forced = nil
+	self.EndReason = reason
 	if self:Voiced() then
 		if reason == "done" then
 			-- the praise of the last step first ("Stocked up!"), then the goodbye
@@ -1688,7 +1902,8 @@ function TutorialController:Tick()
 	if
 		not Vide.untrack(self.PastDay1)
 		and Vide.untrack(self.Dependencies.RoundController.Ready)
-		and Vide.untrack(self.Dependencies.RoundController.Day) > 1
+		-- read in the tick, outside any effect: no tracking
+		and self:PastFirstShift()
 	then
 		self.PastDay1(true)
 	end
@@ -1711,10 +1926,9 @@ function TutorialController:Tick()
 	const round = self.Dependencies.RoundController
 	const phase = Vide.untrack(round.Phase)
 	const ready = Vide.untrack(round.Ready)
-	const night = Vide.untrack(round.IsNight)
 
-	-- the day shift is over without a sale: end it, show the whole HUD
-	if ready and Vide.untrack(self.Running) and (night or END_PHASES[phase]) then
+	-- the shift is over without the last sale: end it, show the whole HUD
+	if ready and Vide.untrack(self.Running) and END_PHASES[phase] then
 		self:Finish("over")
 		return
 	end
@@ -1722,7 +1936,7 @@ function TutorialController:Tick()
 		self.ClockRevealed(true)
 	end
 
-	const canRun = ready and not night and RUN_PHASES[phase] == true and not Vide.untrack(Cinematic.Active)
+	const canRun = ready and RUN_PHASES[phase] == true and not Vide.untrack(Cinematic.Active)
 	if not canRun then
 		if Vide.untrack(self.Running) then
 			self.Running(false)
@@ -1747,16 +1961,33 @@ function TutorialController:Tick()
 	end
 	-- shopping over: the buns are back in the crate (whoever restocked)
 	if self.Shopping and (self:StockAmount(BUN) or 0) > self.ShopFrom then
-		self:Finish("done")
+		self:ShiftTalk() -- then the goodbye (TASK-598)
 		return
 	end
 	-- restaurant restock over: a station got stock back (whoever restocked)
 	if self.Restocking and self:Restocked() then
-		self:Finish("done")
+		self:ShiftTalk()
 		return
 	end
 	const key, target, item = self:Decide()
 	self:SetStep(key, target, item)
+	self:TrackTasks()
+	-- r_leave: the focus HUD pulses its Back button and the spotlight dims the rest of the screen around it (owner 2026-10-19:
+	-- the player is not thrown out of the station, the screen shows where to go)
+	if (Players.LocalPlayer:GetAttribute(BACK_HINT) == true) ~= (key == "r_leave") then
+		Players.LocalPlayer:SetAttribute(BACK_HINT, if key == "r_leave" then true else nil)
+	end
+	const playerGui = Players.LocalPlayer:FindFirstChild("PlayerGui")
+	const focusGui = if playerGui then playerGui:FindFirstChild("CookFocus") else nil
+	const back = if focusGui then focusGui:FindFirstChild("Back") else nil
+	const spot = Vide.untrack(self.Spot)
+	if key == "r_leave" and back ~= nil and back:IsA("GuiObject") then
+		if spot ~= back then
+			self.Spot(back)
+		end
+	elseif spot ~= false and spot ~= nil and spot.Name == "Back" then
+		self.Spot(false)
+	end
 	-- reminder: no progress for IDLE s (Remind), or the same waiting step for NUDGE s and Walt quiet
 	const step = Steps.ByKey[key]
 	if step then
@@ -1794,7 +2025,8 @@ function TutorialController:BoughtGear(): boolean?
 end
 
 -- Key of the upgrade the lesson asks for while it runs for this player (nil = no lesson): a rookie of this session,
--- the day Closing of Day 1 (6 PM), Walt's lesson call heard, nothing bought on the Gear Stand yet, not skipped.
+-- the end of the first shift (Night 1's Summary, or Day 1's Closing at 6 PM), Walt's lesson call heard, nothing bought on
+-- the Gear Stand yet (only a real purchase ends it: the Upgrades set), not skipped.
 -- MarketController reads this to hide its own closing-time arrow (one arrow at a time).
 function TutorialController:UpgradeLesson(): string?
 	if
@@ -1806,11 +2038,17 @@ function TutorialController:UpgradeLesson(): string?
 		return nil
 	end
 	const round = self.Dependencies.RoundController
+	-- the end of the first shift: Night 1's Summary when the run starts at night (owner bug 2026-10-20), else Day 1's
+	-- Closing (TutorialService.LessonActive, same rule)
+	const atNight = Content.Shift.RunStartsAtNight
+	const past: boolean = Vide.untrack(function(): boolean
+		return self:PastFirstShift()
+	end)
 	if
 		not Vide.untrack(round.Ready)
-		or Vide.untrack(round.Day) > 1
-		or Vide.untrack(round.IsNight)
-		or Vide.untrack(round.Phase) ~= "Closing"
+		or past
+		or Vide.untrack(round.IsNight) ~= atNight
+		or Vide.untrack(round.Phase) ~= (if atNight then "Summary" else "Closing")
 	then
 		return nil
 	end
@@ -1896,9 +2134,7 @@ function TutorialController:PreloadVoices(timeout: number, progress: ((number) -
 		task.wait(0.1)
 	end
 	-- every run starts on Day 1 with the tutorial (no saved flag); a run already past Day 1 skips the preload
-	const rookie = self.Dependencies.PlaceController:Is("Run")
-		and Vide.untrack(self.Dependencies.RoundController.Day) <= 1
-		and not Vide.untrack(self.PastDay1)
+	const rookie = self.Dependencies.PlaceController:Is("Run") and not self:PastFirstShift() and not Vide.untrack(self.PastDay1)
 	if not rookie then
 		if progress ~= nil then
 			progress(1)
@@ -1934,7 +2170,7 @@ function TutorialController:NoteDone()
 	const day = Vide.untrack(self.Dependencies.RoundController.Day)
 	const reason = if Vide.untrack(self.Finished)
 		then "done or skipped this run"
-		elseif Vide.untrack(self.PastDay1) or day > 1 then `day {day} is past day 1`
+		elseif Vide.untrack(self.PastDay1) or self:PastFirstShift() then `day {day} is past the run's first shift`
 		else nil
 	if reason == nil then
 		return
@@ -1966,7 +2202,8 @@ function TutorialController:DecideForced(live: string): (string?, Instance?, str
 	elseif key == "order" or key == "serve" then
 		return key, self:Anchor(step.Action or "", false, onGuest) or rig, ""
 	elseif key == "toppings" then
-		const topping = TutorialRules.Order[1]
+		const last = TutorialRules.Orders[#TutorialRules.Orders]
+		const topping = last[1]
 		const row = Content.Ingredients.ByKey[topping]
 		return key,
 			self:Anchor("topping_add", false, function(anchor)
@@ -2016,6 +2253,10 @@ function TutorialController:ApplyForced()
 	end
 	self.Shopping = false
 	self.Restocking = false
+	if key == SHIFT_STEP then
+		self:ShiftTalk() -- /dev tutorial step shift: the closing talk with its dark spotlight on the clock
+		return
+	end
 	if step.Talk then
 		self.Forced = nil
 		if key == MONEY_STEP then
@@ -2146,6 +2387,10 @@ function TutorialController:DevReset()
 	self.WaitStarted = 0
 	self.AskedAt = 0
 	self.GuestId = 0
+	self.Sales = 0
+	self.Flags = {}
+	self.Tasks({})
+	self.TasksOn(false)
 	self.StepAt = 0
 	self.Sent = false
 	self.Shopping = false
@@ -2337,6 +2582,14 @@ function TutorialController:Mount(playerGui: Instance)
 			Objective.SetCard(false)
 			Objective.SetSkip(nil)
 		end)
+		-- HallucinationController reads it: nothing plays under the tutorial (owner 2026-10-19)
+		Vide.effect(function()
+			const running = self.Running() and not self.Finished()
+			Vide.untrack(function()
+				Players.LocalPlayer:SetAttribute("TutorialRunning", if running then true else nil)
+				return nil
+			end)
+		end)
 		Vide.effect(function()
 			const on = self.Running() and SKIPPABLE
 			Vide.untrack(function()
@@ -2396,6 +2649,15 @@ function TutorialController:Mount(playerGui: Instance)
 					return UDim2.new(0, centre, 0, PANEL_TOP_EDGE * s)
 				end,
 			}),
+			-- the tasks of this round, top right under the HUD pills (DEC-311)
+			TaskList({
+				Tasks = self.Tasks,
+				Shown = function(): boolean
+					return TutorialRules.Restaurant and self.Running() and self.TasksOn()
+				end,
+				Scale = scale,
+				Position = UDim2.new(1, -12, 0, 130),
+			}),
 		})
 		panel.Parent = playerGui
 
@@ -2405,7 +2667,11 @@ function TutorialController:Mount(playerGui: Instance)
 		const focus = Vide.create("ScreenGui")({
 			Name = "TutorialSpotlight",
 			ResetOnSpawn = false,
-			ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
+			-- the dim covers the whole screen to the physical edges (owner 2026-10-20: cut at the safe area on a phone); the
+			-- hole is relative AbsolutePosition, so it still lands on the target of any other ScreenGui
+			IgnoreGuiInset = true,
+			ScreenInsets = Enum.ScreenInsets.None,
+			ClipToDeviceSafeArea = false,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			DisplayOrder = 5,
 			Enabled = function()
@@ -2413,15 +2679,78 @@ function TutorialController:Mount(playerGui: Instance)
 			end,
 			Spotlight({
 				Shown = function()
-					return shown() and self.Spot() ~= false
+					const spot = self.Spot()
+					return shown() and spot ~= false and spot.Name ~= CLOCK_NAME
 				end,
 				Target = function(): GuiObject?
 					const spot = self.Spot()
 					return if spot then spot else nil
 				end,
+				-- the Back of the cooking focus (r_leave, after the fry and the cut; owner 2026-10-19): a close-up on it,
+				-- the eye goes to the task list first
+				Intro = function(): boolean
+					const spot = self.Spot()
+					return spot ~= false and spot.Name == "Back"
+				end,
 			}),
 		})
 		focus.Parent = playerGui
+
+		-- The shift step (TASK-598): the screen goes almost black around the HUD clock (close-up intro onto it) while Walt
+		-- says the shift ends at six. The call subtitle (BossCall, DisplayOrder 2) would sit under the dark, so the same
+		-- strip is drawn again over it, from the BossController sources (same insets: it lands on the original)
+		const boss = self.Dependencies.BossController
+		const round = self.Dependencies.RoundController
+		local function onClock(): boolean
+			const spot = self.Spot()
+			return shown() and spot ~= false and spot.Name == CLOCK_NAME
+		end
+		const shiftFocus = Vide.create("ScreenGui")({
+			Name = "TutorialShiftFocus",
+			ResetOnSpawn = false,
+			-- same full-screen dim as TutorialSpotlight
+			IgnoreGuiInset = true,
+			ScreenInsets = Enum.ScreenInsets.None,
+			ClipToDeviceSafeArea = false,
+			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+			DisplayOrder = 5,
+			Enabled = function()
+				return not Cinematic.Active()
+			end,
+			Spotlight({
+				Name = "ClockSpotlight",
+				Shown = onClock,
+				Target = function(): GuiObject?
+					const spot = self.Spot()
+					return if spot then spot else nil
+				end,
+				Dim = SHIFT_DIM,
+				Intro = onClock,
+			}),
+		})
+		shiftFocus.Parent = playerGui
+		-- the subtitle copy keeps BossCall's insets (it lands on the original), one step over the dim
+		const shiftSubtitle = Vide.create("ScreenGui")({
+			Name = "TutorialShiftSubtitle",
+			ResetOnSpawn = false,
+			ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
+			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+			DisplayOrder = 6,
+			Enabled = function()
+				return not Cinematic.Active()
+			end,
+			CallSubtitle({
+				Name = "ShiftSubtitle",
+				Visible = function(): boolean
+					return onClock() and boss.Showing()
+				end,
+				Speaker = boss.Speaker,
+				Text = boss.Text,
+				Phone = round.Vehicle,
+				Scale = boss.Scale,
+			}),
+		})
+		shiftSubtitle.Parent = playerGui
 
 		-- Edge pointer: viewport pixels (WorldToViewportPoint), so the whole screen with no inset
 		const overlay = Vide.create("ScreenGui")({
