@@ -14,6 +14,7 @@ local CrewColorService = require(ServerScriptService.server.ModuxTypes.CrewColor
 local CustomerService = require(ServerScriptService.server.ModuxTypes.CustomerService)
 local CutsceneService = require(ServerScriptService.server.ModuxTypes.CutsceneService)
 local DevService = require(ServerScriptService.server.ModuxTypes.DevService)
+local DriveThruService = require(ServerScriptService.server.ModuxTypes.DriveThruService)
 local EconomyService = require(ServerScriptService.server.ModuxTypes.EconomyService)
 local TipJarService = require(ServerScriptService.server.ModuxTypes.TipJarService)
 local GiftService = require(ServerScriptService.server.ModuxTypes.GiftService)
@@ -75,6 +76,7 @@ export type AllServices = {
 	CustomerService: CustomerService.Public,
 	CutsceneService: CutsceneService.Public,
 	DevService: DevService.Public,
+	DriveThruService: DriveThruService.Public,
 	EconomyService: EconomyService.Public,
 	TipJarService: TipJarService.Public,
 	GiftService: GiftService.Public,

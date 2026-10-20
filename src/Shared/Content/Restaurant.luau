@@ -235,7 +235,7 @@ const restaurant: Restaurant = {
 		MaxCustomers = { 5, 7, 9, 9 },
 	},
 	Drive = {
-		Enabled = false,
+		Enabled = true, -- TASK-574 (2026-10-20): DriveThruService; false = no car ever
 		UnlockNight = 2,
 		Lanes = 3, -- 1 at the window + up to 2 waiting (QueueByParty)
 		ShareByParty = { 0.15, 0.20, 0.20, 0.25 },

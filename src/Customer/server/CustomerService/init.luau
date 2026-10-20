@@ -173,6 +173,16 @@ export type Customer = {
 	CarryModel: Model?, -- rig carrying the attribute Carrying (served at the pickup; cleared when the record goes)
 	-- look of the hot dog it was handed (SellLine, before the Tool goes): the rig's Carry* attributes at SetCarrying
 	CarryLook: { Toppings: string?, Sauce: string?, Altered: boolean, Dish: boolean }?,
+	-- Drive-thru (TASK-574): lane spot 1..Drive.Lanes of its car (1 = at the window), 0 = a walking customer
+	Drive: number,
+}
+
+-- DriveThruService hooks (SetDriver, TASK-574). Try(party): one spawn attempt may become a car; the NpcId when a car
+-- spawned (it called Create with its lane spot), nil = an ordinary attempt. Left(id): a drive customer started leaving (its car drives
+-- off; DriveThruService removes the record). Neither may yield.
+export type Driver = {
+	Try: (party: number) -> number?,
+	Left: (id: number) -> (),
 }
 
 -- What SeatingService gets when a customer or pair takes its order (Seater.Offer). Leader = the customer with the ticket.
@@ -214,6 +224,7 @@ export type Wire = {
 	Leader: number?,
 	Pickup: number?,
 	Number: number?,
+	Drive: number?,
 }
 
 -- Sale.Result (network.md §4.3) = EconomyService SaleResult
@@ -402,6 +413,8 @@ function CustomerService:Setup()
 	-- Ordered(id, player): an order was taken (every customer, the tutorial one included; Acted skips it). Fired after
 	-- the record moved to the pickup line (pickup mode) or to its table (Q-209). PlateService / TabletService may listen.
 	self.Ordered = self.Libs.Signal.new() :: SignalLib.Signal<number, Player>
+	-- DriveThruService hook (SetDriver, TASK-574); nil = no car ever
+	self.Driver = nil :: Driver?
 end
 
 function CustomerService:WarnOnce(key: string, message: string)
@@ -443,7 +456,13 @@ end
 function CustomerService:Occupants(): number
 	local count = 0
 	for _, customer in self.Customers do
-		if customer.State ~= "Leaving" and customer.Leader == nil and not customer.AtTable and customer.Pickup == 0 then
+		if
+			customer.State ~= "Leaving"
+			and customer.Leader == nil
+			and not customer.AtTable
+			and customer.Pickup == 0
+			and customer.Drive == 0 -- a car never takes a counter slot (TASK-574)
+		then
 			count += 1
 		end
 	end
@@ -477,8 +496,8 @@ function CustomerService:IsCounterEmpty(): boolean
 		return false
 	end
 	for _, customer in self.Customers do
-		if (customer.AtTable or customer.Pickup > 0) and customer.State ~= "Leaving" then
-			return false -- waiting at a table or in the pickup line (TASK-380)
+		if (customer.AtTable or customer.Pickup > 0 or customer.Drive > 0) and customer.State ~= "Leaving" then
+			return false -- waiting at a table, in the pickup line (TASK-380) or in the drive-thru lane (TASK-574)
 		end
 		-- Last call only: at night the Closing sends everybody away, the diners included
 		if customer.Dining and customer.State == "Leaving" and not self:IsNightShift() then
@@ -701,6 +720,72 @@ function CustomerService:IsPickupFull(): boolean
 	return self:IsPickupMode() and Pickup.isFull(self.PickupLine, self:PickupSize())
 end
 
+-- Drive-thru (TASK-574; tech/restaurant-flow.md §3.4) ------------------------------------------------------------------
+-- The car is DriveThruService's; the customer is an ordinary record with Drive = lane spot and a hidden, anchored rig
+-- (plan B of §3.4: one NPC slot per car). It never takes a counter slot nor the pickup line: the order is taken at DT-PC
+-- (TabletService, tablet Rules.DrivePcIndex) and served at DT-WIN (ServeFor); its clocks are Drive.OrderPatience (at the
+-- window, before the order) and Drive.PrepBase + PrepPerK x K (after it).
+
+-- DriveThruService (one): Try / Left hooks, nil = off.
+function CustomerService:SetDriver(driver: Driver?)
+	self.Driver = driver
+end
+
+-- The car reached its lane spot for the first time: the customer is in line (arrival counted, ticket drawn).
+function CustomerService:JoinDrive(id: number)
+	const customer = self.Customers[id]
+	if customer == nil or customer.Drive == 0 or customer.State ~= "Arriving" then
+		return
+	end
+	customer.State = "Queued"
+	customer.JoinedAt = now()
+	self:Publish(customer, false)
+	self.Dependencies.EconomyService:CountArrival()
+	self.Joined:Fire(id)
+end
+
+-- Lane spot of a car (DriveThruService moved it up). 1 = at the window.
+function CustomerService:SetDriveSpot(id: number, spot: number)
+	const customer = self.Customers[id]
+	if customer == nil or customer.Drive == 0 or customer.Drive == spot then
+		return
+	end
+	customer.Drive = spot
+	self:Publish(customer, false)
+end
+
+-- The car stopped at the window: Ordering, and the Queue clock runs with Drive.OrderPatience; the Order clock that
+-- follows the order is Drive.PrepBase + PrepPerK x K (+ the PatienceBonus upgrade). false = not a car at the window
+-- in line, or no ticket.
+function CustomerService:FrontDrive(id: number): boolean
+	const customer = self.Customers[id]
+	const ticket = self.Tickets[id]
+	if customer == nil or ticket == nil or customer.Drive ~= 1 or customer.State ~= "Queued" then
+		return false
+	end
+	const drive = Content.Restaurant.Drive
+	const bonus = math.max(self.Dependencies.UpgradeService:GetEffect("PatienceBonus"), 0)
+	ticket.QueueSpan = drive.OrderPatience + bonus
+	ticket.OrderSpan = drive.PrepBase + drive.PrepPerK * ticket.K + bonus
+	Orders.BeginQueue(ticket, now())
+	customer.State = "Ordering"
+	return self:Update(id, {
+		PatienceEndsAt = ticket.PatienceEndsAt,
+		Phase = "Queue",
+		PatienceSpan = Orders.WireSpan(ticket),
+	})
+end
+
+-- The customer in the car at the window (lane spot 1, not leaving), or nil.
+function CustomerService:DriveFront(): number?
+	for id, customer in self.Customers do
+		if customer.Drive == 1 and customer.State ~= "Leaving" then
+			return id
+		end
+	end
+	return nil
+end
+
 -- Network ---------------------------------------------------------------------------------------------------------
 
 function CustomerService:Record(customer: Customer): Wire
@@ -716,6 +801,7 @@ function CustomerService:Record(customer: Customer): Wire
 		Leader = customer.Leader,
 		Pickup = if customer.Pickup > 0 then customer.Pickup else nil,
 		Number = customer.Number,
+		Drive = if customer.Drive > 0 then customer.Drive else nil,
 	}
 end
 
@@ -741,6 +827,9 @@ function CustomerService:Publish(customer: Customer, added: boolean)
 		end
 		if record.Number == nil then
 			record.Number = Lync.none
+		end
+		if record.Drive == nil then
+			record.Drive = Lync.none
 		end
 		self.Libs.Net.Customers:update(customer.Id, record)
 	end
@@ -890,6 +979,18 @@ function CustomerService:Attempt(): (Outcome, number?)
 	local id: number? = nil
 	self.LastWasPair = false
 	const npc = self.Dependencies.NpcService
+	-- TASK-574: a share of the attempts becomes a car at the drive-thru (DriveThruService draws it and checks its lanes);
+	-- a car does not need a counter slot, only room in the customer and NPC caps
+	const driver = self.Driver
+	if driver ~= nil and self:Count() < self:MaxCustomers() and npc:Count() < npc:Capacity() then
+		const ok, driven = pcall(driver.Try, self.Party)
+		if not ok then
+			self:WarnOnce("driver", `drive-thru spawn failed: {driven}`)
+		elseif driven ~= nil then
+			self.SpawnAttempted:Fire(outcome)
+			return outcome, driven
+		end
+	end
 	if Queue.isFull(self:Occupants(), self:QueueSize()) then
 		outcome = "skipped_queue_full"
 	elseif self:Count() >= self:MaxCustomers() or npc:Count() >= npc:Capacity() then
@@ -977,8 +1078,9 @@ function CustomerService:SpawnPair(pair: Group.Pair): number?
 end
 
 -- New record. `leader` = this is the partner of that leader: no walk of its own (StepPairs moves it). `tutorial` =
--- the tutorial customer (RequestTutorial).
-function CustomerService:Create(id: number, variant: Variant?, leader: number?, tutorial: boolean?)
+-- the tutorial customer (RequestTutorial). `drive` = lane spot of a drive-thru car (TASK-574): no walk either, the car
+-- is DriveThruService's (JoinDrive when it reaches its spot).
+function CustomerService:Create(id: number, variant: Variant?, leader: number?, tutorial: boolean?, drive: number?)
 	const customer: Customer = {
 		Id = id,
 		State = "Arriving",
@@ -1010,6 +1112,7 @@ function CustomerService:Create(id: number, variant: Variant?, leader: number?, 
 		PausedAt = nil,
 		CarryModel = nil,
 		CarryLook = nil,
+		Drive = drive or 0,
 	}
 	if customer.Tutorial then
 		-- before the first replication of the record: the client knows it is the tutorial customer from the start
@@ -1022,7 +1125,7 @@ function CustomerService:Create(id: number, variant: Variant?, leader: number?, 
 	self.Customers[id] = customer
 	self:SetPrompts(id, false)
 	self:Publish(customer, true)
-	if leader ~= nil then
+	if leader ~= nil or customer.Drive > 0 then
 		return
 	end
 	-- Arrival routes end at Q5 and never cross the queue (AvoidQueue, MAP-01 §9.1)
@@ -1114,6 +1217,10 @@ end
 -- Leave / remove --------------------------------------------------------------------------------------------------
 
 function CustomerService:SetPrompts(id: number, enabled: boolean)
+	const customer = self.Customers[id]
+	if customer ~= nil and customer.Drive > 0 then
+		enabled = false -- TASK-574: the driver's rig is hidden; the drive-thru is served at DT-PC / DT-WIN
+	end
 	const customerAnchor = self.Dependencies.NpcService:Anchors(id)
 	if customerAnchor ~= nil then
 		self.Dependencies.InteractionService:SetPrompt(customerAnchor, enabled)
@@ -1200,6 +1307,17 @@ function CustomerService:Leave(id: number, mood: string?, reason: LeaveReason?, 
 	end
 	if wasPicking then
 		self:RefreshPickup()
+	end
+	if customer.Drive > 0 then
+		-- TASK-574: the car drives off; DriveThruService removes the record when it is gone
+		const driver = self.Driver
+		if driver ~= nil then
+			const ok, err = pcall(driver.Left, id)
+			if not ok then
+				warn(`[CustomerService] driver Left failed: {err}`)
+			end
+		end
+		return true
 	end
 	if atTable then
 		const seater = self.Seater
@@ -1588,7 +1706,9 @@ function CustomerService:CanActOn(player: Player, id: number?, state: State?): b
 	end
 	-- on Q1, or (TASK-380) anywhere in the pickup line: every #n there can be served
 	const inPickup = customer.Pickup > 0 and Pickup.spotOf(self.PickupLine, id) ~= nil
-	if not inPickup and (self:Front() ~= id or customer.Slot ~= 1) then
+	-- (TASK-574) or the car at the drive-thru window
+	const atWindow = customer.Drive == 1
+	if not inPickup and not atWindow and (self:Front() ~= id or customer.Slot ~= 1) then
 		return false
 	end
 	-- the tutorial customer's order can be taken before the shop opens (Prep); serving it still needs the drawer
@@ -1665,7 +1785,7 @@ end
 -- Pickup mode (TASK-380): no free spot in the pickup line = the order is not taken, the player gets pickup_full and the
 -- customer stays at the tablet (its Queue clock keeps running). The tutorial customer is never refused. true = refused.
 function CustomerService:RefusePickupFull(player: Player, customer: Customer): boolean
-	if customer.Tutorial or not self:IsPickupFull() then
+	if customer.Tutorial or customer.Drive > 0 or not self:IsPickupFull() then
 		return false
 	end
 	self:NotifyThrottled(player, PICKUP_FULL)
@@ -1735,7 +1855,8 @@ function CustomerService:OpenOrder(player: Player, id: number, customer: Custome
 	if not customer.Tutorial then
 		self.Acted:Fire(id, TAKE_ORDER, player, nil)
 	end
-	if self.Customers[id] == customer and customer.State == "Waiting" then
+	if self.Customers[id] == customer and customer.State == "Waiting" and customer.Drive == 0 then
+		-- a car (TASK-574) waits at the window: no pickup line, no table
 		if pickup then
 			-- TASK-380: to the pickup line; it sits (if at all) after the sale
 			self:EnterPickup(customer)

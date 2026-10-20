@@ -1,14 +1,15 @@
 --!strict
 -- Restaurant order tablet (board TASK-381; tech/restaurant-flow.md rev. 2 §2.4; FEAT-043). Thin wrappers over TabletService
 -- (Dev* check IsDev and Content.Restaurant.Rules.Enabled).
---   tablet [state]          TAB-1: state, customer, user, time left, order on the record, head of the queue, room
---   tablet talk             starts the talk as you with the customer of Q1 (every rule but the range: Ordering, room on
---                           the plates and in the pickup line, tablet not busy)
---   tablet finish           ends the running talk now (TakeOrderFor as at EndsAt)
+--   tablet [state] [n]      TAB-n (default 1; 5 = DT-PC, TASK-574): state, customer, user, time left, order on the record,
+--                           head of the queue, room
+--   tablet talk [n]         starts the talk as you with the customer of Q1 (DT-PC: the car at the window) (every rule but
+--                           the range: Ordering, room on the plates and in the pickup line, tablet not busy)
+--   tablet finish [n]       ends the running talk now (TakeOrderFor as at EndsAt)
 --   tablet time <k> [k2]    TalkTime for k toppings (k2 = the partner's hot dog of a pair)
 local Api = require(script.Parent.Parent.Api)
 
-const USAGE = "tablet [state | talk | finish | time <k> [k2]]"
+const USAGE = "tablet [state [n] | talk [n] | finish [n] | time <k> [k2]]"
 
 type Tablet = {
 	DevState: (self: any, index: number?) -> string,
@@ -39,14 +40,14 @@ const Tablet: Api.Module = function(ctx: Api.Context): { Api.Command }
 			Run = function(args: { string }, caller: Player?): string?
 				const verb = args[1]
 				if verb == nil or verb == "state" then
-					return tablets:DevState()
+					return tablets:DevState(count(args[2]))
 				elseif verb == "talk" then
 					if caller == nil then
 						error("tablet talk needs a player (run it from the chat / console, not the Command Bar)", 0)
 					end
-					return tablets:DevTalk(caller)
+					return tablets:DevTalk(caller, count(args[2]))
 				elseif verb == "finish" then
-					return tablets:DevFinish()
+					return tablets:DevFinish(count(args[2]))
 				elseif verb == "time" then
 					const k1 = count(args[2])
 					if k1 == nil then

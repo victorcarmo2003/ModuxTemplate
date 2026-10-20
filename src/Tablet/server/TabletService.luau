@@ -5,7 +5,10 @@
 --
 -- Binding (Content.Restaurant.Binding): an Instance tagged TabletTag with TabletIndex = 1 (TAB-1, the head of the counter
 -- queue Q1) and the anchor TabletPrompt under it (PromptAction tablet_take; attributes and the Interactable tag set here
--- when the map did not). MVP: record 1 only; TAB-2 (UPG-027) and DT-PC (Rules.DrivePcIndex, wave R3) are ignored with a log.
+-- when the map did not). Records: 1 (TAB-1) and, with Content.Restaurant.Drive.Enabled, Rules.DrivePcIndex = DT-PC (the
+-- drive-thru computer, TASK-574: DriveThruService makes the Model when the map has none; its head is the car at the
+-- window, CustomerService:DriveFront, and the pickup line is not checked: the car waits at the window). TAB-2 (UPG-027) is
+-- ignored with a log.
 --
 -- Talk: tablet_take (tap, Actions.tablet_take.Radius) with the customer of Q1 in Ordering, the tablet Idle, room on the
 -- plates (PlateService:HasRoomFor) and in the pickup line (not CustomerService:IsPickupFull, TASK-380) -> Talking with
@@ -148,17 +151,25 @@ function TabletService:TalkTime(k1: number, k2: number?): number
 	return math.max(total, talk.MinTotal)
 end
 
--- Customer this tablet serves now: Q1 for TAB-1
+-- The drive-thru computer (DT-PC, TASK-574)
+local function isDrive(tablet: Tablet): boolean
+	return tablet.Index == Content.Restaurant.Rules.DrivePcIndex
+end
+
+-- Customer this tablet serves now: Q1 for TAB-1, the car at the window for DT-PC
 function TabletService:Head(tablet: Tablet): number?
+	if isDrive(tablet) then
+		return self.Dependencies.CustomerService:DriveFront()
+	end
 	if tablet.Index ~= HEAD_INDEX then
 		return nil
 	end
 	return self.Dependencies.CustomerService:Front()
 end
 
--- Kitchen full for the customer at the head (no plate per line or no pickup spot)
-function TabletService:IsFull(npc: number?): boolean
-	return not self.Dependencies.PlateService:HasRoomFor(npc) or not self:PickupHasRoom()
+-- Kitchen full for the customer at the head (no plate per line or no pickup spot; a car needs no pickup spot)
+function TabletService:IsFull(npc: number?, drive: boolean?): boolean
+	return not self.Dependencies.PlateService:HasRoomFor(npc) or (drive ~= true and not self:PickupHasRoom())
 end
 
 -- Can this player start a talk here? On refusal, the Notice key worth telling them (nil = refuse silently).
@@ -176,7 +187,7 @@ function TabletService:Check(player: Player, tablet: Tablet): (boolean, string?)
 	if not self.Dependencies.PlateService:HasRoomFor(npc) then
 		return false, PLATES_FULL
 	end
-	if not self:PickupHasRoom() then
+	if not isDrive(tablet) and not self:PickupHasRoom() then
 		return false, PICKUP_FULL
 	end
 	return true, nil
@@ -258,7 +269,7 @@ function TabletService:UpdateFull(tablet: Tablet): boolean
 	if tablet.State == "Talking" then
 		return false
 	end
-	const state: TabletState = if self:IsFull(self:Head(tablet)) then "Full" else "Idle"
+	const state: TabletState = if self:IsFull(self:Head(tablet), isDrive(tablet)) then "Full" else "Idle"
 	if state == tablet.State then
 		return false
 	end
@@ -360,8 +371,9 @@ function TabletService:Bind()
 			continue
 		end
 		const raw = model:GetAttribute(binding.TabletIndex)
-		if type(raw) ~= "number" or raw ~= HEAD_INDEX then
-			print(`[TabletService] {model:GetFullName()}: {binding.TabletIndex} {raw} not used yet (MVP binds TAB-1 only)`)
+		const drivePc = Content.Restaurant.Drive.Enabled and raw == Content.Restaurant.Rules.DrivePcIndex
+		if type(raw) ~= "number" or (raw ~= HEAD_INDEX and not drivePc) then
+			print(`[TabletService] {model:GetFullName()}: {binding.TabletIndex} {raw} not used yet (TAB-1 and DT-PC only)`)
 			continue
 		end
 		const index: number = raw

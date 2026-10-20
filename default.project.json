@@ -61,6 +61,12 @@
 						"optional": "src/Cutscene/shared"
 					}
 				},
+				"DriveThru": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/DriveThru/shared"
+					}
+				},
 				"Item": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -273,6 +279,12 @@
 					"$ignoreUnknownInstances": false,
 					"$path": {
 						"optional": "src/Dev/server"
+					}
+				},
+				"DriveThru": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/DriveThru/server"
 					}
 				},
 				"Economy": {
@@ -632,6 +644,12 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Door/client"
+						}
+					},
+					"DriveThru": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/DriveThru/client"
 						}
 					},
 					"Economy": {

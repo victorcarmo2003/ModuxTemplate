@@ -22,6 +22,7 @@ return {
 	StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController,
 	StarterPlayer.StarterPlayerScripts.client.Delivery.DeliveryController,
 	StarterPlayer.StarterPlayerScripts.client.Door.DoorController,
+	StarterPlayer.StarterPlayerScripts.client.DriveThru.DriveThruController,
 	StarterPlayer.StarterPlayerScripts.client.Economy.EconomyController,
 	StarterPlayer.StarterPlayerScripts.client.Hallucination.HallucinationController,
 	StarterPlayer.StarterPlayerScripts.client.Hud.HudController,

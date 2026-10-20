@@ -16,6 +16,7 @@ return {
 	ServerScriptService.server.Customer.CustomerService,
 	ServerScriptService.server.Cutscene.CutsceneService,
 	ServerScriptService.server.Dev.DevService,
+	ServerScriptService.server.DriveThru.DriveThruService,
 	ServerScriptService.server.Economy.EconomyService,
 	ServerScriptService.server.Economy.TipJarService,
 	ServerScriptService.server.Gift.GiftService,
