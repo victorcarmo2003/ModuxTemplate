@@ -20,6 +20,7 @@ local Haptics = require(script.Haptics)
 local HudReveal = require(script.HudReveal)
 local Ingredients = require(script.Ingredients)
 local Journal = require(script.Journal)
+local FaintTips = require(script.FaintTips)
 local Items = require(script.Items)
 local LightGroups = require(script.LightGroups)
 local LightPresets = require(script.LightPresets)
@@ -109,6 +110,7 @@ export type Ingredient = Ingredients.Ingredient
 export type Item = Items.Item
 export type JournalPage = Journal.Page
 export type JournalRules = Journal.Rules
+export type FaintTip = FaintTips.Tip
 export type ItemRules = Items.ItemRules
 export type LightGroup = LightGroups.LightGroup
 export type LightPreset = LightPresets.LightPreset
@@ -320,6 +322,9 @@ return table.freeze({
 	-- Anomaly Tablet in the trailer: one page per V2 anomaly, unlocked per profile (TASK-335, TASK-345; owner request 2026-10-15;
 	-- JournalService, JournalController). Provisional
 	Journal = Journal,
+
+	-- What made the player faint and how to get past it (DEC-317, design/faint-screen-flow.md etapa D). Provisional
+	FaintTips = FaintTips,
 
 	-- Class skins, Robux only (owner request 2026-10-17; design/skins-proposal.md; SkinService, SkinController). Provisional
 	Skins = Skins,

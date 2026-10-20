@@ -54,6 +54,14 @@ function ReviveKitService:SendCount(player: Player)
 	self.Libs.Net.ReviveKits:fireClient(player, { Count = self:Credits(player) })
 end
 
+-- Adds credits (a Revive All bought after its window closed, DEC-318) and sends the new count.
+function ReviveKitService:Grant(player: Player, amount: number)
+	const profiles = self.Dependencies.ProfileService
+	profiles:Update(player, { ReviveCredits = math.clamp(self:Credits(player) + amount, 0, CREDITS_MAX) })
+	profiles:RequestSave(player)
+	self:SendCount(player)
+end
+
 -- One credit of `payer` on `target` (self or a fallen mate). True when the revive happened and the credit was spent.
 function ReviveKitService:Use(payer: Player, target: Player): boolean
 	const credits = self:Credits(payer)

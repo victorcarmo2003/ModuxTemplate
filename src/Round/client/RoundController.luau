@@ -49,6 +49,7 @@ export type Record = {
 	ClockTo: number,
 	Paused: boolean,
 	Chances: number,
+	WipeEndsAt: number,
 }
 
 const RoundController = Modux.Controller("RoundController", { Priority = 800 })
@@ -123,6 +124,8 @@ function RoundController:Setup()
 	self.PhaseStartedAt = Vide.source(0) :: Vide.Source<number>
 	self.PhaseDuration = Vide.source(0) :: Vide.Source<number>
 	self.Chances = Vide.source(0) :: Vide.Source<number>
+	-- server time the nobody-standing window ends (0 = closed); the fall screens read it (DEC-318)
+	self.WipeEndsAt = Vide.source(0) :: Vide.Source<number>
 	-- true once the first Shift record arrived
 	self.Ready = Vide.source(false) :: Vide.Source<boolean>
 	self.Clock = nil :: Clock?
@@ -174,6 +177,7 @@ function RoundController:Apply(record: Record)
 		self.PhaseStartedAt(record.PhaseStartedAt)
 		self.PhaseDuration(record.PhaseDuration)
 		self.Chances(record.Chances)
+		self.WipeEndsAt(record.WipeEndsAt)
 		self:Refresh()
 		self.Ready(true)
 	end)

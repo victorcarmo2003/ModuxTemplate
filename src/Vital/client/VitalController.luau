@@ -156,6 +156,8 @@ function VitalController:Setup()
 	self.CoffeeAt = nil :: number? -- os.clock of the last coffee payoff (TASK-479)
 	-- warm edge glow 0..1
 	self.Warm = Vide.source(0) :: Vide.Source<number>
+	-- tip card of the last fall (FaintCause, DEC-317 etapa D); nil = none yet this night
+	self.FaintTip = Vide.source(nil :: Content.FaintTip?) :: Vide.Source<Content.FaintTip?>
 
 	self.DarkTickAt = NO_TICK :: number
 	self.FaintAt = nil :: number?
@@ -409,6 +411,7 @@ function VitalController:SetLocalState(state: LifeState)
 	elseif state == "Active" then
 		self.FaintAt = nil
 		self.ActiveSince = os.clock()
+		self.FaintTip(nil) -- back on my feet: the tip of that fall is over
 	end
 	self.LocalState(state)
 end
@@ -602,11 +605,38 @@ function VitalController:Mount(playerGui: Instance)
 	gui.Parent = playerGui
 end
 
+-- What got me and how to get past it (Content.FaintTips): an anomaly cause reads its Journal page, unless the player
+-- has not met it yet (no spoiler); suspense / dark / other causes have their own lines.
+function VitalController:TipOf(cause: string, known: boolean): Content.FaintTip
+	const tips = Content.FaintTips
+	const kind, key = string.match(cause, "^([%w_]+):(.+)$")
+	if kind == nil then
+		return tips.Kinds[cause] or tips.Generic
+	end
+	if kind == "anomaly" or kind == "stare" or kind == "see" then
+		if not known then
+			return tips.Unknown
+		end
+		const page = Content.Journal.ByKey[key :: string]
+		const row = Content.Anomalies.ByKey[key :: string]
+		const title = if page then page.Title elseif row then row.Name else tips.Unknown.Title
+		if kind == "stare" then
+			return { Title = title, Tip = tips.Stare }
+		end
+		const fight = if page then page.Fight[1] else nil
+		return { Title = title, Tip = fight or tips.Anomaly.Tip }
+	end
+	return tips.Kinds[kind :: string] or tips.Generic
+end
+
 VitalController:OnInit(function(self)
 	self:Setup()
 
 	const net = self.Libs.Net
 
+	net.FaintCause:onClient(function(data)
+		self.FaintTip(self:TipOf(data.Cause, data.Known))
+	end)
 	net.Sanity:onClient(function(data)
 		self:ApplySanity(data.Value, data.Max)
 	end)

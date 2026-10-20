@@ -361,6 +361,13 @@ return Lync.define("game", {
 		Class = Lync.enum(Content.Classes.Keys),
 	})),
 
+	-- s -> owner. Writer: VitalService, on the fall (DEC-317 etapa D): what drained the last sanity (LastCause:
+	-- "anomaly:<key>", "stare:<key>", "see:<key>", "suspense:<key>", "dark", ...); Known = the player had met that anomaly
+	FaintCause = Lync.packet(Lync.struct({
+		Cause = Lync.str(0, 64),
+		Known = Lync.bool(),
+	})),
+
 	-- §13.1 s -> owner. Writer: VitalService. Max = 0: no sanity (day), the HUD hides the meter
 	Sanity = Lync.packet(Lync.struct({
 		Value = Lync.int(0, 200),

@@ -104,6 +104,9 @@ const UI_RECTS: { [string]: { number } } = {
 -- Whole images outside the sheets (rect 0,0,0,0 = the full image): the Roblox Robux glyph shipped with the client
 const SINGLES: { [string]: string } = {
 	["Ui/robux"] = "rbxasset://textures/ui/common/robux.png",
+	-- fall screens (DEC-317; tools/icons/life_hearts.py): team life heart (white, tinted in LifeHeart) and the revive icon
+	["Life/heart"] = "rbxassetid://127177868031282", -- AST-165
+	["Life/revive"] = "rbxassetid://92117058169007", -- AST-166
 	-- coin pack art (tools/icons/shop_icons.py art/cash_*, owner 2026-10-16): sack, pile, chest
 	["Shop/cash_100"] = "rbxassetid://85020875005926",
 	["Shop/cash_300"] = "rbxassetid://138499953827803",

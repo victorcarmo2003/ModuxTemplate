@@ -4074,3 +4074,27 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
   - **Prato pousado na bancada** durante o foco de montagem e de condimentos (nunca flutuando); volta à mão ao sair.
 - Emendas (append-only): **DEC-308** volta a valer no fluxo (pilhas, descanso, prato na mão); `tech/kitchen-focus.md` §1 (salsicha arrastada da grelha direto ao prato; pão cortado direto no prato) deixa de valer.
 - Impacto: **backend-coder** (`KitchenService/Cook.luau`, `Stations/Grill`, `Rail`, `Board`), **frontend-coder** (`Cook/client/CookController`), **level-designer** (âncoras de câmera da bancada), **qa-tester**.
+
+### DEC-317 — 2026-10-20 — Tela de queda com o coração da vida do time, LAST CHANCE e ícone novo do revive (responde Q-405, Q-406, Q-407)
+
+- Origem: chat do dono (2026-10-20): "Aprovo o roteiro da tela de queda (Q-405, Q-406 e Q-407 conforme a recomendação). Pode implementar."
+- Decidido pelo dono: vale o roteiro de `design/faint-screen-flow.md` (§3 casos A, B e C; §4 ícone).
+  - A chance do time aparece como **coração com número**, só nas telas de queda (desmaio, janela de 10 s, noite perdida, banner do começo da noite repetida); **nunca no HUD do turno**.
+  - Desmaio com gente de pé: coração inteiro + "Team life: n" + "Your crew is still on shift" (sem "wait"); o revive volta grande quando só sobra 1 de pé.
+  - Noite perdida com chance restante: o coração racha de 1 para 0 e entra **LAST CHANCE**.
+  - Ícone do revive: coração com "+" e faíscas.
+- Emenda (append-only): DEC-053 (parte "chances nunca como número") só para as telas de queda; o resto segue.
+- Impacto: frontend-coder (LifeHeart, HudSpectate, HudWipe, NightLostScreen, ReviveKitController), backend-coder (aviso "saved the night"), art-director (ícone).
+- Emenda do dono no mesmo dia (append-only): "aparece o que matou ele e como ele passar por isso da próxima vez" → **etapa D** (cartão de dica com a causa da queda e como evitar), `design/faint-screen-flow.md` §3 etapa D.
+
+### DEC-318 — 2026-10-20 — Tela de queda em três telas limpas: causa, revive de 15 s e vida do time (substitui o roteiro da DEC-317)
+
+- Origem: chat do dono (2026-10-20), depois de ver a 1ª versão: "não curti, muito texto e muita animação, precisamos de algo mais objetivo, podemos dividir por telas talvez 3"; respostas às perguntas do orquestrador no mesmo dia.
+- Decidido pelo dono:
+  - **Tela 1, causa**: o que derrubou e como passar disso (a etapa D da DEC-317 continua).
+  - **Tela 2, revive**: contagem de **15 s** com o produto de revive, junto com o espectador. A tela fica **limpa**: só o produto no centro e a contagem. Acabou sem revive: **espectador até a próxima noite**.
+  - **Tela 3, vida do time**, quando todo mundo cai (e no lugar da tela 2 quando quem caiu era o último de pé): com vida, o coração parte e a noite **recomeça**; sem vida, **"Revive all" por 15 s**, e todos voltam se alguém comprar.
+  - **Revive all = 99 R$** (produto novo; o ProductId falta criar no Creator Hub).
+  - No fim de run: sem "You're out for now" nem "Watching the trailer"; só o botão de configurações (M), por cima.
+- Emenda (append-only): DEC-317 (título/linha/coração no desmaio, revive grande por 7 s, lembrete "só 1 de pé") sai; ficam o coração na noite perdida, o LAST CHANCE, o ícone novo e a etapa D. DEC-094 (janela de 10 s para todos se reviverem) e DEC-115 (Down até 6:00 AM) são substituídas por estas regras.
+- Impacto: `design/faint-screen-flow.md` (reescrito), `Content.Revive` (CauseTime, DownWindow, ReviveAllWindow), VitalService, ShopUtilityService, ReviveKitController, NightLostScreen, HudController.

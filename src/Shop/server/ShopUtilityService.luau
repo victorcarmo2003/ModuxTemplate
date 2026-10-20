@@ -174,7 +174,21 @@ function ShopUtilityService:Handler(utility: Utility): any
 			return { Patch = {}, Wait = true }
 		end
 
-		if kind == "Revive" then
+		if kind == "ReviveAll" then
+			-- DEC-318: the whole crew stands up while the last-life window is open; bought too late = one Revive Kit
+			-- credit for the buyer, so the Robux is never lost
+			return {
+				Patch = {},
+				After = function()
+					if self.Dependencies.VitalService:ReviveAll() > 0 then
+						self:Send(player, key, 1, 0)
+						return
+					end
+					self.Dependencies.ReviveKitService:Grant(player, 1)
+					self:Send(player, key, 1, 0)
+				end,
+			}
+		elseif kind == "Revive" then
 			return {
 				Patch = { ReviveCredits = math.clamp(profile.ReviveCredits() + 1, 0, REVIVE_MAX) },
 				After = function()

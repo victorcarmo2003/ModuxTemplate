@@ -7,6 +7,9 @@
 -- drains from PhaseStartedAt / PhaseDuration (server time; no seconds, TASK-485 / DEC-294). It stays (bar empty) until
 -- the next phase arrives, so the restore gap is covered too. Presentation only: the server decides the phase. Game
 -- servers only.
+-- Team life (DEC-317, design/faint-screen-flow.md §3 caso C): the LifeHeart shows the chances left before this loss
+-- (Shift.Chances is spent only when NightLost ends), shakes, and breaks BREAK_AT s in; then the title reads LAST CHANCE
+-- (the repeated night is the last one) or "Shift's over" (no chance was left: the run ends).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -18,6 +21,7 @@ local NightLostScreen = require(StarterPlayer.StarterPlayerScripts.client.Interf
 const PHASE = "NightLost"
 const DISPLAY_ORDER = 18 -- over the HUD (1) and the Revive Kit button (15), under the settings / shop windows (20)
 const TICK_RATE = 10 -- Hz
+const BREAK_AT = 1.2 -- s into NightLost the heart breaks (C1 -> C2)
 
 const NightLostController = Modux.Controller("NightLostController", {
 	Require = { "PlaceController", "RoundController", "VitalController" },
@@ -34,8 +38,26 @@ function NightLostController:Shown(): boolean
 	return self.Dependencies.RoundController.Phase() == PHASE
 end
 
--- Nobody on their feet (every member Down / Spectator / Away): the wipe. Someone Active = a critical loss.
+-- The heart broke: one chance spent (shown from BREAK_AT on)
+function NightLostController:Broken(): boolean
+	return self.Elapsed() >= BREAK_AT
+end
+
+-- After the break: LAST CHANCE when the repeated night is the last one, "Shift's over" when none was left
 function NightLostController:Title(): string
+	if self:Broken() then
+		const chances = self.Dependencies.RoundController.Chances()
+		if chances == 1 then
+			return "LAST CHANCE"
+		elseif chances <= 0 then
+			return "Shift's over"
+		end
+	end
+	return self:LossTitle()
+end
+
+-- Nobody on their feet (every member Down / Spectator / Away): the wipe. Someone Active = a critical loss.
+function NightLostController:LossTitle(): string
 	for _, state in self.Dependencies.VitalController.State() do
 		if state == "Active" or state == "Reviving" then
 			return "The night is lost"
@@ -106,6 +128,13 @@ function NightLostController:Mount(playerGui: Instance)
 				end,
 				Line = function()
 					return self:Line()
+				end,
+				TitleColor = function()
+					return if self:Title() == "LAST CHANCE" then Theme.Color.Mustard else Theme.Color.Text
+				end,
+				Lives = self.Dependencies.RoundController.Chances,
+				Broken = function()
+					return self:Broken()
 				end,
 				Progress = function()
 					return self:Progress()

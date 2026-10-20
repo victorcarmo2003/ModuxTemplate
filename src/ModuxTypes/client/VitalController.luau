@@ -2,6 +2,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Content = require(ReplicatedStorage.shared.Content)
 
 export type LifeState = "Active" | "Down" | "Reviving" | "Spectator" | "Away"
 export type Band = "Day" | "Mid" | "Night"
@@ -27,6 +28,7 @@ export type Public = {
 	Dark: Vide.Source<boolean>,
 	DarkTickAt: number,
 	FaintAt: number?,
+	FaintTip: Vide.Source<Content.FaintTip?>,
 	GainId: number,
 	Gui: ScreenGui?,
 	HintMachine: Instance?,
@@ -60,6 +62,7 @@ export type Public = {
 	Effects: (self: Public) -> (ColorCorrectionEffect, BlurEffect),
 	Step: (self: Public, dt: number) -> (),
 	Mount: (self: Public, playerGui: Instance) -> (),
+	TipOf: (self: Public, cause: string, known: boolean) -> Content.FaintTip,
 }
 
 return {}

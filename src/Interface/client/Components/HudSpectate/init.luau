@@ -37,6 +37,8 @@ export type Props = {
 	Focus: (() -> boolean)?,
 	-- Down: the context line under the title. Default "Your crew's still on shift."
 	Line: (() -> string)?,
+	-- Nothing shows while true (DEC-318: the fall screens of ReviveKitController own the view). nil = never.
+	Hidden: (() -> boolean)?,
 	-- Name of the watched crewmate; "" = nobody standing (fixed trailer view).
 	Target: () -> string,
 	-- Switch hint for the current device; "" hides it.
@@ -93,7 +95,7 @@ end
 
 return function(props: Props): Frame
 	const shown = function(): boolean
-		return props.Mode() ~= "None"
+		return props.Mode() ~= "None" and not (props.Hidden ~= nil and props.Hidden())
 	end
 	-- Keep the last mode so the card shrinks away with its text.
 	const initial: Mode = if props.Mode() == "None" then "Down" else props.Mode()
@@ -105,10 +107,10 @@ return function(props: Props): Frame
 		end
 	end)
 	const focused = function(): boolean
-		return props.Mode() == "Down" and props.Focus ~= nil and props.Focus()
+		return shown() and props.Mode() == "Down" and props.Focus ~= nil and props.Focus()
 	end
 	const cardScale = Motion.Pop(function()
-		return props.Mode() == "Out" and props.Card()
+		return shown() and props.Mode() == "Out" and props.Card()
 	end)
 	const focusScale = Motion.Pop(focused)
 	const pillScale = Motion.Pop(function()

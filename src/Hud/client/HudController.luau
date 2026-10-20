@@ -49,7 +49,7 @@
 	Status only: no input binding and two buttons top right, the settings gear (TASK-279, SettingsController) and the
 	shop cart (TASK-290, ShopController), with their key labels, plus the shop's quick note under them; FEAT-032
 	otherwise holds, nothing else clickable for an Active player. No reputation, no boss
-	chances (Shift.Chances is never read, DEC-053), no XP. The client never writes money, sanity or life state: the
+	chances on the shift HUD (DEC-053; the fall screens show them in the LifeHeart, DEC-317), no XP. The client never writes money, sanity or life state: the
 	numbers come from the server's sets and packets. Texts from ui-text.md (Provisional, TASK-082).
 ]]
 local GuiService = game:GetService("GuiService")
@@ -70,7 +70,6 @@ local HudSanity = require(StarterPlayer.StarterPlayerScripts.client.Interface.Co
 local HudScreen = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudScreen)
 local HudSpectate = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudSpectate)
 local HudSummary = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudSummary)
-local HudWipe = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudWipe)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local ToastStack = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Toast.Stack)
 local Toast = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Toast)
@@ -201,6 +200,7 @@ export type ShiftRecord = {
 	PhaseDuration: number,
 	WipeEndsAt: number,
 	WipeFrozen: boolean,
+	Chances: number,
 }
 
 -- RunReport packet (network.md §13.1)
@@ -495,12 +495,21 @@ function HudController:ApplyShift(record: ShiftRecord)
 			self.BannerKey = key
 			self:ShowBanner({
 				Title = `Night {record.Night}`,
-				Line = if record.Attempt > 0 then "Same night. Same rules." else "Stay open till 6:00 AM.",
+				-- C3 (DEC-317): the repeated night with no chance left is the last one
+				Line = if record.Attempt > 0 and record.Chances <= 0
+					then "Last chance. Don't all faint."
+					elseif record.Attempt > 0 then "Same night. Same rules."
+					else "Stay open till 6:00 AM.",
 			})
 		end
 	elseif record.Phase == "NightEnd" then
 		self:ShowBanner({ Title = "6:00 AM", Line = "You made it!" })
 	end
+end
+
+-- The lost night or the end of run covers the screen: only the settings gear stays (on top)
+function HudController:Covered(): boolean
+	return self.RunEnd() ~= false or self.Dependencies.RoundController.Phase() == "NightLost"
 end
 
 -- Not on their feet: the clean faint screen (HudScreen Calm)
@@ -944,13 +953,18 @@ function HudController:Mount(playerGui: Instance)
 					Line = function()
 						return self:DownLine()
 					end,
+					-- DEC-318: the fall screens (cause, countdown, team life) are ReviveKitController's, and the lost night /
+					-- end of run cover the screen (owner 2026-10-20: no "You're out for now" nor "Watching" there)
+					Hidden = function()
+						return self.Dependencies.ReviveKitController:Stage() ~= "None" or self:Covered()
+					end,
 					Target = self.Watching,
 					Hint = function()
 						return self:SwitchHint()
 					end,
 					CardTop = UNDER_CLOCK,
 				}),
-				HudWipe({ Left = self.WipeLeft }),
+				-- (HudWipe left the screen with DEC-318: the team life screen has only the offer and its countdown)
 			}),
 
 			-- Order card (top-left column), under the wave-1 pills
@@ -958,47 +972,57 @@ function HudController:Mount(playerGui: Instance)
 				self:OrderCard(),
 			}),
 
-			HudScreen({
-				Clock = round.ClockText,
-				Shift = function()
-					return self:ShiftText()
+			-- the HUD row; over the end-of-run card while it shows, where only the settings gear is left (owner
+			-- 2026-10-20: "leave only the M open, on top")
+			Vide.create("Frame")({
+				Name = "Screen",
+				Size = UDim2.fromScale(1, 1),
+				BackgroundTransparency = 1,
+				ZIndex = function()
+					return if self:Covered() then 4 else 1
 				end,
-				IsNight = round.IsNight,
-				Cash = economy.Cash,
-				Toasts = self.Toasts,
-				OnToastDone = function(entry)
-					self:ToastDone(entry)
-				end,
-				Report = self.Report,
-				Scale = self.Scale,
-				-- progressive reveal (Content.HudReveal): clock, shift, money, toasts
-				Reveal = function(key: string)
-					return self:IsOpen(key)
-				end,
-				-- clean faint screen (TASK-485)
-				Calm = function()
-					return self:Fallen()
-				end,
-				-- settings gear (TASK-279)
-				OnSettings = function()
-					self.Dependencies.SettingsController:Toggle()
-				end,
-				SettingsOpen = self.Dependencies.SettingsController.Open,
-				-- shop cart, key labels and the quick note (TASK-290)
-				OnShop = function()
-					self.Dependencies.ShopController:Toggle()
-				end,
-				ShopOpen = self.Dependencies.ShopController.Open,
-				ShopGlow = self.Dependencies.ShopController.Glow,
-				Device = self.Dependencies.InputController.Device,
-				Nudge = function()
-					return self.Dependencies.ShopController:NudgeLine()
-				end,
-				OnNudge = function()
-					self.Dependencies.ShopController:OnNudge()
-				end,
-				NudgeIcon = self.Dependencies.ShopController.NudgeIcon,
-				NudgePad = self.Dependencies.ShopController.NudgePad,
+				HudScreen({
+					Clock = round.ClockText,
+					Shift = function()
+						return self:ShiftText()
+					end,
+					IsNight = round.IsNight,
+					Cash = economy.Cash,
+					Toasts = self.Toasts,
+					OnToastDone = function(entry)
+						self:ToastDone(entry)
+					end,
+					Report = self.Report,
+					Scale = self.Scale,
+					-- progressive reveal (Content.HudReveal): clock, shift, money, toasts
+					Reveal = function(key: string)
+						return self:IsOpen(key)
+					end,
+					-- clean faint screen (TASK-485)
+					Calm = function()
+						return self:Fallen() or self:Covered()
+					end,
+					-- settings gear (TASK-279)
+					OnSettings = function()
+						self.Dependencies.SettingsController:Toggle()
+					end,
+					SettingsOpen = self.Dependencies.SettingsController.Open,
+					-- shop cart, key labels and the quick note (TASK-290)
+					OnShop = function()
+						self.Dependencies.ShopController:Toggle()
+					end,
+					ShopOpen = self.Dependencies.ShopController.Open,
+					ShopGlow = self.Dependencies.ShopController.Glow,
+					Device = self.Dependencies.InputController.Device,
+					Nudge = function()
+						return self.Dependencies.ShopController:NudgeLine()
+					end,
+					OnNudge = function()
+						self.Dependencies.ShopController:OnNudge()
+					end,
+					NudgeIcon = self.Dependencies.ShopController.NudgeIcon,
+					NudgePad = self.Dependencies.ShopController.NudgePad,
+				}),
 			}),
 
 			-- End of run covers everything (15 s)

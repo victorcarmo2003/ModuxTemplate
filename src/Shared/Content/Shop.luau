@@ -54,7 +54,7 @@ export type ClassProduct = GamePass
 --            Kit      Night Kit (DEC-267): Coffee + Radar (Amount s) + Revive in one receipt
 --   Target   what the buyer picks before the prompt ("Mate" | "Ingredient"); nil = nothing to pick
 --   Night    only sold while a night shift runs (the client disables the card by day)
-export type UtilityKind = "Radar" | "Scare" | "Cash" | "Restock" | "Pantry" | "Coffee" | "Revive" | "Kit"
+export type UtilityKind = "Radar" | "Scare" | "Cash" | "Restock" | "Pantry" | "Coffee" | "Revive" | "ReviveAll" | "Kit"
 export type UtilityTarget = "Mate" | "Ingredient"
 
 export type Utility = {
@@ -332,10 +332,25 @@ const utilities: { Utility } = {
 		Robux = 39,
 		Name = "Revive Kit",
 		Text = "Get back up when you faint",
-		Icon = "Item/revive_kit",
+		Icon = "Life/revive", -- AST-166 (DEC-317)
 		Kind = "Revive",
 		Amount = 0,
 		Night = false,
+		Category = "Survive",
+		Tone = "Green",
+	},
+	{
+		-- DEC-318: the last team life is gone and nobody stands; the whole crew stands up again. Shown only in that
+		-- window (ReviveKitController), never in the shop
+		Key = "util_revive_all",
+		ProductId = 0, -- not created on the Creator Hub yet (owner: 99 R$)
+		Robux = 99,
+		Name = "Revive All",
+		Text = "The whole crew gets back up",
+		Icon = "Life/revive",
+		Kind = "ReviveAll",
+		Amount = 0,
+		Night = true,
 		Category = "Survive",
 		Tone = "Green",
 	},

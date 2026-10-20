@@ -359,6 +359,9 @@ function ShopController:Cards(): { ShopPanel.Card }
 	const others = self.Others()
 	const cards: { ShopPanel.Card } = {}
 	for _, utility in Content.Shop.Utilities.List do
+		if utility.Kind == "ReviveAll" then
+			continue -- only on the last-life screen (DEC-318)
+		end
 		local note = ""
 		if utility.Night and not night then
 			note = "Night only"

@@ -36,6 +36,7 @@ export type ShiftRecord = {
 	PhaseDuration: number,
 	WipeEndsAt: number,
 	WipeFrozen: boolean,
+	Chances: number,
 }
 export type RunReport = {
 	Result: "Success" | "Failed",
@@ -87,6 +88,7 @@ export type Public = {
 	ShowBanner: (self: Public, banner: HudBanner.Banner, duration: number?) -> (),
 	RefreshWipe: (self: Public) -> (),
 	ApplyShift: (self: Public, record: ShiftRecord) -> (),
+	Covered: (self: Public) -> boolean,
 	Fallen: (self: Public) -> boolean,
 	DownLine: (self: Public) -> string,
 	SpectateMode: (self: Public) -> HudSpectate.Mode,

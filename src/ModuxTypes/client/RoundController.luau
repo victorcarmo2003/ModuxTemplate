@@ -23,6 +23,7 @@ export type Record = {
 	ClockTo: number,
 	Paused: boolean,
 	Chances: number,
+	WipeEndsAt: number,
 }
 
 export type Public = {
@@ -42,6 +43,7 @@ export type Public = {
 	PhaseStartedAt: Vide.Source<number>,
 	Ready: Vide.Source<boolean>,
 	Vehicle: Vide.Source<string>,
+	WipeEndsAt: Vide.Source<number>,
 	Format: (self: Public, minutes: number) -> string,
 	MinutesAt: (self: Public, clock: Clock, now: number) -> number,
 	WindowAt: (self: Public, minutes: number) -> Window?,

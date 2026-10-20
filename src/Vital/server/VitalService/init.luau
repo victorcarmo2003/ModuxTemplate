@@ -330,6 +330,19 @@ function VitalService:SendSanity(player: Player, force: boolean)
 	self.Libs.Net.Sanity:fireClient(player, { Value = value, Max = max })
 end
 
+-- What drained the last sanity, to the fallen player (DEC-317 etapa D: the tip card). Known: the anomaly of the cause
+-- was already seen tonight (a rule broken counts as met), so the client never spoils one the player has not met.
+function VitalService:SendFaintCause(player: Player, cause: string)
+	const net = self.Dependencies.NetService
+	if not net:IsRunning() or player.Parent == nil or not net:IsReady(player) then
+		return
+	end
+	const entry = self:EntryOf(player.UserId)
+	const key = string.match(cause, "^[%w_]+:(.+)$")
+	const known = key ~= nil and (string.sub(cause, 1, 8) == "anomaly:" or entry.Seen[key] == true)
+	self.Libs.Net.FaintCause:fireClient(player, { Cause = string.sub(cause, 1, 64), Known = known })
+end
+
 function VitalService:FireLife(userId: number, event: LifeEventKind)
 	const net = self.Dependencies.NetService
 	if not net:IsRunning() then
@@ -494,13 +507,20 @@ function VitalService:Fall(player: Player, forced: LifeState?)
 	const bodyPos = if root ~= nil and root:IsA("BasePart") then root.Position else nil
 
 	entry.DarkSince = nil
-	entry.StateEndsAt = if state == "Down" then self.Dependencies.RoundService:NightEndsAt() else 0
+	-- DEC-318: a Down has the cause card + DownWindow s to be revived, never past 6:00 AM; then Spectator
+	entry.StateEndsAt = if state == "Down"
+		then math.min(
+			now() + Content.Revive.CauseTime + Content.Revive.DownWindow,
+			self.Dependencies.RoundService:NightEndsAt()
+		)
+		else 0
 	self.LastFallen = userId
 	if not runState:SetLifeState(userId, state) then
 		return
 	end
 
 	self.Dependencies.CharacterService:Faint(player)
+	self:SendFaintCause(player, entry.LastCause)
 	const items = self.Dependencies.ItemService
 	if state == "Down" then
 		items:Stash(player)
@@ -582,7 +602,11 @@ function VitalService:EvaluateWipe()
 	const losable = round:IsStarted() and Flow.CanLose(round:GetPhase(), round:Info())
 	const open = Life.wipe(present, standing, losable)
 	if open and self.WipeEndsAt == 0 then
-		self.WipeEndsAt = now() + Content.Revive.WipeWindow
+		-- DEC-318: a team life left = only the cause card, then the heart breaks (the night repeats); none left = the
+		-- cause card + ReviveAllWindow s for "Revive all"
+		const revive = Content.Revive
+		const lastLife = self.Dependencies.RunStateService.Chances() <= 0
+		self.WipeEndsAt = now() + revive.CauseTime + (if lastLife then revive.ReviveAllWindow else 0)
 		round:SetWipe(self.WipeEndsAt, false)
 		self.Wipe:Fire(true, self.WipeEndsAt)
 		self:FireLife(self.LastFallen, "Wipe")
@@ -599,6 +623,47 @@ function VitalService:CloseWipe(cleared: boolean)
 	if cleared then
 		self:FireLife(self.LastFallen, "WipeCleared")
 	end
+end
+
+-- DEC-318: a Down whose revive countdown ran out becomes a Spectator until the next night (stash to the counter). The
+-- countdown holds while the wipe window is open (the team life screen replaces it).
+function VitalService:ExpireDowns(t: number)
+	if self.WipeEndsAt > 0 then
+		return
+	end
+	const runState = self.Dependencies.RunStateService
+	for userId, member in runState.Members() do
+		if member.State ~= "Down" then
+			continue
+		end
+		const entry = self:EntryOf(userId)
+		if entry.StateEndsAt > 0 and t >= entry.StateEndsAt then
+			entry.StateEndsAt = 0
+			if runState:SetLifeState(userId, "Spectator") then
+				self.Dependencies.ItemService:DropStash(userId, DROP_POINT)
+				self:FireLife(userId, "Spectating")
+			end
+		end
+	end
+end
+
+-- "Revive all" (DEC-318, util_revive_all): while the last-life window is open, every connected member who is down or
+-- out stands up again (same core as a revive). Returns how many stood up; 0 = no window (the caller keeps the credit).
+function VitalService:ReviveAll(): number
+	if not self.Enabled or self.WipeEndsAt == 0 then
+		return 0
+	end
+	local count = 0
+	for userId, member in self.Dependencies.RunStateService.Members() do
+		const player = Players:GetPlayerByUserId(userId)
+		if player ~= nil and (member.State == "Down" or member.State == "Spectator") then
+			const state: LifeState = if member.State == "Down" then "Down" else "Spectator"
+			if self:Restore(player, state) then
+				count += 1
+			end
+		end
+	end
+	return count
 end
 
 function VitalService:ExpireWipe()
@@ -697,6 +762,7 @@ function VitalService:Step()
 	if self.WipeEndsAt > 0 and t >= self.WipeEndsAt then
 		self:ExpireWipe()
 	end
+	self:ExpireDowns(t)
 	if t < self.NextDarkAt then
 		return
 	end
