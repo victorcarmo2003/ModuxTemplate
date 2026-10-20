@@ -1,4 +1,4 @@
-Status: Aprovado (DEC-318; substitui o roteiro da DEC-317)
+Status: Aprovado (DEC-318; substitui o roteiro da DEC-317). Vida extra do time estacionada (DEC-319)
 
 # Tela de queda: causa, contagem do revive e vida do time
 
@@ -6,6 +6,10 @@ Pedido do dono, 2026-10-20. A 1ª versão (DEC-317) tinha "muito texto e muita a
 uma de cada vez**, e a tela **limpa** durante as contagens, com **só o produto no centro e a contagem**.
 
 ## 1. As três telas
+
+> **DEC-319 (2026-10-20):** a vida extra do time está **estacionada** (`RunParams.Chances = 0`,
+> `Content.Revive.TeamLife = false`). Hoje, quando cai o último: causa, depois Revive all por 15 s, senão fim da run.
+> O ramo "com vida" abaixo fica guardado para quando a vida extra voltar (classe ou ação no mapa).
 
 | Tela | Quando | O que aparece | Tempo |
 |---|---|---|---|

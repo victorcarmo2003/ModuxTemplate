@@ -29,7 +29,10 @@ const params: RunParams = {
 	PartyPriceMult = { 1.0, 1.5, 1.9, 2.2 }, -- 1p..4p price multiplier (DEC-047); Revive Kit (DEC-129)
 	PricePartyFrom = "JoinedByDay1End", -- party size fixed at the end of Day 1 (DEC-121)
 	Nights = 10, -- DEC-060
-	Chances = 1, -- per whole run: the 2nd lost night ends the run (DEC-110, DEC-112)
+	-- DEC-319 (owner 2026-10-20): the team extra life is parked until it comes back as a feature of its own (a class or a
+	-- map action that grants it). 0 = no extra life: nobody standing opens "Revive all", a lost night ends the run.
+	-- Chances = 1, -- per whole run: the 2nd lost night ends the run (DEC-110, DEC-112)
+	Chances = 0,
 	StartCash = 30, -- boss advance (DEC-045)
 	StartStockFull = true, -- run starts with full stock at Cooler level 1 (DEC-049)
 	BaseWalkSpeed = 16, -- class without speed effect (DEC-069)

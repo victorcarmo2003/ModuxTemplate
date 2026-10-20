@@ -4098,3 +4098,10 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
   - No fim de run: sem "You're out for now" nem "Watching the trailer"; só o botão de configurações (M), por cima.
 - Emenda (append-only): DEC-317 (título/linha/coração no desmaio, revive grande por 7 s, lembrete "só 1 de pé") sai; ficam o coração na noite perdida, o LAST CHANCE, o ícone novo e a etapa D. DEC-094 (janela de 10 s para todos se reviverem) e DEC-115 (Down até 6:00 AM) são substituídas por estas regras.
 - Impacto: `design/faint-screen-flow.md` (reescrito), `Content.Revive` (CauseTime, DownWindow, ReviveAllWindow), VitalService, ShopUtilityService, ReviveKitController, NightLostScreen, HudController.
+
+### DEC-319 — 2026-10-20 — Vida extra do time estacionada (volta depois como feature própria)
+
+- Origem: chat do dono (2026-10-20): "deixa só comentado o código, faz com que ele não chame essas funções... eu vou pensar talvez uma classe que conceda isso, ou alguma ação no mapa que te dê uma vida extra".
+- Decidido pelo dono: a **vida extra do time sai do jogo por enquanto**, com o código guardado. `RunParams.Chances = 0` (o valor antigo 1 fica comentado) e `Content.Revive.TeamLife = false` (sem coração nem LAST CHANCE). Quando cai o último: causa, depois **Revive all por 15 s**; ninguém comprou = **fim da run**.
+- Aberto: como a vida extra volta (classe que concede, ação no mapa). Vira feature quando o dono decidir.
+- Emenda (append-only): DEC-053 / DEC-110 / DEC-112 (chances da run) e a parte de vida do time da DEC-317 / DEC-318 ficam suspensas até essa feature.

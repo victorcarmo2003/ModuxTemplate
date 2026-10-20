@@ -14,6 +14,8 @@ export type Revive = {
 	CauseTime: number,
 	DownWindow: number, -- s a Down can be revived after the cause card; then Spectator until the next night
 	ReviveAllWindow: number,
+	-- DEC-319: the team life heart (LifeHeart on the lost night, LAST CHANCE) shows; false while the extra life is parked
+	TeamLife: boolean,
 }
 
 const revive: Revive = {
@@ -23,6 +25,7 @@ const revive: Revive = {
 	CauseTime = 3, -- DEC-318
 	DownWindow = 15, -- DEC-318
 	ReviveAllWindow = 15, -- DEC-318
+	TeamLife = false, -- DEC-319: parked with RunParams.Chances = 0
 }
 
 return Table.record(revive)

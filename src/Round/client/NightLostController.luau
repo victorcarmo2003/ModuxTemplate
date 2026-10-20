@@ -15,6 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
+local Content = require(ReplicatedStorage.shared.Content)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local NightLostScreen = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.NightLostScreen)
 
@@ -45,7 +46,7 @@ end
 
 -- After the break: LAST CHANCE when the repeated night is the last one, "Shift's over" when none was left
 function NightLostController:Title(): string
-	if self:Broken() then
+	if self:Broken() and Content.Revive.TeamLife then
 		const chances = self.Dependencies.RoundController.Chances()
 		if chances == 1 then
 			return "LAST CHANCE"
@@ -67,6 +68,10 @@ function NightLostController:LossTitle(): string
 end
 
 function NightLostController:Line(): string
+	-- DEC-319: without the team extra life a lost night always ends the run
+	if not Content.Revive.TeamLife then
+		return "Shift's over"
+	end
 	return if self.Dependencies.RoundController.Chances() > 0 then "Restarting the night" else "No chances left"
 end
 
@@ -132,7 +137,8 @@ function NightLostController:Mount(playerGui: Instance)
 				TitleColor = function()
 					return if self:Title() == "LAST CHANCE" then Theme.Color.Mustard else Theme.Color.Text
 				end,
-				Lives = self.Dependencies.RoundController.Chances,
+				-- DEC-319: no heart while the team extra life is parked (Content.Revive.TeamLife)
+				Lives = if Content.Revive.TeamLife then self.Dependencies.RoundController.Chances else nil,
 				Broken = function()
 					return self:Broken()
 				end,
