@@ -16,14 +16,15 @@ export type View = {
 	Horned: { [number]: boolean }, -- HornAt indices played for the running clock
 	ClockKey: number, -- PatienceEndsAt the Horned set belongs to
 	HopAt: number, -- os.clock() of the last horn (hop)
+	Seat: CFrame, -- the driver's root, from the car pivot
+	Rig: Model?, -- the customer's rig on that seat (nil = not found yet)
 }
 export type Move = { From: number, To: number, Start: number, Duration: number, Accel: boolean }
 
 export type Public = {
 	DriveTalk: number,
+	FindAt: number,
 	Folder: Folder?,
-	Hidden: { [Model]: boolean },
-	HideAt: number,
 	Lane: Lane.Lane?,
 	Patience: { [number]: Patience },
 	Records: { [number]: CarRecord },
@@ -36,7 +37,8 @@ export type Public = {
 	Horn: (self: Public, car: View, sound: string) -> (),
 	CheckHorn: (self: Public, car: View, t: number) -> (),
 	Step: (self: Public) -> (),
-	HideRigs: (self: Public) -> (),
+	SeatDriver: (self: Public, car: View, pose: CFrame) -> (),
+	FindRigs: (self: Public) -> (),
 	Rebuild: (self: Public) -> (),
 }
 

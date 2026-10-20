@@ -6,8 +6,8 @@
 -- Spawn: CustomerService:Attempt asks Try(party) first (SetDriver): from night Drive.UnlockNight on, with a free lane spot
 -- (1 + Drive.QueueByParty[party] spots), a draw under Drive.ShareByParty[party] turns the attempt into a car. The customer
 -- is an ordinary Customers record with Drive = spot and a rig of the NPC pool (plan B of §3.4: one NPC slot per car),
--- anchored at its spot and marked with the rig attribute DriveThru (the client hides it: the driver is part of the car
--- model; its balloon stays over the car). Looks: a random Content.Traffic look (own Random, the seeded draws stay).
+-- anchored at its spot and marked with the rig attribute DriveThru (the client seats it at the wheel of its car, seen
+-- through the glass; its balloon rides over the car). Looks: a random Content.Traffic look (own Random, the seeded draws stay).
 -- Life: Arriving (the car drives to its spot, Lane.MoveTime) -> Waiting at the spot; the first stop joins the line
 -- (CustomerService:JoinDrive: arrival counted, ticket drawn); at spot 1 FrontDrive starts the window clock
 -- (Drive.OrderPatience). The order is taken at DT-PC (TabletService, tablet Rules.DrivePcIndex, same talk and ticket as
@@ -44,7 +44,7 @@ export type Car = {
 
 const ACTION = "drive_serve"
 const ANCHOR_TAG = "Interactable"
-const HIDDEN = "DriveThru" -- rig attribute: the client hides the driver's rig
+const HIDDEN = "DriveThru" -- rig attribute: this rig drives a drive-thru car (the client seats it in the car)
 const WINDOW_FOLDER = "DriveThru_Anchors"
 const DT_PC = "DT-PC"
 const TICK_RATE = 5 -- Hz
@@ -253,7 +253,7 @@ function DriveThruService:Release(car: Car)
 	self.Dependencies.CustomerService:Remove(car.Npc)
 end
 
--- The rig goes back to the pool visible (the next customer on it walks)
+-- The rig goes back to the pool unmarked (the next customer on it walks)
 function DriveThruService:Unhide(car: Car)
 	const model = car.Model
 	if model ~= nil then

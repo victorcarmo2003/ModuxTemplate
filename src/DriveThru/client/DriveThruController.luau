@@ -7,8 +7,9 @@
 
 	  - DriveCars set (Net.Restaurant, record = lane spot, 1 = at the window) -> one local car per customer (keyed by Npc,
 	    so a car that moves up a spot keeps its model). The car is a Traffic kit car of record.Look
-	    (`Assets.Vehicles.Cars/<Shape>`, paint `Paints/<Paint>`, Content.Traffic.LookOf; the TrafficController is not
-	    touched) with a simple driver inside; anchored, no collision, query or touch.
+	    (`Assets.Vehicles.DriveCars/<Shape>`: the AST-035 car with a translucent Glass and a dark Interior, owner
+	    2026-10-20; else `Cars/<Shape>`), paint `Paints/<Paint>`, Content.Traffic.LookOf; the TrafficController is not
+	    touched; anchored, no collision, query or touch.
 	  - Motion: along the shared lane (DriveThru/shared/Lane: DT-IN -> DTQ-n..1 -> U-turn -> DT-STOP -> DT-OUT). Arriving =
 	    eased move from where the car is to its spot in Lane.MoveTime (from record.At, server time); Waiting = parked on the
 	    spot; Leaving = pulls away to DT-OUT and on for Lane.ExtraOut studs, then gone. A record that disappears without
@@ -17,8 +18,9 @@
 	    PatienceSpan) crosses each Drive.HornAt value, `car_horn` on the car and a little hop; not while its order is being
 	    taken at DT-PC (Tablets record Rules.DrivePcIndex Talking with this Npc: the server froze the clock). A car that
 	    leaves Complaining (gave up, wrong order, window shut) honks `car_horn_long`.
-	  - The driver's rig (server NPC with the attribute DriveThru, plan B of §3.4) is hidden locally
-	    (LocalTransparencyModifier); its balloon stays over the car. Shown again when the attribute goes.
+	  - The driver is the customer's own rig (server NPC with the attribute DriveThru, plan B of §3.4): every frame it is
+	    put locally on the driver's seat of its car (window side, SEAT), seen through the glass; its balloon rides over
+	    the car. The server only anchors it at the lane spot; the local pose wins until the rig goes back to the pool.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -47,23 +49,28 @@ export type View = {
 	Horned: { [number]: boolean }, -- HornAt indices played for the running clock
 	ClockKey: number, -- PatienceEndsAt the Horned set belongs to
 	HopAt: number, -- os.clock() of the last horn (hop)
+	Seat: CFrame, -- the driver's root, from the car pivot
+	Rig: Model?, -- the customer's rig on that seat (nil = not found yet)
 }
 
 const DRIVE = Content.Restaurant.Drive
 const TRAFFIC = Content.Traffic
-const HIDDEN = "DriveThru" -- rig attribute set by DriveThruService
+const HIDDEN = "DriveThru" -- rig attribute set by DriveThruService: this rig drives a drive-thru car
 const NPC_FOLDER = "Npcs"
 const FOLDER_NAME = "DriveThruCars"
 const MAP_WAIT = 30 -- s
-const HIDE_EVERY = 0.4 -- s between two passes over the rigs
+const FIND_EVERY = 0.4 -- s between two looks for a driver's rig not found yet
 const LOST_GRACE = 0.6 -- s: a record removed and not re-added (a car moving up is remove + add) = the car goes
 const HOP_TIME = 0.35 -- s
 const HOP_HEIGHT = 0.35 -- studs
 const COMPLAINING = "Complaining"
 const FALLBACK_SIZE = Vector3.new(7, 5, 12)
 const FALLBACK_COLOR = Color3.fromHex("#F4B183")
-const DRIVER_COLOR = Color3.fromHex("#5B4636")
-const SKIN_COLOR = Color3.fromHex("#E8B98F")
+-- driver's seat from the car pivot: share of the width to the window side (-X: the left, MAP-01 window), share of the
+-- length from the centre towards the nose (-Z), root height over the road (head in the window band of AST-035)
+const SEAT_SIDE = 0.22
+const SEAT_FORWARD = 0.04
+const SEAT_UP = 2.7
 
 local function now(): number
 	return Workspace:GetServerTimeNow()
@@ -99,7 +106,7 @@ local function cloneLook(look: number): Model
 	const shape, paint = TRAFFIC.LookOf(look)
 	const assets = ReplicatedStorage:FindFirstChild("Assets")
 	const vehicles = if assets then assets:FindFirstChild("Vehicles") else nil
-	const cars = if vehicles then vehicles:FindFirstChild("Cars") else nil
+	const cars = if vehicles then (vehicles:FindFirstChild("DriveCars") or vehicles:FindFirstChild("Cars")) else nil
 	const template = if cars and shape then cars:FindFirstChild(shape) else nil
 	if template == nil or not template:IsA("Model") then
 		return fallbackModel()
@@ -121,34 +128,9 @@ local function cloneLook(look: number): Model
 	return model
 end
 
--- Head and shoulders on the driver's seat (left side, the window side of MAP-01), moving with the car
-local function addDriver(model: Model)
-	const pivot = model:GetPivot()
-	const _, size = model:GetBoundingBox()
-	const length = math.max(size.Z, size.X)
-	const width = math.min(size.Z, size.X)
-	const seat = pivot * CFrame.new(width * 0.22, size.Y * 0.55, -length * 0.05)
-	for _, piece in
-		{
-			{ "DriverShoulders", Enum.PartType.Block, Vector3.new(1.6, 1, 0.8), CFrame.new(), DRIVER_COLOR },
-			{ "DriverHead", Enum.PartType.Ball, Vector3.one * 1.05, CFrame.new(0, 0.95, 0), SKIN_COLOR },
-		} :: { any }
-	do
-		const part = Instance.new("Part")
-		part.Name = piece[1]
-		part.Shape = piece[2]
-		part.Size = piece[3]
-		part.CFrame = seat * piece[4]
-		part.Color = piece[5]
-		part.Material = Enum.Material.SmoothPlastic
-		part.Parent = model
-	end
-end
-
 local function makeCar(look: number): Model
 	const model = cloneLook(look)
 	model.Name = "DriveThruCar"
-	addDriver(model)
 	for _, descendant in model:GetDescendants() do
 		if descendant:IsA("BasePart") then
 			descendant.Anchored = true
@@ -160,15 +142,12 @@ local function makeCar(look: number): Model
 	return model
 end
 
--- Rig hiding ------------------------------------------------------------------------------------------------------------
-
-local function setHidden(model: Model, hidden: boolean)
-	const value = if hidden then 1 else 0
-	for _, descendant in model:GetDescendants() do
-		if descendant:IsA("BasePart") or descendant:IsA("Decal") then
-			descendant.LocalTransparencyModifier = value
-		end
-	end
+-- Driver's seat (root of the rig) from the car pivot
+local function seatOf(model: Model): CFrame
+	const _, size = model:GetBoundingBox()
+	const length = math.max(size.Z, size.X)
+	const width = math.min(size.Z, size.X)
+	return CFrame.new(-width * SEAT_SIDE, SEAT_UP, -length * SEAT_FORWARD)
 end
 
 const DriveThruController = Modux.Controller("DriveThruController", { Require = { "AudioController" }, Priority = 655 })
@@ -183,8 +162,7 @@ function DriveThruController:Setup()
 	self.Patience = {} :: { [number]: Patience }
 	-- Npc whose order is being taken at DT-PC (0 = none)
 	self.DriveTalk = 0 :: number
-	self.Hidden = {} :: { [Model]: boolean }
-	self.HideAt = 0 :: number
+	self.FindAt = 0 :: number
 	self.Folder = nil :: Folder?
 end
 
@@ -237,9 +215,13 @@ function DriveThruController:Apply(spot: number, record: CarRecord)
 			Horned = {},
 			ClockKey = 0,
 			HopAt = 0,
+			Seat = CFrame.identity,
+			Rig = nil,
 		}
 		view = made
 		self.Views[record.Npc] = made
+		model:PivotTo(CFrame.identity)
+		made.Seat = seatOf(model)
 		model:PivotTo(Lane.Pose(lane, 0))
 		model.Parent = self:Container()
 		if record.State ~= "Arriving" then
@@ -357,35 +339,40 @@ function DriveThruController:Step()
 			pose += Vector3.new(0, math.sin(math.pi * hop / HOP_TIME) * HOP_HEIGHT, 0)
 		end
 		car.Model:PivotTo(pose)
+		self:SeatDriver(car, pose)
 	end
-	if clockNow >= self.HideAt then
-		self.HideAt = clockNow + HIDE_EVERY
-		self:HideRigs()
+	if clockNow >= self.FindAt then
+		self.FindAt = clockNow + FIND_EVERY
+		self:FindRigs()
 	end
 end
 
--- The drivers' rigs are hidden here (dressing may add parts later: every pass re-applies)
-function DriveThruController:HideRigs()
+-- The customer's rig on the driver's seat (local pose; the server keeps it anchored at the lane spot)
+function DriveThruController:SeatDriver(car: View, pose: CFrame)
+	const rig = car.Rig
+	if rig == nil then
+		return
+	end
+	if rig.Parent == nil or rig:GetAttribute(HIDDEN) ~= true or rig:GetAttribute("NpcId") ~= car.Npc then
+		car.Rig = nil -- back in the pool (or reused): leave it alone
+		return
+	end
+	rig:PivotTo(pose * car.Seat)
+end
+
+-- Rigs of the drivers not found yet (the rig replicates a moment after the car record)
+function DriveThruController:FindRigs()
 	const folder = Workspace:FindFirstChild(NPC_FOLDER)
-	const seen: { [Model]: boolean } = {}
-	if folder ~= nil then
-		for _, model in folder:GetChildren() do
-			if model:IsA("Model") and model:GetAttribute(HIDDEN) == true then
-				seen[model] = true
-				setHidden(model, true)
+	if folder == nil then
+		return
+	end
+	for npc, car in self.Views do
+		if car.Rig == nil and car.State ~= "Leaving" then
+			const model = folder:FindFirstChild(`Npc_{npc}`)
+			if model ~= nil and model:IsA("Model") and model:GetAttribute(HIDDEN) == true then
+				car.Rig = model
 			end
 		end
-	end
-	for model in self.Hidden do
-		if not seen[model] then
-			if model.Parent ~= nil then
-				setHidden(model, false)
-			end
-			self.Hidden[model] = nil
-		end
-	end
-	for model in seen do
-		self.Hidden[model] = true
 	end
 end
 
