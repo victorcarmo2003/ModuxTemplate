@@ -17,7 +17,8 @@
 
 	Screens (Interface/Components; one open at a time, input context "Menu" while open):
 	  LobbyHud      gem balance (opens the shop), tiles Classes · Shop · Codes · Squad, a status card (Solo / Squad
-	                n/4, members, Friends only) over the big Play button (PLAY green · START SQUAD mustard · READY)
+	                n/4, members, Friends only) over the big Play button (START for the leader, a waiting state for the
+	                others, CANCEL during the countdown; DEC-344)
 	  ClassSelect   every class (Content.Classes): list, card with perks / drawbacks, Buy with Gems / Buy with Robux /
 	                Equip. The rig stands in the middle: on the MapPoint LOBBY-CLASS-STAGE with the camera locked in
 	                front of it when the map has one (Stage.luau, CameraController External), else in a ClassStage
@@ -26,7 +27,7 @@
 	                credits the gems on the receipt; the Profile packet brings the new balance)
 	  CodeRedeem    CodeRedeem packet -> CodeRedeemResult (ok / invalid / expired / already used)
 	  SquadPanel    the Party set (my squad = the record whose Members has my UserId), invite the players of this
-	                server, kick (leader), Ready, Start (leader), Leave; InvitePopup for PartyInviteReceived
+	                server, kick (leader), Start (leader), Leave; InvitePopup for PartyInviteReceived
 	  PlayChoice    what Play opens outside a squad: Play Solo · Create Squad (PartyQuickPlay)
 	Feedback toasts (top right) for ClassBuyResult, CodeRedeemResult and PartyNotice; texts in Text.luau.
 
@@ -39,25 +40,25 @@
 	  Play Solo     PartyQuickPlay { Mode = "Solo" }: the server creates a squad of one and starts it at once (normal
 	                countdown, then the teleport; Studio answers StudioNoTeleport and drops the squad). The choice
 	                closes; the HUD shows "Starting in n..." over the Play button.
-	  Create Squad  PartyQuickPlay { Mode = "Squad" }: an open invite squad (no platform); as soon as it arrives the
-	                setup window (SquadSetup) opens: one page (TASK-300) with Max players and Who can join, Create Room
-	                (the room then waits for players; the window closes back to the lobby HUD, TASK-306), Invite players
-	                (-> SquadPanel), Leave. No need to walk to a platform; stepping on a free one takes the squad there.
-	In a squad, Play opens the setup window of my squad (Ready for invite squad members; SET UP ROOM while the leader's
-	room is still a draft). The leader of a created room gets START (PartyStart at once) and a round gear beside it that
-	reopens the setup window (TASK-306, user request 2026-10-15).
+	  Create Squad  PartyQuickPlay { Mode = "Squad" }: a friends-only invite squad (no platform); as soon as it arrives
+	                the setup window (SquadSetup) opens with Max players, Who can join, Invite players (-> SquadPanel)
+	                and Leave. No need to walk to a platform; stepping on a free one takes the squad there.
+	Simple pad (DEC-344, TASK-619): in a squad, the leader's Play is START (PartyStart at once, even alone) with a round
+	gear beside it that opens the setup window (who can join, max players); the others see a waiting state. No SET UP
+	ROOM, no READY, no Leave on the pad: stepping off is leaving.
 
 	Zones (user request 2026-10-11, Provisional; Content.Lobby, shared.Lobby.LobbyZones): every lobby zone is a floor
 	Part of the map tagged "LobbyZone" (attribute Zone = Classes / Shop / Codes / Squad1..4; circle on a disc, oriented
 	rectangle otherwise; Content position as fallback). Walking in opens its panel,
 	walking out closes it (only if that panel is still the open one); checked every Trigger.Poll s from the own
 	HumanoidRootPart, with hysteresis. The HUD tiles and keys stay as shortcuts. A panel closed by hand stays closed
-	until the player walks out and in again.
-	  SquadSetup    the setup window (Panel "Platform"): my squad (platform or invite), else the squad on the platform
-	                the player stands on; Friends only, Max players, Start (leader) or the countdown; invite squads add
-	                Ready (members), Invite players and Leave. Joining / leaving a platform is the server's
-	                (PartyService watches the platforms); this client sends PartyConfigure / PartyStart / PartyReady /
-	                PartyLeave. Opened by Play too; closes by itself when there is no squad left to show.
+	until the player walks out and in again. Squad pads open nothing (DEC-344): the room exists at once and START is
+	on the HUD.
+	  SquadSetup    the setup window (Panel "Platform", behind the gear): my squad (platform or invite), else the squad
+	                on the platform the player stands on; Who can join, Max players, Start (leader) or the countdown;
+	                invite squads add Invite players and Leave. Joining / leaving a platform is the server's
+	                (PartyService watches the platforms); this client sends PartyConfigure / PartyStart / PartyCancel /
+	                PartyLeave. Closes by itself when there is no squad left to show.
 	Pad signs (Pads.luau + Interface/Components/PadTag, user request 2026-10-12): over every squad pad a studs-sized
 	sign: a big count pill (FREE / SETUP / "n/max" / FULL, green free and open, mustard configuring, Slate closed, Teal
 	breathing while starting), a round run seal under it (Content.Lobby.Squad.Pad.Badge, "D1" Provisional) and the
@@ -123,18 +124,11 @@ export type Panel = "None" | "Classes" | "Shop" | "Codes" | "Squad" | "Platform"
 export type PartyRecord = {
 	Leader: number,
 	Members: { number },
-	Ready: { [number]: boolean },
 	State: "Forming" | "Configuring" | "Starting",
 	Platform: number,
 	Access: string, -- PartyRules.Access
 	MaxPlayers: number,
 	StartAt: number,
-}
-
--- One-page room setup (TASK-300): what Create Room will send.
-export type Draft = {
-	Access: string,
-	MaxPlayers: number,
 }
 
 export type Invite = {
@@ -188,8 +182,8 @@ const FIRST_SELECTION: { [Panel]: { string } } = {
 	Classes = {}, -- the focused class row (its name is the class key)
 	Shop = { "Buy" },
 	Codes = { "Redeem" },
-	Squad = { "Start", "Ready", "Create", "Invite" },
-	Platform = { "Create", "Start", "Ready", "Toggle", "Leave" },
+	Squad = { "Start", "Create", "Invite" },
+	Platform = { "Start", "Toggle", "Leave" },
 	Play = { "Solo", "Squad" },
 }
 
@@ -298,11 +292,6 @@ function LobbyController:Setup()
 	self.Roster = Vide.source({}) :: Vide.Source<{ Player }>
 	self.Sent = Vide.source({}) :: Vide.Source<{ [number]: boolean }>
 	self.Invites = Vide.source({}) :: Vide.Source<{ Invite }>
-	-- room draft (TASK-300): size and who can join, picked on the one-page setup while my room is still "Setup"; sent
-	-- only by Create Room (PartyConfigure)
-	self.Draft = Vide.source({ Access = "Open", MaxPlayers = PartyRules.Rules.DefaultMaxPlayers }) :: Vide.Source<Draft>
-	-- PartyId whose draft was started
-	self.DraftParty = 0 :: number
 	-- a quick play (PartyQuickPlay) waiting for its squad
 	self.QuickPending = Vide.source(false) :: Vide.Source<boolean>
 	self.QuickMode = "Solo" :: PlayChoice.Choice
@@ -770,7 +759,6 @@ function LobbyController:Members(): { SquadPanel.Member }
 			UserId = userId,
 			Name = if userId == me then `{nameOf(userId)} (you)` else nameOf(userId),
 			Leader = userId == party.Leader,
-			Ready = party.Ready[userId] == true or userId == party.Leader,
 			Me = userId == me,
 		})
 	end
@@ -797,15 +785,6 @@ end
 function LobbyController:IsLeader(): boolean
 	const _, party = self:MyParty()
 	return party ~= nil and party.Leader == Players.LocalPlayer.UserId
-end
-
-function LobbyController:AllReady(party: PartyRecord): boolean
-	for _, userId in party.Members do
-		if userId ~= party.Leader and party.Ready[userId] ~= true then
-			return false
-		end
-	end
-	return true
 end
 
 function LobbyController:Invite(userId: number)
@@ -903,30 +882,21 @@ function LobbyController:PlayButton(): LobbyHud.PlayButton
 		end
 		return { Text = "STARTING...", Kind = "Go", Enabled = true }
 	end
-	const me = Players.LocalPlayer.UserId
-	if party.Leader == me then
-		if party.Access == "Setup" then
-			return { Text = "SET UP ROOM", Kind = "Wait", Enabled = true }
-		end
-		-- green once everyone is ready; mustard still taps (the server answers NotAllReady)
-		return { Text = "START", Kind = if self:AllReady(party) then "Go" else "Wait", Enabled = true }
+	-- one button (DEC-344): the leader starts with whoever is in, alone included; the others wait for the leader
+	if party.Leader == Players.LocalPlayer.UserId then
+		return { Text = "START", Kind = "Go", Enabled = true }
 	end
-	return if party.Ready[me] == true
-		then { Text = "READY!", Kind = "Go", Enabled = true }
-		else { Text = "READY", Kind = "Wait", Enabled = true }
+	return { Text = "WAITING...", Kind = "Off", Enabled = false }
 end
 
--- The gear beside START: the leader of a created room, before the countdown (TASK-306). Reactive (Parties).
+-- The gear beside START: the leader, before the countdown (TASK-306, DEC-344). Reactive (Parties).
 function LobbyController:GearShown(): boolean
 	const _, party = self:MyParty()
-	return party ~= nil
-		and party.Leader == Players.LocalPlayer.UserId
-		and party.Access ~= "Setup"
-		and party.State ~= "Starting"
+	return party ~= nil and party.Leader == Players.LocalPlayer.UserId and party.State ~= "Starting"
 end
 
--- Play button: outside a squad the choice (Play Solo / Create Squad); the leader of a created room starts it
--- (TASK-306); otherwise my squad's setup window.
+-- Play button: outside a squad the choice (Play Solo / Create Squad); the leader starts the squad (DEC-344); the others
+-- have nothing to press (the button waits).
 function LobbyController:Play()
 	-- event handlers run outside any reactive scope: plain reads
 	if self:CanCancel() then
@@ -942,9 +912,7 @@ function LobbyController:Play()
 	end
 	if self:GearShown() then
 		self.Libs.Net.PartyStart:fireServer()
-		return
 	end
-	self:SetPanel("Platform")
 end
 
 function LobbyController:ClearQuickPlay()
@@ -1036,38 +1004,9 @@ function LobbyController:SetupMembers(): { SquadSetup.Member }
 			Name = if userId == me then `{nameOf(userId)} (you)` else nameOf(userId),
 			Leader = userId == party.Leader,
 			Me = userId == me,
-			-- invite squads only: platform members are ready by standing there
-			Ready = if party.Platform == 0 and userId ~= party.Leader then party.Ready[userId] == true else nil,
 		})
 	end
 	return list
-end
-
--- One-page room setup (user request 2026-10-15, TASK-300; replaces the two-stage room of network.md §16.9). A room I
--- lead that is still "Setup" is a draft: size and who can join change only here, Create Room sends them (the room then
--- exists and waits for players; Start / PLAY begins it later). Reactive.
-function LobbyController:Drafting(): boolean
-	const party = self:SetupParty()
-	return party ~= nil and party.Access == "Setup" and party.Leader == Players.LocalPlayer.UserId
-end
-
--- A room of mine (re)appears in "Setup": a fresh draft (its size as the server has it).
-function LobbyController:CheckDraft(id: number, record: PartyRecord)
-	if record.Access == "Setup" and record.Leader == Players.LocalPlayer.UserId and self.DraftParty ~= id then
-		self.DraftParty = id
-		self.Draft({ Access = "Open", MaxPlayers = math.clamp(record.MaxPlayers, 1, PartyRules.Rules.MaxSize) })
-	end
-end
-
--- Create Room: the draft becomes the room (Setup -> its access). A room of one is closed (nobody else fits). The setup
--- window closes back to the lobby HUD (TASK-306): the squad card with START and the gear; a gamepad lands on START.
-function LobbyController:CreateRoom()
-	const draft = Vide.untrack(self.Draft)
-	self:Configure(if draft.MaxPlayers <= 1 then "Closed" else draft.Access, draft.MaxPlayers)
-	self:SetPanel("None")
-	task.defer(function()
-		self:SelectFirst("None")
-	end)
 end
 
 -- Seconds before the teleport of the shown squad; nil = not starting.
@@ -1094,8 +1033,8 @@ end
 
 function LobbyController:PadMax(n: number): number
 	const party = self:PlatformParty(n)
-	-- no fixed capacity per pad: a free pad or a room still being set up has no size
-	return if party and party.Access ~= "Setup" then math.max(party.MaxPlayers, #party.Members) else 0
+	-- no fixed capacity per pad: a free pad has no size
+	return if party then math.max(party.MaxPlayers, #party.Members) else 0
 end
 
 function LobbyController:PadState(n: number): PadTag.State
@@ -1104,8 +1043,6 @@ function LobbyController:PadState(n: number): PadTag.State
 		return "Free"
 	elseif party.State == "Starting" then
 		return "Starting"
-	elseif party.Access == "Setup" then
-		return "Configuring"
 	end
 	return if party.Access == "Closed" or #party.Members >= math.max(party.MaxPlayers, 1) then "Closed" else "Open"
 end
@@ -1123,9 +1060,7 @@ function LobbyController:PadStatus(n: number): string
 		-- after the count the squad is on its way (owner 2026-10-17: everyone in the lobby sees it leave)
 		return if left > 0 then `STARTING IN {math.ceil(left)}...` else "TELEPORTING..."
 	end
-	if party.Access == "Setup" then
-		return "CONFIGURING"
-	elseif party.Access == "Closed" then
+	if party.Access == "Closed" then
 		return "CLOSED"
 	elseif #party.Members >= math.max(party.MaxPlayers, 1) then
 		return "FULL"
@@ -1155,8 +1090,7 @@ function LobbyController:PadFaces(n: number): { number }
 	return if party then party.Members else {}
 end
 
--- Ring + floor glow of each platform by room state (Content.Lobby.Squad.Pad): green free / open, mustard configuring,
--- Slate full / closed, Teal starting; the breath speeds up with the countdown; sparks while someone stands on it.
+-- Ring + floor glow of each platform by room state (Content.Lobby.Squad.Pad): green free / open, Slate full / closed, Teal starting; the breath speeds up with the countdown; sparks while someone stands on it.
 function LobbyController:PaintPlatforms()
 	const rings = self.Rings
 	if rings == nil then
@@ -1197,6 +1131,9 @@ function LobbyController:OnZone(zone: LobbyZones.Zone, inside: boolean)
 		elseif Vide.untrack(self.Standing) == zone.Platform then
 			self.Standing(0)
 		end
+	end
+	if zone.Platform > 0 then
+		return -- a pad opens nothing (DEC-344): START is on the HUD, the setup window is behind the gear
 	end
 	const panel: Panel = zone.Panel
 	if inside then
@@ -1549,16 +1486,16 @@ function LobbyController:Mount(playerGui: Instance)
 	end
 
 	const unmount, gui = Vide.root(function()
-		-- A Profile packet answers a class request: whatever it says, the buttons come back. Sources are written deferred,
-		-- never inside an effect (see the setup window effect below).
+		-- A Profile packet answers a class request: whatever it says, the buttons come back.
 		Vide.effect(function()
 			profile.Classes()
 			profile.Selected()
 			profile.Gems()
-			task.defer(function()
+			Vide.untrack(function()
 				if self.PromptClass == "" then
 					self:ClearPending()
 				end
+				return nil
 			end)
 		end)
 
@@ -1566,11 +1503,12 @@ function LobbyController:Mount(playerGui: Instance)
 		Vide.effect(function()
 			const scale = self.Scale()
 			const panel = self.Panel()
-			task.defer(function()
+			Vide.untrack(function()
 				gifts.Scale(scale)
 				if panel ~= "Shop" and panel ~= "Classes" then
 					gifts:Close()
 				end
+				return nil
 			end)
 		end)
 
@@ -1590,19 +1528,16 @@ function LobbyController:Mount(playerGui: Instance)
 			return panel ~= "None" and (panel ~= "Classes" or not self.WorldStage())
 		end)
 
-		-- The setup window opened by Play closes when there is no squad to show anymore (left, solo run over). Deferred:
-		-- writing Panel inside an effect breaks Vide's graph ("attempt to call a boolean"), and the error aborted the
-		-- OnZone that set Standing, leaving the window stuck open (owner 2026-10-20: lobby UI froze on pad in / out).
+		-- The setup window opened by Play closes when there is no squad to show anymore (left, solo run over)
 		Vide.effect(function()
 			const panel = self.Panel()
 			const party = self:SetupParty()
-			if panel == "Platform" and party == nil and Vide.untrack(self.Standing) == 0 then
-				task.defer(function()
-					if Vide.untrack(self.Panel) == "Platform" and self:SetupParty() == nil and Vide.untrack(self.Standing) == 0 then
-						self:SetPanel("None")
-					end
-				end)
-			end
+			Vide.untrack(function()
+				if panel == "Platform" and party == nil and self.Standing() == 0 then
+					self:SetPanel("None")
+				end
+				return nil
+			end)
 		end)
 
 		-- The zone rings leave the world while the class panel is open (they drew over the class on the stage, owner
@@ -1868,10 +1803,6 @@ function LobbyController:Mount(playerGui: Instance)
 					self:Click()
 					self.Libs.Net.PartyLeave:fireServer()
 				end,
-				OnReady = function(ready: boolean)
-					self:Click()
-					self.Libs.Net.PartyReady:fireServer({ Ready = ready })
-				end,
 				OnStart = function()
 					self:Click()
 					self.Libs.Net.PartyStart:fireServer()
@@ -1907,23 +1838,10 @@ function LobbyController:Mount(playerGui: Instance)
 					return party ~= nil and party.Leader == Players.LocalPlayer.UserId
 				end,
 				Access = function()
-					if self:Drafting() then
-						return self.Draft().Access
-					end
 					const party = self:SetupParty()
-					return if party then party.Access else "Setup"
-				end,
-				Drafting = function()
-					return self:Drafting()
-				end,
-				OnCreate = function()
-					self:Click()
-					self:CreateRoom()
+					return if party then party.Access else "Friends"
 				end,
 				MaxPlayers = function()
-					if self:Drafting() then
-						return self.Draft().MaxPlayers
-					end
 					const party = self:SetupParty()
 					return if party then party.MaxPlayers else PartyRules.Rules.DefaultMaxPlayers
 				end,
@@ -1931,21 +1849,8 @@ function LobbyController:Mount(playerGui: Instance)
 				Countdown = function()
 					return self:Countdown()
 				end,
-				CanStart = function()
-					const party = self:SetupParty()
-					return party ~= nil
-						and party.State ~= "Starting"
-						and party.Access ~= "Setup"
-						and self:AllReady(party)
-				end,
 				OnAccess = function(access: string)
 					self:Click()
-					if self:Drafting() then
-						const draft = table.clone(Vide.untrack(self.Draft))
-						draft.Access = access
-						self.Draft(draft)
-						return
-					end
 					const party = self:SetupParty()
 					if party then
 						self:Configure(access, party.MaxPlayers)
@@ -1953,12 +1858,6 @@ function LobbyController:Mount(playerGui: Instance)
 				end,
 				OnMaxPlayers = function(count: number)
 					self:Click()
-					if self:Drafting() then
-						const draft = table.clone(Vide.untrack(self.Draft))
-						draft.MaxPlayers = math.clamp(count, 1, PartyRules.Rules.MaxSize)
-						self.Draft(draft)
-						return
-					end
 					const party = self:SetupParty()
 					if party then
 						self:Configure(party.Access, count)
@@ -1980,14 +1879,6 @@ function LobbyController:Mount(playerGui: Instance)
 				Invite = function()
 					const party = self:SetupParty()
 					return party ~= nil and party.Platform == 0
-				end,
-				Ready = function()
-					const party = self:SetupParty()
-					return party ~= nil and party.Ready[Players.LocalPlayer.UserId] == true
-				end,
-				OnReady = function(ready: boolean)
-					self:Click()
-					self.Libs.Net.PartyReady:fireServer({ Ready = ready })
 				end,
 				OnInvite = function()
 					self:Click()
@@ -2107,14 +1998,12 @@ LobbyController:OnInit(function(self)
 		const copy = table.clone(Vide.untrack(self.Parties))
 		copy[id] = record :: any
 		self.Parties(copy)
-		self:CheckDraft(id, record :: any)
 		self:CheckQuickPlay()
 	end)
 	net.Party:onChanged(function(id, record)
 		const copy = table.clone(Vide.untrack(self.Parties))
 		copy[id] = record :: any
 		self.Parties(copy)
-		self:CheckDraft(id, record :: any)
 		self:CheckQuickPlay()
 	end)
 	net.Party:onRemoved(function(id)

@@ -1,10 +1,8 @@
 --!strict
 -- SquadSetup on a phone-sized frame (iPhone SE landscape, 667 x 375) or the whole viewport, with a fake server:
--- Who can join / Max players answer after "Latency" s; the room starts as a draft (one page, TASK-300: size and who can
--- join change at once, Create Room makes the room after "Latency" s); Start runs a 5 s countdown and goes back (as in
--- Studio). Leave puts the room back to a fresh draft.
+-- Who can join / Max players answer after "Latency" s; Start runs a 5 s countdown and goes back (as in Studio).
 -- "Leader" off shows the member view; "Members" sets how many stand on the platform. "Invite" = an invite squad (Play ->
--- Create Squad): Ready / Not ready tags, the members' Ready button, Invite players / Leave in the foot.
+-- Create Squad): Invite players / Leave in the foot.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -43,17 +41,10 @@ return UILabs.CreateVideStory({
 	},
 }, function(props)
 	const controls: Controls = (props.controls :: any)
-	const access = source("Setup")
+	const access = source("Friends")
 	const maxPlayers = source(4)
-	-- the draft of a room still "Setup" (local, as LobbyController.Draft)
-	const draftAccess = source("Open")
-	const draftMax = source(4)
-	const drafting = function(): boolean
-		return access() == "Setup" and controls.Leader()
-	end
 	const startAt = source(0)
 	const now = source(os.clock())
-	const ready = source(false)
 
 	const threads: { thread } = {}
 	local alive = true
@@ -107,24 +98,14 @@ return UILabs.CreateVideStory({
 						Name = if me then `{person.Name} (you)` else person.Name,
 						Leader = index == 1,
 						Me = me,
-						Ready = if controls.Invite() then (if me then ready() else index % 2 == 1) else nil,
 					})
 				end
 				return list
 			end,
 			IsLeader = controls.Leader,
-			Access = function()
-				return if drafting() then draftAccess() else access()
-			end,
-			Drafting = drafting,
-			OnCreate = function()
-				later(function()
-					maxPlayers(draftMax())
-					access(if draftMax() <= 1 then "Closed" else draftAccess())
-				end)
-			end,
+			Access = access,
 			MaxPlayers = function()
-				return math.max(if drafting() then draftMax() else maxPlayers(), math.floor(controls.Members()))
+				return math.max(maxPlayers(), math.floor(controls.Members()))
 			end,
 			MaxSize = 4,
 			Countdown = function()
@@ -134,23 +115,12 @@ return UILabs.CreateVideStory({
 				end
 				return math.max(at - now(), 0)
 			end,
-			CanStart = function()
-				return startAt() == 0
-			end,
 			OnAccess = function(value: string)
-				if drafting() then
-					draftAccess(value)
-					return
-				end
 				later(function()
 					access(value)
 				end)
 			end,
 			OnMaxPlayers = function(count: number)
-				if drafting() then
-					draftMax(math.clamp(count, 1, 4))
-					return
-				end
 				later(function()
 					maxPlayers(math.clamp(count, 1, 4))
 				end)
@@ -169,18 +139,11 @@ return UILabs.CreateVideStory({
 			end,
 			Scale = controls.Scale,
 			Invite = controls.Invite,
-			Ready = ready,
-			OnReady = function(on: boolean)
-				later(function()
-					ready(on)
-				end)
-			end,
 			OnInvite = function()
 				print("[SquadSetup story] invite players")
 			end,
 			OnLeave = function()
 				print("[SquadSetup story] leave")
-				access("Setup")
 			end,
 		}),
 	})

@@ -1,19 +1,15 @@
 --!strict
 -- SquadSetup: the squad setup window (user request 2026-10-11, Provisional), cartoon kit (AST-091), mobile first.
--- Opens when the player steps on a lobby squad platform (LobbyController zone trigger), closes when they step off;
--- also opened by the lobby Play button for the player's own squad ("Create Squad" or already in one).
+-- Behind the gear beside START (DEC-344, TASK-619): stepping on a pad no longer opens it; the room already exists and
+-- the leader starts it from the HUD. Also opened by "Create Squad" for the new invite squad.
 -- A LobbyWindow (560 x 320 at Scale 1):
---   left   the squad: `MaxPlayers` slots (head shot, name, "Leader" / "Ready" / "Not ready" tag); empty slots faded
---   right  ONE page (user request 2026-10-15, TASK-300; replaced the two-stage room of network.md §16.9): Who can join
---          (tap to cycle) · Max players  -  n  +  (the leader changes them; the others only read them)
---            draft (`Drafting`: my room is still private "Setup")  Create Room: the room is made with that size and
---                     access and waits for players (nothing starts)
---            room     Start (leader) or "Waiting for the leader..." (members) · Cancel while starting
---          while starting: "Starting in n..."
---          invite squad (`Invite`): Ready / Not ready for the members (platform members are ready by standing there)
+--   left   the squad: `MaxPlayers` slots (head shot, name, "Leader" tag); empty slots faded
+--   right  Who can join (tap to cycle) · Max players  -  n  +  (the leader changes them; the others only read them);
+--          Start (leader) or "Waiting for the leader..." (members) · Cancel while starting; while starting:
+--          "Starting in n...". No draft and no ready step (DEC-344).
 --   foot   platform squad: hint "Step off the platform to leave"
 --          invite squad: Invite players (leader) · Leave · hint "Step on a free pad to take your squad there"
--- Pure: only props. The caller sends PartyConfigure / PartyStart / PartyReady / PartyLeave and the server decides
+-- Pure: only props. The caller sends PartyConfigure / PartyStart / PartyCancel / PartyLeave and the server decides
 -- (Party set).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -31,8 +27,6 @@ export type Member = {
 	Name: string,
 	Leader: boolean,
 	Me: boolean,
-	-- invite squads: ready state shown on the slot; nil = no tag (platform members are ready by standing there)
-	Ready: boolean?,
 }
 
 type Slot = { Member: Member? }
@@ -42,31 +36,22 @@ export type Props = {
 	Platform: () -> number,
 	Members: () -> { Member },
 	IsLeader: () -> boolean,
-	-- PartyRules.Access of the shown room: "Setup" | "Open" | "Friends" | "Invite" | "Closed"
+	-- PartyRules.Access of the shown room: "Open" | "Friends" | "Invite" | "Closed"
 	Access: () -> string,
 	MaxPlayers: () -> number,
 	MaxSize: number?,
 	-- seconds left before the teleport; nil = not starting
 	Countdown: () -> number?,
-	-- every other member ready (platform members are ready by standing there)
-	CanStart: () -> boolean,
 	OnAccess: (access: string) -> (),
 	OnMaxPlayers: (count: number) -> (),
-	-- my room is still private ("Setup"): Access / MaxPlayers are the draft and the button is Create Room. Default false.
-	Drafting: (() -> boolean)?,
-	-- Create Room: make the room with the shown size and access (it waits for players)
-	OnCreate: (() -> ())?,
 	OnStart: () -> (),
 	-- the leader may abort the countdown until shortly before the teleport (Cancel button; nil = no button)
 	CanCancel: (() -> boolean)?,
 	OnCancel: (() -> ())?,
 	OnClose: () -> (),
 	Scale: (() -> number)?,
-	-- invite squad (no platform): Ready for the members, Invite players / Leave in the foot. Default false.
+	-- invite squad (no platform): Invite players / Leave in the foot. Default false.
 	Invite: (() -> boolean)?,
-	-- my ready state (invite squad members)
-	Ready: (() -> boolean)?,
-	OnReady: ((ready: boolean) -> ())?,
 	-- open the invite list (the leader)
 	OnInvite: (() -> ())?,
 	OnLeave: (() -> ())?,
@@ -82,17 +67,15 @@ const SLOT_GAP = 4
 const BUTTON = 44
 const AVATAR = 32
 
--- who can join (PartyRules.Access without "Setup"): cycle order, button text and tone
+-- who can join (PartyRules.Access): cycle order, button text and tone
 const ACCESS_ORDER = { "Open", "Friends", "Invite", "Closed" }
 const ACCESS_TEXT: { [string]: string } = {
-	Setup = "Setting up",
 	Open = "Open",
 	Friends = "Friends only",
 	Invite = "Invite only",
 	Closed = "Closed",
 }
 const ACCESS_TONE: { [string]: Theme.Tone } = {
-	Setup = Theme.Tone.Mustard,
 	Open = Theme.Tone.Green,
 	Friends = Theme.Tone.Teal,
 	Invite = Theme.Tone.Violet,
@@ -113,12 +96,6 @@ return function(props: Props): Frame
 	end
 	const inviteMode = function(): boolean
 		return props.Invite ~= nil and props.Invite()
-	end
-	const ready = function(): boolean
-		return props.Ready ~= nil and props.Ready()
-	end
-	const drafting = function(): boolean
-		return props.Drafting ~= nil and props.Drafting()
 	end
 	const slots = function(): { Slot }
 		const list: { Slot } = {}
@@ -199,24 +176,13 @@ return function(props: Props): Frame
 						AnchorPoint = Vector2.new(1, 0.5),
 						Position = UDim2.fromScale(1, 0.5),
 						TextSize = Theme.MinTextSize,
-						Color = function()
-							const m = member()
-							return if m and (m.Leader or m.Ready == true) then Theme.Color.Green else Theme.Color.Dark
-						end,
+						Color = Theme.Color.Green,
 						Stroke = 0,
 						Visible = function()
 							const m = member()
-							return m ~= nil and (m.Leader or m.Ready ~= nil)
+							return m ~= nil and m.Leader
 						end,
-						Text = function()
-							const m = member()
-							if m == nil then
-								return ""
-							elseif m.Leader then
-								return "Leader"
-							end
-							return if m.Ready then "Ready" else "Not ready"
-						end,
+						Text = "Leader",
 					}),
 				},
 			})
@@ -320,24 +286,6 @@ return function(props: Props): Frame
 				end,
 			}),
 		}),
-		-- draft: make the room (it waits for players; nothing starts)
-		CartoonButton({
-			Name = "Create",
-			LayoutOrder = 3,
-			Size = UDim2.new(1, 0, 0, BUTTON + 8),
-			TextSize = 22,
-			Outline = Theme.Outline.Thick,
-			Tone = Theme.Tone.Green,
-			Visible = function()
-				return drafting() and props.IsLeader() and not starting()
-			end,
-			Text = "Create Room",
-			OnActivated = function()
-				if props.OnCreate then
-					props.OnCreate()
-				end
-			end,
-		}),
 		CartoonButton({
 			Name = "Start",
 			LayoutOrder = 3,
@@ -346,35 +294,10 @@ return function(props: Props): Frame
 			Outline = Theme.Outline.Thick,
 			Tone = Theme.Tone.Green,
 			Visible = function()
-				return props.IsLeader() and not starting() and not drafting()
+				return props.IsLeader() and not starting()
 			end,
-			Enabled = props.CanStart,
-			Text = function()
-				return if props.CanStart() then "Start" else "Waiting..."
-			end,
+			Text = "Start",
 			OnActivated = props.OnStart,
-		}),
-		-- invite squad members: Ready toggle
-		CartoonButton({
-			Name = "Ready",
-			LayoutOrder = 4,
-			Size = UDim2.new(1, 0, 0, BUTTON),
-			TextSize = 20,
-			Outline = Theme.Outline.Thick,
-			Tone = function()
-				return if ready() then Theme.Tone.Mustard else Theme.Tone.Green
-			end,
-			Visible = function()
-				return inviteMode() and not props.IsLeader() and not starting()
-			end,
-			Text = function()
-				return if ready() then "Not ready" else "Ready"
-			end,
-			OnActivated = function()
-				if props.OnReady then
-					props.OnReady(not ready())
-				end
-			end,
 		}),
 		-- leader: abort the countdown (dark mustard, never red)
 		CartoonButton({
@@ -404,14 +327,14 @@ return function(props: Props): Frame
 				return if starting() then Theme.Color.Green else Theme.Color.Text
 			end,
 			Visible = function()
-				return starting() or not props.IsLeader() or drafting()
+				return starting() or not props.IsLeader()
 			end,
 			Text = function()
 				const left = props.Countdown()
 				if left ~= nil then
 					return if left > 0 then `Starting in {math.ceil(left)}...` else "Here we go!"
 				end
-				return if drafting() then "Private until you create it" else "Waiting for the leader..."
+				return "Waiting for the leader..."
 			end,
 		}),
 	})

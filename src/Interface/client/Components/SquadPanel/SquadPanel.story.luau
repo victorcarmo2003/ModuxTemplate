@@ -1,7 +1,7 @@
 --!strict
 -- SquadPanel on a phone-sized frame (iPhone SE landscape, 667 x 375) or the whole viewport, with a fake server:
 -- "Create Squad" makes you leader; Invite adds the player after "Latency" s (as if they accepted); kick / leave /
--- ready / start answer the same way. "Leader" off shows the member view (you are not the leader).
+-- start answer the same way. "Leader" off shows the member view (you are not the leader).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -40,7 +40,6 @@ return UILabs.CreateVideStory({
 	const controls: Controls = (props.controls :: any)
 	const inSquad = source(false)
 	const members = source({} :: { number })
-	const ready = source({} :: { [number]: boolean })
 	const invited = source({} :: { [number]: boolean })
 	const busy = source(false)
 	const starting = source(false)
@@ -101,7 +100,6 @@ return UILabs.CreateVideStory({
 						UserId = userId,
 						Name = nameOf(userId),
 						Leader = userId == leaderId(),
-						Ready = ready()[userId] == true,
 						Me = userId == ME,
 					})
 				end
@@ -163,13 +161,6 @@ return UILabs.CreateVideStory({
 					members({})
 					invited({})
 					starting(false)
-				end)
-			end,
-			OnReady = function(value: boolean)
-				later(function()
-					const copy = table.clone(ready())
-					copy[ME] = value
-					ready(copy)
 				end)
 			end,
 			OnStart = function()

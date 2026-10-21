@@ -24,7 +24,6 @@ const NOTICE_KEYS = table.freeze({
 	"Left", -- to the squad; UserId = who left
 	"Kicked", -- to the kicked player
 	"NewLeader", -- to the squad; UserId = new leader
-	"NotAllReady", -- Start with a member not ready
 	"Busy", -- squad is starting: nothing changes until the teleport ends
 	"TooFast", -- rate limit
 	"Starting", -- to the squad: server reserved, teleport on its way
@@ -40,16 +39,15 @@ const NOTICE_KEYS = table.freeze({
 	-- cancel the countdown (user request 2026-10-12, Provisional; network.md §16.8)
 	"StartCancelled", -- to the other members: UserId = the leader who cancelled
 	"CancelTooLate", -- to the leader: the cancel window is over, the teleport is on its way
-	-- two-stage room (user request 2026-10-12, Provisional; network.md §16.9)
-	"SetupFirst", -- to the leader: Start / invite before the room is confirmed (Access "Setup")
-	"RoomClosed", -- the room is not open (Access "Setup" or "Closed"): pad entry or invite refused
+	-- room access (user request 2026-10-12, Provisional; network.md §16.9; the "Setup" stage left with DEC-344)
+	"RoomClosed", -- the room is not open (Access "Closed"): pad entry or invite refused
 	"InviteOnly", -- stepped on an invite-only pad
 })
 
--- PartyConfigure.Access / Party.Access. "Setup" = created, private, the leader is still choosing (nobody can join,
--- Start is refused); the others are the confirmed room: Open (pad or invite), Friends (friends of the leader, pad or
--- invite), Invite (invite only, pads refuse), Closed (nobody joins). A squad of one (Play Solo) is "Closed".
-const ACCESS = table.freeze({ "Setup", "Open", "Friends", "Invite", "Closed" })
+-- PartyConfigure.Access / Party.Access: Open (pad or invite), Friends (friends of the leader, pad or invite; the
+-- default of a new room, DEC-344), Invite (invite only, pads refuse), Closed (nobody joins). A squad of one (Play Solo)
+-- is "Closed". The private "Setup" stage is gone (DEC-344): a room exists as soon as it is created.
+const ACCESS = table.freeze({ "Open", "Friends", "Invite", "Closed" })
 
 const RULES = table.freeze({
 	MaxSize = #Content.RunParams.PartyPriceMult, -- 4 (DEC-012, DEC-047)

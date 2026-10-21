@@ -1198,9 +1198,9 @@ Party = Lync.replicate(Lync.struct({
 | `PartyRespond` | `{ PartyId, Accept }` | convite existe e não expirou (60 s), squad existe e `Forming`, vaga; a squad atual (se houver) está `Forming` | aceito: set + `Joined{UserId}` à squad; recusado: `InviteDeclined{UserId}` ao líder; `InviteExpired`, `PartyFull`, `Busy` |
 | `PartyLeave` | — | está numa squad (vale até em `Starting`) | set + `Left{UserId}` aos que ficam (+ `NewLeader{UserId}` se era o líder) / `NotInParty` |
 | `PartyKick` | `{ UserId }` | líder, `Forming`, alvo é membro e não é ele | `Kicked` ao alvo + `Left{UserId}` à squad / `NotLeader`, `Busy`, `PlayerNotFound` |
-| `PartyReady` | `{ Ready }` | membro não-líder, `Forming` | set / `NotInParty`, `Busy` |
-| `PartyStart` | — | líder, `Forming`/`Configuring`, todos os outros prontos | set `Starting` + `StartAt` + `Starting` à squad → `Rules.Countdown` s (5) depois, teleporte (`TeleportRetry` a cada nova tentativa; `TeleportFailed` se todas falharem); no Studio a contagem roda e termina em `StudioNoTeleport` (volta ao estado de antes) / `NotLeader`, `Busy`, `NotAllReady{UserId}` |
-| `PartyConfigure` | `{ Access, MaxPlayers }` | líder, não `Starting` (§16.9: `Access = "Setup"` só com o líder sozinho); `MaxPlayers` preso a `[max(#Members, 1), 4]` | set + `Configured` aos outros membros / `NotInParty`, `NotLeader`, `Busy` |
+| ~~`PartyReady`~~ | — | **removido** (DEC-344, TASK-618): não há mais passo de pronto; o campo `Ready` saiu do record `Party` | — |
+| `PartyStart` | — | líder, `Forming`/`Configuring`, com quem estiver na squad (sozinho vale, DEC-344) | set `Starting` + `StartAt` + `Starting` à squad → `Rules.Countdown` s (5) depois, teleporte (`TeleportRetry` a cada nova tentativa; `TeleportFailed` se todas falharem); no Studio a contagem roda e termina em `StudioNoTeleport` (volta ao estado de antes) / `NotLeader`, `Busy` |
+| `PartyConfigure` | `{ Access, MaxPlayers }` | líder, não `Starting`; `Access` ∈ `Open`/`Friends`/`Invite`/`Closed` (sem `Setup`, DEC-344); `MaxPlayers` preso a `[max(#Members, 1), 4]` | set + `Configured` aos outros membros / `NotInParty`, `NotLeader`, `Busy` |
 | `PartyCancel` | — | líder, `Starting`, antes de `StartAt - Rules.CancelCutoff` (§16.8) | set volta ao estado ocioso (solo: some) + `StartCancelled{UserId = líder}` aos outros / `NotLeader`, `NotInParty`, `CancelTooLate` |
 | `PartyQuickPlay` | `{ Mode }` (`"Solo"`/`"Squad"`) | fora de squad (§16.7) | `Solo`: set (`Platform 0`, `MaxPlayers 1`) já em `Starting` + `Starting`; `Squad`: set `Forming` + `Created` / `AlreadyInParty` |
 
@@ -1313,6 +1313,14 @@ cancelled"). **Client**: o botão só existe para o líder enquanto `StartAt - a
 volta a "STARTING...". Orçamento: um evento por clique.
 
 ### 16.9 Sala em dois estágios e plataformas sem capacidade fixa (v5.8, pedido do usuário 2026-10-12; **Provisório**, Q-217)
+
+> **DEC-344 (2026-10-20, TASK-618/619) — supera a parte "dois estágios" e o pronto:** pisar no pad (ou o **Create
+> Squad** do Play) cria a sala já existente com `Access = "Friends"`; não há mais `Setup` (saiu do enum
+> `PartyRules.Access`), nem `Create Room`, nem `PartyReady`, nem as notices `SetupFirst`/`NotAllReady`. O líder tem só
+> **START** no HUD (inicia sozinho ou com quem estiver; contagem de 5 s cancelável); o acesso e o tamanho ficam na
+> engrenagem ao lado (`SquadSetup`). Pisar no pad não abre janela. Sair do pad = sair da sala. O rastreio `Configured`
+> (funil "squad" do `MetricsService`) passa a disparar logo depois de `Created`, com o `Access` inicial. O resto desta
+> seção vale só como histórico.
 
 Cada plataforma (e o **Create Squad** do Play) cria a sala **privada** e o líder a monta em dois estágios no
 `SquadSetup`; o servidor só guarda o resultado. **Nenhuma plataforma tem capacidade própria**: o tamanho é o `MaxPlayers`

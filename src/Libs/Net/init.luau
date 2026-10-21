@@ -634,14 +634,13 @@ return Lync.define("game", {
 	Party = Lync.replicate(Lync.struct({
 		Leader = Lync.f64(),
 		Members = Lync.array(Lync.f64(), 1, 4), -- party order, leader first; max = PartyRules.Rules.MaxSize
-		Ready = Lync.map(Lync.f64(), Lync.bool(), 0, 4), -- every member; the leader is always true
-		-- Forming = invite squad; Configuring = platform squad being set up (platform red); Starting = countdown, then
-		-- reserve + teleport (platform green)
+		-- Forming = invite squad; Configuring = platform squad waiting for START; Starting = countdown, then
+		-- reserve + teleport (platform green). No ready step (DEC-344): every member is in
 		State = Lync.enum({ "Forming", "Configuring", "Starting" }),
 		-- §16.6 squad platforms (user request 2026-10-11, Provisional)
 		Platform = Lync.int(0, 8), -- PartyRules.Rules.Platforms (LOBBY v2: 8); LOBBY-SQUAD-n owned by this squad; 0 = none (invite squad)
-		-- §16.9 who may join: "Setup" private while the leader chooses, Open, Friends (friends of the leader), Invite
-		-- (invites only), Closed. Small enum: the record is wide (f64 ids), so no drop.section risk
+		-- §16.9 who may join: Open, Friends (friends of the leader; a new room's default, DEC-344), Invite (invites
+		-- only), Closed. Small enum: the record is wide (f64 ids), so no drop.section risk
 		Access = Lync.enum(PartyRules.Access),
 		MaxPlayers = Lync.int(1, 4), -- set by the leader, never below the member count
 		StartAt = Lync.f64(), -- workspace:GetServerTimeNow() when the teleport starts; 0 = no countdown
@@ -668,19 +667,16 @@ return Lync.define("game", {
 	PartyKick = Lync.packet(Lync.struct({
 		UserId = Lync.f64(),
 	})),
-	-- §16.2 c -> s. Members other than the leader; Forming only
-	PartyReady = Lync.packet(Lync.struct({
-		Ready = Lync.bool(),
-	})),
-	-- §16.2 c -> s. Leader only, every member Ready: reserve a server and teleport the squad (Role "Game")
+	-- §16.2 c -> s. Leader only, with whoever is in the squad (alone included, DEC-344): countdown, then reserve a
+	-- server and teleport the squad (Role "Game")
 	PartyStart = Lync.packet(Lync.empty()),
 	-- §16.6 c -> s. Leader only, not Starting: platform squad settings (MaxPlayers clamped to the member count)
 	PartyConfigure = Lync.packet(Lync.struct({
-		Access = Lync.enum(PartyRules.Access), -- "Setup" is only kept (stage 1: count change while still private)
+		Access = Lync.enum(PartyRules.Access), -- behind the gear beside START (DEC-344)
 		MaxPlayers = Lync.int(1, 4),
 	})),
 	-- §16.7 c -> s. Lobby Play button outside a squad: Solo = a squad of one started at once (countdown + teleport);
-	-- Squad = an open invite squad (Platform 0) to set up and invite into
+	-- Squad = a friends-only invite squad (Platform 0) to invite into
 	PartyQuickPlay = Lync.packet(Lync.struct({
 		Mode = Lync.enum({ "Solo", "Squad" }),
 	})),

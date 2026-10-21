@@ -1,8 +1,8 @@
 --!strict
 -- SquadPanel: the lobby squad (party) window (user request 2026-10-11), cartoon kit (AST-091), mobile first.
 -- A LobbyWindow (600 x 330 at Scale 1):
---   left   the squad: up to `MaxSize` slots (avatar head shot, name, "Leader" tag, Ready / Not ready, kick X for the
---          leader on the others; empty slots faded) and the action row: Ready / Not ready · Start (leader) · Leave.
+--   left   the squad: up to `MaxSize` slots (avatar head shot, name, "Leader" tag, kick X for the leader on the
+--          others; empty slots faded) and the action row: Start (leader) · Leave. No ready step (DEC-344).
 --          Outside a squad: a big "Create Squad" button instead.
 --   right  "Invite": the other players of this server (avatar, name, Invite / Sent), scrolling.
 -- Pure: only props; the caller sends the Party packets and the server decides (Party set).
@@ -25,7 +25,6 @@ export type Member = {
 	UserId: number,
 	Name: string,
 	Leader: boolean,
-	Ready: boolean,
 	Me: boolean,
 }
 
@@ -52,7 +51,6 @@ export type Props = {
 	OnInvite: (userId: number) -> (),
 	OnKick: (userId: number) -> (),
 	OnLeave: () -> (),
-	OnReady: (ready: boolean) -> (),
 	OnStart: () -> (),
 	OnClose: () -> (),
 	Scale: (() -> number)?,
@@ -90,22 +88,6 @@ return function(props: Props): Frame
 	const maxSize = props.MaxSize or 4
 	const busy = function(): boolean
 		return props.Busy ~= nil and props.Busy()
-	end
-	const me = function(): Member?
-		for _, member in props.Members() do
-			if member.Me then
-				return member
-			end
-		end
-		return nil
-	end
-	const allReady = function(): boolean
-		for _, member in props.Members() do
-			if not member.Ready and not member.Leader then
-				return false
-			end
-		end
-		return true
 	end
 	-- slot rows: the members, then empty slots up to maxSize
 	const slots = function(): { Slot }
@@ -174,27 +156,19 @@ return function(props: Props): Frame
 							return if m then m.Name else "Empty"
 						end,
 					}),
-					-- leader crown / ready state
+					-- leader crown
 					CartoonLabel({
 						Name = "State",
 						AnchorPoint = Vector2.new(1, 0.5),
 						Position = UDim2.new(1, -(BUTTON + 6), 0.5, 0),
 						TextSize = Theme.MinTextSize,
-						Color = function()
-							const m = member()
-							return if m and (m.Ready or m.Leader) then Theme.Color.Green else Theme.Color.Dark
-						end,
+						Color = Theme.Color.Green,
 						Stroke = 0,
-						Visible = filled,
-						Text = function()
+						Visible = function()
 							const m = member()
-							if m == nil then
-								return ""
-							elseif m.Leader then
-								return "Leader"
-							end
-							return if m.Ready then "Ready" else "Not ready"
+							return m ~= nil and m.Leader
 						end,
+						Text = "Leader",
 					}),
 					CartoonButton({
 						Name = "Kick",
@@ -246,32 +220,6 @@ return function(props: Props): Frame
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			Padding = UDim.new(0, 8),
 		}),
-		-- members: Ready toggle
-		CartoonButton({
-			Name = "Ready",
-			LayoutOrder = 1,
-			Size = UDim2.fromOffset(150, BUTTON),
-			TextSize = 18,
-			Outline = Theme.Outline.Thick,
-			Visible = function()
-				return not props.IsLeader()
-			end,
-			Tone = function()
-				const m = me()
-				return if m and m.Ready then Theme.Tone.Mustard else Theme.Tone.Green
-			end,
-			Enabled = function()
-				return not busy() and not props.Starting()
-			end,
-			Text = function()
-				const m = me()
-				return if m and m.Ready then "Not ready" else "Ready"
-			end,
-			OnActivated = function()
-				const m = me()
-				props.OnReady(not (m and m.Ready))
-			end,
-		}),
 		-- leader: Start
 		CartoonButton({
 			Name = "Start",
@@ -282,13 +230,10 @@ return function(props: Props): Frame
 			Visible = props.IsLeader,
 			Tone = Theme.Tone.Green,
 			Enabled = function()
-				return allReady() and not busy() and not props.Starting()
+				return not busy() and not props.Starting()
 			end,
 			Text = function()
-				if props.Starting() then
-					return "Starting..."
-				end
-				return if allReady() then "Start" else "Waiting..."
+				return if props.Starting() then "Starting..." else "Start"
 			end,
 			OnActivated = props.OnStart,
 		}),

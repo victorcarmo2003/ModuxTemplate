@@ -26,7 +26,6 @@ const PARTY: { [string]: Line } = {
 	Left = { Text = "{name} left the squad", Kind = "Info" },
 	Kicked = { Text = "You were removed from the squad", Kind = "Alert" },
 	NewLeader = { Text = "{name} is the new leader", Kind = "Info" },
-	NotAllReady = { Text = "Not everyone is ready yet", Kind = "Alert" },
 	Busy = { Text = "The squad is starting...", Kind = "Info" },
 	TooFast = { Text = "Easy there! Try again in a moment", Kind = "Alert" },
 	Starting = { Text = "Opening the shop... here we go!", Kind = "Good", Quiet = true }, -- the pad sign counts down
@@ -38,7 +37,6 @@ const PARTY: { [string]: Line } = {
 	WrongServer = { Text = "Not available here", Kind = "Alert" },
 	FriendsOnly = { Text = "This squad is friends only", Kind = "Alert" },
 	Configured = { Text = "The leader changed the squad settings", Kind = "Info" },
-	SetupFirst = { Text = "Create the room first", Kind = "Alert" },
 	RoomClosed = { Text = "That room isn't open", Kind = "Alert" },
 	InviteOnly = { Text = "That room is invite only", Kind = "Alert" },
 	StartCancelled = { Text = "Leader cancelled", Kind = "Info" },
