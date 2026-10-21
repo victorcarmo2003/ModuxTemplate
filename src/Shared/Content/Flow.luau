@@ -190,7 +190,7 @@ const flow: Flow = {
 	-- (CustomerService:SpawnActor) takes the ordinary customer's turn; the next one comes when the current one leaves.
 	NightQueueSize = 1,
 	NightQueueByParty = { 1, 1, 2, 2 }, -- DEC-320 (Q-413), Provisional
-	CounterGap = { 10, 20 }, -- owner 2026-10-18, Provisional
+	CounterGap = { 4, 8 }, -- owner 2026-10-18; 2026-10-21 was 10-20 s, nights felt empty (Provisional)
 	CounterLeave = 5, -- owner 2026-10-18: "a contagem deve só iniciar quando o cliente que estava na frente sair"
 }
 

@@ -258,9 +258,11 @@ const restaurant: Restaurant = {
 	Flow = {
 		PartyMult = { 1.0, 1.8, 2.5, 3.1 },
 		-- owner 2026-10-18: there was no break between customers; slower nights plus a quiet stretch (Provisional)
-		NightInterval = { 55, 52, 50, 48, 46, 45, 44, 43, 42, 40 },
-		LullEvery = 3,
-		LullSeconds = 45,
+		-- owner 2026-10-21: nights felt empty (~5 real customers on Night 1); faster again, shorter and rarer lull
+		-- (Provisional, economy.md §5)
+		NightInterval = { 30, 29, 28, 27, 26, 25, 24, 23, 22, 22 },
+		LullEvery = 4,
+		LullSeconds = 20,
 		Day1Interval = 22,
 		MaxCustomers = { 5, 7, 9, 9 },
 	},

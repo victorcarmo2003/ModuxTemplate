@@ -78,6 +78,31 @@ Custo = $1,25 (pão + salsicha) + Σ custo por uso. Tabela por ingrediente: `ite
 > cliente só nasce com o balcão livre), vendas **direto no dinheiro** (DEC-238), gorjeta no pote, bônus do chefe sobre
 > o faturamento do turno, **sem trailer para comprar**. Estimativa de planilha (sem simulação; conferir no playtest).
 
+> **Fluxo da noite com o restaurante (2026-10-21, Provisório; pedido do dono: "falta muito cliente ainda").** Com o
+> restaurante ligado, o intervalo da noite vem de `Restaurant.Flow.NightInterval`, não de `Nights[k].Customers`. Os
+> valores de 2026-10-18 (55 → 40 s, pausa de 45 s a cada 3 clientes, `Flow.CounterGap` 10–20 s) davam ~5 clientes reais
+> na N1, menos da metade da tabela abaixo. Novo: `NightInterval` **30 → 22 s**, `LullEvery` **4**, `LullSeconds`
+> **20 s**, `CounterGap` **4–8 s** (`CounterLeave` 5 s igual). Ciclo efetivo ≈ intervalo + ~11 s (saída + gap + pausa
+> rateada); reais = chegadas − ~40% dos `Events`; completos 85%; ~$6 líquidos por completo.
+>
+> | Noite | Duração | Intervalo | Chegadas | Reais | Completos | Lucro líquido |
+> |---|---|---|---|---|---|---|
+> | 1 | 540 s | 30 s | 13 | 11 | 9 | ~$55 |
+> | 2 | 580 s | 29 s | 14 | 12 | 10 | ~$60 |
+> | 3 | 620 s | 28 s | 15 | 13 | 11 | ~$66 |
+> | 4 | 660 s | 27 s | 17 | 14 | 12 | ~$72 |
+> | 5 | 700 s | 26 s | 18 | 15 | 13 | ~$78 |
+> | 6 | 740 s | 25 s | 20 | 17 | 14 | ~$86 |
+> | 7 | 780 s | 24 s | 22 | 19 | 16 | ~$98 |
+> | 8 | 820 s | 23 s | 24 | 20 | 17 | ~$104 |
+> | 9 | 860 s | 22 s | 26 | 22 | 19 | ~$116 |
+> | 10 | 900 s | 22 s | 27 | 22 | 19 | ~$116 |
+> | **Total** | 7.200 s | | 196 | 165 | 140 | **~$850** |
+>
+> As N1–N5 voltam ao que a tabela abaixo já supunha; as N6–N10 ficam mais cheias. Run solo: ~$30 + $56 + ~$850 ≈
+> **~$935** contra $850 à venda, compra tudo e sobra ~$85 (antes da mudança faltava bem mais que 1 nível). Pausas de
+> Tension (rua vazia durante anomalia) não estão na conta; conferir no playtest.
+
 Premissas por noite: chegadas ≈ duração ÷ (intervalo + ~4 s perdidos na tentativa com o balcão cheio); ~40% das
 ocorrências de anomalia (`Nights[k].Events`, família A) ocupam o balcão sem pagar; 85% dos clientes reais completos,
 7% incompletos (metade do preço); K médio 2,0 → preço médio **$7,67** (média dos complementos $1,83); gorjeta ~60% dos
