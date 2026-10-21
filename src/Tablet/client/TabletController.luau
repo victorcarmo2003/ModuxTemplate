@@ -19,7 +19,10 @@
 	    (HudOrder `Reveal`, CustomerController, TASK-384).
 	  - Everybody else: the customer's line in a SpeechBalloon over the rig (the greeting is not shown), `dialog_blip`
 	    on each new line at the tablet.
-	  - Blank customer (ANM-001, rig Variant "blank"): Dialog.Blank, no item, no pop-up.
+	  - Odd customer (owner 2026-10-21, DEC-353; any rig with a Variant, CustomerService SpawnActor): one odd line instead of
+	    the order (Content.OrderTalk: Silent / Garbled / Almost by night, ByVariant for the Raincoat Lady), no item.
+	  - Deciding (DEC-353): the talk is over and the record waits for the user's pick. The user's TabletDialog keeps the last
+	    line and shows SERVE / REFUSE (also E / Q, gamepad X / Y while deciding) -> TabletDecide { Index, Serve }.
 	  - Full (no free plate or pickup spot): "Kitchen full" balloon over the tablet for everyone (Dialog.KitchenFull).
 
 	Content.Restaurant.Rules.Enabled = false: inert (no listener, no tag watch, no gui). No input of its own: the talk is
@@ -47,7 +50,10 @@ const BINDING = RESTAURANT.Binding
 const TALK = RESTAURANT.Talk
 const DIALOG = RESTAURANT.Dialog
 const MAX_TOPPINGS = Content.OrderRules.MaxToppings
-const BLANK = "blank" -- ANM-001 rig Variant
+const TALK_LINES = Content.OrderTalk
+const DECIDE_SERVE = "tablet_serve" -- InputController binding names while deciding (DEC-353)
+const DECIDE_REFUSE = "tablet_refuse"
+const DECIDE_PRIORITY = 3000 -- over the interact key while the choice is up
 const BALLOON_DISTANCE = 40
 const BALLOON_LIFT = Vector3.new(0, 2.2, 0) -- studs over the head (or the tablet screen)
 const FULL_LIFT = Vector3.new(0, 1.2, 0)
@@ -60,7 +66,7 @@ const DIALOG_LIFT = 150 -- px over the bottom edge (UI scale 1): clear of the ho
 export type Speaker = "Player" | "Customer"
 
 export type Record = {
-	State: string, -- "Idle" | "Talking" | "Full"
+	State: string, -- "Idle" | "Talking" | "Full" | "Deciding"
 	Npc: number,
 	User: number,
 	StartedAt: number,
@@ -79,12 +85,12 @@ export type Talk = {
 }
 
 -- What the screen of the player taking the order reads (reactive through MyTalk)
-export type MyTalk = { Index: number, Npc: number, Items: { string }, Reveal: number, Step: Step }
+export type MyTalk = { Index: number, Npc: number, Items: { string }, Reveal: number, Step: Step, Deciding: boolean }
 
 type Spot = {
 	Index: number,
 	Record: Vide.Source<Record | false>,
-	Blank: Vide.Source<boolean>,
+	Odd: Vide.Source<string>, -- rig Variant of an odd customer (DEC-353), "" = ordinary
 	Rig: Model?, -- the customer talking at it
 	Model: Model?,
 	BalloonUnmount: (() -> ())?,
@@ -127,12 +133,23 @@ local function line(at: number, speaker: Speaker, text: string, reveal: number):
 	return { At = at, Speaker = speaker, Text = text, Reveal = reveal }
 end
 
--- The talk script of a record (pure). `blank` = ANM-001 customer: nothing to read, no item.
-local function timeline(record: Record, blank: boolean): Talk
+-- The odd customer's line (DEC-353, pure): its Variant's own lines, else one of the night's kinds, same pick on every client
+local function oddLine(variant: string, npc: number, night: number): string
+	const own = TALK_LINES.ByVariant[variant]
+	if own ~= nil then
+		return pick(own, npc, 1)
+	end
+	const kinds = TALK_LINES.Kinds[math.clamp(night, 1, #TALK_LINES.Kinds)]
+	const kind = kinds[npc % #kinds + 1]
+	return pick(TALK_LINES.Lines[kind], npc, 1)
+end
+
+-- The talk script of a record (pure). `odd` = rig Variant of an anomaly customer ("" = ordinary): one odd line, no item.
+local function timeline(record: Record, odd: string, night: number): Talk
 	const npc = record.Npc
 	const steps: { Step } = { line(0, "Player", pick(DIALOG.Greeting, npc, 0), 0) }
-	if blank then
-		table.insert(steps, line(TALK.Open, "Customer", pick(DIALOG.Blank, npc, 1), 0))
+	if odd ~= "" then
+		table.insert(steps, line(TALK.Open, "Customer", oddLine(odd, npc, night), 0))
 		return { Steps = steps, Items = {}, Base = TALK.Open + TALK.Lead + TALK.Confirm }
 	end
 	table.insert(steps, line(TALK.Open, "Customer", pick(DIALOG.Opening, npc, 1), 0))
@@ -178,6 +195,11 @@ local function stepAt(record: Record, talk: Talk, now: number): number
 	return current
 end
 
+-- A talk is on: still talking, or done and waiting for the user's pick (DEC-353)
+local function talking(record: Record): boolean
+	return record.State == "Talking" or record.State == "Deciding"
+end
+
 local function rigOf(npc: number): Model?
 	for _, instance in CollectionService:GetTagged(CrewRig.Tag) do
 		if instance:IsA("Model") and instance:GetAttribute("NpcId") == npc then
@@ -187,7 +209,10 @@ local function rigOf(npc: number): Model?
 	return nil
 end
 
-const TabletController = Modux.Controller("TabletController", { Require = { "AudioController" }, Priority = 658 })
+const TabletController = Modux.Controller("TabletController", {
+	Require = { "AudioController", "RoundController", "InputController" },
+	Priority = 658,
+})
 
 
 function TabletController:Setup()
@@ -201,11 +226,14 @@ function TabletController:Setup()
 	self.Holder = nil :: Folder?
 	self.DialogUnmount = nil :: (() -> ())?
 	self.Clock = nil :: RBXScriptConnection?
+	-- DEC-353: the choice keys are bound; StartedAt of the talk my pick was sent for (one pick per talk)
+	self.DecideBound = false
+	self.DecideSentAt = 0 :: number
 end
 
 -- Pure helpers, for the HUD note (TASK-384) and the tests: the script of a record and the step said at `now`.
-function TabletController:Timeline(record: Record, blank: boolean): Talk
-	return timeline(record, blank)
+function TabletController:Timeline(record: Record, odd: string, night: number): Talk
+	return timeline(record, odd, night)
 end
 
 function TabletController:StepAt(record: Record, talk: Talk, now: number): number
@@ -235,10 +263,11 @@ function TabletController:MyTalk(): MyTalk?
 	end
 	const record = spot.Record()
 	const talk = spot.Talk
-	if record == false or record.State ~= "Talking" or talk == nil then
+	if record == false or not talking(record) or talk == nil then
 		return nil
 	end
-	const current = stepAt(record, talk, self.Now())
+	const deciding = record.State == "Deciding"
+	const current = if deciding then #talk.Steps else stepAt(record, talk, self.Now())
 	const step = talk.Steps[math.max(current, 1)]
 	return {
 		Index = index,
@@ -246,6 +275,7 @@ function TabletController:MyTalk(): MyTalk?
 		Items = talk.Items,
 		Reveal = if current == 0 then 0 else step.Reveal,
 		Step = step,
+		Deciding = deciding,
 	}
 end
 
@@ -257,7 +287,7 @@ function TabletController:SpotOf(index: number): Spot
 	const spot: Spot = {
 		Index = index,
 		Record = Vide.source(false :: Record | false) :: Vide.Source<Record | false>,
-		Blank = Vide.source(false) :: Vide.Source<boolean>,
+		Odd = Vide.source("") :: Vide.Source<string>,
 		Rig = nil,
 		Model = nil,
 		BalloonUnmount = nil,
@@ -274,7 +304,7 @@ function TabletController:SpotOf(index: number): Spot
 end
 
 local function isMine(record: Record | false): boolean
-	return record ~= false and record.State == "Talking" and record.User == Players.LocalPlayer.UserId
+	return record ~= false and talking(record) and record.User == Players.LocalPlayer.UserId
 end
 
 -- Copies: the set may reuse its record table between frames, and Vide needs a new value to notice a change.
@@ -292,18 +322,20 @@ function TabletController:WriteRecord(index: number, record: Record?)
 			Order2 = if record.Order2 then table.clone(record.Order2) else nil,
 		}
 	end
-	-- a new talk (another customer or another start): rig, blank flag and the heard steps start over
-	const key = if copy ~= false and copy.State == "Talking" then `{copy.Npc}@{copy.StartedAt}` else ""
+	-- a new talk (another customer or another start): rig, odd variant and the heard steps start over (Deciding keeps them)
+	const key = if copy ~= false and talking(copy) then `{copy.Npc}@{copy.StartedAt}` else ""
 	if key ~= spot.TalkKey then
 		spot.TalkKey = key
 		spot.LastStep = 0
 		spot.LastReveal = 0
 		spot.Rig = if copy ~= false and copy.Npc ~= 0 then rigOf(copy.Npc) else nil
 		const rig = spot.Rig
-		spot.Blank(rig ~= nil and rig:GetAttribute("Variant") == BLANK)
+		const variant = if rig ~= nil then rig:GetAttribute("Variant") else nil
+		spot.Odd(if type(variant) == "string" then variant else "")
 	end
 	-- the script first: the readers of Record (balloon, MyTalk) use it in the same update
-	spot.Talk = if copy ~= false and copy.State == "Talking" then timeline(copy, Vide.untrack(spot.Blank)) else nil
+	const night = Vide.untrack(self.Dependencies.RoundController.Night)
+	spot.Talk = if copy ~= false and talking(copy) then timeline(copy, Vide.untrack(spot.Odd), night) else nil
 	spot.Record(copy)
 
 	-- my talk: the tablet I am at (one at a time; the last one written wins)
@@ -314,6 +346,44 @@ function TabletController:WriteRecord(index: number, record: Record?)
 	end
 	self:Present(spot)
 	self:RunClock()
+	self:SyncDecide()
+end
+
+-- DEC-353: the keys of the choice, bound only while my tablet is Deciding (they sink the interact key meanwhile)
+function TabletController:SyncDecide()
+	const index = Vide.untrack(self.Mine)
+	const spot = if index ~= 0 then self.Spots[index] else nil
+	const record: Record | false = if spot ~= nil then Vide.untrack(spot.Record) else false
+	const deciding = record ~= false and record.State == "Deciding"
+	if deciding == self.DecideBound then
+		return
+	end
+	self.DecideBound = deciding
+	const input = self.Dependencies.InputController
+	if not deciding then
+		input:Unbind(DECIDE_SERVE)
+		input:Unbind(DECIDE_REFUSE)
+		return
+	end
+	input:Bind({ Name = DECIDE_SERVE, Key = Enum.KeyCode.E, Keys = { Enum.KeyCode.ButtonX }, Priority = DECIDE_PRIORITY }).OnPress(function()
+		self:Decide(true)
+	end)
+	input:Bind({ Name = DECIDE_REFUSE, Key = Enum.KeyCode.Q, Keys = { Enum.KeyCode.ButtonY }, Priority = DECIDE_PRIORITY }).OnPress(function()
+		self:Decide(false)
+	end)
+end
+
+-- DEC-353: my pick on the Deciding tablet (once per talk: the record leaves Deciding when the server takes it)
+function TabletController:Decide(serve: boolean)
+	const index = Vide.untrack(self.Mine)
+	const spot = if index ~= 0 then self.Spots[index] else nil
+	const record: Record | false = if spot ~= nil then Vide.untrack(spot.Record) else false
+	if record == false or record.State ~= "Deciding" or self.DecideSentAt == record.StartedAt then
+		return
+	end
+	self.DecideSentAt = record.StartedAt
+	self.Dependencies.AudioController:Play(if serve then "ticket_pop" else "dialog_blip")
+	Restaurant.TabletDecide:fireServer({ Index = index, Serve = serve })
 end
 
 function TabletController:Anchor(spot: Spot): Instance?
@@ -337,8 +407,8 @@ function TabletController:Present(spot: Spot)
 	const record = Vide.untrack(spot.Record)
 
 	-- customer balloon: mounted per talk, adorned on the rig's head (else the tablet)
-	const talking = record ~= false and record.State == "Talking"
-	if spot.BalloonUnmount ~= nil and (not talking or spot.BalloonGui == nil or spot.BalloonGui:GetAttribute("Talk") ~= spot.TalkKey) then
+	const isTalking = record ~= false and talking(record)
+	if spot.BalloonUnmount ~= nil and (not isTalking or spot.BalloonGui == nil or spot.BalloonGui:GetAttribute("Talk") ~= spot.TalkKey) then
 		spot.BalloonUnmount()
 		spot.BalloonUnmount = nil
 		if spot.BalloonGui ~= nil then
@@ -346,7 +416,7 @@ function TabletController:Present(spot: Spot)
 			spot.BalloonGui = nil
 		end
 	end
-	if talking and spot.BalloonUnmount == nil then
+	if isTalking and spot.BalloonUnmount == nil then
 		const rig = spot.Rig
 		const head = if rig ~= nil then rig:FindFirstChild("Head") else nil
 		const adornee = head or self:Anchor(spot)
@@ -355,10 +425,10 @@ function TabletController:Present(spot: Spot)
 				local function current(): Step?
 					const now = spot.Record()
 					const talk = spot.Talk
-					if now == false or now.State ~= "Talking" or talk == nil then
+					if now == false or not talking(now) or talk == nil then
 						return nil
 					end
-					const index = stepAt(now, talk, self.Now())
+					const index = if now.State == "Deciding" then #talk.Steps else stepAt(now, talk, self.Now())
 					return if index > 0 then talk.Steps[index] else nil
 				end
 				return SpeechBalloon({
@@ -530,6 +600,19 @@ function TabletController:MountDialog(gui: Instance)
 				Scale = UiScale.Current,
 				AnchorPoint = Vector2.new(0, 1),
 				Position = UDim2.new(0, 12, 1, -DIALOG_LIFT),
+				-- DEC-353: SERVE / REFUSE once the customer is done
+				Choice = function()
+					const now = talk()
+					return now ~= nil and now.Deciding
+				end,
+				OnServe = function()
+					self:Decide(true)
+				end,
+				OnRefuse = function()
+					self:Decide(false)
+				end,
+				ServeLabel = TALK_LINES.Serve,
+				RefuseLabel = TALK_LINES.Refuse,
 			}),
 		})
 	end)

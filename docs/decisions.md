@@ -4435,3 +4435,16 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - Regras que não mudam: o servidor decide (sustos e anomalias extras em `AnomalyService/Pressure.luau`); o client só apresenta. A anomalia extra é uma entrada comum da agenda (Admit, MinGap, simultâneas, carência, janela fechada, fim da janela) e as regras de acerto/erro de cada anomalia ficam iguais. No máximo **2 extras por noite**, nunca na Noite 1 nem durante o tutorial. Sustos da família D não contam como anomalia vista e não tiram sanidade (DEC-254, DEC-256). Tom Mild (DEC-172): sem vermelho, sem gore, sem tremer a câmera; blur ≤ 4 por ≤ 0,5 s.
 - Substitui (Provisório): o pulso "< 25" e as faixas Mid/Night da vinheta do `VitalController`, e o intervalo fixo `HallucinationRules.Interval` na rolagem (fica só como referência).
 - Impacto: `src/Shared/Content/Sanity.luau`, `src/Shared/Content/Validate.luau`, `src/Anomaly/shared/SanityTier.luau`, `src/Anomaly/server/AnomalyService/{init,Pressure,Scheduler}.luau`, `src/Hallucination/client/HallucinationController/init.luau`, `src/Vital/client/VitalController.luau`, `src/Dev/server/DevService/Commands/Pressure.luau` (`/dev pressure [now]`). TASK-635 a TASK-637.
+
+### DEC-353 — 2026-10-21 — Diálogo no Take Order: o cliente fala e o jogador escolhe SERVE ou REFUSE
+
+- Origem: chat do dono (2026-10-21): "implementar um diálogo intencional... aparece duas opções na tela... aceitar ou recusar quando a gente clicar ali no take order... ou ele vai mandar uns três pontinhos... ou vai falar alguma coisa esquisita, meio embolada... a minha prioridade agora é deixar isso o mais fluido possível". Proposta do agente aceita: "Fechado: implementa o diálogo no Take Order com Serve/Refuse como proposto (falas normais, '...', embolada, quase normal por noite; recusar manda só ele embora; janela só pra ameaça de fora)".
+- Decidido pelo dono:
+  - No fim da conversa do tablet o cliente já disse a fala dele; aparecem **SERVE** e **REFUSE** no cartão da conversa (também E / Q no teclado, X / Y no gamepad). SERVE = o pedido é anotado (como antes); REFUSE = **só aquele cliente** vai embora.
+  - Cliente esquisito (anomalia de cliente) nunca diz um pedido normal: por noite fica em silêncio ("..."), fala embolado ou fala "quase normal" com algo errado. A Raincoat Lady fala algo carinhoso de propósito (é servida). Regra única para o jogador: **pareceu ou soou estranho? REFUSE**.
+  - Recusar um cliente normal: perde a venda, ele sai reclamando, sem susto. Servir uma anomalia: o erro de sempre (jumpscare, −35).
+  - A janela de atendimento fica para a ameaça **de fora** (névoa vermelha, carro longo, Hush), não para recusar cliente.
+  - Desfaz a **DEC-261** ("recusar = fechar a janela, sem botão Refuse").
+- **Provisório** (agente): falas em `Content.OrderTalk` (textos do narrative-writer depois); tiers N1 Silent, N2–3 Silent/Garbled, N4–5 Garbled, N6 Garbled/Almost, N7–10 Almost; a paciência continua congelada enquanto o jogador escolhe; estado `Deciding` no set `Tablets`, pacote `TabletDecide`.
+- Pendências: `Q-455` a `Q-458`.
+- Impacto: `src/Shared/Content/OrderTalk.luau`, `src/Libs/Net/Restaurant.luau`, `src/Interface/client/Components/TabletDialog/init.luau`, `src/Tablet/client/TabletController.luau`, `src/Tablet/server/TabletService.luau`, `src/Customer/server/CustomerService/init.luau`.

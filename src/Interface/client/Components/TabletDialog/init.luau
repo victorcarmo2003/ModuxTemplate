@@ -6,7 +6,9 @@
 --   Line          the line being said (one or two lines, 16 px Ink on a Cream card)
 --   Items         the order said so far: one icon per item (bun, sausage, each topping; a pair = both hot dogs), each new
 --                 one pops in (Motion.Pop, 0 -> 1.15 -> 1) when Reveal reaches it. Same AST-071 icons as the HUD note
--- Status only: Frames and labels, nothing clickable, never Active (the talk speeds up with the interact key, not here).
+-- Status only while talking: the talk speeds up with the interact key, not here. Owner 2026-10-21 (DEC-353): when Choice() is
+-- true two buttons show under the line - SERVE (Green, the order is taken) and REFUSE (Ketchup, only that customer leaves);
+-- the keys are TabletController's (E / Q, gamepad A / B).
 -- Sized in px at UI scale 1 (smallest phone, 667 x 375): 250 px wide, text >= 14 px; the caller gives the UIScale and the
 -- spot (default: lower left, over the joystick zone, clear of the hotbar and of the interact button on the right).
 -- Pure: only props; build it inside a Vide root.
@@ -17,6 +19,7 @@ local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonLabel = require(script.Parent.CartoonLabel)
+local CartoonButton = require(script.Parent.CartoonButton)
 
 const create = Vide.create
 const indexes = Vide.indexes
@@ -42,6 +45,12 @@ export type Props = {
 	PlayerLabel: string?,
 	CustomerLabel: string?,
 	Name: string?,
+	-- owner 2026-10-21 (DEC-353): the SERVE / REFUSE pair under the line while this is true
+	Choice: (() -> boolean)?,
+	OnServe: (() -> ())?,
+	OnRefuse: (() -> ())?,
+	ServeLabel: string?,
+	RefuseLabel: string?,
 }
 
 const WIDTH = 250
@@ -53,6 +62,8 @@ const TAB_HEIGHT = 22
 const TAB_TEXT = 14
 const TAB_OVERLAP = 7
 const LABEL_SIZE = 14
+const CHOICE_HEIGHT = 44 -- px: a thumb target on a phone
+const CHOICE_TEXT = 18
 
 -- Letter chip for a key with no cell in the sheet (same colours as HudOrder / PlateTicket).
 const CHIP: { [string]: { Color: Color3, Label: string } } = {
@@ -144,6 +155,26 @@ return function(props: Props): Frame
 
 	local function anyItem(): boolean
 		return props.Reveal() > 0 and #props.Items() > 0
+	end
+
+	local function choosing(): boolean
+		return props.Choice ~= nil and props.Choice()
+	end
+
+	local function choice(name: string, text: string, tone: Theme.Tone, order: number, act: (() -> ())?): any
+		return CartoonButton({
+			Name = name,
+			LayoutOrder = order,
+			Text = text,
+			TextSize = CHOICE_TEXT,
+			Tone = tone,
+			Size = UDim2.new(0.5, -GAP, 0, CHOICE_HEIGHT),
+			OnActivated = function()
+				if act ~= nil and choosing() then
+					act()
+				end
+			end,
+		})
 	end
 
 	return create("Frame")({
@@ -251,6 +282,22 @@ return function(props: Props): Frame
 							return order <= props.Reveal()
 						end)
 					end),
+				}),
+				-- owner 2026-10-21 (DEC-353): SERVE / REFUSE once the customer is done talking
+				create("Frame")({
+					Name = "Choice",
+					LayoutOrder = 3,
+					Size = UDim2.new(1, 0, 0, CHOICE_HEIGHT),
+					BackgroundTransparency = 1,
+					Visible = choosing,
+					create("UIListLayout")({
+						FillDirection = Enum.FillDirection.Horizontal,
+						HorizontalAlignment = Enum.HorizontalAlignment.Center,
+						SortOrder = Enum.SortOrder.LayoutOrder,
+						Padding = UDim.new(0, GAP * 2),
+					}),
+					choice("Serve", props.ServeLabel or "SERVE", Theme.Tone.Green, 1, props.OnServe),
+					choice("Refuse", props.RefuseLabel or "REFUSE", Theme.Tone.Ketchup, 2, props.OnRefuse),
 				}),
 			},
 		}),

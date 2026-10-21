@@ -4,7 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 
 export type Record = {
-	State: string, -- "Idle" | "Talking" | "Full"
+	State: string, -- "Idle" | "Talking" | "Full" | "Deciding"
 	Npc: number,
 	User: number,
 	StartedAt: number,
@@ -17,11 +17,11 @@ export type Talk = {
 	Items: { string }, -- ingredient keys in the order they are said
 	Base: number, -- s of the script without speed-ups (Open + Lead + PerItem x items + PairExtra + Confirm)
 }
-export type MyTalk = { Index: number, Npc: number, Items: { string }, Reveal: number, Step: Step }
+export type MyTalk = { Index: number, Npc: number, Items: { string }, Reveal: number, Step: Step, Deciding: boolean }
 type Spot = {
 	Index: number,
 	Record: Vide.Source<Record | false>,
-	Blank: Vide.Source<boolean>,
+	Odd: Vide.Source<string>, -- rig Variant of an odd customer (DEC-353), "" = ordinary
 	Rig: Model?, -- the customer talking at it
 	Model: Model?,
 	BalloonUnmount: (() -> ())?,
@@ -38,6 +38,8 @@ export type Speaker = "Player" | "Customer"
 
 export type Public = {
 	Clock: RBXScriptConnection?,
+	DecideBound: boolean,
+	DecideSentAt: number,
 	DialogUnmount: (() -> ())?,
 	Gui: Instance?,
 	Holder: Folder?,
@@ -46,13 +48,15 @@ export type Public = {
 	Spots: { [number]: Spot },
 	Tracked: { [Instance]: { RBXScriptConnection } },
 	Setup: (self: Public) -> (),
-	Timeline: (self: Public, record: Record, blank: boolean) -> Talk,
+	Timeline: (self: Public, record: Record, odd: string, night: number) -> Talk,
 	StepAt: (self: Public, record: Record, talk: Talk, now: number) -> number,
 	Enabled: (self: Public) -> boolean,
 	RecordOf: (self: Public, index: number) -> Record?,
 	MyTalk: (self: Public) -> MyTalk?,
 	SpotOf: (self: Public, index: number) -> Spot,
 	WriteRecord: (self: Public, index: number, record: Record?) -> (),
+	SyncDecide: (self: Public) -> (),
+	Decide: (self: Public, serve: boolean) -> (),
 	Anchor: (self: Public, spot: Spot) -> Instance?,
 	Present: (self: Public, spot: Spot) -> (),
 	DropBalloons: (self: Public, spot: Spot) -> (),

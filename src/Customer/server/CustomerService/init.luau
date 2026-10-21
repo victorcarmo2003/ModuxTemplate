@@ -195,6 +195,13 @@ export type Driver = {
 }
 
 -- What SeatingService gets when a customer or pair takes its order (Seater.Offer). Leader = the customer with the ticket.
+-- TabletService hook (SetTalker): the car's "Take Order" runs the tablet talk (TabletDialog, lines, sounds) on the DT-PC
+-- record instead of taking the order at once. Start = talk started; Talking = that car's talk is running.
+export type Talker = {
+	Start: (player: Player, id: number) -> boolean,
+	Talking: (id: number) -> boolean,
+}
+
 export type SeatParty = {
 	Leader: number,
 	Partner: number?,
@@ -445,6 +452,8 @@ end
 
 function CustomerService:WarnOnce(key: string, message: string)
 	if self.Warned[key] then
+	-- TabletService hook (SetTalker); nil = the car's order is taken at once
+	self.Talker = nil :: Talker?
 		return
 	end
 	self.Warned[key] = true
@@ -770,6 +779,11 @@ end
 function CustomerService:JoinDrive(id: number)
 	const customer = self.Customers[id]
 	if customer == nil or customer.Drive == 0 or customer.State ~= "Arriving" then
+-- TabletService (one): the talk for the car's "Take Order", nil = off.
+function CustomerService:SetTalker(talker: Talker?)
+	self.Talker = talker
+end
+
 		return
 	end
 	customer.State = "Queued"
@@ -1591,6 +1605,40 @@ end
 -- the line (not ordered yet) goes then; the customers whose order was taken keep waiting and go only if the window stays
 -- shut WaitShutGrace s (twice the line's time to leave), complaining the same way. An anomaly that slams it clears the line
 -- at once and starts the same WaitShutGrace wait for the others.
+-- REFUSE at the end of the order talk (owner 2026-10-21, DEC-353; TabletService): only this customer goes. An anomaly
+-- customer is answered by its module (Kit/CustomerActor reads Acted "refuse": the right verb resolves it, the wrong one
+-- scares). An ordinary one walks off at once (it must not stay at the tablet to be talked to again) saying one of
+-- ShopWindow.ShutLines: the sale is lost (LeaveResult), no scare. true = refused.
+function CustomerService:RefuseOne(player: Player, id: number): boolean
+	const customer = self.Customers[id]
+	if customer == nil or customer.State == "Leaving" then
+		return false
+	end
+	if customer.Variant ~= nil then
+		self.Acted:Fire(id, REFUSE, player, nil)
+		return true
+	end
+	const rules = Content.ShopWindow
+	const result = rules.LeaveResult :: SaleResult
+	const lines = #rules.ShutLines
+	local line = math.random(1, math.max(lines, 1))
+	if lines > 1 and line == self.LastComplaint then
+		line = line % lines + 1
+	end
+	self.LastComplaint = line
+	const net = self.Dependencies.NetService
+	if lines > 0 and net:IsRunning() then
+		self.Libs.Net.CustomerComplain:fireClient(net.Audience, { Npc = id, Line = line })
+	end
+	const ticket = self.Tickets[id]
+	if ticket ~= nil then
+		self:SettlePending(customer, ticket, result)
+		self.Acted:Fire(id, REFUSE, player, result)
+	end
+	self:Leave(id, rules.LeaveMood)
+	return true
+end
+
 function CustomerService:OnShutter(closed: boolean, player: Player?)
 	self:CancelShutWait()
 	if not closed then
@@ -2781,7 +2829,11 @@ function CustomerService:RegisterOrders()
 			if not self:CanAct(player, anchor, "Ordering") then
 				return false
 			end
-			const _, customer = self:TicketAt(anchor)
+			const id, customer = self:TicketAt(anchor)
+			const talker = self.Talker
+			if id ~= nil and talker ~= nil and talker.Talking(id) then
+				return false -- its talk is running
+			end
 			return not self:IsTabletMode() or (customer ~= nil and customer.Drive == 1)
 		end,
 		Run = function(player: Player, anchor: Instance)
@@ -2805,6 +2857,12 @@ function CustomerService:RegisterOrders()
 	interaction:RegisterAction(PICKUP_SERVE, {
 		Validate = function(player: Player, anchor: Instance): boolean
 			return self:IsPickupMode()
+			-- the car at the window talks first (TabletDialog), like TAB-1; the order is taken at the end of the talk
+			const id, customer = self:TicketAt(anchor)
+			const talker = self.Talker
+			if id ~= nil and customer ~= nil and customer.Drive == 1 and talker ~= nil and talker.Start(player, id) then
+				return
+			end
 				and self:IsPickupAnchor(anchor)
 				and self.Dependencies.RunStateService:IsActive(player)
 				and self.Dependencies.EconomyService:IsDrawerOpen()

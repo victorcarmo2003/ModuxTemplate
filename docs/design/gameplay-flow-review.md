@@ -76,6 +76,17 @@ seguidas. O client confere a própria câmera de novo antes de tocar. `Content.N
 `AnomalyService/Behind.luau`, `HallucinationController/Behind.luau` + `Effects/Behind*`; `/dev behind [now]`.
 Sons provisórios: `walker_step`, `floor_creak`, `door_knock` agudo (falta um "toque no vidro" próprio).
 
+## 3d. Diálogo no Take Order: SERVE / REFUSE (DEC-353, 2026-10-21)
+
+No fim da conversa do tablet o cliente já disse a fala dele e o cartão da conversa mostra **SERVE** (verde) e **REFUSE**
+(vermelho); também E / Q no teclado e X / Y no gamepad. SERVE anota o pedido como antes; REFUSE manda **só aquele
+cliente** embora. O cliente esquisito (rig com `Variant`) não diz pedido: por noite fica em silêncio, fala embolado ou
+"quase normal" (`Content.OrderTalk`); a Raincoat Lady fala algo carinhoso (é servida). Recusar cliente normal: perde a
+venda, ele sai com uma reclamação, sem susto. O kit `CustomerActor` já resolve a anomalia pelo "refuse" (verbo certo =
+resolvida; verbo errado, como na Raincoat = susto). A janela continua igual (`Q-455`, `Q-456`). Estado `Deciding` no set
+`Tablets`, pacote `TabletDecide`; a paciência segue congelada enquanto o jogador escolhe (`Q-458`). Vale também para o
+carro do drive-thru, que passou a ter a conversa (sessão "Restaurar UI de conversa").
+
 ## 4. Propostas (dependem do dono)
 
 ### 4.1 Quatro respostas pela direção do perigo (`Q-445`)

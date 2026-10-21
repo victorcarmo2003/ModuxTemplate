@@ -12,7 +12,7 @@ export type Tablet = {
 	Order2: { string }?, -- pair (FEAT-038)
 	PromptOn: boolean?, -- last state written to the prompt (owner 2026-10-18: it showed with nobody at the counter)
 }
-export type TabletState = "Idle" | "Talking" | "Full"
+export type TabletState = "Idle" | "Talking" | "Full" | "Deciding"
 
 export type Public = {
 	AnchorTablet: { [Instance]: number },
@@ -32,7 +32,10 @@ export type Public = {
 	Check: (self: Public, player: Player, tablet: Tablet) -> (boolean, string?),
 	Start: (self: Public, player: Player, tablet: Tablet) -> boolean,
 	Reset: (self: Public, tablet: Tablet) -> (),
+	StartDrive: (self: Public, player: Player, npc: number) -> boolean,
+	DriveTalking: (self: Public, npc: number) -> boolean,
 	Finish: (self: Public, tablet: Tablet) -> (),
+	Decide: (self: Public, tablet: Tablet, player: Player, serve: boolean) -> (),
 	UserGone: (self: Public, tablet: Tablet) -> boolean,
 	Cancel: (self: Public, tablet: Tablet, why: string) -> (),
 	StillThere: (self: Public, tablet: Tablet) -> boolean,

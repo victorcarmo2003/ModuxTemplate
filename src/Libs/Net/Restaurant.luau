@@ -40,7 +40,8 @@ end
 
 local function restaurantTablets()
 	return Lync.struct({
-		State = Lync.enum({ "Idle", "Talking", "Full" }),
+		-- Deciding (owner 2026-10-21, DEC-353): the talk is over, the user picks SERVE or REFUSE (TabletDecide)
+		State = Lync.enum({ "Idle", "Talking", "Full", "Deciding" }),
 		Npc = Lync.int(0, 65535), -- customer at this tablet, 0 = none
 		User = Lync.f64(), -- UserId taking the order, 0 = nobody
 		StartedAt = Lync.f64(),
@@ -96,6 +97,12 @@ return Lync.define("restaurant", {
 	-- reveals item i of Order at StartedAt + Talk.Open + Talk.Lead + Talk.PerItem * i (bun, sausage, then ToppingKeys order);
 	-- EndsAt is the server's end of the talk (hurry / veteran speed already applied)
 	Tablets = Lync.replicate(restaurantTablets()),
+	-- c -> s (owner 2026-10-21, DEC-353): the user of a Deciding tablet picks. Serve = the order is taken (TakeOrderFor),
+	-- false = REFUSE (only that customer leaves). Responder TabletService (OnInit); anyone else / another state = ignored
+	TabletDecide = Lync.packet(Lync.struct({
+		Index = Lync.int(1, 255),
+		Serve = Lync.bool(),
+	})),
 
 	-- §3.4 (wave R3), record = drive lane spot 1..Content.Restaurant.Drive.Lanes (1 = at the window, 2..3 = waiting behind).
 	-- Writer: DriveThruService. The client moves the car DT-IN -> DT-STOP -> DT-OUT from State + At

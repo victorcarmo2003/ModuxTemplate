@@ -63,6 +63,10 @@ export type Driver = {
 	TryTutorial: () -> number?,
 	Left: (id: number) -> (),
 }
+export type Talker = {
+	Start: (player: Player, id: number) -> boolean,
+	Talking: (id: number) -> boolean,
+}
 export type Seater = {
 	Offer: (party: SeatParty) -> boolean,
 	Left: (leader: number, ate: boolean) -> (),
@@ -148,6 +152,7 @@ export type Public = {
 	SpawnAttempted: SignalLib.Signal<Outcome>,
 	SpawnHold: (() -> boolean)?,
 	SpawnHolds: { [string]: boolean },
+	Talker: Talker?,
 	Tickets: { [number]: Orders.Ticket },
 	TutorialRng: Random,
 	TutorialServed: number,
@@ -188,6 +193,7 @@ export type Public = {
 	PickupIds: (self: Public) -> { number },
 	IsPickupFull: (self: Public) -> boolean,
 	SetDriver: (self: Public, driver: Driver?) -> (),
+	SetTalker: (self: Public, talker: Talker?) -> (),
 	JoinDrive: (self: Public, id: number) -> (),
 	SetDriveSpot: (self: Public, id: number, spot: number) -> (),
 	FrontDrive: (self: Public, id: number) -> boolean,
@@ -220,6 +226,7 @@ export type Public = {
 	SendAllAway: (self: Public) -> (),
 	LineAwayIds: (self: Public, waiting: boolean?) -> { number },
 	ComplainLineAway: (self: Public, player: Player?, waiting: boolean?) -> (),
+	RefuseOne: (self: Public, player: Player, id: number) -> boolean,
 	OnShutter: (self: Public, closed: boolean, player: Player?) -> (),
 	CancelShutWait: (self: Public) -> (),
 	SendLineAway: (self: Public, player: Player?, waiting: boolean?) -> (),

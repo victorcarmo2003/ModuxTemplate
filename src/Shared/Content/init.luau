@@ -44,6 +44,7 @@ local Outfits = require(script.Outfits)
 local Packages = require(script.Packages)
 local Prep = require(script.Prep)
 local Restaurant = require(script.Restaurant)
+local OrderTalk = require(script.OrderTalk)
 local Revive = require(script.Revive)
 local RunParams = require(script.RunParams)
 local RunZones = require(script.RunZones)
@@ -162,6 +163,7 @@ export type RestaurantTalk = Restaurant.Talk
 export type RestaurantDrive = Restaurant.Drive
 export type RestaurantSupply = Restaurant.Supply
 export type RestaurantDialog = Restaurant.Dialog
+export type OrderTalkKind = OrderTalk.Kind
 export type RestaurantBinding = Restaurant.Binding
 export type HapticProfile = Haptics.Profile
 export type HapticKey = Haptics.Key
@@ -354,6 +356,8 @@ return table.freeze({
 	-- Restaurant.Rules.Enabled is THE single switch (TASK-390): Prep, Seating, Vehicles, Anomalies and Nights derive their
 	-- restaurant values from Restaurant.Switch at require time (see the header of Restaurant.luau); false = published game
 	Restaurant = Restaurant,
+	-- owner 2026-10-21 (DEC-353): SERVE / REFUSE after the order talk, odd lines of the anomaly customers
+	OrderTalk = OrderTalk,
 
 	-- Horror score in steps Calm / Uneasy / Tension / Climax / Release and the on-screen warnings (TASK-443, TASK-444;
 	-- owner request 2026-10-17; AnomalyController/Score). Provisional
