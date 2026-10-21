@@ -85,10 +85,38 @@ local function strip(text: string, seconds: number)
 	end)
 end
 
+-- owner 2026-10-21: the squelch (`phone_glitch`, a 6.5 s file) is cut in the middle, and a new one stops the last
+local lastSquelch: Sound? = nil
+const SQUELCH_CUT = 3.25 -- s
+const SQUELCH_FADE = 0.25
+
+local function cut(sound: Sound)
+	if sound.Parent == nil or not sound.IsPlaying then
+		return
+	end
+	TweenService:Create(sound, TweenInfo.new(SQUELCH_FADE), { Volume = 0 }):Play()
+	task.delay(SQUELCH_FADE, function()
+		sound:Stop()
+	end)
+end
+
 -- Squelch, voice and strip for `seconds`.
 function Radio.Say(ctx: Effect.Context, text: string, seconds: number)
 	if Content.Sounds.ByKey[RADIO_KEY] ~= nil then
-		ctx.Play(RADIO_KEY)
+		const previous = lastSquelch
+		if previous ~= nil then
+			cut(previous)
+		end
+		const sound = ctx.Play(RADIO_KEY)
+		lastSquelch = sound
+		if sound ~= nil then
+			task.delay(SQUELCH_CUT, function()
+				if lastSquelch == sound then
+					lastSquelch = nil
+				end
+				cut(sound)
+			end)
+		end
 	end
 	voice(text)
 	strip(text, seconds)

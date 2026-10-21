@@ -3,13 +3,13 @@
 -- line from nobody ("Radio: ..."), then static again. No prompt, no answer, not a call (FEAT-018). Only while no
 -- real boss call is up and the player is in or next to the vehicle; a real call cancels it at once.
 -- Source: a part named like "Radio" in the vehicle; else the vehicle's centre (the trailer has no radio model yet).
--- Static = `phone_glitch` (Provisional until a radio static key exists). Lines are original, short and Mild.
+-- Static = `phone_glitch` (Provisional until a radio static key exists), once and cut in the middle (Context.Glitch,
+-- owner 2026-10-21: it used to play again at the end, on top of the first one). Lines are original, short and Mild.
 local Context = require(script.Parent.Parent.Context)
 local Lines = require(script.Parent.Parent.Lines)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VehicleRoot = require(ReplicatedStorage.shared.Vehicle.VehicleRoot)
 
-const STATIC_KEY = "phone_glitch"
 const SPEAKER = "Radio"
 -- TASK-601: the lines are Content.Hallucinations.RadioLines, by night (Lines.Next "Radio")
 const NEAR = 8 -- studs of margin around the vehicle box
@@ -66,7 +66,7 @@ const RadioVoice: Context.Effect = {
 		run:Cleanup(function()
 			env.Subtitle(SPEAKER, "")
 		end)
-		env.Sound(STATIC_KEY, at, { Volume = 0.6, Speed = 0.9 })
+		Context.Glitch(env, at, { Volume = 0.6, Speed = 0.9 })
 		if not hold(env, run, 0.9) then
 			return
 		end
@@ -90,8 +90,6 @@ const RadioVoice: Context.Effect = {
 			return
 		end
 		env.Subtitle(SPEAKER, "")
-		env.Sound(STATIC_KEY, at, { Volume = 0.5, Speed = 1.1 })
-		hold(env, run, 0.6)
 	end,
 }
 

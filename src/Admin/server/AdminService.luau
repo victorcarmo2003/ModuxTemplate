@@ -58,7 +58,7 @@ local function integer(value: any, min: number, max: number): number?
 end
 
 -- Runs a DevService command for the executor and mirrors the reply into the console.
-function AdminService:RunDev(name: string, args: { string })
+function AdminService:RunDev(name: string?, args: { string })
 	const caller = executor()
 	if not caller then
 		return fail("not allowed")
@@ -67,7 +67,8 @@ function AdminService:RunDev(name: string, args: { string })
 	if not dev.Enabled then
 		return fail("dev commands are off here (DevService runs only in Studio dev mode)")
 	end
-	if string.lower(name) == "help" then
+	-- owner 2026-10-21: "dev" with no command name used to error (string.lower(nil)); it shows the help now
+	if name == nil or name == "" or string.lower(name) == "help" then
 		conch.log("normal", dev:Help())
 		return
 	end

@@ -16,7 +16,6 @@ const PHONE_ACTION = "answer_phone"
 const LIGHT_NAME = "Light_Ring"
 const LAMP_SUFFIX = "_Lamp"
 const RING_KEY = "phone_ring"
-const GLITCH_KEY = "phone_glitch" -- the "line" of the fake call: glitched phone noise (user request 2026-10-10)
 const SPEAKER = "Walt"
 const RING_TIME = 3.5 -- s: about two rings
 const PAUSE = 0.4
@@ -130,7 +129,8 @@ const FakeCall: Context.Effect = {
 		end
 		const line = picked.Text
 		env.Subtitle(SPEAKER, line)
-		env.Sound(GLITCH_KEY, host, { Volume = 0.4 })
+		-- the "line" of the fake call: glitched phone noise (user request 2026-10-10), cut in the middle (Context.Glitch)
+		Context.Glitch(env, host, { Volume = 0.4 })
 		pcall(function()
 			const client = script:FindFirstAncestor("client")
 			const feature = if client then client:FindFirstChild("Boss") else nil

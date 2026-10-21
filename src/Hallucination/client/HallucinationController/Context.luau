@@ -420,4 +420,47 @@ function Context.Pick<T>(random: Random, rows: { T }, weight: (T) -> number): T?
 	return rows[#rows]
 end
 
+-- Phone glitch (owner 2026-10-21) -------------------------------------------------------------------------------------
+
+-- `phone_glitch` is a 6.5 s file: played whole twice in a row it doubled. Outside the blackout's omen (HorrorScenes plays
+-- that one whole) it plays ONCE at a time and is cut in the middle: a new glitch stops the previous one, and each one
+-- fades out at GLITCH_CUT s.
+const GLITCH_KEY = "phone_glitch"
+const GLITCH_CUT = 3.25 -- s: half of the file
+const GLITCH_FADE = 0.25
+local lastGlitch: Sound? = nil
+
+local function fadeOut(sound: Sound)
+	if sound.Parent == nil or not sound.IsPlaying then
+		return
+	end
+	const from = sound.Volume
+	const started = os.clock()
+	while sound.Parent ~= nil and sound.IsPlaying and os.clock() - started < GLITCH_FADE do
+		sound.Volume = from * (1 - (os.clock() - started) / GLITCH_FADE)
+		RunService.Heartbeat:Wait()
+	end
+	sound:Stop()
+end
+
+function Context.Glitch(env: Env, at: (Vector3 | Instance)?, opts: PlayOptions?): Sound?
+	const previous = lastGlitch
+	if previous ~= nil then
+		lastGlitch = nil
+		task.spawn(fadeOut, previous)
+	end
+	const sound = env.Sound(GLITCH_KEY, at, opts)
+	if sound == nil then
+		return nil
+	end
+	lastGlitch = sound
+	task.delay(GLITCH_CUT, function()
+		if lastGlitch == sound then
+			lastGlitch = nil
+		end
+		fadeOut(sound)
+	end)
+	return sound
+end
+
 return Context

@@ -16,7 +16,6 @@ local Context = require(script.Parent.Parent.Context)
 
 const TAG = "StreetLight"
 const CLICK = "post_click"
-const STATIC = "phone_glitch"
 const BREATH = "breath_held"
 const SPEAKER = "Walt"
 const BEAT = 2.5 -- s of silence first
@@ -194,13 +193,14 @@ local function call(env: Context.Env, run: Context.Run)
 		if not env.CallIdle() then
 			break
 		end
-		env.Sound(STATIC, host, { Volume = 0.5 })
+		-- owner 2026-10-21: one glitch at a time, cut in the middle (Context.Glitch)
+		Context.Glitch(env, host, { Volume = 0.5 })
 		env.Subtitle(SPEAKER, line.Text)
 		if not run:Wait(line.Time) then
 			return
 		end
 	end
-	env.Sound(STATIC, host, { Volume = 0.7, Speed = 0.85 })
+	Context.Glitch(env, host, { Volume = 0.7, Speed = 0.85 })
 	env.Subtitle(SPEAKER, "")
 end
 
