@@ -1,6 +1,6 @@
 --!strict
 -- Body: the 2D flip bar of the world progress bar (owner 2026-10-20: the flip bar IS the cooking bar, not a second billboard
--- over it). Fills its parent, which is a studs-sized BillboardGui about 1.5 x 0.8 (ProgressBar's flip mode): a Mustard "FLIP!"
+-- over it). Fills its parent, which is a studs-sized BillboardGui about 1.0 x 0.8 (ProgressBar's flip mode): a Mustard "FLIP!"
 -- seal on top, a Cream pill track below with the Gold NICE band and the Green PERFECT band (same constants as the score) and the
 -- sausage icon riding it on an Ink pin. Every outline is a proportional Ink shape behind the colour (a pixel UIStroke would go
 -- thin in studs, like Bar). Pure: only props.
@@ -22,6 +22,10 @@ const LANE_H = 0.7
 const ZONE_H = 0.74
 const ZONE_EDGE_W = 0.014 -- extra width (share of the lane) of the Ink behind a zone
 const ZONE_EDGE_H = 0.94
+-- owner 2026-10-21: the gui went from 1.5 to 1.0 studs wide (ProgressBar FLIP_GUI); the icon and the seal keep their old
+-- studs (0.25 x 1.5 and 0.44 x 1.5), so their shares grow
+const MARKER_W = 0.375 -- share of the lane the sausage icon's frame takes
+const SEAL_W = 0.64 -- share of the width the "FLIP!" seal takes
 
 export type Props = {
 	-- 0..1 along the bar: where the sausage is
@@ -109,7 +113,7 @@ return function(props: Props): Frame
 			Position = function(): UDim2
 				return UDim2.fromScale(math.clamp(props.Marker(), 0, 1), 0.5)
 			end,
-			Size = UDim2.fromScale(0.25, 1),
+			Size = UDim2.fromScale(MARKER_W, 1),
 			BackgroundTransparency = 1,
 			ZIndex = 10,
 			pill("Pin", Theme.Color.Ink, UDim2.fromScale(0.064, 1.6), UDim2.fromScale(0.5, 0.5), 10),
@@ -136,7 +140,7 @@ return function(props: Props): Frame
 		Name = "Seal",
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.fromScale(0.5, 0),
-		Size = UDim2.fromScale(0.44, 0.3),
+		Size = UDim2.fromScale(SEAL_W, 0.3),
 		BackgroundColor3 = Theme.Color.Ink,
 		BorderSizePixel = 0,
 		ZIndex = 6,

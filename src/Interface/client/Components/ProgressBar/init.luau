@@ -18,7 +18,9 @@ const create = Vide.create
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
 -- Studs of the gui in flip mode: room for the "FLIP!" seal over the track and the sausage riding it
-const FLIP_GUI = Vector2.new(1.5, 0.8)
+-- owner 2026-10-21 ("muito larga na horizontal"): 1.5 -> 1.0 wide; FlipMeter.Body keeps the sausage icon and the seal at their
+-- old size in studs, only the track gets shorter
+const FLIP_GUI = Vector2.new(1.0, 0.8)
 const HANDOFF = 0.1 -- scale at which one body is "gone" and the other may start to pop in
 const GONE = 0.02 -- below this a body is not drawn
 
