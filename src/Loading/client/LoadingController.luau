@@ -368,7 +368,8 @@ function LoadingController:Run()
 	end
 
 	-- the sting plays before the server may start a scene, so it never covers one
-	self:PlayIntro()
+	-- Disabled (owner request 2026-10-21): no "Powered by Modux" sting on load. Uncomment to bring it back.
+	-- self:PlayIntro()
 
 	-- the server may start a scene now
 	self:SendReady()
