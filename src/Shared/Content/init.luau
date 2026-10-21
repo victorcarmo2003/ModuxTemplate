@@ -12,6 +12,7 @@ local BossCalls = require(script.BossCalls)
 local Classes = require(script.Classes)
 local CustomerTypes = require(script.CustomerTypes)
 local Cutscenes = require(script.Cutscenes)
+local Events = require(script.Events)
 local Flow = require(script.Flow)
 local GemRewards = require(script.GemRewards)
 local Hallucinations = require(script.Hallucinations)
@@ -42,6 +43,7 @@ local Prep = require(script.Prep)
 local Restaurant = require(script.Restaurant)
 local Revive = require(script.Revive)
 local RunParams = require(script.RunParams)
+local RunZones = require(script.RunZones)
 local Sanity = require(script.Sanity)
 local Score = require(script.Score)
 local Seating = require(script.Seating)
@@ -56,7 +58,6 @@ local Stations = require(script.Stations)
 local Stats = require(script.Stats)
 local Suspense = require(script.Suspense)
 local Table = require(script.Table)
-local Thief = require(script.Thief)
 local TipJar = require(script.TipJar)
 local Metrics = require(script.Metrics)
 local Traffic = require(script.Traffic)
@@ -158,6 +159,8 @@ export type RestaurantBinding = Restaurant.Binding
 export type HapticProfile = Haptics.Profile
 export type HapticKey = Haptics.Key
 export type RunParams = RunParams.RunParams
+export type RunZones = RunZones.RunZones
+export type RunZoneBox = RunZones.Box
 export type Sanity = Sanity.Sanity
 export type Seating = Seating.Seating
 export type Security = Security.Security
@@ -182,9 +185,9 @@ export type VoiceLine = VoiceLines.VoiceLine
 export type SoundRules = Sounds.SoundRules
 export type Species = Species.Species
 export type Skin = Skins.Skin
+export type HalloweenEvent = Events.Halloween
 export type Stat = Stats.Stat
 export type Station = Stations.Station
-export type Thief = Thief.Thief
 export type TipJar = TipJar.TipJar
 export type Metrics = Metrics.Metrics
 export type Traffic = Traffic.Traffic
@@ -230,7 +233,7 @@ return table.freeze({
 	Trailer = Trailer,
 	-- service window = shop (TASK-284, owner request 2026-10-14, Provisional Q-270): the line leaves, anomalies it avoids/closes
 	ShopWindow = ShopWindow,
-	-- anomaly mode / day-only mode switch (owner request 2026-10-14, Provisional; tables, thief, Wide Counter off)
+	-- anomaly mode / day-only mode switch (owner request 2026-10-14, Provisional; tables, Wide Counter off)
 	Mode = Mode,
 	Vehicles = Vehicles,
 
@@ -247,7 +250,6 @@ return table.freeze({
 	Sanity = Sanity,
 	SoundRules = Sounds.Rules,
 	Sounds = Sounds,
-	Thief = Thief,
 	-- TASK-268: vibration profiles (Input/client/Haptics), Provisional
 	Haptics = Haptics,
 
@@ -311,6 +313,8 @@ return table.freeze({
 	TipJar = TipJar,
 	-- RoMetrics analytics: the client-reported wire lists (owner request 2026-10-16; MetricsService). Provisional
 	Metrics = Metrics,
+	-- Run hot zones for RoMetrics: boxes measured in world space (owner request 2026-10-21; MetricsService/Zones). Provisional
+	RunZones = RunZones,
 
 	-- Sausage pose on the RestRail Parts (owner request 2026-10-12; Kitchen/shared/RailSlot). Provisional
 	RailSlot = RailSlot,
@@ -328,6 +332,10 @@ return table.freeze({
 
 	-- Class skins, Robux only (owner request 2026-10-17; design/skins-proposal.md; SkinService, SkinController). Provisional
 	Skins = Skins,
+
+	-- Seasonal lobby overlays: the Halloween decoration folder, its end date and its client animations (DEC-346,
+	-- TASK-624; docs/levels/LOBBY-halloween.md; LobbyController/Halloween). Provisional
+	Events = Events,
 
 	-- Restaurant flow (DEC-269..DEC-280; tech/restaurant-flow.md rev. 2 §4.1, design/restaurant-flow.md). Provisional.
 	-- Restaurant.Rules.Enabled is THE single switch (TASK-390): Prep, Seating, Vehicles, Anomalies and Nights derive their

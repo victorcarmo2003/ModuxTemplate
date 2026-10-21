@@ -4075,6 +4075,62 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - Emendas (append-only): **DEC-308** volta a valer no fluxo (pilhas, descanso, prato na mão); `tech/kitchen-focus.md` §1 (salsicha arrastada da grelha direto ao prato; pão cortado direto no prato) deixa de valer.
 - Impacto: **backend-coder** (`KitchenService/Cook.luau`, `Stations/Grill`, `Rail`, `Board`), **frontend-coder** (`Cook/client/CookController`), **level-designer** (âncoras de câmera da bancada), **qa-tester**.
 
+### DEC-311 — 2026-10-19 — Cozinha: grelha centrada com minigame de virar, pratos por pedido com ficha, cestas por estoque, bisnaga e tutorial de 3 tarefas
+
+- Origem: pedido do dono em chat (2026-10-19), depois do Play da DEC-310. Registrado pelo agente de implementação no formato do secretário.
+- Decidido pelo dono:
+  - **Walt:** ao abrir a janela, só "We're open! Folks are lining up." (sai a fala de fechar a loja).
+  - **Pratos por pedido:** cada prato da bancada da frente é um pedido. Sem pedido o prato fica invisível; com pedido ele aparece com a **ficha** (billboard) em cima — o hot dog em camadas (pão, salsicha, condimentos), com o tamanho das camadas ajustado ao card. O jogador escolhe qual prato (pedido) fazer.
+  - **Grelha:** enquadrada no centro; caixa de salsichas à esquerda (passar o mouse abre a tampa; **arrastar** a salsicha até a grelha ou **clicar** na caixa = vai sozinha); não se põe mais clicando na grelha. Em **50%** a salsicha trava e abre o **minigame de virar**: barra com zona **Perfect** no centro e **Nice** ao redor, um cilindro indo e voltando; o clique dá a nota, ela vira e termina de cozinhar. Pronta: **arrastar** ao descanso ou **clicar** = vai sozinha. O contador da caixa aparece no close-up.
+  - **Cestas de pão:** a do pão inteiro (`TLR-BUN_CRATE`, o estoque) mostra **3 / 2 / 1 / 0 camadas** conforme o estoque (cheio / médio / baixo / vazio); o pão cortado vai para a cesta da direita (`TLR_BUN_CUT`).
+  - **Condimentos:** ketchup e mostarda (e o cream cheese, que também é molho) voltam com a **bisnaga** transparente que esvazia enquanto desenha e o **guia em S** de setas brancas que contorna a salsicha; nota **Perfect / Nice / Good**. Os outros são só posicionamento.
+  - **Patinha de gato** (almofada e "feijõezinhos") mostrando o gesto de cada estação até o jogador aprender.
+  - **Tutorial:** começa na primeira noite com a loja aberta; painel de **tarefas** no canto superior direito (fritar uma salsicha, cortar um pão, servir um cliente). 1º cliente sem condimento (fritar → sair → cortar → sair, com o **Back** destacado → pegar o prato → pão → salsicha → servir); 2º cliente com **ketchup e mostarda** (o mesmo + mesa de condimentos). Termina no 2º.
+- Emendas (append-only): **DEC-310** (grelha: tocar na vaga para pôr sai; a pronta vai ao descanso por arrastar ou clique), **DEC-305** (virar continua opcional na nota, mas a salsicha só termina depois de virada), `Tutorial/Rules.Order` vira `Orders`.
+- Impacto: **backend-coder** (`PlateService` vagas, `Grill` trava em `HoldAt`, `CustomerService`/`TutorialService` clientes do tutorial), **frontend-coder** (`Cook/client`, `Plate/client/SlotCards`, `Kitchen/client/Stock`, `Tutorial/client`, componentes `PlateOrderCard`, `FlipMeter`, `TaskList`), **narrative-writer** (vozes novas do Walt no tutorial), **qa-tester**.
+
+### DEC-312 — 2026-10-19 — Lore: o Walt é o vilão, contado só por easter eggs (Q-401 A)
+
+- Origem: pedido do dono em chat (2026-10-19): "vamos usar esses áudios pra poder fazer plot na história de easter egg... a gente pode fazer com que o verdadeiro vilão de tudo no final seja o Walt"; escolha em chat: "Vai com a opção A: o final fica igual, a lore do Walt vilão vem só pelas falas das ligações e do rádio, mais os panfletos depois dos créditos. Pode implementar a TASK-601." Registrado pela sessão principal no formato do secretário.
+- Decidido pelo dono:
+  - **Opção A da Q-401** (`story/walt-calls-lore.md` §3–§5): a verdade escondida (Walt trocou o próprio turno pelo de outros Rookies; o estranho do rádio é o último Rookie) aparece **só** nas falas da ligação falsa (Walt) e do rádio (o estranho), noite a noite, e num plano mudo depois dos créditos: **vários panfletos velhos "NOW HIRING"** atrás do novo.
+  - O final aprovado (DEC-075/076, as 9 falas) **não muda**; nenhuma regra, verbo, escolha ou penalidade nova.
+  - A ligação falsa nunca mais é muda ("Walt: ..."): toda ligação termina numa fala (dica + peça da lore).
+- Provisório (dono não decidiu): "ouvida" por run (memória do client) até a Q-401 (a); textos da §4 como placeholder até `ui-text.md` e vozes novas em `tools/voice`.
+- Fecha: **Q-401** (A). Emenda (append-only) a leitura de DEC-075 (o final continua igual; muda o que ele significa para quem juntou as falas).
+- Impacto: `Content/Hallucinations.luau` (`WaltLines` / `RadioLines` por noite), `Hallucination/client` (`Lines.luau`, `FakeCall`, `RadioVoice`), `Cutscene/client/CutsceneController/Actors.luau` (panfletos velhos), `Content/Validate` (TASK-601).
+
+### DEC-313 — 2026-10-20 — O ladrão sai do jogo (código e conteúdo)
+
+- Origem: pedido do dono em chat (2026-10-20): "a gente pode seguir retirando o modo do ladrão... atualmente a gente não tem mais o ladrão no jogo. Então a gente pode limpar tudo relacionado ao ladrão."
+- Decidido pelo dono:
+  - **Quick Quentin (CHR-004, NPC-007) e o roubo da gaveta (FEAT-013) saem.** Tudo que existia só para ele sai junto: UPG-004 Cash Drawer Lock, a variante "quentin" das ligações do Walt, os notices `thief_caught` / `thief_stole`, o "Nice catch!" e a linha "Stolen" do resumo do turno.
+  - IDs não são reaproveitados (FEAT-013, NPC-007, CHR-004, UPG-004, AST-021, AST-056, AST-087 ficam marcados como removidos).
+- Provisório (agente): o guaxinim continua reservado (não vira cliente) até alguém propor outro uso; a fala gerada do Quentin em `VoiceLines.luau` sai no próximo `tools/voice`.
+- Emenda (append-only): DEC-018, DEC-050, DEC-159 (parte do ladrão), DEC-182, DEC-186 (raccoon como Quentin), e a regra "Catches/Stolen" da DEC-051 (a base do bônus vira Vendas + Gorjetas).
+- Impacto: TASK-603 (feita na sessão principal); docs marcados como históricos em `features.md`, `npcs.md`, `characters.md`, `upgrades.md`, `tech/*`, `audio/sound-list.md`, `art/asset-list.md`.
+
+### DEC-314 — 2026-10-20 — A ambulância é descartada
+
+- Origem: pedido do dono em chat (2026-10-20): "eu percebi também que falta a mecânica da ambulância... acho que a gente pode descartar ela também. Vamos deixar ela de lado, porque tem bastante conteúdo no jogo já."
+- Decidido pelo dono: **ambulância (NPC-023) e médicos (NPC-024, CHR-008) não serão feitos.** Nunca houve `AmbulanceService`; saem os ganchos que esperavam por ela.
+- Provisório (agente): quem desmaia fica no chão (ragdoll) até ser revivido ou até o fim da noite; o corpo some por `Revive.BodyFallback`, como já acontecia. As formas de reviver (Robux, Rescue Whistle) seguem como estão no FEAT-034, só sem a ambulância.
+- Emenda (append-only): DEC-091, DEC-114, DEC-122 (parte da ambulância) e a parte de ambulância de FEAT-034.
+- Impacto: TASK-604; badge `bellmoor_regular` sai da lista (DEC-315).
+
+### DEC-315 — 2026-10-20 — Lista de badges aprovada e ícones aprovados (responde Q-403)
+
+- Origem: chat do dono (2026-10-20), depois de ver a prancha dos ícones: "pode upar os badges, eu não achei ruim não, tá tranquilo. Se conseguir deixar talvez mais cartunesco... mais cômico, talvez seja interessante".
+- Decidido pelo dono: a lista de `design/badges.md` **vale**, **menos** `gotcha_quentin` (DEC-313) e `bellmoor_regular` (DEC-314): **15 badges**. Os ícones de `Assets/ui/badges/` estão aprovados para subir.
+- Aberto: uma versão mais cartunesca/cômica dos ícones é desejável, não obrigatória. Quem é o Hunter segue na **Q-404**.
+- Impacto: `design/badges.md` (Aprovado), TASK-605.
+
+### DEC-316 — 2026-10-20 — Skins de Halloween à venda até 5/11 (responde Q-301)
+
+- Origem: chat do dono (2026-10-20): "O Halloween encerra dia 31, né? Mas coloca as skins disponíveis até o dia 5 do mês que vem."
+- Decidido pelo dono: as 6 skins de Halloween ficam à venda **até o fim de 2026-11-05 (horário de Brasília)** = `EndsAt` 2026-11-06 03:00 UTC (`1793934000`). Substitui o provisório de 2026-11-03 00:00 UTC.
+- Impacto: `src/Shared/Content/Skins.luau` (`HALLOWEEN_END`); Q-301 fechada.
+
 ### DEC-317 — 2026-10-20 — Tela de queda com o coração da vida do time, LAST CHANCE e ícone novo do revive (responde Q-405, Q-406, Q-407)
 
 - Origem: chat do dono (2026-10-20): "Aprovo o roteiro da tela de queda (Q-405, Q-406 e Q-407 conforme a recomendação). Pode implementar."
@@ -4105,3 +4161,227 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - Decidido pelo dono: a **vida extra do time sai do jogo por enquanto**, com o código guardado. `RunParams.Chances = 0` (o valor antigo 1 fica comentado) e `Content.Revive.TeamLife = false` (sem coração nem LAST CHANCE). Quando cai o último: causa, depois **Revive all por 15 s**; ninguém comprou = **fim da run**.
 - Aberto: como a vida extra volta (classe que concede, ação no mapa). Vira feature quando o dono decidir.
 - Emenda (append-only): DEC-053 / DEC-110 / DEC-112 (chances da run) e a parte de vida do time da DEC-317 / DEC-318 ficam suspensas até essa feature.
+
+### DEC-320 — 2026-10-20 — Regras de grupo do multiplayer: valem as recomendações (responde Q-408 a Q-414)
+
+- Origem: chat do dono (2026-10-20), depois da auditoria `tech/multiplayer-audit.md`: "Você consegue fazer a correção de todos esses erros aí e trazer uma melhoria no geral?" e, à pergunta do agente, "Sim, todas (Recomendado)". Registrado pelo agente de implementação no formato do secretário.
+- Decidido pelo dono:
+  - **Q-408 A:** qualquer jogador gasta o caixa do time no Gear Stand; o aviso diz **quem** comprou.
+  - **Q-409:** o revive grátis fica **estacionado** ("deixei ela abstraída"): nada muda, o Revive Kit segue como única forma de reviver o colega.
+  - **Q-410 B:** a ANM-006 ataca **quem mais olhou** para ela ("quem mais olhou mesmo"; desempate: o mais perto da janela).
+  - **Q-411 B:** anti-AFK **por jogador**: sem pelo menos 1 ação de cozinha ou entrega no turno, aquele jogador não ganha as gemas do turno.
+  - **Q-412 C:** a trava do relógio pelo tutorial tem **teto único de 180 s por run** (soma de todas as travas, inclusive a lição de upgrade); veteranos veem "Waiting for the rookie".
+  - **Q-413:** à noite o teto de clientes segue o tamanho do time (**5 / 7 / 9 / 9**) e com **3+ jogadores o balcão abre 2 vagas**; anomalias por noite **+1 com 3 jogadores e +2 com 4**. Números Provisórios, medidos em playtest.
+  - **Q-414 / Q-404:** o perseguidor de fora é o **Hunter**, e há **um Hunter para cada jogador**: cada um tem o seu, pessoal. Fica como está (só o perseguido o vê e sofre a cena).
+- Emenda do dono no mesmo chat (append-only): primeiro "Sim, todas"; logo depois tirou o revive grátis (Q-409) e definiu o Hunter por jogador (Q-414), e confirmou a Q-410.
+- Impacto: backend-coder (Customer, Tutorial, Reward, Anomaly Scheduler e ANM-006), frontend-coder (Notice, HUD), qa-tester (roteiro TASK-610).
+
+### DEC-321 — 2026-10-20 — Sem lanterna no jogo, nem para o trailer; o Blackout fica com o halo do jogador e a luz vermelha de emergência
+
+- Origem: chat do dono (2026-10-20), revisão do trailer `marketing/trailer-blackout-60s.md`. Registrado pelo secretário.
+- Decidido pelo dono: **não existe lanterna** no jogo, nem como item, nem como recurso só de gravação do trailer. No Blackout a luz vem do **halo do jogador** e da **luz vermelha de emergência**.
+- Emenda (append-only): confirma e estende a DEC-055 (lanterna fora do MVP) para o jogo inteiro e para o material de divulgação.
+- Impacto: cinematographer (planos do Blackout sem lanterna), frontend-coder / level-designer (nenhum item de lanterna).
+
+### DEC-322 — 2026-10-20 — Música do trailer liberada: o dono tem permissão de uso
+
+- Origem: chat do dono (2026-10-20), trailer `marketing/trailer-blackout-60s.md`.
+- Decidido pelo dono: o dono **tem permissão de uso** da música escolhida para o trailer. A trilha fica.
+- Nota: vale só para o trailer; o áudio do jogo segue a regra da Q-168 (licença em `art/credits.md`).
+- Impacto: cinematographer (trilha confirmada).
+
+### DEC-323 — 2026-10-20 — Slogan aprovado: "Cook. Serve. Survive the night."
+
+- Origem: chat do dono (2026-10-20), trailer `marketing/trailer-blackout-60s.md`.
+- Decidido pelo dono: o slogan **"Cook. Serve. Survive the night."** está **aprovado** (texto exato, em inglês).
+- Impacto: cinematographer (cartela final), narrative-writer / thumbnail-artist (pode ser reutilizado na divulgação).
+
+### DEC-324 — 2026-10-20 — Jogo e vídeos de divulgação só na horizontal 16:9; sem versões verticais
+
+- Origem: chat do dono (2026-10-20), trailer `marketing/trailer-blackout-60s.md`.
+- Decidido pelo dono: o jogo e **todos os vídeos de divulgação** são **somente horizontais, 16:9**. **Não há** versão vertical (9:16) nem recorte para Shorts/TikTok/Reels.
+- Impacto: cinematographer (sem cortes verticais no shot list), thumbnail-artist (formato 16:9 segue).
+
+### DEC-325 — 2026-10-20 — Trailer sem a tela de desmaio/revive; no lugar, plano geral frontal do food truck, afastado e de cima
+
+- Origem: chat do dono (2026-10-20), trailer `marketing/trailer-blackout-60s.md`.
+- Decidido pelo dono: a **tela de desmaio/revive não aparece** no trailer. No lugar dela entra um **plano geral frontal do food truck**, com a câmera **afastada e de cima**.
+- Impacto: cinematographer (troca do plano no roteiro e no shot list).
+
+### DEC-326 — 2026-10-20 — O dono grava o trailer sozinho
+
+- Origem: chat do dono (2026-10-20), trailer `marketing/trailer-blackout-60s.md`.
+- Decidido pelo dono: a captura do trailer é feita **só pelo dono**. Planos que pediam mais de um jogador ou um operador de câmera extra precisam caber em uma pessoa (câmera de Studio, dev commands, NPCs).
+- Impacto: cinematographer (shot list para uma pessoa só).
+
+### DEC-327 — 2026-10-20 — Janela de revive cai de 15 s para 10 s
+
+- Origem: chat do dono (2026-10-20).
+- Decidido pelo dono: quem cai pode ser revivido por **10 s** (era 15 s, DEC-318) depois da tela de causa; depois vira espectador até a próxima noite. `Content.Revive.DownWindow = 10`.
+- O **Revive all** (quando cai o último) também cai para **10 s** (era 15 s). `Content.Revive.ReviveAllWindow = 10`.
+- Impacto: `src/Shared/Content/Revive.luau`, `docs/design/faint-screen-flow.md`.
+
+### DEC-328 — 2026-10-20 — Sem colisão entre jogadores em todo lugar; jogador muito perto fica meio transparente
+
+- Origem: chat do dono (2026-10-20).
+- Decidido pelo dono: jogadores **não colidem** entre si (run já fazia, DEC-175; agora o lobby também). Quando outro jogador fica **muito perto** do nosso, ele fica **meio transparente** só na nossa tela.
+- Números (Provisórios, agente): começa a 4 studs (raiz a raiz), chega a 0,6 de transparência a 2 studs.
+- Impacto: `src/Lobby/server/LobbyService.luau` (grupo `Players`), `src/Crew/client/ProximityFadeController.luau` (novo).
+
+### DEC-329 — 2026-10-20 — Baú de pelúcias custa 2.500 gemas
+
+- Origem: chat do dono (2026-10-20), resposta à `Q-419`.
+- Decidido pelo dono: cada baú do gacha de pelúcias da loja de brinquedos custa **2.500 gemas** (o pedido inicial de 100 gemas era da escala antiga; com ×75, TASK-308, seria ≈ 300 baús por run).
+- O resto do gacha (raridades, perks, estrelas, garantia, chances na tela) segue Provisório em `design/upgrades-v3-proposal.md` §3 (`Q-420`).
+- Impacto: `docs/design/upgrades-v3-proposal.md`; futuro `Content.Plushies`.
+
+### DEC-330 — 2026-10-20 — Quick Quentin reformado atende a banca (Gear Stand)
+
+- Origem: chat do dono (2026-10-20), resposta à `Q-421`.
+- Decidido pelo dono: o NPC da banca de upgrades é o **Quick Quentin reformado** (guaxinim, CHR-004), reaproveitando modelo, chapéu e texturas. Ele saiu como ladrão (DEC-313) e volta só como vendedor; não é personagem-chave.
+- Falas novas: narrative-writer (Provisório).
+- Impacto: `docs/story/characters.md` CHR-004, `docs/design/npcs.md`, `docs/design/upgrades-v3-proposal.md` §4.
+
+### DEC-331 — 2026-10-20 — Upgrades V3: pedestais verdes, com os modelos reais do trailer
+
+- Origem: chat do dono (2026-10-20), resposta à `Q-417`.
+- Decidido pelo dono: os pedestais verdes passam a ser **Grill, Bun Box, Topping Rack, Coffee Shelf e Breaker Box**, cada um com 3 níveis (o 1 de fábrica). Saem de venda (o código fica): Storage, Coffee Maker de velocidade (UPG-013) e Trailer Lights (UPG-005).
+- Modelos: usar os **modelos reais que já estão no trailer** (estações, potes, caixas e prateleiras da cozinha), não modelos novos. O nível aparece nas peças que já existem.
+- Números (preços e capacidades) seguem Provisórios em `design/upgrades-v3-proposal.md` §1.1 e §1.3.
+- Impacto: `src/Shared/Content/Upgrades.luau`, `Ingredients.luau`, `Mode.luau`, `Mart.luau`; `docs/design/upgrades.md`.
+- Implementação (2026-10-20, TASK-607): IDs UPG-035..037 (015-034 reservados em `restaurant-flow.md`); Storage/Coffee Maker/Trailer Lights via `Content.Mode.RetiredUpgrades`; run antiga perde a capacidade comprada do Storage, sem reembolso.
+
+### DEC-332 — 2026-10-20 — ABC Blocks abrem a loja de brinquedos; a chave da mostarda sai
+
+- Origem: chat do dono (2026-10-20), resposta à `Q-418`.
+- Decidido pelo dono: só os **ABC Blocks** (especial mítico do pedestal dourado) abrem a loja de brinquedos. A chave da mostarda (`bonds-proposal.md` §14.1, `Q-280` a) **sai do escopo**; a fala do Walt "Keys under the mustard." fica só como sabor.
+- Persistência (para sempre, por jogador; em co-op abre se qualquer um tiver), preço e chance seguem Provisórios em `upgrades-v3-proposal.md` §1.2 e §2.
+
+### DEC-333 — 2026-10-20 — Pelúcias com perk, incluindo o Lobo mítico
+
+- Origem: chat do dono (2026-10-20), resposta à `Q-420`.
+- Decidido pelo dono: as pelúcias do gacha **dão perk** (até 10%, só para o dono, uma equipada por vez). Revoga `Q-280` (d) ("o pet não dá vantagem nenhuma"). Roster: as 8 espécies jogáveis + **Lobo** como Mítico exclusivo (modelo novo).
+- Números da tabela: Provisórios, game-designer (`upgrades-v3-proposal.md` §3.3).
+
+### DEC-334 — 2026-10-20 — Máquina de café dupla, 8 s por máquina
+
+- Origem: chat do dono (2026-10-20), resposta à `Q-422`.
+- Decidido pelo dono: a **Double Coffee Machine** é especial épico do pedestal dourado ($250, 1 por run; clone da cafeteira atual ao lado). Com ela, **cada máquina leva 8 s** (15 cafés/min contra 10 com uma máquina a 6 s).
+
+### DEC-335 — 2026-10-20 — Sem partida direta para o novato; entram lobbies com grupo aleatório (responde Q-423 a)
+
+- Origem: chat do dono (2026-10-20), resposta à `Q-423` depois das notas de retenção (`research/retention-notes-2026-10-20.md`): "O de começar já em partida acho que vou descartar pois não parece bom (o game é mais divertido com amigos) então lobbys aleatórios ajudariam". Registrado pelo agente de implementação no formato do secretário.
+- Decidido pelo dono:
+  - O jogador de primeira vez **não** pula o lobby nem cai numa run solo direta. O jogo é melhor com amigos.
+  - Para encher o grupo e cortar a espera, entram **lobbies aleatórios**: o jogador sem amigos pode cair num grupo com desconhecidos.
+- **Provisório:** como o grupo aleatório funciona (pad próprio, contagem, mínimo de jogadores, quem entra depois) → `Q-429`. `Q-423` (b) e (c) seguem abertas.
+- Impacto: **game-designer** (regra do grupo aleatório), **level-designer** (lobby), **architect** (`Party`, `Lobby`, teleporte), **qa-tester**.
+
+### DEC-336 — 2026-10-20 — Sinal estranho leve nos primeiros 2 minutos da Noite 1 (responde Q-424)
+
+- Origem: chat do dono (2026-10-20), resposta à `Q-424`: "A Q-424 faz sentido, eu gostei".
+- Decidido pelo dono: a Noite 1 entrega um **sinal estranho leve e Mild** dentro dos **primeiros 2 minutos**, para o primeiro minuto bater com a promessa de terror da thumb, sem atrapalhar o tutorial.
+- **Provisório** (recomendação da Q-424): um evento de ambiente da família D (já liberada na Noite 1, TASK-341) logo depois do 1º cliente servido; sem susto, sem teste, sem perda de sanidade.
+- Impacto: **game-designer** (qual evento e quando), **narrative-writer**, **frontend-coder** (Suspense/Anomaly client), **backend-coder** (agenda da Noite 1), **qa-tester**.
+
+### DEC-337 — 2026-10-20 — Baú diário no lobby (responde Q-425)
+
+- Origem: chat do dono (2026-10-20), resposta à `Q-425`: "A 425 podemos fazer um baú sim no lobby".
+- Decidido pelo dono: opção **A** — **baú diário no lobby**, para dar motivo de voltar no dia seguinte. As opções B (desafio diário) e C (checkpoint da run por noite) não entram agora.
+- **Provisório:** prêmio em gemas, streak de 7 dias, o que acontece se perder um dia, reset por UTC, onde fica o baú no lobby → game-designer (números), level-designer (lugar), art-director (asset).
+- Impacto: **game-designer**, **architect** (dados no perfil), **backend-coder** (`Reward`/`Profile`), **frontend-coder** (UI do baú), **level-designer**, **art-director**, **qa-tester**.
+
+### DEC-338 — 2026-10-20 — Modo fantasma para quem caiu (responde Q-426)
+
+- Origem: chat do dono (2026-10-20), resposta à `Q-426`: "A 426 eu gostei do modo fantasma também".
+- Decidido pelo dono: quem cai e vira espectador (DEC-318) entra num **modo fantasma**: continua ajudando o time em vez de só assistir. Nunca é alvo de anomalia nem mexe nas regras dela (FEAT-025).
+- **Provisório** (recomendação da Q-426): começa só com **"ping" no mundo** visível para os colegas (1 a cada 10 s), sem ação física. Outras ações ficam para depois do playtest.
+- Emenda (append-only): FEAT-025 ("Jogador `Down` ou `Spectator` não tem nenhum prompt") ganha a exceção do ping do fantasma.
+- Impacto: **game-designer** (FEAT-025), **frontend-coder** (spectate, ping), **backend-coder** (validação e limite do ping), **art-director** (visual do ping e do fantasma), **qa-tester**.
+
+### DEC-339 — 2026-10-20 — Ranking, badges e título aparecem só no lobby (responde Q-427)
+
+- Origem: chat do dono (2026-10-20), resposta à `Q-427`: "podemos botar ranking e badgets / title no lobby somente também".
+- Decidido pelo dono: entram **ranking** e **título** do jogador, junto com as badges (DEC-315), mostrados **só no lobby**. Na run nada disso aparece.
+- **Provisório:** quais rankings (recomendação: "Most nights survived" primeiro), de onde vem o título (badge escolhida ou conquista), onde fica no lobby → game-designer, level-designer, art-director.
+- Impacto: **game-designer**, **architect** (OrderedDataStore, título no perfil), **backend-coder**, **frontend-coder** (placar e título acima da cabeça no lobby), **level-designer**, **art-director**, **qa-tester**.
+
+### DEC-340 — 2026-10-20 — Sem anúncios com recompensa (responde Q-428)
+
+- Origem: chat do dono (2026-10-20), resposta à `Q-428`: "A 428 n faz muito sentido para mim".
+- Decidido pelo dono: **anúncio com recompensa não entra** no jogo. Nada de pesquisa sobre isso.
+
+### DEC-341 — 2026-10-20 — O pad aleatório sai; os pads normais já iniciam solo (responde Q-429; emenda DEC-335)
+
+- Origem: chat do dono (2026-10-20): "Vamos deixar de lado o pad aleatório, nos pads padrões ele já consegue iniciar sozinho se quiser".
+- Decidido pelo dono: **não** há pad nem fila de grupo aleatório. O jogador sem amigos usa os **pads normais**, que já deixam iniciar sozinho.
+- Emenda (append-only): **DEC-335** — a parte "entram lobbies aleatórios" deixa de valer; fica só "o novato não pula o lobby". `Q-429` fechada sem uso.
+
+### DEC-342 — 2026-10-20 — Interface do pad mais simples: menos botões, partida mais rápida
+
+- Origem: chat do dono (2026-10-20): "acho melhor talvez simplificar a interface para ter menos botões e ser mais rápida".
+- Decidido pelo dono: a interface do pad/squad no lobby fica com **menos botões** e o caminho até a partida fica **mais curto**.
+- Hoje (código, `Lobby/client/LobbyController`): pisar no pad → líder vê **SET UP ROOM** (escolhe o acesso da sala) → **START** (só verde com todos **READY**) → contagem; ao lado, engrenagem, **Invite**, **Leave**, e os painéis Squad / Shop / Codes.
+- **Provisório** (recomendação do agente, a confirmar no Play): (a) pisar no pad já cria a sala aberta a amigos, sem passo SET UP ROOM (o acesso fica atrás da engrenagem); (b) quem pisa no pad já conta como pronto, sem botão READY; (c) o líder tem um botão só, **START**, que inicia mesmo sozinho; (d) sair do pad = sair da sala, sem botão Leave. Detalhes em `Q-430`.
+- Impacto: **game-designer** + **frontend-coder** (LobbyHud, LobbyController), **backend-coder** (`Party`: acesso padrão, ready automático), **qa-tester**.
+
+### DEC-343 — 2026-10-20 — Caixa de formulário (feedback) com recompensa
+
+- Origem: chat do dono (2026-10-20): "Podemos fazer uma caixinha de formulário e dar uma recompensa em cima?".
+- Decidido pelo dono: entra uma **caixa de formulário** no jogo, e quem responde ganha uma **recompensa**.
+- **Leitura do agente (não afirmada pelo dono):** formulário curto de feedback/pesquisa sobre o jogo, no lobby, com recompensa em gemas uma vez por formulário. Confirmar em `Q-431`.
+- **Regra fixa:** a recompensa vale pela **resposta enviada**, nunca pelo conteúdo (nota alta) e nunca em troca de like, favorito, seguir ou entrar em grupo — a Roblox proíbe recompensar engajamento desse tipo.
+- Impacto: **game-designer** (perguntas, prêmio), **narrative-writer** (texto), **backend-coder** (gravar respostas, prêmio 1×), **frontend-coder** (UI), **qa-tester**.
+
+### DEC-344 — 2026-10-20 — Pad simples: pisar cria a sala e conta como pronto, START único, sair do pad sai da sala (responde Q-430)
+
+- Origem: chat do dono (2026-10-20), resposta à `Q-430`: "Aceito a 342".
+- Decidido pelo dono (recomendação da Q-430, de (a) a (e)):
+  - (a) pisar no pad já cria a sala aberta a amigos; sem passo **SET UP ROOM**; o acesso (Friends / Invite) fica atrás da engrenagem;
+  - (b) pisar no pad = pronto; sai o botão **READY**;
+  - (c) o líder tem um botão só, **START**, que inicia sozinho ou com quem estiver no pad;
+  - (d) sair do pad = sair da sala; sai o botão **Leave**;
+  - (e) contagem de 5 s depois do START, cancelável.
+- **Provisório:** conferir no Play em celular (tamanho do START, engrenagem alcançável). Emenda **DEC-342** (deixa de ser só direção).
+- Impacto: **frontend-coder** (`Lobby/client/LobbyController`, LobbyHud), **backend-coder** (`Party`: acesso padrão, ready automático, saída por zona), **qa-tester**.
+
+### DEC-345 — 2026-10-20 — Caixa de sugestões física no lobby, liberada depois da Noite 2, com seta prioritária e gemas ao enviar (responde Q-431; detalha DEC-343)
+
+- Origem: chat do dono (2026-10-20), resposta à `Q-431`: "aquelas caixas físicas mesmo de formulário que aparece no lobby somente para o jogador que passou pela night 2, com uma setinha guiando ele até lá [...] esse daí entraria como prioridade, passou da 2ª noite, desbloqueia a caixinha de sugestões e ao enviar uma sugestão / formulário recompensamos ele com gemas".
+- Decidido pelo dono:
+  - É uma **caixa de sugestões física** no lobby (objeto no mundo, abre o formulário ao interagir), não um pop-up nem tela de fim de run.
+  - Só aparece para o jogador que **já passou da Noite 2** (em qualquer run). Antes disso, ele não a vê.
+  - Ao liberar, a **seta do chão** do lobby (`LobbyController/Guide.luau`, a mesma das classes e do pad) guia até ela **com prioridade** sobre as outras setas.
+  - **Enviar** a sugestão/formulário dá **gemas**.
+- **Provisório** (recomendação da Q-431, não falada pelo dono): formulário com 3 notas de 1 a 5 + 1 texto livre opcional; **50 gemas**, 1× por versão do formulário; texto passa pelo filtro de texto da Roblox e fica só no log interno, nunca visível para outros jogadores. Regra fixa da DEC-343 vale (prêmio pelo envio, nunca pelo conteúdo nem por like/favorito).
+- Impacto: **game-designer** (perguntas, gemas), **narrative-writer** (texto da caixa e do formulário), **art-director** + **level-designer** (asset e lugar da caixa no lobby), **architect** (marco "passou da Noite 2" persistido no perfil, onde gravar as respostas), **backend-coder** (Profile, envio, prêmio 1×, filtro de texto), **frontend-coder** (caixa visível só para quem liberou, nova chave `Content.Lobby.Guide` com prioridade, UI do formulário), **qa-tester**.
+
+### DEC-346 — 2026-10-21 — Overlay de Halloween no lobby: plano da Fase 1 aprovado, com as recomendações P-HW1 a P-HW6
+
+- Origem: chat do dono (2026-10-21), sobre `levels/LOBBY-halloween.md` (brief "Halloween Lobby Transformation"): "Aprovo P-HW1..6 como recomendado. Registra as DECs, cria fichas AST e TASKs, e começa o lote 1 [...]" e, em seguida, "acabando a fase 1 faz todas as restantes, pode seguir com o recomendado e no final eu só reviso".
+- Decidido pelo dono (todas as recomendações da §9 do doc):
+  - (P-HW1) **Caldeirão no quadrante NE** do disco do spawn, ~(16, 0, −603) WORLD.
+  - (P-HW2) O evento liga por **flag** `Enabled` em `Content` e **desliga sozinho** no `EndsAt` das skins de Halloween (DEC-316, 2026-11-06 03:00 UTC).
+  - (P-HW3) **Caça aos doces sem recompensa** na v1 (só visual, se entrar); recompensa exige DEC nova.
+  - (P-HW4) **Só peças novas por cima**, numa pasta própria (`workspace.HalloweenEvent`); nada do lobby é apagado, movido ou recolorido.
+  - (P-HW5) Letreiros 3D em inglês só no canto de foto ("SPOOKY SNAPSHOT"); **sem** placa "HALLOWEEN EVENT" na v1.
+  - (P-HW6) Kit **modelado do zero** (Blender, atlas próprio), sem pack de terceiros.
+- Delegado: o dono autorizou seguir todas as fases (modelagem, upload, integração, QA) com as recomendações do doc e revisar no fim. Números e posições continuam **Provisórios** até a revisão do dono.
+- Impacto: **art-director** (fichas AST-167 a AST-176), **modeler-3d** (kit), **level-designer** (placement table), **frontend-coder** (liga/desliga e animações no client), **qa-tester** (capturas no Play). TASKs: TASK-624 a TASK-631.
+
+### DEC-347 — 2026-10-21 — Pad que já conta: 30 s ao pisar, barra START NOW / SKIP TUTORIAL / FRIENDS ONLY, sem janela de config (emenda DEC-344)
+
+- Origem: chat do dono (2026-10-21): "Quando um player pisar, automaticamente ele vai para state de starting, porém esse starting dura 30 segundos. Em baixo haverão 3 botões: Start now, Skip tutorial, Friends Only. Com isso a interface de configs sai (deixa só o código, mas para de chamar ele)".
+- Decidido pelo dono:
+  - pisar num pad livre cria a sala já em contagem de **30 s**; quem pisa depois entra durante a contagem;
+  - embaixo, três botões: **START NOW**, **SKIP TUTORIAL**, **FRIENDS ONLY**;
+  - a janela de configuração da sala (SquadSetup) deixa de ser aberta; o código fica.
+- **Provisório** (recomendação do agente): START NOW e FRIENDS ONLY são do líder; SKIP TUTORIAL é de cada membro e fecha o tutorial só dele na partida; START NOW deixa **3 s**; ninguém entra nos últimos **2 s**; sala nova abre aberta a todos (FRIENDS ONLY desligado); no pad não há CANCEL (sair do pad = sair); teleporte falho (ou Studio) encerra a sala e quem continua no pad começa outra.
+- Emenda (append-only): **DEC-344** — (a) o acesso padrão deixa de ser "amigos" e a engrenagem sai; (c) o START vira a contagem automática + START NOW; (e) a contagem de 5 s cancelável não vale para pads.
+- Impacto: **backend-coder** (`PartyService`, `PartyPad`, TeleportData `SkipTutorial`, `TutorialService`), **frontend-coder** (`LobbyHud` barra do pad, `LobbyController`), **qa-tester** (dois jogadores no mesmo pad, celular).
+
+### DEC-347 — 2026-10-21 — Caldeirão de Halloween movido pelo dono para o lado oeste da praça (emenda DEC-346 P-HW1)
+
+- Origem: edição à mão do dono no Studio (2026-10-21), depois da entrega do overlay: "Pronto fiz uns ajustes".
+- Decidido pelo dono: o grupo do caldeirão (caldeirão ×1,3, 5 abóboras, balde e doces) sai do quadrante NE do spawn e vai para **(−35, −590,4)**, entre o food court e a Gem Shop, virado para o spawn; as duas lanternas do grupo vão para perto do pórtico dos squads, em (22,2, −666,3) e (25,0, −578,8). O resto do overlay fica como entregue.
+- Impacto: `tools/assetplace/HALLOWEEN_placements.luau` (valores absolutos lidos do place; diff 0 com o Studio), `levels/LOBBY-halloween.md` §10. Folga ao NPC de cenário `food_dog` do food court: ~1,9 studs da borda do caldeirão (Provisório, conferir no Play).

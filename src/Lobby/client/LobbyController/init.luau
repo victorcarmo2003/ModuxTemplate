@@ -69,6 +69,11 @@
 	is open.
 	Zone VFX (Rings.luau): local Neon frames on the floor edges (square / ring) with rising ghost frames, one Heartbeat
 	for every zone; pad rings follow the room state (colour, breath speed, floor glow discs, sparks while occupied).
+	Floor guide (Guide.luau, owner request 2026-10-20, Provisional): Mustard chevrons on the floor from the player to
+	the nearest squad pad (free pads first) until the player steps on one or joins a squad; once the gems buy a class
+	not owned yet, to the Classes zone instead, until the class screen opens. Each one only once per account: done goes
+	to the server (LobbyGuideDone) and comes back in the Profile packet (Guides); the pad one is done for anyone who
+	already started a run. Hidden while a screen is open.
 	Camera: normal third person in the lobby (CameraController External; CameraMode Classic). While the class screen
 	shows the world stage every character is hidden locally (LocalTransparencyModifier; LOBBY.md §11).
 
@@ -115,6 +120,8 @@ local Pads = require(script.Pads)
 local Signs = require(script.Signs)
 local Rings = require(script.Rings)
 local Extras = require(script.Extras)
+local Guide = require(script.Guide)
+local Halloween = require(script.Halloween)
 local Stage = require(script.Stage)
 local Text = require(script.Text)
 local Traffic = require(script.Traffic)
@@ -129,6 +136,7 @@ export type PartyRecord = {
 	Access: string, -- PartyRules.Access
 	MaxPlayers: number,
 	StartAt: number,
+	Skip: { [number]: boolean }, -- members who skip the run's tutorial (pad bar)
 }
 
 export type Invite = {
@@ -211,6 +219,7 @@ const LOBBY = Content.Lobby
 const HIDE_STEP = "LobbyController.HideCharacters"
 const HIDE_PRIORITY = Enum.RenderPriority.Camera.Value + 2 -- after the stock camera and CameraController
 const CLOCK_INTERVAL = 0.1 -- s between two countdown clock ticks
+const GUIDE_TAKEN = 40 -- studs a taken pad counts farther when the floor guide picks the nearest one
 const PAD_SOUND_RANGE = 24 -- studs past a pad edge where somebody stepping on / off it still clicks
 
 local function isLobby(placeRole: Roles.Role): boolean
@@ -309,6 +318,11 @@ function LobbyController:Setup()
 	self.Extras = nil :: Extras.Extras? -- TASK-452: set-dressing NPCs (crew at the HQ cart, shopkeeper, food court)
 	self.Pads = nil :: Pads.Pads?
 	self.Signs = nil :: Signs.Signs?
+	self.Guide = nil :: Guide.Guide?
+	self.Halloween = nil :: Halloween.Halloween? -- DEC-346: seasonal overlay (cauldron bubbles, bats); nil = event off
+	-- guide due now ("" = none; Content.Lobby.Guide key) and the ones sent as done this session
+	self.GuideKey = "" :: string
+	self.GuideSent = {} :: { [string]: boolean }
 	self.Hiding = false :: boolean
 
 	self.Gui = nil :: ScreenGui?
@@ -866,7 +880,38 @@ end
 -- The status card and the Play button show only once the player has a squad (a pad, Create Squad, an accepted invite; a
 -- quick play waiting for its squad too). User request 2026-10-15, TASK-296. Reactive (Parties).
 function LobbyController:PlayShown(): boolean
-	return self:MyParty() ~= nil or self.QuickPending()
+	const _, party = self:MyParty()
+	if party ~= nil and party.Platform > 0 then
+		return false -- a pad room has the pad bar instead
+	end
+	return party ~= nil or self.QuickPending()
+end
+
+-- Pad bar (owner request 2026-10-21, Provisional): under a pad room, START NOW · SKIP TUTORIAL · FRIENDS ONLY (the
+-- countdown lives on the pad sign). nil = not in a pad room. Reactive (Parties).
+function LobbyController:PadBar(): LobbyHud.PadBar?
+	const _, party = self:MyParty()
+	if party == nil or party.Platform <= 0 then
+		return nil
+	end
+	const me = Players.LocalPlayer.UserId
+	return {
+		Leader = party.Leader == me,
+		Skip = party.Skip[me] == true,
+		Friends = party.Access == "Friends",
+	}
+end
+
+function LobbyController:PadAction(action: LobbyHud.PadAction)
+	-- event handlers run outside any reactive scope: plain reads
+	const bar = Vide.untrack(function()
+		return self:PadBar()
+	end)
+	if bar == nil then
+		return
+	end
+	const on = if action == "SkipTutorial" then not bar.Skip elseif action == "FriendsOnly" then not bar.Friends else true
+	self.Libs.Net.PartyPad:fireServer({ Action = action, On = on })
 end
 
 function LobbyController:PlayButton(): LobbyHud.PlayButton
@@ -890,9 +935,9 @@ function LobbyController:PlayButton(): LobbyHud.PlayButton
 end
 
 -- The gear beside START: the leader, before the countdown (TASK-306, DEC-344). Reactive (Parties).
+-- The room setup window is no longer opened (owner request 2026-10-21: the pad bar replaces it; the code stays)
 function LobbyController:GearShown(): boolean
-	const _, party = self:MyParty()
-	return party ~= nil and party.Leader == Players.LocalPlayer.UserId and party.State ~= "Starting"
+	return false
 end
 
 -- Play button: outside a squad the choice (Play Solo / Create Squad); the leader starts the squad (DEC-344); the others
@@ -910,7 +955,7 @@ function LobbyController:Play()
 		end
 		return
 	end
-	if self:GearShown() then
+	if self:IsLeader() then
 		self.Libs.Net.PartyStart:fireServer()
 	end
 end
@@ -929,8 +974,7 @@ function LobbyController:QuickPlay(choice: PlayChoice.Choice)
 	end
 	const id = self:MyParty()
 	if id ~= nil then
-		self:SetPanel("Platform")
-		return
+		return -- already in a squad: the HUD shows its button
 	end
 	const at = os.clock()
 	self.QuickMode = choice
@@ -959,9 +1003,8 @@ function LobbyController:CheckQuickPlay()
 		return
 	end
 	self:ClearQuickPlay()
-	const panel = Vide.untrack(self.Panel)
-	if self.QuickMode == "Squad" and (panel == "Play" or panel == "None") then
-		self:SetPanel("Platform")
+	if Vide.untrack(self.Panel) == "Play" then
+		self:SetPanel("None") -- the squad is there: the HUD shows START (no setup window any more)
 	end
 end
 
@@ -1117,6 +1160,89 @@ function LobbyController:OnPadCount(n: number, _from: number, _to: number)
 	end
 end
 
+-- Floor guide -------------------------------------------------------------------------------------------------------
+
+-- Cheapest class on sale this account does not own yet (gems); nil when there is none
+function LobbyController:CheapestClass(): number?
+	const owned = self.Dependencies.ProfileController.Classes()
+	local best: number? = nil
+	for _, class in Content.Classes.List do
+		if class.InMvp and class.Price > 0 and owned[class.Key] ~= true and (best == nil or class.Price < best) then
+			best = class.Price
+		end
+	end
+	return best
+end
+
+function LobbyController:GuidePending(key: string): boolean
+	return self.GuideSent[key] ~= true and self.Dependencies.ProfileController.Guides()[key] ~= true
+end
+
+-- The guide due now ("" = none) and its zone
+function LobbyController:GuideTarget(): (string, LobbyZones.Zone?)
+	const profile = self.Dependencies.ProfileController
+	if not profile.Ready() then
+		return "", nil
+	end
+	if self:GuidePending("classes") then
+		const price = self:CheapestClass()
+		if price ~= nil and profile.Gems() >= price then
+			for _, zone in LobbyZones.List() do
+				if zone.Panel == "Classes" then
+					return "classes", zone
+				end
+			end
+		end
+	end
+	if self:GuidePending("pad") then
+		const character = Players.LocalPlayer.Character
+		const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+		if root == nil or not root:IsA("BasePart") then
+			return "pad", nil
+		end
+		local best: LobbyZones.Zone? = nil
+		local bestScore = math.huge
+		for n = 1, PartyRules.Rules.Platforms do
+			const zone = LobbyZones.Platform(n)
+			if zone ~= nil then
+				-- a free pad first: a taken one counts as GUIDE_TAKEN studs farther
+				const score = (zone.Center - root.Position).Magnitude + (if self:PadState(n) == "Free" then 0 else GUIDE_TAKEN)
+				if score < bestScore then
+					best, bestScore = zone, score
+				end
+			end
+		end
+		return "pad", best
+	end
+	return "", nil
+end
+
+function LobbyController:GuideDone(key: string)
+	if not self:GuidePending(key) then
+		return
+	end
+	self.GuideSent[key] = true
+	self.Libs.Net.LobbyGuideDone:fireServer(key)
+end
+
+-- Every zone poll: what the guide points at (nothing while a screen is open)
+function LobbyController:CheckGuide()
+	const guide = self.Guide
+	if guide == nil then
+		return
+	end
+	if self:GuidePending("pad") and self:MyParty() ~= nil then
+		self:GuideDone("pad") -- joined a squad some other way (Play Solo, an invite)
+	end
+	const key, zone = self:GuideTarget()
+	self.GuideKey = key
+	if zone == nil or Vide.untrack(self.Panel) ~= "None" then
+		guide.Clear()
+	else
+		guide.Point(zone.Center, zone.Radius)
+	end
+end
+
 -- Zones -------------------------------------------------------------------------------------------------------------
 
 function LobbyController:OnZone(zone: LobbyZones.Zone, inside: boolean)
@@ -1127,6 +1253,7 @@ function LobbyController:OnZone(zone: LobbyZones.Zone, inside: boolean)
 	end
 	if zone.Platform > 0 then
 		if inside then
+			self:GuideDone("pad")
 			self.Standing(zone.Platform)
 		elseif Vide.untrack(self.Standing) == zone.Platform then
 			self.Standing(0)
@@ -1174,6 +1301,8 @@ end
 function LobbyController:RunZones()
 	self.Rings = Rings()
 	self.Extras = Extras()
+	self.Guide = Guide()
+	self.Halloween = Halloween()
 	-- street traffic between the two lobby tunnels (owner 2026-10-16); nil when the map lacks the cars or the tunnels
 	const traffic = Traffic()
 	self:PaintPlatforms()
@@ -1195,6 +1324,11 @@ function LobbyController:RunZones()
 		if traffic then
 			traffic.Step(dt)
 		end
+		const halloween = self.Halloween
+		if halloween then
+			const camera = workspace.CurrentCamera
+			halloween.Step(t, if camera then camera.CFrame.Position else nil)
+		end
 		const pads = self.Pads
 		if pads then
 			pads.Step()
@@ -1207,6 +1341,11 @@ function LobbyController:RunZones()
 		if now >= nextZones then
 			nextZones = now + LOBBY.Trigger.Poll
 			self:CheckZones()
+			self:CheckGuide()
+		end
+		const guide = self.Guide
+		if guide then
+			guide.Step()
 		end
 		if now >= nextClock then
 			nextClock = now + CLOCK_INTERVAL
@@ -1235,7 +1374,7 @@ end
 
 -- UI scale of the notices column (same rule as the windows).
 function LobbyController:NoticeScale(): number
-	return math.max(math.min(self.Scale(), UiScale.Current()), Theme.Scale.Min)
+	return math.max(math.min(self.Scale(), UiScale.Current()), UiScale.Floor())
 end
 
 -- The top left stays free for the Roblox menu and chat (the tiles sit at the middle of the left edge): the player list
@@ -1288,6 +1427,9 @@ function LobbyController:SetPanel(panel: Panel)
 		end
 	end
 	if panel == "Classes" then
+		if self.GuideKey == "classes" then
+			self:GuideDone("classes")
+		end
 		self:FocusClass(self.Dependencies.ProfileController.Selected())
 		self:OpenStage()
 	end
@@ -1486,16 +1628,16 @@ function LobbyController:Mount(playerGui: Instance)
 	end
 
 	const unmount, gui = Vide.root(function()
-		-- A Profile packet answers a class request: whatever it says, the buttons come back.
+		-- A Profile packet answers a class request: whatever it says, the buttons come back. Sources are written deferred,
+		-- never inside an effect (see the setup window effect below).
 		Vide.effect(function()
 			profile.Classes()
 			profile.Selected()
 			profile.Gems()
-			Vide.untrack(function()
+			task.defer(function()
 				if self.PromptClass == "" then
 					self:ClearPending()
 				end
-				return nil
 			end)
 		end)
 
@@ -1503,12 +1645,11 @@ function LobbyController:Mount(playerGui: Instance)
 		Vide.effect(function()
 			const scale = self.Scale()
 			const panel = self.Panel()
-			Vide.untrack(function()
+			task.defer(function()
 				gifts.Scale(scale)
 				if panel ~= "Shop" and panel ~= "Classes" then
 					gifts:Close()
 				end
-				return nil
 			end)
 		end)
 
@@ -1528,16 +1669,19 @@ function LobbyController:Mount(playerGui: Instance)
 			return panel ~= "None" and (panel ~= "Classes" or not self.WorldStage())
 		end)
 
-		-- The setup window opened by Play closes when there is no squad to show anymore (left, solo run over)
+		-- The setup window opened by Play closes when there is no squad to show anymore (left, solo run over). Deferred:
+		-- writing Panel inside an effect breaks Vide's graph ("attempt to call a boolean"), and the error aborted the
+		-- OnZone that set Standing, leaving the window stuck open (owner 2026-10-20: lobby UI froze on pad in / out).
 		Vide.effect(function()
 			const panel = self.Panel()
 			const party = self:SetupParty()
-			Vide.untrack(function()
-				if panel == "Platform" and party == nil and self.Standing() == 0 then
-					self:SetPanel("None")
-				end
-				return nil
-			end)
+			if panel == "Platform" and party == nil and Vide.untrack(self.Standing) == 0 then
+				task.defer(function()
+					if Vide.untrack(self.Panel) == "Platform" and self:SetupParty() == nil and Vide.untrack(self.Standing) == 0 then
+						self:SetPanel("None")
+					end
+				end)
+			end
 		end)
 
 		-- The zone rings leave the world while the class panel is open (they drew over the class on the stage, owner
@@ -1642,7 +1786,13 @@ function LobbyController:Mount(playerGui: Instance)
 				end,
 				OnGear = function()
 					self:Click()
-					self:SetPanel("Platform")
+				end,
+				Pad = function()
+					return self:PadBar()
+				end,
+				OnPad = function(action: LobbyHud.PadAction)
+					self:Click()
+					self:PadAction(action)
 				end,
 				Scale = self.Scale,
 				Online = self.Online,

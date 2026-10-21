@@ -176,6 +176,16 @@ Caminhos dos packs (abreviados nas fichas):
 | AST-161 | Cozinha com esteira: mesa central de 8 vagas em grid 4 × 2 | equipment | P0 | Pack + edição | `KP/kitchencounter_straight_A.fbx` recolor Steel (como AST-144); marcas `AST-019_QueueMark` | Rascunho (TASK-523) |
 | AST-162 | Cozinha com esteira: prato do hot dog (Tool + mundo + esteira) | equipment | P0 | Pack + edição | `FP/plate-rectangle.fbx` (Kenney Food Kit, CC0) | Rascunho (TASK-523) |
 | AST-163 | Cozinha com esteira: plaquinha do ticket no prato | equipment | P0 | Modelar | — (peça mínima; texto por `SurfaceGui`) | Rascunho (TASK-523) |
+| AST-167 | Halloween: caldeirão do spawn `HW_Cauldron_Main` (+ bolhas procedurais) | prop | P0 | Modelar | — | Rascunho (DEC-346, TASK-625; entregue e enviado 2026-10-21, ids em `_asset_ids.json`) |
+| AST-168 | Halloween: abóboras `HW_Pumpkin_Small/Medium/Large` + rostos `HW_Pumpkin_Face_A/B/C` | prop | P0 | Modelar | — | Rascunho (DEC-346, TASK-625; entregue e enviado 2026-10-21, ids em `_asset_ids.json`) |
+| AST-169 | Halloween: lanternas `HW_Lantern_Post` / `HW_Lantern_Hanging` | prop | P0 | Modelar | — | Rascunho (DEC-346, TASK-625; entregue e enviado 2026-10-21, ids em `_asset_ids.json`) |
+| AST-170 | Halloween: doces `HW_Candy_Bucket` / `HW_Candy_Cluster` | prop | P1 | Modelar | — | Rascunho (DEC-346, TASK-626; entregue e enviado 2026-10-21, ids em `_asset_ids.json`) |
+| AST-171 | Halloween: caixote `HW_Crate` | prop | P1 | Modelar | — | Rascunho (DEC-346, TASK-626; entregue e enviado 2026-10-21, ids em `_asset_ids.json`) |
+| AST-172 | Halloween: morcego `HW_Bat_Silhouette` e teia `HW_Cobweb_Corner` | prop | P1 | Modelar | — | Rascunho (DEC-346, TASK-626; entregue e enviado 2026-10-21, ids em `_asset_ids.json`) |
+| AST-173 | Halloween: bandeirinhas `HW_Pennant_String` | prop | P1 | Modelar | — | Rascunho (DEC-346, TASK-626; entregue e enviado 2026-10-21, ids em `_asset_ids.json`) |
+| AST-174 | Halloween: fantasminha `HW_Ghost_Cute` | prop | P1 | Modelar | — | Rascunho (DEC-346, TASK-626; entregue e enviado 2026-10-21, ids em `_asset_ids.json`) |
+| AST-175 | Halloween: arco de lua `HW_Moon_Arch`, placa `HW_Photo_Sign`, placa `HW_Hotdog_Pumpkin_Sign` | prop | P2 | Modelar | — | Rascunho (DEC-346, TASK-626; entregue e enviado 2026-10-21, ids em `_asset_ids.json`) |
+| AST-176 | Halloween: cristais `HW_Crystal_Cursed_A/B` | prop | P2 | Modelar | — | Rascunho (DEC-346, TASK-626; entregue e enviado 2026-10-21, ids em `_asset_ids.json`) |
 
 Totais: **77 IDs**, **76 fichas ativas** (AST-001 a AST-038 existentes, revistas; AST-039 a AST-075 da 1ª conciliação; AST-076 e AST-077 da 2ª revisão; **AST-077 Obsoleto** por DEC-130).
 Usam pack: **25** (4 direto, 21 com edição). Plataforma R6 + acessórios: **9**. Modelar / 2D / animação do zero: **43**. (DEC-138: AST-017, 018, 019, 024 passaram de Modelar para Pack + edição; antes 21 / 47.) DEC-140: AST-025 passou de Modelar para Pack + edição ("Trashcan" by Kenney via Poly Pizza, fora dos packs de `Assets/`) — usam pack **26** (4 / 22); Modelar **42**.
@@ -186,6 +196,7 @@ Usam pack: **25** (4 direto, 21 com edição). Plataforma R6 + acessórios: **9*
 **2026-10-17 (TASK-395, restaurante, DEC-269 a DEC-280):** colisão de ID resolvida. **AST-123/124 ficam com as skins** (TASK-373: já estão em `Content.Skins.Ref`, `SkinLooks.luau`, `skin_icons.py` e no Roblox) e ganham ficha aqui. A reserva AST-123..139 do MAP-01 r4 rev. 2 não pode ser mantida (123/124 ocupados) e **AST-125..139 ficam queimados** (citados em docs e no board antes da troca; não reaproveitar). Assets do restaurante = **AST-140 a AST-156** (grep `AST-1[2-9][0-9]` no repo inteiro, `src/`, `tools/`, `docs/` e nomes em `Assets/`: o maior ID citado era AST-139). **AST-122 segue livre** (nunca usado; fica como lacuna para não partir a faixa do restaurante). Os FBX `AST-099` a `AST-102` em `Assets/import/` continuam sem ficha (não reaproveitar). Próximo ID livre depois da faixa: **AST-157**.
 **2026-10-18 (TASK-523, cozinha com esteira, DEC-302 a DEC-304):** fichas novas **AST-157 a AST-163** (7, todas **Rascunho**; seção "Cozinha com esteira" antes de "Fora desta lista"). Grep `AST-15[7-9]|AST-16[0-9]` em `docs/`, `src/`, `tools/` antes da numeração: nenhum uso. AST-122 segue livre (lacuna). Próximo ID livre: **AST-164**.
 **2026-10-20 (tela de queda, DEC-317):** **AST-165** coração da vida do time (256², branco com contorno Ink, tingido no client; `Icons` "Life/heart") e **AST-166** ícone novo do revive (coração rosa com "+" e faíscas, brilho arredondado no lobo esquerdo a pedido do dono; "Life/revive"). Arte gerada por script (Pillow), sem terceiros: `Assets/textures/ui/life/`. Subidos em 2026-10-20: AST-165 `rbxassetid://127177868031282`, AST-166 `rbxassetid://92117058169007` (`Icons` SINGLES).
+**2026-10-21 (overlay de Halloween do lobby, DEC-346):** fichas **AST-167 a AST-176** (10, **Rascunho**; seção "Overlay de Halloween do lobby"). Grep `AST-16[7-9]|AST-17[0-9]` antes da numeração: nenhum uso. Próximo ID livre: **AST-177**.
 Mapeamento Kenney/KayKit por ficha (DEC-136, Rascunho): `asset-sourcing.md`. As entradas "→ sourcing:" na coluna "Arquivo de pack" vêm de lá; Origem e Status não mudaram.
 **DEC-137 (2026-10-09):** comida aprovada — AST-001 a AST-011 e AST-061 em **Aprovado**, com o candidato do sourcing como arquivo de origem (fila do `modeler-3d`). Demais fichas seguem Rascunho. `Q-133` (limite de atlases) segue aberta.
 **DEC-138 (2026-10-10):** equipamentos aprovados após o teste em `workspace.__ImportTest_Equip` — AST-014, 015, 017, 018, 019, 024, 040, 041, 049 em **Aprovado** com o candidato KP/MM como origem (partes sem candidato seguem para modelar no estilo). Banqueta `KP/chair_stool` com **assento plano** em todo uso. **AST-012**: candidato fogão KayKit **recusado**; vira **roller grill** modelada (Steel + painel Ketchup, sem marca), Aprovado na direção; silhueta em reescrita pelo art-director; níveis em `Q-134`.
@@ -530,6 +541,8 @@ Compra de upgrade: bancada do Mart (AST-049, DEC-101); a peça visível troca no
 
 ### AST-021 — Saco de moedas (ladrão)
 
+> **Removido (DEC-313, 2026-10-20):** o ladrão saiu do jogo e do código (`src/Thief`, `Content.Thief`, `Net.Thief`, UPG-004, notices `thief_*`, ligações "quentin"). Texto abaixo é histórico.
+
 - **Status:** Rascunho · **Prioridade:** P0 · **Origem:** Pack + edição — `FP/bag.fbx` recolor + 2–3 moedas saindo + "$" costurado (CHR-004)
 - **Dimensões:** 0,8 Ø × 1,0 A. **Cores:** saco `#B9A27A`, "$" e moedas Mustard.
 - **Encaixes:** `Handle`/`Att_Hand` (para o `RightGripAttachment` do R6). **Tris:** ≤ 300.
@@ -673,6 +686,8 @@ Compra de upgrade: bancada do Mart (AST-049, DEC-101); a peça visível troca no
 - **Encaixes:** `Hit_Front` (área de colisão do atropelamento), `VFX_Honk`. **Pivô:** base-centro. **Tris:** 800–1.500 cada; teto 2.000.
 
 ### AST-052 — Ambulância (+ maca levada pelos médicos)
+
+> **Descartado (DEC-314, 2026-10-20):** a ambulância e os médicos não serão feitos; o corpo fica no chão até o reviver ou o fim da noite (`Revive.BodyFallback`). Texto abaixo sobre ambulância é histórico.
 
 - **Status:** Aprovado (DEC-139) · **Prioridade:** P1 · **Origem:** Pack + edição — `CK/ambulance.fbx` (16 × 7 × 8); maca, portas traseiras recortadas e barra de luz conforme `asset-sourcing.md`. ~~**Pendente (modeler-3d):** conferir o lado oculto~~ (conferido: sem cruz/emblema, DEC-141). **Ambulância: modelo aprovado DEC-141.**
 - **Modelo (DEC-141):** `Assets/blender/vehicle/AST-052_Ambulance.blend`, `Assets/models/vehicle/AST-052_Ambulance.fbx`; 1.748 tris; Cream + faixa Teal; portas traseiras com pivô, vão **5,1 × 4,9**; compartimento de carga **8,37 de fundo × 5,13 de largura × 4,89 de altura** (medido pelo modeler-3d; o "~2 de fundo" da DEC-141 era leitura errada da prévia escura).
@@ -1004,6 +1019,8 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 
 ### AST-056 — Quick Quentin (CHR-004, NPC-007)
 
+> **Removido (DEC-313, 2026-10-20):** o ladrão saiu do jogo e do código (`src/Thief`, `Content.Thief`, `Net.Thief`, UPG-004, notices `thief_*`, ligações "quentin"). Texto abaixo é histórico.
+
 - **Status:** Rascunho · **Prioridade:** P0 · **Origem:** Plataforma + Modelar
 - **Visual:** magro e comprido (postura), sobretudo grande demais **cinza-arroxeado `#7A6FB0`** (lido a 110 studs, MAP-01 §6), chapéu de aba baixa, óculos escuros redondos, bigodinho fino (decal), tênis muito brancos. Carrega AST-021.
 - **Tom:** vilão de desenho; sem máscara, sem arma, sem capuz de assalto.
@@ -1032,6 +1049,8 @@ Regras gerais: style guide §4 (opção A: `BodyColors` + acessórios de atlas +
 - **DEC-202 (2026-10-10):** Walt é uma **tartaruga** (Turtle, rig da crew). Fala literal: "Faz uma tartaruga mesmo, ele vai ter uma animaçào mais corcunda, andando com um bastão de madeira e uma barba branca low poly, além da textura com rugas". Peças novas: **bastão de madeira** (na mão), **barba branca low poly** (substitui o bigode), **textura de cabeça com rugas** (própria do Walt). Animação: **andar corcunda** apoiado no bastão (AST-069). **Provisório** (art-director): bastão na mão esquerda e `Coffee_Pair` na direita; boné vermelho com o logo da DEC-206, óculos, jaqueta e crachá mantidos se couberem com a barba; tris ≤ 2.500 somando barba e bastão.
 
 ### AST-076 — Médicos da ambulância: Bellmoor Rescue crew (CHR-008, NPC-024)
+
+> **Descartado (DEC-314, 2026-10-20):** a ambulância e os médicos não serão feitos; o corpo fica no chão até o reviver ou o fim da noite (`Revive.BodyFallback`). Texto abaixo sobre ambulância é histórico.
 
 - **Status:** Rascunho · **Prioridade:** P1 · **Origem:** Plataforma (R6) + Modelar (acessórios)
 - **Uso:** **DEC-114** — na **ida** (coleta do desmaiado) os 2 médicos descem da ambulância (AST-052), vão até o corpo, levam-no na maca e sobem. Na **volta do reviver** não aparecem (DEC-091). Atores **visuais** dirigidos pela linha do tempo do servidor, fora do teto de 12 NPCs (NPC-024, FEAT-034). Não são anomalia nem âncora de anomalia; podem entrar no ponto seguro para buscar um corpo (MAP-01 §9.6).
@@ -1406,6 +1425,8 @@ Diferença para a sugestão padrão (lobby na onda 4): o board põe **lobby e pa
 - **Formato:** 128² cada, folha `T_UI_Portraits` 1024²; câmera 3/4 frontal, fundo transparente, luz chapada igual para todos, contorno 4 px `#2B2233`.
 
 #### AST-087 — Jornal de espreita do Quick Quentin
+
+> **Removido (DEC-313, 2026-10-20):** o ladrão saiu do jogo e do código (`src/Thief`, `Content.Thief`, `Net.Thief`, UPG-004, notices `thief_*`, ligações "quentin"). Texto abaixo é histórico.
 
 - **Status:** Rascunho · **Prioridade:** P1 · **Onda:** 2 (ladrão) · **Dono:** modeler-3d · **Origem:** Modelar (nenhum pack tem jornal).
 - **Uso:** espreita disfarçada (AST-056; clipe `Thief_Lurk` do AST-069) no banco de praça e no poste; some quando ele vai à gaveta; o saco AST-021 aparece na fuga. Também serve de "jornal de vagas amassado" da intro (AST-075, variante `Newspaper_Crumpled`).
@@ -2106,6 +2127,65 @@ Fonte: **DEC-302** (modo focado volta com esteira; layout: grelha + mesa de desc
 2. **P0, cenário de uso:** AST-158 (bancada), AST-161 (mesa central), AST-160 (calço da mesa de descanso; o `Rail_8` já existe).
 
 Aceite de revisão (art-director): medidas da TASK-503 (±0,1) e desta ficha onde a 503 não fechar; pivô e frente; nomes `AST-###_<Nome>` e attachments do §8 com os nomes das fichas (ou os do contrato da TASK-512, se mudarem); tris dentro da ficha e do bloco; nenhum atlas ou textura 3D nova; prato mais claro que a lona e o tampo na vista do foco (print 16:9 e 667 × 375); setas com alvo ≥ 44 px; nenhuma forma, cor ou layout do jogo de referência.
+
+## Overlay de Halloween do lobby — AST-167 a AST-176 (DEC-346, 2026-10-21)
+
+Fonte: **DEC-346** (plano `levels/LOBBY-halloween.md`, recomendações P-HW1..6 aprovadas; kit modelado do zero, sem pack).
+Tudo **Rascunho**: o dono revisa no fim (delegação da DEC-346). Placement e limites de zona: `levels/LOBBY-halloween.md` §5.
+
+### Regras do kit
+
+- **Estilo:** toy low-poly do style guide §1.1, cantos chanfrados, silhuetas grandes e redondas; fofo primeiro, estranho
+  depois. Sem caveira, sem sangue, sem rosto assustador (rostos das abóboras = sorriso, surpresa, piscadinha).
+- **Cor:** uma atlas só para o kit, `T_HW_Atlas` (faixas chapadas por UV, `uv_band`), em `Assets/textures/props/`.
+  Paleta: abóbora `#F28C28`, abóbora escura `#C9651A`, talo `#5E8C3A`, âmbar `#FFB25A`, violeta `#7B4BC4`, violeta escuro
+  `#4A2F7A`, ferro `#3A2E4F`, verde-poção `#5FD38D`, creme `#FFF3DC`, ink `#2B2233`, madeira `#8A5A3B`, magenta `#C45BB8`.
+  Nada do vermelho de alerta (§2.4).
+- **Brilho:** peça que brilha (rosto da abóbora, chama, líquido, ponta do cristal) é **objeto separado** que vira
+  `Material = Neon` no Roblox; nenhuma luz real no kit.
+- **Eixos e pivô:** 1 unidade = 1 stud; pivô na base-centro (pendurados: no ponto de pendurar, topo); frente = −Z no Roblox.
+- **Colisão:** só o caldeirão colide (proxy cilindro, colocado pelo placement); o resto `CanCollide/CanQuery/CanTouch` falso.
+- **Orçamento total colocado:** ≤ 25 mil tris, 0 luzes, ≤ 3 emissores.
+
+### AST-167 — `HW_Cauldron_Main`
+Caldeirão bojudo Ø ~7, altura ~4,6 (borda), 3 pés curtos, borda grossa em toro, 2 alças de argola laterais. Corpo ferro
+violeta-escuro, borda e alças âmbar/abóbora. Objeto separado `Liquid` (disco levemente abaulado, verde-poção → Neon).
+Tris ≤ 1.500. Bolhas = esferas Neon procedurais no client (6–8, sobem e somem), não modeladas.
+
+### AST-168 — Abóboras
+`Small` Ø 1,4, `Medium` Ø 2,2, `Large` Ø 3,2; gomos (8 lóbulos), talo curvo verde, 1 folhinha. `Face_A/B/C` = abóbora
+Medium com rosto recortado (sorriso / "o" de surpresa / piscadinha) e objeto `Glow` atrás do rosto (âmbar → Neon).
+Tris ≤ 300 / 400 / 500.
+
+### AST-169 — Lanternas
+`Post`: haste ink 4,5 de altura, pé quadrado, gancho em cima com lanterna. `Hanging`: lanterna 0,9 × 1,3 com argola; pivô
+no topo da argola. Vidro = objeto `Glow` âmbar → Neon. Tris ≤ 400.
+
+### AST-170 — Doces
+`Bucket`: balde-abóbora Ø 1,4 com alça e doces aparecendo; `Cluster`: 5–7 balas embrulhadas (creme/violeta/magenta).
+Tris ≤ 300.
+
+### AST-171 — `HW_Crate`
+Caixote de madeira 2 × 1,6 × 2 com 2 tábuas e marca de abóbora pintada (atlas). Tris ≤ 200.
+
+### AST-172 — Morcego e teia
+`Bat`: silhueta plana com espessura 0,1, envergadura 2,4, olhinhos creme (amigável). `Cobweb_Corner`: teia de canto
+plana 2 × 2 (fios ink claros), sem aranha. Tris ≤ 150.
+
+### AST-173 — `HW_Pennant_String`
+Trecho de 8 studs com 6 bandeirinhas triangulares alternando abóbora/violeta, fio ink; pivô na ponta esquerda.
+Tris ≤ 150.
+
+### AST-174 — `HW_Ghost_Cute`
+Fantasminha gota 1,6 × 2,2, creme, olhos ovais ink e bochechas magenta, base ondulada. Tris ≤ 600.
+
+### AST-175 — Arco de lua e placas
+`Moon_Arch`: lua crescente em pé, Ø ~8, creme-âmbar (face interna `Glow` → Neon fraco), base de pedra ink. `Photo_Sign`:
+placa de madeira 5 × 1,4 em 2 postes (texto por `SurfaceGui`, "SPOOKY SNAPSHOT"). `Hotdog_Pumpkin_Sign`: placa recortada
+com abóbora segurando um hot dog (pintado no atlas), 3 × 2. Tris ≤ 800 cada.
+
+### AST-176 — `HW_Crystal_Cursed_A/B`
+Aglomerado de 3–4 prismas facetados (A violeta, B abóbora), base de pedra; ponta = objeto `Glow` → Neon. Tris ≤ 300.
 
 ## Fora desta lista (próxima rodada)
 
