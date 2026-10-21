@@ -1549,16 +1549,16 @@ function LobbyController:Mount(playerGui: Instance)
 	end
 
 	const unmount, gui = Vide.root(function()
-		-- A Profile packet answers a class request: whatever it says, the buttons come back.
+		-- A Profile packet answers a class request: whatever it says, the buttons come back. Sources are written deferred,
+		-- never inside an effect (see the setup window effect below).
 		Vide.effect(function()
 			profile.Classes()
 			profile.Selected()
 			profile.Gems()
-			Vide.untrack(function()
+			task.defer(function()
 				if self.PromptClass == "" then
 					self:ClearPending()
 				end
-				return nil
 			end)
 		end)
 
@@ -1566,12 +1566,11 @@ function LobbyController:Mount(playerGui: Instance)
 		Vide.effect(function()
 			const scale = self.Scale()
 			const panel = self.Panel()
-			Vide.untrack(function()
+			task.defer(function()
 				gifts.Scale(scale)
 				if panel ~= "Shop" and panel ~= "Classes" then
 					gifts:Close()
 				end
-				return nil
 			end)
 		end)
 
@@ -1591,16 +1590,19 @@ function LobbyController:Mount(playerGui: Instance)
 			return panel ~= "None" and (panel ~= "Classes" or not self.WorldStage())
 		end)
 
-		-- The setup window opened by Play closes when there is no squad to show anymore (left, solo run over)
+		-- The setup window opened by Play closes when there is no squad to show anymore (left, solo run over). Deferred:
+		-- writing Panel inside an effect breaks Vide's graph ("attempt to call a boolean"), and the error aborted the
+		-- OnZone that set Standing, leaving the window stuck open (owner 2026-10-20: lobby UI froze on pad in / out).
 		Vide.effect(function()
 			const panel = self.Panel()
 			const party = self:SetupParty()
-			Vide.untrack(function()
-				if panel == "Platform" and party == nil and self.Standing() == 0 then
-					self:SetPanel("None")
-				end
-				return nil
-			end)
+			if panel == "Platform" and party == nil and Vide.untrack(self.Standing) == 0 then
+				task.defer(function()
+					if Vide.untrack(self.Panel) == "Platform" and self:SetupParty() == nil and Vide.untrack(self.Standing) == 0 then
+						self:SetPanel("None")
+					end
+				end)
+			end
 		end)
 
 		-- The zone rings leave the world while the class panel is open (they drew over the class on the stage, owner
