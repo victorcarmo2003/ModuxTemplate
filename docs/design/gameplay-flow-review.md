@@ -87,6 +87,11 @@ resolvida; verbo errado, como na Raincoat = susto). A janela continua igual (`Q-
 `Tablets`, pacote `TabletDecide`; a paciência segue congelada enquanto o jogador escolhe (`Q-458`). Vale também para o
 carro do drive-thru, que passou a ter a conversa (sessão "Restaurar UI de conversa").
 
+**2ª passada (mesmo dia):** Take Order → close no rosto do cliente (só na tela de quem atende, tablet escondido, andar
+travado) → oi + resposta → **ACCEPT / REFUSE** → só então o pedido (cliente normal). ACCEPT numa anomalia assusta ainda no
+close. Diálogo à esquerda, 1,35× maior. Próximo passo: sustos do close por indício de anomalia (olhar que segue, rosto
+que falha, piscada errada, a cabeça que vira no último frame antes de soltar a câmera).
+
 ## 4. Propostas (dependem do dono)
 
 ### 4.1 Quatro respostas pela direção do perigo (`Q-445`)

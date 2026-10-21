@@ -7,6 +7,10 @@
 --   Kinds      night -> the kinds an odd customer may say that night (one is drawn per customer, seeded by its id)
 --   Lines      kind -> lines (English UI, short, Mild)
 --   ByVariant  rig Variant -> its own lines instead of the night's kinds
+--   Hello      an ordinary customer's answer to the greeting (the order comes only after ACCEPT, 2nd pass 2026-10-21)
+--   CloseUp    the taker's camera on the customer's face while the talk is on (the tablet in front hidden on that
+--              screen): studs in front of the head, lift, field of view, glide s, s it holds after the talk ends
+--   DialogScale the talk card on the left, this much bigger than the HUD scale
 -- A refused ordinary customer walks off with one of Content.ShopWindow.ShutLines over its head (no scare, only the sale).
 local Table = require(script.Parent.Table)
 
@@ -16,6 +20,9 @@ export type OrderTalk = {
 	Kinds: { { Kind } },
 	Lines: { [Kind]: { string } },
 	ByVariant: { [string]: { string } },
+	Hello: { string },
+	CloseUp: { Distance: number, Lift: number, Fov: number, Travel: number, Hold: number },
+	DialogScale: number,
 	Serve: string,
 	Refuse: string,
 }
@@ -55,7 +62,10 @@ const talk: OrderTalk = {
 	ByVariant = {
 		raincoat = { "Something warm, dear. I've waited so long.", "Just a hot dog, love. Take your time." },
 	},
-	Serve = "SERVE",
+	Hello = { "Hi!", "Evening!", "Hey there.", "Hello!", "Hi, how's it going?" },
+	CloseUp = { Distance = 2.4, Lift = 0.15, Fov = 50, Travel = 0.45, Hold = 1.2 },
+	DialogScale = 1.35,
+	Serve = "ACCEPT",
 	Refuse = "REFUSE",
 }
 

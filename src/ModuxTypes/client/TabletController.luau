@@ -38,10 +38,13 @@ export type Speaker = "Player" | "Customer"
 
 export type Public = {
 	Clock: RBXScriptConnection?,
+	CloseTablet: number?,
+	CloseToken: number,
 	DecideBound: boolean,
 	DecideSentAt: number,
 	DialogUnmount: (() -> ())?,
 	Gui: Instance?,
+	Hidden: { [BasePart]: number },
 	Holder: Folder?,
 	Mine: Vide.Source<number>,
 	Now: Vide.Source<number>,
@@ -55,6 +58,7 @@ export type Public = {
 	MyTalk: (self: Public) -> MyTalk?,
 	SpotOf: (self: Public, index: number) -> Spot,
 	WriteRecord: (self: Public, index: number, record: Record?) -> (),
+	SyncCloseUp: (self: Public) -> (),
 	SyncDecide: (self: Public) -> (),
 	Decide: (self: Public, serve: boolean) -> (),
 	Anchor: (self: Public, spot: Spot) -> Instance?,

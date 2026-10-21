@@ -26,10 +26,15 @@
 -- not lost behind a warn. Walking away is still not a cancel (board TASK-381; design gap noted in R-5).
 -- TASK-380 runs in parallel: the CustomerService methods it adds are called by name and skipped (logged once) while
 -- missing.
--- Choice (owner 2026-10-21, DEC-353): at EndsAt the talk does not take the order by itself any more. The tablet goes
--- Deciding (same record, patience still frozen) and waits for its User's TabletDecide: Serve = CustomerService:TakeOrderFor
--- as before; Refuse = CustomerService:RefuseOne (only that customer leaves; an anomaly customer is answered by its module).
--- The customer gone / the user gone while deciding = the same Reset / Cancel as while talking.
+-- Choice (owner 2026-10-21, DEC-353; 2nd pass the same day: "o primeiro step seria um greeting e dai vem o refuse / accept e
+-- depois sim ele faz o pedido"). Three steps, the patience frozen all along:
+--   Greeting  StartedAt..EndsAt = Talk.Open + Talk.Lead: the player says hi, the customer answers (an odd one with its odd line)
+--   Deciding  waits for the User's TabletDecide. Refuse = CustomerService:RefuseOne (only that customer leaves; an anomaly
+--             customer is answered by its module). Accept: an anomaly customer = TakeOrderFor at once (its module scares,
+--             in the close-up); an ordinary one goes on to
+--   Talking   the order itself (new StartedAt, EndsAt = OrderTime = the old talk minus the greeting); at EndsAt
+--             CustomerService:TakeOrderFor as before.
+-- The customer gone / the user gone in any of them = the same Reset / Cancel.
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -39,7 +44,7 @@ local Lync = require(ReplicatedStorage.Packages.Lync)
 local Restaurant = require(ReplicatedStorage.shared.Libs.Net.Restaurant)
 local Modux = require(ServerScriptService.server.Modux)
 
-export type TabletState = "Idle" | "Talking" | "Full" | "Deciding"
+export type TabletState = "Idle" | "Talking" | "Full" | "Deciding" | "Greeting"
 
 export type Tablet = {
 	Index: number,
@@ -52,6 +57,7 @@ export type Tablet = {
 	Order: { string }, -- topping keys of the 1st hot dog
 	Order2: { string }?, -- pair (FEAT-038)
 	PromptOn: boolean?, -- last state written to the prompt (owner 2026-10-18: it showed with nobody at the counter)
+	OrderTime: number?, -- s of the order talk after Accept (DEC-353), set at Start
 }
 
 const ACTION = "tablet_take"
@@ -72,7 +78,7 @@ end
 
 -- A talk is on: talking, or done and waiting for the user's SERVE / REFUSE (DEC-353)
 local function busy(tablet: Tablet): boolean
-	return tablet.State == "Talking" or tablet.State == "Deciding"
+	return tablet.State == "Greeting" or tablet.State == "Talking" or tablet.State == "Deciding"
 end
 
 local function toppingSet(list: { string }): { [string]: boolean }
@@ -211,11 +217,14 @@ function TabletService:Start(player: Player, tablet: Tablet): boolean
 	const first = lines[1] or {}
 	const second = lines[2]
 	const at = now()
-	tablet.State = "Talking"
+	const talk = Content.Restaurant.Talk
+	const greeting = talk.Open + talk.Lead
+	tablet.State = "Greeting"
 	tablet.Npc = npc
 	tablet.User = player
 	tablet.StartedAt = at
-	tablet.EndsAt = at + self:TalkTime(#first, if second then #second else nil)
+	tablet.EndsAt = at + greeting
+	tablet.OrderTime = math.max(self:TalkTime(#first, if second then #second else nil) - talk.Open, talk.MinTotal)
 	tablet.Order = table.clone(first)
 	tablet.Order2 = if second then table.clone(second) else nil
 	self:Pause(npc, true)
@@ -233,6 +242,7 @@ function TabletService:Reset(tablet: Tablet)
 	tablet.EndsAt = 0
 	tablet.Order = {}
 	tablet.Order2 = nil
+	tablet.OrderTime = nil
 	if npc ~= 0 then
 		self:Pause(npc, false)
 		-- the car's own "Take Order" went off for the talk (StartDrive); back on while it still waits to order
@@ -263,29 +273,54 @@ function TabletService:DriveTalking(npc: number): boolean
 end
 
 -- End of the talk (DEC-353): the customer said its line; the record stays and waits for the user's SERVE / REFUSE
-function TabletService:Finish(tablet: Tablet)
-	if tablet.State ~= "Talking" then
+function TabletService:Ask(tablet: Tablet)
+	if tablet.State ~= "Greeting" then
 		return
 	end
 	tablet.State = "Deciding"
 	self:Publish(tablet)
 end
 
--- The user's pick (DEC-353, TabletDecide). Serve = the order is taken by whoever started the talk (same path as the old
--- "Take Order" prompt); Refuse = only that customer leaves. Anyone else, or a tablet not Deciding = ignored.
+-- End of the order talk: the order is taken by whoever started it (same path as the old "Take Order" prompt)
+function TabletService:Finish(tablet: Tablet)
+	if tablet.State ~= "Talking" then
+		return
+	end
+	const npc = tablet.Npc
+	const user = tablet.User
+	self:Reset(tablet)
+	if npc == 0 or user == nil then
+		return
+	end
+	if not self.Dependencies.CustomerService:TakeOrderFor(user, npc) then
+		warn(`[TabletService] TAB-{tablet.Index}: TakeOrderFor({user.Name}, {npc}) refused at the end of the talk`)
+	end
+end
+
+-- The user's pick (DEC-353, TabletDecide). Accept = an ordinary customer says its order (Talking), an anomaly customer is
+-- taken at once (its module answers); Refuse = only that customer leaves. Anyone else, or a tablet not Deciding = ignored.
 function TabletService:Decide(tablet: Tablet, player: Player, serve: boolean)
 	if tablet.State ~= "Deciding" or tablet.User ~= player then
 		return
 	end
 	const npc = tablet.Npc
+	const customers = self.Dependencies.CustomerService
+	const customer = customers:Get(npc)
+	if serve and customer ~= nil and customer.Variant == nil then
+		const at = now()
+		tablet.State = "Talking"
+		tablet.StartedAt = at
+		tablet.EndsAt = at + (tablet.OrderTime or Content.Restaurant.Talk.MinTotal)
+		self:Publish(tablet)
+		return
+	end
 	self:Reset(tablet)
 	if npc == 0 then
 		return
 	end
-	const customers = self.Dependencies.CustomerService
 	if serve then
 		if not customers:TakeOrderFor(player, npc) then
-			warn(`[TabletService] TAB-{tablet.Index}: TakeOrderFor({player.Name}, {npc}) refused after SERVE`)
+			warn(`[TabletService] TAB-{tablet.Index}: TakeOrderFor({player.Name}, {npc}) refused after ACCEPT`)
 		end
 	elseif not customers:RefuseOne(player, npc) then
 		warn(`[TabletService] TAB-{tablet.Index}: RefuseOne({player.Name}, {npc}) found nobody to refuse`)
@@ -353,6 +388,8 @@ function TabletService:Step()
 				self:Reset(tablet)
 			elseif self:UserGone(tablet) then
 				self:Cancel(tablet, "attendant left")
+			elseif tablet.State == "Greeting" and t >= tablet.EndsAt then
+				self:Ask(tablet)
 			elseif tablet.State == "Talking" and t >= tablet.EndsAt then
 				self:Finish(tablet)
 			end
@@ -534,10 +571,11 @@ function TabletService:DevFinish(index: number?): string
 	end
 	const npc = tablet.Npc
 	const user = tablet.User
-	self:Finish(tablet)
+	self:Ask(tablet)
 	if user ~= nil then
 		self:Decide(tablet, user, true)
 	end
+	self:Finish(tablet)
 	const customer = self.Dependencies.CustomerService:Get(npc)
 	return `TAB-{tablet.Index} done; customer {npc} is {if customer then customer.State else "gone"}`
 end

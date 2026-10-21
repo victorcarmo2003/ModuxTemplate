@@ -40,8 +40,8 @@ end
 
 local function restaurantTablets()
 	return Lync.struct({
-		-- Deciding (owner 2026-10-21, DEC-353): the talk is over, the user picks SERVE or REFUSE (TabletDecide)
-		State = Lync.enum({ "Idle", "Talking", "Full", "Deciding" }),
+		-- DEC-353: Greeting (hi + the answer) -> Deciding (the user picks ACCEPT / REFUSE, TabletDecide) -> Talking (the order)
+		State = Lync.enum({ "Idle", "Talking", "Full", "Deciding", "Greeting" }),
 		Npc = Lync.int(0, 65535), -- customer at this tablet, 0 = none
 		User = Lync.f64(), -- UserId taking the order, 0 = nobody
 		StartedAt = Lync.f64(),

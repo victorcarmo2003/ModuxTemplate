@@ -11,8 +11,9 @@ export type Tablet = {
 	Order: { string }, -- topping keys of the 1st hot dog
 	Order2: { string }?, -- pair (FEAT-038)
 	PromptOn: boolean?, -- last state written to the prompt (owner 2026-10-18: it showed with nobody at the counter)
+	OrderTime: number?, -- s of the order talk after Accept (DEC-353), set at Start
 }
-export type TabletState = "Idle" | "Talking" | "Full" | "Deciding"
+export type TabletState = "Idle" | "Talking" | "Full" | "Deciding" | "Greeting"
 
 export type Public = {
 	AnchorTablet: { [Instance]: number },
@@ -34,6 +35,7 @@ export type Public = {
 	Reset: (self: Public, tablet: Tablet) -> (),
 	StartDrive: (self: Public, player: Player, npc: number) -> boolean,
 	DriveTalking: (self: Public, npc: number) -> boolean,
+	Ask: (self: Public, tablet: Tablet) -> (),
 	Finish: (self: Public, tablet: Tablet) -> (),
 	Decide: (self: Public, tablet: Tablet, player: Player, serve: boolean) -> (),
 	UserGone: (self: Public, tablet: Tablet) -> boolean,

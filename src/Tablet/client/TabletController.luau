@@ -14,7 +14,7 @@
 	    server never sends steps: every client reads the same record and the same server clock, so all see the same.
 	    EndsAt carries the speed-ups (veteran, hurry, UPG-034): the script is stretched onto StartedAt..EndsAt, so a hurry
 	    in the middle jumps the rest forward and nothing is ever un-said.
-	  - The player taking the order (User = me, Talking): TabletDialog on the screen (lower left, never in the middle) with
+	  - The player taking the order (User = me, Talking): TabletDialog on the screen (left, mid-height, never in the middle) with
 	    the line and the items popping in, SFX `ticket_pop` per item. `MyTalk()` exposes the reveal for the HUD note
 	    (HudOrder `Reveal`, CustomerController, TASK-384).
 	  - Everybody else: the customer's line in a SpeechBalloon over the rig (the greeting is not shown), `dialog_blip`
@@ -30,6 +30,8 @@
 	Lync.start); tags and the gui in OnStart.
 ]]
 local CollectionService = game:GetService("CollectionService")
+local ContextActionService = game:GetService("ContextActionService")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -61,7 +63,7 @@ const CLOSE_AT = 0.5 -- fraction of Talk.Confirm after the last item where "That
 const MIN_SPAN = 0.05 -- s, a talk shorter than this is read as already over
 const GUI_NAME = "TabletDialog"
 const CLOCK_STEP = 1 / 30 -- s between two clock writes while a talk runs (pop-ups land within a frame or two)
-const DIALOG_LIFT = 150 -- px over the bottom edge (UI scale 1): clear of the hotbar and the joystick's thumb
+const DIALOG_LEFT = 24 -- px from the left edge (DEC-353 2nd pass: the card sits on the left, mid-height)
 
 export type Speaker = "Player" | "Customer"
 
@@ -145,17 +147,22 @@ local function oddLine(variant: string, npc: number, night: number): string
 end
 
 -- The talk script of a record (pure). `odd` = rig Variant of an anomaly customer ("" = ordinary): one odd line, no item.
+-- DEC-353, 2nd pass: Greeting / Deciding = the hi and the customer's answer (Hello, or an odd customer's odd line); Talking
+-- (after ACCEPT, a new StartedAt) = the order itself, from the customer's opening on.
 local function timeline(record: Record, odd: string, night: number): Talk
 	const npc = record.Npc
-	const steps: { Step } = { line(0, "Player", pick(DIALOG.Greeting, npc, 0), 0) }
-	if odd ~= "" then
-		table.insert(steps, line(TALK.Open, "Customer", oddLine(odd, npc, night), 0))
-		return { Steps = steps, Items = {}, Base = TALK.Open + TALK.Lead + TALK.Confirm }
+	if record.State ~= "Talking" then
+		const answer = if odd ~= "" then oddLine(odd, npc, night) else pick(TALK_LINES.Hello, npc, 1)
+		return {
+			Steps = { line(0, "Player", pick(DIALOG.Greeting, npc, 0), 0), line(TALK.Open, "Customer", answer, 0) },
+			Items = {},
+			Base = TALK.Open + TALK.Lead,
+		}
 	end
-	table.insert(steps, line(TALK.Open, "Customer", pick(DIALOG.Opening, npc, 1), 0))
+	const steps: { Step } = { line(0, "Customer", pick(DIALOG.Opening, npc, 1), 0) }
 
 	const said: { string } = {}
-	local at = TALK.Open + TALK.Lead
+	local at = TALK.Lead
 	local function say(list: { string })
 		for _, key in list do
 			at += TALK.PerItem
@@ -195,9 +202,14 @@ local function stepAt(record: Record, talk: Talk, now: number): number
 	return current
 end
 
--- A talk is on: still talking, or done and waiting for the user's pick (DEC-353)
+-- A talk is on: greeting, waiting for the user's pick, or saying the order (DEC-353)
 local function talking(record: Record): boolean
-	return record.State == "Talking" or record.State == "Deciding"
+	return record.State == "Greeting" or record.State == "Deciding" or record.State == "Talking"
+end
+
+-- Lines are being said now (the clock runs, the steps advance): greeting or the order
+local function running(record: Record): boolean
+	return record.State == "Greeting" or record.State == "Talking"
 end
 
 local function rigOf(npc: number): Model?
@@ -210,7 +222,7 @@ local function rigOf(npc: number): Model?
 end
 
 const TabletController = Modux.Controller("TabletController", {
-	Require = { "AudioController", "RoundController", "InputController" },
+	Require = { "AudioController", "RoundController", "InputController", "CameraController" },
 	Priority = 658,
 })
 
@@ -229,6 +241,10 @@ function TabletController:Setup()
 	-- DEC-353: the choice keys are bound; StartedAt of the talk my pick was sent for (one pick per talk)
 	self.DecideBound = false
 	self.DecideSentAt = 0 :: number
+	-- DEC-353 2nd pass: the close-up on the customer's face (my talk): the tablet whose parts I hid, their old modifiers
+	self.CloseTablet = nil :: number?
+	self.Hidden = {} :: { [BasePart]: number }
+	self.CloseToken = 0
 end
 
 -- Pure helpers, for the HUD note (TASK-384) and the tests: the script of a record and the step said at `now`.
@@ -347,6 +363,80 @@ function TabletController:WriteRecord(index: number, record: Record?)
 	self:Present(spot)
 	self:RunClock()
 	self:SyncDecide()
+	self:SyncCloseUp()
+end
+
+-- DEC-353 2nd pass (owner 2026-10-21: "ao clicar em takeorder ele vai dar um close no rosto do cliente (escondendo o
+-- tablet q fica na frente)"): while my talk is on, the camera sits CloseUp.Distance studs in front of the customer's face
+-- (CameraController:Prep, like the cooking focus), the tablet Model is hidden on my screen only (LocalTransparencyModifier)
+-- and walking is held. It lets go CloseUp.Hold s after the talk ends (an anomaly accepted scares in the close-up first).
+const CLOSE_FREEZE = "TabletCloseUpFreeze"
+-- the default walk / jump inputs held during the close-up (the touch thumbstick goes off with TouchControlsEnabled)
+const FREEZE_INPUTS: { Enum.KeyCode } = {
+	Enum.KeyCode.W,
+	Enum.KeyCode.A,
+	Enum.KeyCode.S,
+	Enum.KeyCode.D,
+	Enum.KeyCode.Up,
+	Enum.KeyCode.Down,
+	Enum.KeyCode.Left,
+	Enum.KeyCode.Right,
+	Enum.KeyCode.Space,
+	Enum.KeyCode.Thumbstick1,
+	Enum.KeyCode.ButtonA,
+}
+function TabletController:SyncCloseUp()
+	const index = Vide.untrack(self.Mine)
+	const spot = if index ~= 0 then self.Spots[index] else nil
+	const rig = if spot ~= nil then spot.Rig else nil
+	const head = if rig ~= nil then rig:FindFirstChild("Head") else nil
+	const camera = self.Dependencies.CameraController
+	const close = TALK_LINES.CloseUp
+	if spot ~= nil and head ~= nil and head:IsA("BasePart") then
+		self.CloseToken += 1
+		if self.CloseTablet == index then
+			return
+		end
+		self.CloseTablet = index
+		const facing = Vector3.new(head.CFrame.LookVector.X, 0, head.CFrame.LookVector.Z)
+		const forward = if facing.Magnitude > 1e-3 then facing.Unit else Vector3.zAxis
+		const eye = head.Position + forward * close.Distance + Vector3.yAxis * close.Lift
+		camera:Prep(true, CFrame.lookAt(eye, head.Position), { Fov = close.Fov, Travel = close.Travel, Min = 0.2, Look = head.Position })
+		const model = spot.Model
+		if model ~= nil then
+			for _, part in model:GetDescendants() do
+				if part:IsA("BasePart") and self.Hidden[part] == nil then
+					self.Hidden[part] = part.LocalTransparencyModifier
+					part.LocalTransparencyModifier = 1
+				end
+			end
+		end
+		ContextActionService:BindActionAtPriority(CLOSE_FREEZE, function(): Enum.ContextActionResult
+			return Enum.ContextActionResult.Sink
+		end, false, DECIDE_PRIORITY - 1, table.unpack(FREEZE_INPUTS))
+		GuiService.TouchControlsEnabled = false
+		return
+	end
+	if self.CloseTablet == nil then
+		return
+	end
+	self.CloseToken += 1
+	const token = self.CloseToken
+	task.delay(close.Hold, function()
+		if self.CloseToken ~= token or self.CloseTablet == nil then
+			return
+		end
+		self.CloseTablet = nil
+		for part, modifier in self.Hidden do
+			part.LocalTransparencyModifier = modifier
+		end
+		table.clear(self.Hidden)
+		ContextActionService:UnbindAction(CLOSE_FREEZE)
+		GuiService.TouchControlsEnabled = true
+		if Vide.untrack(camera.Mode) == "Prep" then
+			camera:Prep(false, nil, { Travel = close.Travel })
+		end
+	end)
 end
 
 -- DEC-353: the keys of the choice, bound only while my tablet is Deciding (they sink the interact key meanwhile)
@@ -506,7 +596,7 @@ end
 function TabletController:Cue(spot: Spot, now: number)
 	const record = Vide.untrack(spot.Record)
 	const talk = spot.Talk
-	if record == false or record.State ~= "Talking" or talk == nil then
+	if record == false or not running(record) or talk == nil then
 		return
 	end
 	const index = stepAt(record, talk, now)
@@ -534,7 +624,7 @@ function TabletController:RunClock()
 	local any = false
 	for _, spot in self.Spots do
 		const record = Vide.untrack(spot.Record)
-		if record ~= false and record.State == "Talking" then
+		if record ~= false and running(record) then
 			any = true
 			break
 		end
@@ -597,9 +687,12 @@ function TabletController:MountDialog(gui: Instance)
 					const now = talk()
 					return if now then now.Reveal else 0
 				end,
-				Scale = UiScale.Current,
-				AnchorPoint = Vector2.new(0, 1),
-				Position = UDim2.new(0, 12, 1, -DIALOG_LIFT),
+				-- DEC-353 2nd pass: on the left, mid-height, bigger (the camera is on the customer's face)
+				Scale = function(): number
+					return UiScale.Current() * TALK_LINES.DialogScale
+				end,
+				AnchorPoint = Vector2.new(0, 0.5),
+				Position = UDim2.new(0, DIALOG_LEFT, 0.5, 0),
 				-- DEC-353: SERVE / REFUSE once the customer is done
 				Choice = function()
 					const now = talk()
