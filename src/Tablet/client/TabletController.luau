@@ -370,6 +370,44 @@ end
 -- tablet q fica na frente)"): while my talk is on, the camera sits CloseUp.Distance studs in front of the customer's face
 -- (CameraController:Prep, like the cooking focus), the tablet Model is hidden on my screen only (LocalTransparencyModifier)
 -- and walking is held. It lets go CloseUp.Hold s after the talk ends (an anomaly accepted scares in the close-up first).
+-- The parts between the close-up's lens and the customer (window frame, shutter box, a sign): rays from the eye to a few
+-- points of the head and the chest; every part hit that is not the customer hides on this screen (restored with the
+-- tablet). At most OCCLUDER_HITS per ray.
+const OCCLUDER_HITS = 6
+const OCCLUDER_POINTS: { Vector3 } = {
+	Vector3.new(0, 0, 0),
+	Vector3.new(0, 0.9, 0),
+	Vector3.new(0.8, 0.3, 0),
+	Vector3.new(-0.8, 0.3, 0),
+	Vector3.new(0, -1.4, 0),
+}
+function TabletController:HideBetween(eye: Vector3, rig: Model, head: BasePart)
+	const ignore: { Instance } = { rig }
+	const character = Players.LocalPlayer.Character
+	if character ~= nil then
+		table.insert(ignore, character)
+	end
+	const params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.IgnoreWater = true
+	for _, offset in OCCLUDER_POINTS do
+		const target = head.Position + offset
+		for _ = 1, OCCLUDER_HITS do
+			params.FilterDescendantsInstances = ignore
+			const result = Workspace:Raycast(eye, target - eye, params)
+			if result == nil then
+				break
+			end
+			const part = result.Instance
+			table.insert(ignore, part)
+			if part:IsA("BasePart") and self.Hidden[part] == nil then
+				self.Hidden[part] = part.LocalTransparencyModifier
+				part.LocalTransparencyModifier = 1
+			end
+		end
+	end
+end
+
 const CLOSE_FREEZE = "TabletCloseUpFreeze"
 const CLOSE_UP_ATTRIBUTE = "TalkCloseUp" -- on LocalPlayer while the close-up is on (the tutorial beacon hides)
 -- the default walk / jump inputs held during the close-up (the touch thumbstick goes off with TouchControlsEnabled)
@@ -416,6 +454,9 @@ function TabletController:SyncCloseUp()
 				end
 			end
 		end
+		-- owner 2026-10-21 (print: "o chapéu tá cobrindo o rosto" - the shutter box over the service window): anything else
+		-- between the lens and the customer hides on this screen too
+		self:HideBetween(eye, rig :: Model, head)
 		ContextActionService:BindActionAtPriority(CLOSE_FREEZE, function(): Enum.ContextActionResult
 			return Enum.ContextActionResult.Sink
 		end, false, DECIDE_PRIORITY - 1, table.unpack(FREEZE_INPUTS))
