@@ -9,6 +9,7 @@ local Scheduler = require(ServerScriptService.server.Anomaly.AnomalyService.Sche
 local Pressure = require(ServerScriptService.server.Anomaly.AnomalyService.Pressure)
 local Trip = require(ServerScriptService.server.Anomaly.AnomalyService.Trip)
 local Director = require(ServerScriptService.server.Anomaly.AnomalyService.Director)
+local Behind = require(ServerScriptService.server.Anomaly.AnomalyService.Behind)
 
 export type Occurrence = Api.Occurrence
 export type Event = Api.Event
@@ -55,6 +56,7 @@ type TrafficHook = { Hold: (self: any, reason: string, on: boolean) -> () }
 export type Wire = { Anomaly: string, Phase: Api.Phase, StartedAt: number, Step: number, Anchor: number }
 
 export type Public = {
+	Behind: Behind.State,
 	Context: Api.Context?,
 	DevHeld: boolean,
 	DevSerial: number,
@@ -135,6 +137,9 @@ export type Public = {
 	BeatClear: (self: Public, kind: string) -> boolean,
 	BeatBegin: (self: Public, key: string, hold: number?) -> (),
 	BeatEnd: (self: Public, key: string) -> (),
+	BehindCalm: (self: Public) -> boolean,
+	BehindTargets: (self: Public) -> { Player },
+	BehindScare: (self: Public, player: Player, key: string) -> number,
 	Limits: (self: Public) -> Scheduler.Limits,
 	RunningCandidates: (self: Public) -> { Scheduler.Candidate },
 	SetHold: (self: Public, hold: () -> boolean) -> (),
@@ -160,6 +165,7 @@ export type Public = {
 	DevAgenda: (self: Public) -> string,
 	DevPressure: (self: Public, nowToo: boolean) -> string,
 	DevTrip: (self: Public, nowToo: boolean) -> string,
+	DevBehind: (self: Public, nowToo: boolean) -> string,
 	DevBeats: (self: Public) -> string,
 }
 

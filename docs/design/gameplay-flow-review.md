@@ -64,6 +64,18 @@ mundo; 1–2 novidades por noite, anunciadas; janelas de calma; erro com margem 
   noites 3, 5 e 6 (restaurante) ajustadas.
 - Não testado em Play; os números são Provisórios.
 
+## 3c. Sons pelas costas (pedido do dono 2026-10-21, Provisório)
+
+O jogador prepara o lanche de costas para a janela. Numa calmaria (nenhuma anomalia rodando, nenhuma batida ativa,
+≥ 12 s desde a última, nenhuma anomalia da agenda vencendo em < 15 s, luz acesa), o servidor escolhe um jogador a até
+22 studs do ponto `Q1` (o balcão do lado de fora da janela) olhando a mais de 110° dele, e toca **só para ele** um de
+três sustos roteirizados da família D: `behind_steps` (passos vêm da janela até logo atrás e param), `behind_creak`
+(o piso range logo atrás, duas vezes) e `behind_tap` (batidinhas no vidro). Quando ele vira, não há nada. Sem verbo,
+sem custo, não é batida do diretor. **1/1/2/2/2/2/2/2/2/2** por noite, a cada 50–100 s; nunca o mesmo duas vezes
+seguidas. O client confere a própria câmera de novo antes de tocar. `Content.Nights.Behind`,
+`AnomalyService/Behind.luau`, `HallucinationController/Behind.luau` + `Effects/Behind*`; `/dev behind [now]`.
+Sons provisórios: `walker_step`, `floor_creak`, `door_knock` agudo (falta um "toque no vidro" próprio).
+
 ## 4. Propostas (dependem do dono)
 
 ### 4.1 Quatro respostas pela direção do perigo (`Q-445`)

@@ -1319,6 +1319,26 @@ local function checkHallucinations()
 	if not (hasHigh and hasMid and hasLow) then
 		fail("Hallucinations", nil, nil, `needs effects below {bands.High}, below {bands.Mid} and lower (FEAT-019)`)
 	end
+	-- "behind you" (owner 2026-10-21): scripted family D rows, sane numbers
+	const behind = Nights.Behind
+	if #behind.Keys == 0 then
+		fail("Nights", nil, "Behind", "Keys must not be empty")
+	end
+	for _, key in behind.Keys do
+		const row = Hallucinations.ByKey[key]
+		if row == nil or not row.FamilyD or row.Scripted ~= true then
+			fail("Nights", nil, "Behind", `'{key}' is not a scripted family D row of Content.Hallucinations`)
+		end
+	end
+	inRange("Nights", nil, "Behind", "FromNight", behind.FromNight, 1, RunParams.Nights)
+	for night, count in behind.PerNight do
+		inRange("Nights", night, "Behind", "PerNight", count, 0, 5)
+	end
+	inRange("Nights", nil, "Behind", "Every[1]", behind.Every[1], 5, 600)
+	inRange("Nights", nil, "Behind", "Every[2]", behind.Every[2] or behind.Every[1], behind.Every[1], 600)
+	inRange("Nights", nil, "Behind", "Calm", behind.Calm, 0, 120)
+	inRange("Nights", nil, "Behind", "Near", behind.Near, 1, 100)
+	inRange("Nights", nil, "Behind", "Facing", behind.Facing, 90, 180)
 	-- TASK-601: Walt's fake call and the radio, by night (story/walt-calls-lore.md §6, §7)
 	const ids: { [string]: boolean } = {}
 	const perNight: { [number]: number } = {}

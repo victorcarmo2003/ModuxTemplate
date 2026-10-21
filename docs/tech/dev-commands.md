@@ -38,6 +38,7 @@ Anomalia = key, `ANM-###`, número (o do ANM) ou parte do nome (`blackout`, `kno
 | `suspense [list\|status\|<spot>\|<event> [spot]]` | evento de suspense agora |
 | `trip [now]` | disjuntor desarma sozinho (Q-435): contagem da noite e o próximo; `now` = desarma assim que estiver calmo |
 | `beats` | diretor de batidas (2026-10-21): última batida, o que conta como ativo agora (anomalias, tarefas, desarme), intervalo e a próxima anomalia |
+| `behind [now]` | som pelas costas (2026-10-21): contagem da noite, próxima tentativa, se está calmo e quem está de costas para a janela; `now` = assim que estiver calmo |
 | `chore [<key>\|now\|end [<key>\|all]]` | tarefas da noite (Q-436): `grill_fire`, `back_door`, `rats`, `camera_static`; sem args = estado; `<key>` liga agora |
 | `sanity [<n>\|hint\|dark on\|off\|auto] [player]` | sanidade |
 | `god [on\|off]` · `god me [on\|off] [player]` | ninguém desmaia (party) · sanidade infinita de um jogador |

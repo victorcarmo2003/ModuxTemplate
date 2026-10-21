@@ -62,6 +62,12 @@ const base = Table.new({
 	-- owner 2026-10-20 (Provisional Q-415): Night 1 scripted opening (posts, the figure across the street, the call static)
 	{ Key = "night_opening", MaxSanity = 1, FamilyD = true, Effect = "NightOpening", Cooldown = 0, Weight = 1, Scripted = true },
 	{ Key = "monster_glimpse", MaxSanity = 20, FamilyD = true, Effect = "MonsterGlimpse", Cooldown = 180, Weight = 3 }, -- end of street; TASK-341: x3 so N2-N5 show one
+	-- owner 2026-10-21 (Provisional): "behind you" - the player cooks with the back to the window; a sound right behind
+	-- them, nothing there when they turn. Scripted: only Nights.Behind sends them (the server picks the calm moment and
+	-- the player facing away); no verb, no cost.
+	{ Key = "behind_steps", MaxSanity = 1, FamilyD = true, Effect = "BehindSteps", Cooldown = 0, Weight = 1, Scripted = true }, -- steps come close, stop
+	{ Key = "behind_creak", MaxSanity = 1, FamilyD = true, Effect = "BehindCreak", Cooldown = 0, Weight = 1, Scripted = true }, -- the floor gives right behind
+	{ Key = "behind_tap", MaxSanity = 1, FamilyD = true, Effect = "BehindTap", Cooldown = 0, Weight = 1, Scripted = true }, -- taps on the window glass
 } :: { Hallucination })
 
 -- Walt's fake calls and the stranger on the radio (TASK-601; owner 2026-10-19, Q-401 A: the lore of Walt as the real

@@ -164,6 +164,32 @@ const beats: Beats = {
 	Hold = 20,
 }
 
+-- "Behind you" (owner 2026-10-21, Provisional): while a player cooks with the back to the window and the night is calm,
+-- a sound plays right behind them (Content.Hallucinations behind_*; nothing there when they turn). No verb, no cost, not
+-- a beat. Calm = no anomaly running, no beat active, Calm s since the last beat, no regular anomaly due within
+-- Beats.Reserve, the power on. The player: within Near studs (flat) of Point (the counter spot outside the window),
+-- looking more than Facing degrees away from it (server Gaze; the client checks its camera again).
+export type Behind = {
+	FromNight: number,
+	PerNight: { number },
+	Every: { number },
+	Calm: number,
+	Point: string,
+	Near: number,
+	Facing: number,
+	Keys: { string },
+}
+const behind: Behind = {
+	FromNight = 1,
+	PerNight = { 1, 1, 2, 2, 2, 2, 2, 2, 2, 2 },
+	Every = { 50, 100 }, -- s of the Night phase before the first one, and between two
+	Calm = 12,
+	Point = "Q1",
+	Near = 22,
+	Facing = 110,
+	Keys = { "behind_steps", "behind_creak", "behind_tap" },
+}
+
 -- DEC-320 (Q-413, Provisional): extra regular anomaly events of a night by the crew connected at its start (1..4 players):
 -- +1 with 3, +2 with 4 (more eyes make every anomaly easier)
 const crewEvents: { number } = { 0, 0, 1, 2 }
@@ -176,5 +202,6 @@ return Table.with(base, {
 	ScaresFrom = scaresFrom,
 	CrewEvents = table.freeze(crewEvents),
 	Beats = Table.record(beats),
+	Behind = Table.record(behind),
 	Occurrences = Table.record(occurrences),
 })

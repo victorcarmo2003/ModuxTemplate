@@ -41,6 +41,9 @@
 --               the crew to act. Regular entries (not the fixed premiere, not scripted ones), trips, chores
 --               (ChoreService) and suspense events (SuspenseService) ask BeatClear before they start and note it with
 --               BeatBegin; Gap between two starts, MaxActive at once, the agenda first (Reserve).
+--   Behind      owner 2026-10-21 (Behind.luau, Content.Nights.Behind, Provisional): in a calm stretch, a sound right
+--               behind a player who cooks with the back to the window (a scripted behind_* family D scare, that
+--               player only). Not a beat: no verb, no cost.
 --   Ended       signal Ended(key, players) when an occurrence ends (Finish, NightOver, or a Restore once it left Signal or
 --               someone failed): the members Active at its start plus whoever failed, still connected. Reader:
 --               JournalService (TASK-335, TASK-345, Anomaly Tablet pages).
@@ -63,6 +66,7 @@ local Scheduler = require(script.Scheduler)
 local Pressure = require(script.Pressure)
 local Trip = require(script.Trip)
 local Director = require(script.Director)
+local Behind = require(script.Behind)
 local Vision = require(script.Vision)
 local Modux = require(ServerScriptService.server.Modux)
 local ModuxModules = require(ServerScriptService.server.Modux.Modules)
@@ -141,6 +145,7 @@ const EYE_OFFSET = Vector3.new(0, 1.5, 0) -- HumanoidRootPart -> eye when the He
 const DOMAIN = "anomaly"
 const PRESSURE_DOMAIN = "pressure"
 const TRIP_DOMAIN = "trip"
+const BEHIND_DOMAIN = "behind"
 const NIGHT_PHASE = "Night"
 const PREFIX = "[AnomalyService]"
 
@@ -251,6 +256,8 @@ function AnomalyService:Setup()
 	self.Trip = Trip.new() :: Trip.State
 	-- beat budget of the current night (Director.luau)
 	self.Director = Director.new() :: Director.State
+	-- "behind you" sounds of the current night (Behind.luau)
+	self.Behind = Behind.new() :: Behind.State
 	-- SecurityService, false when this build has none (IsWatching)
 	self.Security = nil :: any
 	self.Running = {} :: { [number]: Run }
@@ -1154,6 +1161,7 @@ function AnomalyService:BuildAgenda(info: { Day: number, Night: number, IsNight:
 		Scheduler.Seed(runSeed, info.Day, info.Night, info.Attempt, PRESSURE_DOMAIN)
 	)
 	Trip.reset(self.Trip, info.Night, Scheduler.Seed(runSeed, info.Day, info.Night, info.Attempt, TRIP_DOMAIN))
+	Behind.reset(self.Behind, info.Night, Scheduler.Seed(runSeed, info.Day, info.Night, info.Attempt, BEHIND_DOMAIN))
 	for _, entry in entries do
 		table.insert(self.Queue, { Entry = entry, RetryAt = 0, Done = false })
 	end
@@ -1314,6 +1322,62 @@ function AnomalyService:BeatEnd(key: string)
 	Director.finish(self.Director, key)
 end
 
+-- "Behind you" host (Behind.luau, Content.Nights.Behind) -------------------------------------------------------------
+
+-- Nothing asks for action, the last beat is Calm s old, no regular anomaly due soon, the power on
+function AnomalyService:BehindCalm(): boolean
+	const t = now()
+	const director = self.Director
+	if self:RunningCount() > 0 or Director.count(director, t) > 0 then
+		return false
+	end
+	if director.LastAt > 0 and t - director.LastAt < Content.Nights.Behind.Calm then
+		return false
+	end
+	if self:BeatDueIn() < Content.Nights.Beats.Reserve then
+		return false
+	end
+	return not self.Dependencies.LightService:IsBlackout()
+end
+
+-- Active players near the window's counter spot, looking more than Behind.Facing degrees away from it (fresh Gaze, not
+-- on the security cameras)
+function AnomalyService:BehindTargets(): { Player }
+	const rules = Content.Nights.Behind
+	const point = MapIndex.FindPoint(rules.Point)
+	const out: { Player } = {}
+	if point == nil then
+		return out
+	end
+	const t = now()
+	for _, player in self:ActivePlayers() do
+		if not self:InZone(player, rules.Point, rules.Near) or self:IsWatching(player) then
+			continue
+		end
+		const gaze = self.Gazes[player]
+		const eye = eyeOf(player)
+		if gaze == nil or t - gaze.At > GAZE_STALE or eye == nil then
+			continue
+		end
+		const look = Vision.Direction(gaze.Yaw, gaze.Pitch)
+		const toward = point.Position - eye
+		const flatLook = Vector3.new(look.X, 0, look.Z)
+		const flatToward = Vector3.new(toward.X, 0, toward.Z)
+		if flatLook.Magnitude < 1e-3 or flatToward.Magnitude < 1e-3 then
+			continue
+		end
+		const cos = flatLook.Unit:Dot(flatToward.Unit)
+		if math.deg(math.acos(math.clamp(cos, -1, 1))) >= rules.Facing then
+			table.insert(out, player)
+		end
+	end
+	return out
+end
+
+function AnomalyService:BehindScare(player: Player, key: string): number
+	return self.Dependencies.HallucinationService:Scare(player, { key })
+end
+
 function AnomalyService:Limits(): Scheduler.Limits
 	const nights = Content.Nights.List
 	const night = nights[math.clamp(self.Shift.Night, 1, #nights)]
@@ -1396,6 +1460,8 @@ function AnomalyService:StepAgenda(t: number)
 	-- Q-435: the breaker trips by itself (not in the grace, not past the window, never on top of an anomaly)
 	if not held and minutes < windowEnd then
 		Trip.step(self.Trip, self, t)
+		-- owner 2026-10-21: a sound behind a player cooking with the back to the window, in a calm stretch
+		Behind.step(self.Behind, self, t)
 	end
 	for _, due in self.Queue do
 		const entry = due.Entry
@@ -1721,6 +1787,21 @@ function AnomalyService:DevTrip(nowToo: boolean): string
 		Trip.hurry(self.Trip, t)
 	end
 	return Trip.describe(self.Trip, t)
+end
+
+-- "Behind you": tonight's count, the next try, calm now, who faces away. now = true: the next one is due at once
+function AnomalyService:DevBehind(nowToo: boolean): string
+	self:DevCheck()
+	const t = now()
+	if nowToo then
+		Behind.hurry(self.Behind, t)
+	end
+	const names: { string } = {}
+	for _, player in self:BehindTargets() do
+		table.insert(names, player.Name)
+	end
+	const calm = if self:BehindCalm() then "calm" else "busy"
+	return `{Behind.describe(self.Behind, t)}; {calm}; facing away: {if #names > 0 then table.concat(names, ", ") else "nobody"}`
 end
 
 -- Beat director: last beat, what counts as active now, the next regular anomaly
