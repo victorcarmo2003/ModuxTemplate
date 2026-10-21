@@ -135,6 +135,17 @@ export type Lobby = {
 		DefaultFriendsOnly: boolean,
 		Colors: { Free: Color3, Busy: Color3, Starting: Color3 },
 		Pad: Pad,
+		-- Invisible wall around a pad room (owner request 2026-10-21, Provisional; PartyService/Barrier.luau): members
+		-- stay in (Exit leaves), outsiders walk in unless the room is not Open (friends of the leader pass Friends only)
+		Barrier: {
+			Height: number, -- studs over the pad floor (a jump is ~7)
+			Segments: number, -- wall pieces around the circle
+			Thickness: number, -- studs
+			Gap: number, -- studs between the pad edge and the inner face of the wall
+			Near: number, -- studs past the pad edge where a friend of the leader starts to pass (friends-only room)
+			ExitStep: number, -- studs past the wall where Exit puts the player down
+			Slack: number, -- studs past the edge (+ Trigger.Hysteresis) a member may be seen before being put back
+		},
 	},
 	Camera: {
 		MinZoom: number,
@@ -272,6 +283,16 @@ const lobby: Lobby = {
 			GlowAlpha = 0.86,
 			Sparks = { Rate = 6, Distance = 60 },
 			KickTime = 0.45,
+		},
+		-- PROVISIONAL (owner request 2026-10-21), tune in play
+		Barrier = {
+			Height = 14,
+			Segments = 24,
+			Thickness = 1,
+			Gap = 0.4,
+			Near = 10,
+			ExitStep = 3,
+			Slack = 2,
 		},
 	},
 	-- TASK-451 (DEC-289 L5): who works and who eats in the lobby

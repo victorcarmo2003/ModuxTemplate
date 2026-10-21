@@ -40,6 +40,11 @@
 -- StartNow (leader) drops the clock to Rules.StartNow s, SkipTutorial (each member) rides TeleportData SkipTutorial
 -- so the run closes that member's tutorial, FriendsOnly (leader) switches Access Friends / Open. No cancel on a pad: a
 -- failed or Studio teleport ends the room, and whoever still stands there starts a fresh one.
+-- Pad barrier (owner request 2026-10-21, Provisional; DEC-348 emends DEC-344 (d); Barrier.luau): a room's pad gets an
+-- invisible ring. Its members on the pad cannot step or jump off (a member seen past it is put back): the way out is
+-- Exit (PartyLeave), which puts them down outside the ring. Outsiders walk in while the room is Open; Friends only lets
+-- the leader's friends through (IsFriendsWith, cached per pair, run aside), Invite / Closed nobody. A non-member left
+-- inside a ring that now stops them (the leader switched Friends only) is put outside.
 -- Server never trusts the client: membership, leadership, state, size, presence of the target, friendship and rate
 -- are checked here; TeleportData is written only by this service.
 -- Tracked (analytics, owner request 2026-10-17; MetricsService listens): (kind, party, userId, detail) at Created,
@@ -54,6 +59,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local LobbyZones = require(ReplicatedStorage.shared.Lobby.LobbyZones)
 local PartyRules = require(ReplicatedStorage.shared.Party.PartyRules)
 local Teleport = require(script.Teleport)
+local Barrier = require(script.Barrier)
 local Modux = require(ServerScriptService.server.Modux)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 
@@ -87,6 +93,8 @@ type Record = {
 
 const RULES = PartyRules.Rules
 const WATCHDOG = 45 -- s a squad may stay "Starting" (after the countdown) with members still in the lobby
+const BARRIER = Content.Lobby.Squad.Barrier
+const TRIGGER = Content.Lobby.Trigger
 
 -- Not starting: members may join, leave, be kicked; the leader may configure and start.
 local function isOpen(party: Party): boolean
@@ -129,6 +137,10 @@ function PartyService:Setup()
 	-- UserId -> PartyId whose teleport has begun (countdown over); any other platform is ignored for them until the
 	-- squad is back to the idle state or their own teleport gives up (owner request 2026-10-17)
 	self.Teleporting = {} :: { [number]: number }
+	-- UserId -> leader UserId -> friends (pad barrier of a friends-only room); missing = not asked yet
+	self.Friendship = {} :: { [number]: { [number]: boolean } }
+	-- "UserId:leader" -> IsFriendsWith in flight
+	self.Asking = {} :: { [string]: boolean }
 	self.PollAt = 0 :: number
 	self.Tracked = self.Libs.Signal.new() :: SignalLib.Signal<string, Party, number, string>
 end
@@ -463,11 +475,23 @@ function PartyService:HandleRespond(player: Player, partyId: number, accept: boo
 end
 
 function PartyService:HandleLeave(player: Player)
-	if self:PartyOfUser(player.UserId) == nil then
+	const party = self:PartyOfUser(player.UserId)
+	if party == nil then
 		self:Notice(player, "NotInParty", nil)
 		return
 	end
+	const platform = party.Platform
+	const standing = platform > 0 and self.OnPlatform[player.UserId] == platform
 	self:Leave(player.UserId)
+	if standing then
+		-- Exit (DEC-348): out of the ring, on the lobby side
+		Barrier.Assign(player, Barrier.Base)
+		const outside = Barrier.Outside(platform)
+		const zone = LobbyZones.Platform(platform)
+		if outside ~= nil and zone ~= nil then
+			Barrier.Place(player, outside, zone.Center)
+		end
+	end
 end
 
 function PartyService:HandleKick(player: Player, target: number)
@@ -959,11 +983,135 @@ function PartyService:ExitPlatform(player: Player, platform: number)
 	end
 end
 
+-- Root of a living character; nil = no character or dead.
+local function rootOf(player: Player): BasePart?
+	const character = player.Character
+	const root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+	const humanoid = if character ~= nil then character:FindFirstChildOfClass("Humanoid") else nil
+	if root == nil or not root:IsA("BasePart") or humanoid == nil or humanoid.Health <= 0 then
+		return nil
+	end
+	return root
+end
+
+-- Planar distance from pad n's centre (math.huge = no pad).
+local function fromPad(position: Vector3, n: number): number
+	const zone = LobbyZones.Platform(n)
+	if zone == nil then
+		return math.huge
+	end
+	return Vector3.new(position.X - zone.Center.X, 0, position.Z - zone.Center.Z).Magnitude
+end
+
+-- Living member of the pad room of `platform`: the ring keeps them in (DEC-348).
+function PartyService:Holds(player: Player, platform: number): boolean
+	const party = self:PartyOfUser(player.UserId)
+	return platform > 0 and party ~= nil and party.Platform == platform and rootOf(player) ~= nil
+end
+
+-- Is `player` a friend of `leader`? nil = not known yet (asked aside, cached for the pair).
+function PartyService:IsFriend(player: Player, leader: number): boolean?
+	const userId = player.UserId
+	if userId == leader then
+		return true
+	end
+	const known = self.Friendship[userId]
+	if known ~= nil and known[leader] ~= nil then
+		return known[leader]
+	end
+	const key = `{userId}:{leader}`
+	if not self.Asking[key] then
+		self.Asking[key] = true
+		task.spawn(function()
+			const ok, friend = pcall(function(): boolean
+				return player:IsFriendsWith(leader)
+			end)
+			self.Asking[key] = nil
+			if player.Parent == nil then
+				return
+			end
+			const cache = self.Friendship[userId] or {}
+			cache[leader] = ok and friend == true
+			self.Friendship[userId] = cache
+		end)
+	end
+	return nil
+end
+
+-- Collision group of a player's character (Barrier.luau): caged on the pad of their room, passing its ring when off it,
+-- passing a friends-only ring when a friend of its leader comes close; Barrier.Base otherwise.
+function PartyService:GroupFor(player: Player): string
+	const userId = player.UserId
+	const party = self:PartyOfUser(userId)
+	if party ~= nil and party.Platform > 0 then
+		return if self.OnPlatform[userId] == party.Platform
+			then Barrier.Cage(party.Platform)
+			else Barrier.Guest(party.Platform)
+	end
+	const root = rootOf(player)
+	if root == nil then
+		return Barrier.Base
+	end
+	for n = 1, RULES.Platforms do
+		const room = self:PartyOnPlatform(n)
+		const zone = LobbyZones.Platform(n)
+		if
+			room ~= nil
+			and room.Access == "Friends"
+			and zone ~= nil
+			and fromPad(root.Position, n) <= zone.Radius + BARRIER.Near
+			and self:IsFriend(player, room.Leader) == true
+		then
+			return Barrier.Guest(n)
+		end
+	end
+	return Barrier.Base
+end
+
+-- Rings on / off by room access, every character in its group, nobody shut inside a ring that stops them.
+function PartyService:SyncBarrier()
+	Barrier.Build()
+	for n = 1, RULES.Platforms do
+		const room = self:PartyOnPlatform(n)
+		Barrier.Block(n, room ~= nil and room.Access ~= "Open")
+	end
+	for _, player in Players:GetPlayers() do
+		const group = self:GroupFor(player)
+		Barrier.Assign(player, group)
+		const on = self.OnPlatform[player.UserId]
+		const room = if on ~= nil then self:PartyOnPlatform(on) else nil
+		if on ~= nil and room ~= nil and room.Access ~= "Open" and group == Barrier.Base then
+			-- a friend still being checked stays; anyone else is put outside
+			if room.Access ~= "Friends" or self:IsFriend(player, room.Leader) == false then
+				const outside = Barrier.Outside(on)
+				const zone = LobbyZones.Platform(on)
+				if outside ~= nil and zone ~= nil then
+					Barrier.Place(player, outside, zone.Center)
+				end
+			end
+		end
+	end
+end
+
 function PartyService:PollPlatforms()
 	for _, player in Players:GetPlayers() do
 		const userId = player.UserId
 		const was = self.OnPlatform[userId] or 0
 		const now = self:PlatformOf(player, was)
+		if was > 0 and now ~= was and self:Holds(player, was) then
+			-- caged (DEC-348): seen out of the zone = a jump over the trigger height or lag at the wall while close,
+			-- else (an exploit, a glitch) put back on the pad. Exit is the only way out
+			const root = rootOf(player)
+			const zone = LobbyZones.Platform(was)
+			if root ~= nil and zone ~= nil then
+				const reach = zone.Radius + TRIGGER.Hysteresis + BARRIER.Slack
+				const dy = root.Position.Y - zone.Center.Y
+				if fromPad(root.Position, was) > reach or dy < -TRIGGER.Height or dy > TRIGGER.Height + BARRIER.Height then
+					Barrier.Return(player, was)
+				end
+			end
+			continue
+		end
 		if now ~= was then
 			self.OnPlatform[userId] = if now > 0 then now else nil
 			if was > 0 then
@@ -980,6 +1128,7 @@ function PartyService:PollPlatforms()
 			end
 		end
 	end
+	self:SyncBarrier()
 end
 
 function PartyService:Forget(player: Player)
@@ -990,6 +1139,8 @@ function PartyService:Forget(player: Player)
 	self.OnPlatform[userId] = nil
 	self.Refused[userId] = nil
 	self.Checking[userId] = nil
+	self.Friendship[userId] = nil
+	Barrier.Forget(player)
 	self.RateStart[player] = nil
 	self.RateCount[player] = nil
 	if self.PartyOf[userId] ~= nil then
@@ -1083,6 +1234,7 @@ PartyService:OnStart(function(self)
 	if not self.Active then
 		return
 	end
+	Barrier.Setup(RULES.Platforms)
 	-- platforms: one cheap check of every root every Content.Lobby.Squad.Poll s
 	const poll = Content.Lobby.Squad.Poll
 	RunService.Heartbeat:Connect(function()

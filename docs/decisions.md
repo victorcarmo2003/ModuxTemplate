@@ -4380,8 +4380,24 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - Emenda (append-only): **DEC-344** — (a) o acesso padrão deixa de ser "amigos" e a engrenagem sai; (c) o START vira a contagem automática + START NOW; (e) a contagem de 5 s cancelável não vale para pads.
 - Impacto: **backend-coder** (`PartyService`, `PartyPad`, TeleportData `SkipTutorial`, `TutorialService`), **frontend-coder** (`LobbyHud` barra do pad, `LobbyController`), **qa-tester** (dois jogadores no mesmo pad, celular).
 
-### DEC-347 — 2026-10-21 — Caldeirão de Halloween movido pelo dono para o lado oeste da praça (emenda DEC-346 P-HW1)
+### DEC-349 — 2026-10-21 — Caldeirão de Halloween movido pelo dono para o lado oeste da praça (emenda DEC-346 P-HW1)
+
+- Nota de numeração: registrada primeiro como "DEC-347", número que já era de outra decisão (pad, DEC-347); corrigida para DEC-349. O commit `95d5a7c1` ainda cita "DEC-347" para o caldeirão.
 
 - Origem: edição à mão do dono no Studio (2026-10-21), depois da entrega do overlay: "Pronto fiz uns ajustes".
 - Decidido pelo dono: o grupo do caldeirão (caldeirão ×1,3, 5 abóboras, balde e doces) sai do quadrante NE do spawn e vai para **(−35, −590,4)**, entre o food court e a Gem Shop, virado para o spawn; as duas lanternas do grupo vão para perto do pórtico dos squads, em (22,2, −666,3) e (25,0, −578,8). O resto do overlay fica como entregue.
 - Impacto: `tools/assetplace/HALLOWEEN_placements.luau` (valores absolutos lidos do place; diff 0 com o Studio), `levels/LOBBY-halloween.md` §10. Folga ao NPC de cenário `food_dog` do food court: ~1,9 studs da borda do caldeirão (Provisório, conferir no Play).
+
+### DEC-348 — 2026-10-21 — Barreira invisível no pad ocupado, saída só pelo EXIT, fila no topo e pad sem placas para quem está nele (emenda DEC-344 (d) e DEC-347)
+
+- Origem: pedido do dono (2026-10-21), com print do celular: a tela sobre o pad está poluída ("1/4", "STARTING IN 9…", foto) e falta um sinal claro de que o jogador está na fila. Pedido: barreira invisível no pad ocupado, botão Exit no topo junto de uma faixa com a foto de cada jogador da sala, placas do pad escondidas para quem está nele, "Starting in N…" logo acima do START NOW, textos dos botões dentro do frame.
+- Decidido pelo dono:
+  - quando a sala existe, o pad ganha uma **barreira invisível** em volta (Ø do pad); quem está dentro **não sai andando nem pulando**;
+  - outros jogadores **entram** enquanto a sala não está em **Friends Only**; com Friends Only, a barreira barra quem não é amigo do líder;
+  - a saída passa a ser só pelo botão **EXIT**, no topo da tela, junto da faixa de jogadores (não na fileira de baixo);
+  - a faixa do topo mostra um círculo com a foto de cada jogador da sala e círculos vazios nas vagas livres (até 4), no lugar do contador "N players online" enquanto o jogador está no pad;
+  - as placas do pad ("1/4", "STARTING IN…", fotos) somem para quem está naquele pad; o estado ("Starting in N…", "Teleporting…") aparece acima do START NOW só para eles;
+  - SKIP TUTORIAL e FRIENDS ONLY com o texto dentro do botão.
+- **Provisório** (recomendação do agente): barreira server-authoritative por collision groups (`PadWall<n>` / `PadCage<n>` / `PadGuest<n>` sobre o grupo `Players` do lobby; jogadores continuam se atravessando); membro visto fora do anel (lag, exploit) volta ao centro do pad; EXIT põe o jogador ~3 studs fora do anel, do lado do resto do lobby; sala em Invite/Closed barra todos de fora; quem não é membro e fica preso dentro quando o líder liga Friends Only é posto para fora; amigo do líder passa a barreira a até 10 studs do pad (checagem `IsFriendsWith` em cache); números em `Content.Lobby.Squad.Barrier`.
+- Emenda (append-only): **DEC-344** (d) "sair do pad = sair da sala" deixa de valer para pads: a saída é o EXIT (morrer ainda tira da sala). **DEC-347**: "no pad não há CANCEL (sair do pad = sair)" passa a "sair pelo EXIT".
+- Impacto: **backend-coder** (`PartyService` + `Barrier.luau`), **frontend-coder** (`LobbyHud`, `PadQueue`, `LobbyController`, `Pads.luau`), **qa-tester** (dois jogadores, amigo / não amigo, celular). TASKs: TASK-632 a TASK-634.

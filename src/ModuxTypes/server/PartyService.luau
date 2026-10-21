@@ -24,7 +24,9 @@ export type State = "Forming" | "Configuring" | "Starting"
 
 export type Public = {
 	Active: boolean,
+	Asking: { [string]: boolean },
 	Checking: { [number]: boolean },
+	Friendship: { [number]: { [number]: boolean } },
 	InFlight: { [number]: Flight },
 	Invites: { [number]: { [number]: Invite } },
 	LastId: number,
@@ -76,6 +78,10 @@ export type Public = {
 	Refuse: (self: Public, player: Player, platform: number, key: string) -> (),
 	EnterPlatform: (self: Public, player: Player, platform: number) -> (),
 	ExitPlatform: (self: Public, player: Player, platform: number) -> (),
+	Holds: (self: Public, player: Player, platform: number) -> boolean,
+	IsFriend: (self: Public, player: Player, leader: number) -> boolean?,
+	GroupFor: (self: Public, player: Player) -> string,
+	SyncBarrier: (self: Public) -> (),
 	PollPlatforms: (self: Public) -> (),
 	Forget: (self: Public, player: Player) -> (),
 	Gate: (self: Public, player: Player) -> boolean,

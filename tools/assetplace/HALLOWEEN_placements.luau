@@ -52,7 +52,7 @@ local function add(zone, name, asset, x, z, rot, opts)
 	table.insert(P, { Zone = zone, Name = name, Asset = asset, X = x, Z = z, Rot = rot or 0, Opts = opts })
 end
 
--- Z-A cauldron landmark. Owner hand edit in Studio (2026-10-21, DEC-347): the whole group moved west, beside the food
+-- Z-A cauldron landmark. Owner hand edit in Studio (2026-10-21, DEC-349): the whole group moved west, beside the food
 -- court, and the two lanterns went to the squad gantry. Absolute values read back from the place (y included).
 add("HW_Spawn", "Cauldron", "Cauldron", -35.03, -590.43, -20.6, { Role = "Cauldron", Scale = CS, y = -0.19 })
 add("HW_Spawn", "Pumpkin_FaceA", "FaceA", -29.37, -590.73, -35.2, { y = 0.06 })

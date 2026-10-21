@@ -30,8 +30,9 @@ export type Props = {
 	Badge: string,
 	-- Somebody stepped on / off pad n (the number of players on it changed). Presentation hook: sound, ring shiver.
 	OnCount: (n: number, from: number, to: number) -> (),
-	-- The sign shows only while this is true (a screen that owns the view hides them).
-	Visible: () -> boolean,
+	-- Sign of pad n shows only while this is true (a screen that owns the view hides them; the players standing in a
+	-- pad room do not see its sign, owner request 2026-10-21: the queue strip and the bar say it for them).
+	Visible: (n: number) -> boolean,
 }
 
 export type Pads = {
@@ -99,7 +100,9 @@ return function(props: Props): Pads
 			return PadTag({
 				Name = `PadTag{n}`,
 				Adornee = anchor,
-				Visible = props.Visible,
+				Visible = function()
+					return props.Visible(n)
+				end,
 				Badge = props.Badge,
 				Leader = function()
 					return props.Leader(n)

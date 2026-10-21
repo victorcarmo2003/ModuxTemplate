@@ -63,7 +63,9 @@
 	sign: a big count pill (FREE / SETUP / "n/max" / FULL, green free and open, mustard configuring, Slate closed, Teal
 	breathing while starting), a round run seal under it (Content.Lobby.Squad.Pad.Badge, "D1" Provisional) and the
 	leader's name; all read from the Party set (Platform, Members, MaxPlayers, StartAt). The pill pops when someone
-	steps on / off (+ ui click, ring shiver).
+	steps on / off (+ ui click, ring shiver). The players standing in a pad room do not see its sign (owner request
+	2026-10-21): the HUD queue strip (faces + EXIT, top centre, instead of the online pill) and the state line over
+	START NOW say it for them; EXIT sends PartyLeave and the server lifts them out of the pad barrier (DEC-348).
 	Zone signs (Signs.luau + Interface/Components/ZoneSign, owner request 2026-10-20): over every non-squad zone a
 	studs-sized floating sign, icon disc + name (CLASSES / GEMS / CODES), tones of the HUD tiles; hidden while its panel
 	is open.
@@ -122,6 +124,7 @@ local Rings = require(script.Rings)
 local Extras = require(script.Extras)
 local Guide = require(script.Guide)
 local Halloween = require(script.Halloween)
+local Lanterns = require(script.Lanterns)
 local Stage = require(script.Stage)
 local Text = require(script.Text)
 local Traffic = require(script.Traffic)
@@ -182,6 +185,7 @@ const NOTICE_TOP = 8
 const NOTICE_TOP_NARROW = 64 -- under the Roblox top bar (the HUD sides are centred, the top is free)
 const NARROW_VIEWPORT = 420
 const ONLINE_SPACE = 34 -- px (x the notice scale) the LobbyHud online pill takes, gap included (28 + 6)
+const QUEUE_SPACE = 56 -- px (x the notice scale) the LobbyHud queue strip takes in a pad room, gap included (48 + 8)
 const BIND_PRIORITY = 10 -- over ClassController's Crew toggle (priority 0) on C / ButtonY
 
 -- First button a gamepad selects when a panel opens (by instance name, searched in the panel).
@@ -902,6 +906,44 @@ function LobbyController:PadBar(): LobbyHud.PadBar?
 	}
 end
 
+-- Queue strip + state line of a pad room (owner request 2026-10-21, Provisional): who is in, the seats, and
+-- "Starting in 9..." over START NOW (the pad sign is hidden for its players). nil = not in a pad room. Reactive.
+function LobbyController:Queue(): LobbyHud.Queue?
+	const _, party = self:MyParty()
+	if party == nil or party.Platform <= 0 then
+		return nil
+	end
+	local status = ""
+	if party.State == "Starting" then
+		if party.StartAt <= 0 then
+			status = "Starting..."
+		else
+			const left = party.StartAt - self.Clock()
+			status = if left > 0 then `Starting in {math.ceil(left)}...` else "Teleporting..."
+		end
+	end
+	return {
+		Members = party.Members,
+		Max = math.max(party.MaxPlayers, #party.Members),
+		Leader = party.Leader,
+		Status = status,
+	}
+end
+
+-- The pad of my own pad room (0 = none). Reactive (Parties).
+function LobbyController:MyPad(): number
+	const _, party = self:MyParty()
+	return if party then party.Platform else 0
+end
+
+-- EXIT on the queue strip: leave the room; the server takes the player out of the pad barrier (DEC-348).
+function LobbyController:ExitPad()
+	-- event handlers run outside any reactive scope: plain reads
+	if self:MyPad() > 0 then
+		self.Libs.Net.PartyLeave:fireServer()
+	end
+end
+
 function LobbyController:PadAction(action: LobbyHud.PadAction)
 	-- event handlers run outside any reactive scope: plain reads
 	const bar = Vide.untrack(function()
@@ -1303,6 +1345,8 @@ function LobbyController:RunZones()
 	self.Extras = Extras()
 	self.Guide = Guide()
 	self.Halloween = Halloween()
+	-- floating smoke lanterns of LOBBY_Assets.Lights bob up and down (owner request 2026-10-21)
+	const lanterns = Lanterns()
 	-- street traffic between the two lobby tunnels (owner 2026-10-16); nil when the map lacks the cars or the tunnels
 	const traffic = Traffic()
 	self:PaintPlatforms()
@@ -1324,6 +1368,7 @@ function LobbyController:RunZones()
 		if traffic then
 			traffic.Step(dt)
 		end
+		lanterns.Step(t)
 		const halloween = self.Halloween
 		if halloween then
 			const camera = workspace.CurrentCamera
@@ -1796,6 +1841,13 @@ function LobbyController:Mount(playerGui: Instance)
 				end,
 				Scale = self.Scale,
 				Online = self.Online,
+				Queue = function()
+					return self:Queue()
+				end,
+				OnExit = function()
+					self:Click()
+					self:ExitPad()
+				end,
 			}),
 
 			ClassSelect({
@@ -2049,9 +2101,13 @@ function LobbyController:Mount(playerGui: Instance)
 				Position = function()
 					const narrow = self.Viewport().X < NARROW_VIEWPORT
 					const top = if narrow then NOTICE_TOP_NARROW else NOTICE_TOP
-					-- under the online pill while it is shown (HUD up, count known)
-					const pill = self.Panel() == "None" and self.Online() > 0
-					return UDim2.new(0.5, 0, 0, top + (if pill then ONLINE_SPACE * self:NoticeScale() else 0))
+					-- under the queue strip (pad room) or the online pill while it is shown (HUD up, count known)
+					const hud = self.Panel() == "None"
+					const space = if hud and self:MyPad() > 0
+						then QUEUE_SPACE
+						elseif hud and self.Online() > 0 then ONLINE_SPACE
+						else 0
+					return UDim2.new(0.5, 0, 0, top + space * self:NoticeScale())
 				end,
 				Size = UDim2.fromOffset(0, 0),
 				AutomaticSize = Enum.AutomaticSize.XY,
@@ -2121,8 +2177,8 @@ function LobbyController:Mount(playerGui: Instance)
 		OnCount = function(n: number, from: number, to: number)
 			self:OnPadCount(n, from, to)
 		end,
-		Visible = function()
-			return self.Panel() ~= "Classes"
+		Visible = function(n: number)
+			return self.Panel() ~= "Classes" and self:MyPad() ~= n
 		end,
 	})
 	-- floating name signs over the Classes / Gems / Codes zones (Signs.luau, owner request 2026-10-20)

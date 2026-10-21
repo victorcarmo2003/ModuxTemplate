@@ -216,7 +216,7 @@ Nada fora de `workspace.HalloweenEvent` foi tocado no place (P-HW4). O `Lighting
 
 | AST | Modelo | Tamanho (studs) | Tris | Brilho (Neon) | Onde está |
 |---|---|---|---|---|---|
-| 167 | `HW_Cauldron_Main` | 7,3 × 4,6 × 6,9 (colocado em ×1,3) | 1.000 | `Glow_Liquid` verde | oeste da praça, (−35, −590,4), virado para o spawn (DEC-347, edição do dono) |
+| 167 | `HW_Cauldron_Main` | 7,3 × 4,6 × 6,9 (colocado em ×1,3) | 1.000 | `Glow_Liquid` verde | oeste da praça, (−35, −590,4), virado para o spawn (DEC-349, edição do dono) |
 | 168 | `HW_Pumpkin_Small/Medium/Large` | Ø 1,4 / 2,2 / 3,2 | 392 | — | bordas, pilhas, base do caldeirão |
 | 168 | `HW_Pumpkin_Face_A/B/C` | Ø 2,2 × 1,8 | 484–508 | `Glow_Face` âmbar | todas as zonas |
 | 169 | `HW_Lantern_Post` / `_Hanging` | 1 × 4,9 × 1,8 / 1 × 2 × 1 | 368 / 256 | `Glow_Lamp` | caldeirão, Classes, fonte, Codes |
@@ -275,7 +275,7 @@ Câmera de classes: as lanternas do Classes ficam em |X| ≥ 14,5, fora do quadr
 Caça aos doces com recompensa (DEC nova, P-HW3); NPC fantasiado reaproveitando `Content.Lobby.Extras` + skins AST-123;
 placa "HALLOWEEN EVENT" (P-HW5); preset de luz de Halloween (10.5); olhos piscando na água da fonte.
 
-### 10.8 Ajuste do dono no Studio (DEC-347)
+### 10.8 Ajuste do dono no Studio (DEC-349)
 
 Depois da entrega, o dono moveu o grupo do caldeirão para (−35, −590,4), entre o food court e a Gem Shop, e as duas
 lanternas do grupo para perto do pórtico dos squads. A tabela do placement foi atualizada com os valores lidos do place

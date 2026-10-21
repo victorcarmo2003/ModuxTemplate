@@ -20,7 +20,12 @@
 --                  on the left, START NOW (Green, bigger, leader) in the middle, FRIENDS ONLY (leader) on the right. A
 --                  toggle is grey off, Green on; each flip turns it over like a card (180 deg on a spring: it narrows to
 --                  its edge and opens again, with a slight tilt and pop), the colour blends Slate <-> Green on the way and
---                  a white shine sweeps across it. Reduced motion: the colour only. The countdown lives on the pad sign
+--                  a white shine sweeps across it. Reduced motion: the colour only. Over the bar, the room's state line
+--                  ("Starting in 9...", "Teleporting...") for the players of that pad only (owner request 2026-10-21: the
+--                  pad sign hides for them). Toggle labels scale down inside the card (they spilled out on phones)
+--   top centre, in a pad room (owner request 2026-10-21, Provisional; `Queue`)  the queue strip (PadQueue): a circle per
+--                  seat with each member's head shot, empty dashed circles for the free seats, and EXIT (OnExit). It takes
+--                  the place of the players-online pill
 -- Mobile clean-up (owner request 2026-10-17, Provisional): each tile's name sits UNDER the tile (white, thin Ink
 -- stroke), never inside it (it spilled out and overlapped on phones); bigger icons; Normal outlines instead of Thick;
 -- smaller gem and online pills.
@@ -41,6 +46,7 @@ local CartoonButton = require(script.Parent.CartoonButton)
 local CartoonLabel = require(script.Parent.CartoonLabel)
 local KeyChip = require(script.Parent.KeyChip)
 local GearButton = require(script.Parent.GearButton)
+local PadQueue = require(script.Parent.PadQueue)
 local Icon = require(script.Parent.LobbyWindow.Icon)
 local Count = require(script.Parent.HudPill.Count)
 
@@ -63,6 +69,14 @@ export type PlayButton = {
 }
 
 export type PadAction = "StartNow" | "SkipTutorial" | "FriendsOnly"
+
+-- The queue strip of a pad room (LobbyController:Queue): who is in, the seats, the state line over the pad bar
+export type Queue = {
+	Members: { number }, -- user ids, leader first
+	Max: number,
+	Leader: number,
+	Status: string, -- "Starting in 9...", "Teleporting..."; "" = none
+}
 
 -- The pad bar of a pad room (LobbyController:PadBar)
 export type PadBar = {
@@ -95,6 +109,10 @@ export type Props = {
 	-- The pad bar (in a pad room); missing or nil = none.
 	Pad: (() -> PadBar?)?,
 	OnPad: ((action: PadAction) -> ())?,
+	-- The queue strip at the top + the state line over the pad bar (in a pad room); missing or nil = none.
+	Queue: (() -> Queue?)?,
+	-- EXIT on the queue strip (leave the room).
+	OnExit: (() -> ())?,
 }
 
 const MARGIN = 12
@@ -141,6 +159,8 @@ const FREE_BOTTOM = 200
 -- (menu, chat, microphone; ~58 px, HudController TOPBAR_REAL) is over the top-left corner
 const TOPBAR_FREE = 64
 const ONLINE_PILL = 28 -- px tall (UIScale grows it)
+const STATUS_HEIGHT = 26 -- px, the state line over the pad bar
+const TOGGLE_INSET = Vector2.new(14, 10) -- px kept free around a toggle's label (its outline + lip)
 
 -- "950", "1.2K", "12K", "3.4M": one decimal under 10 of a unit, none above.
 local function short(value: number): string
@@ -202,6 +222,13 @@ return function(props: Props): Frame
 	end
 	const padBar = function(): PadBar?
 		return if props.Pad then props.Pad() else nil
+	end
+	const queue = function(): Queue?
+		return if props.Queue then props.Queue() else nil
+	end
+	const padStatus = function(): string
+		const info = queue()
+		return if info then info.Status else ""
 	end
 	const pressPad = function(action: PadAction)
 		return function()
@@ -286,9 +313,14 @@ return function(props: Props): Frame
 					end,
 					OnActivated = pressPad(action),
 					Children = {
+						-- inset and scaled down to fit: the long words (SKIP TUTORIAL) spilled out of the card on phones
 						CartoonLabel({
 							Name = "Label",
-							Box = UDim2.fromScale(1, 1),
+							AnchorPoint = Vector2.new(0.5, 0.5),
+							Position = UDim2.new(0.5, 0, 0.5, -1),
+							Box = UDim2.new(1, -TOGGLE_INSET.X * 2, 1, -TOGGLE_INSET.Y * 2),
+							Scaled = true,
+							MaxTextSize = 16,
 							TextSize = 16,
 							Text = text,
 							Transparency = function()
@@ -478,7 +510,7 @@ return function(props: Props): Frame
 			AutomaticSize = Enum.AutomaticSize.X,
 			BackgroundTransparency = 1,
 			Visible = function()
-				return online() > 0
+				return online() > 0 and queue() == nil
 			end,
 			createRaw("UIScale")({ Scale = scaled }),
 			CartoonPanel({
@@ -507,6 +539,41 @@ return function(props: Props): Frame
 						end,
 					}),
 				},
+			}),
+		}),
+
+		-- Top centre, in a pad room: the queue strip (faces + EXIT) instead of the online pill
+		create("Frame")({
+			Name = "Queue",
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = function()
+				return UDim2.new(0.5, 0, 0, if area().X < NARROW then TOPBAR_FREE else TOP)
+			end,
+			Size = UDim2.fromOffset(0, 0),
+			AutomaticSize = Enum.AutomaticSize.XY,
+			BackgroundTransparency = 1,
+			Visible = function()
+				return queue() ~= nil
+			end,
+			createRaw("UIScale")({ Scale = scaled }),
+			PadQueue({
+				Members = function()
+					const info = queue()
+					return if info then info.Members else {}
+				end,
+				Max = function()
+					const info = queue()
+					return if info then info.Max else 0
+				end,
+				Leader = function()
+					const info = queue()
+					return if info then info.Leader else 0
+				end,
+				OnExit = function()
+					if props.OnExit then
+						props.OnExit()
+					end
+				end,
 			}),
 		}),
 
@@ -590,50 +657,69 @@ return function(props: Props): Frame
 			tiles,
 		}),
 
-		-- Pad bar (pad room): SKIP TUTORIAL · START NOW (big, middle) · FRIENDS ONLY
+		-- Pad bar (pad room): the state line, then SKIP TUTORIAL · START NOW (big, middle) · FRIENDS ONLY
 		create("Frame")({
 			Name = "PadBar",
 			AnchorPoint = Vector2.new(0.5, 1),
 			Position = UDim2.new(0.5, 0, 1, -MARGIN),
-			Size = UDim2.fromOffset(PAD_WIDTH, PAD_START.Y),
+			Size = UDim2.fromOffset(PAD_WIDTH, STATUS_HEIGHT + PAD_START.Y),
 			BackgroundTransparency = 1,
 			Visible = function()
 				return padBar() ~= nil
 			end,
 			createRaw("UIScale")({ Scale = scaled }),
-			create("UIListLayout")({
-				FillDirection = Enum.FillDirection.Horizontal,
-				HorizontalAlignment = Enum.HorizontalAlignment.Center,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				Padding = UDim.new(0, PAD_GAP),
-			}),
-			padToggle("SkipTutorial", 1, "SKIP TUTORIAL", function(bar: PadBar): boolean
-				return bar.Skip
-			end, function(_bar: PadBar): boolean
-				return true
-			end),
-			CartoonButton({
-				Name = "StartNow",
-				LayoutOrder = 2,
-				Size = UDim2.fromOffset(PAD_START.X, PAD_START.Y),
-				TextSize = 22,
-				Outline = Theme.Outline.Normal,
-				Radius = Theme.Radius.Card,
-				Studs = true,
-				Tone = Theme.Tone.Green,
-				Text = "START NOW",
-				Enabled = function()
-					const bar = padBar()
-					return bar ~= nil and bar.Leader
+			-- "Starting in 9..." right over START NOW, only for the players of this pad
+			CartoonLabel({
+				Name = "Status",
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = UDim2.fromScale(0.5, 0),
+				Box = UDim2.new(1, 0, 0, STATUS_HEIGHT),
+				TextSize = 20,
+				Text = padStatus,
+				Visible = function()
+					return padStatus() ~= ""
 				end,
-				OnActivated = pressPad("StartNow"),
 			}),
-			padToggle("FriendsOnly", 3, "FRIENDS ONLY", function(bar: PadBar): boolean
-				return bar.Friends
-			end, function(bar: PadBar): boolean
-				return bar.Leader
-			end),
+			create("Frame")({
+				Name = "Row",
+				AnchorPoint = Vector2.new(0.5, 1),
+				Position = UDim2.fromScale(0.5, 1),
+				Size = UDim2.new(1, 0, 0, PAD_START.Y),
+				BackgroundTransparency = 1,
+				create("UIListLayout")({
+					FillDirection = Enum.FillDirection.Horizontal,
+					HorizontalAlignment = Enum.HorizontalAlignment.Center,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, PAD_GAP),
+				}),
+				padToggle("SkipTutorial", 1, "SKIP TUTORIAL", function(bar: PadBar): boolean
+					return bar.Skip
+				end, function(_bar: PadBar): boolean
+					return true
+				end),
+				CartoonButton({
+					Name = "StartNow",
+					LayoutOrder = 2,
+					Size = UDim2.fromOffset(PAD_START.X, PAD_START.Y),
+					TextSize = 22,
+					Outline = Theme.Outline.Normal,
+					Radius = Theme.Radius.Card,
+					Studs = true,
+					Tone = Theme.Tone.Green,
+					Text = "START NOW",
+					Enabled = function()
+						const bar = padBar()
+						return bar ~= nil and bar.Leader
+					end,
+					OnActivated = pressPad("StartNow"),
+				}),
+				padToggle("FriendsOnly", 3, "FRIENDS ONLY", function(bar: PadBar): boolean
+					return bar.Friends
+				end, function(bar: PadBar): boolean
+					return bar.Leader
+				end),
+			}),
 		}),
 
 		-- Play, with the squad status card over it

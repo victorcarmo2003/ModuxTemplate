@@ -6,6 +6,8 @@
 -- "Squad" the badge on the tile; "Keys" shows the desktop key badges; "InSquad" off hides the card + Play button
 -- (TASK-296: no squad yet; toggle it to see the pop). Tiles on the left, gem pill on the right (TASK-295). Taps print
 -- the tile. "Online" picks the players-online pill count at the top centre (TASK-312; K / M format; 0 = hidden).
+-- "PadRoom" puts the player in a pad room (owner request 2026-10-21): pad bar with the state line over START NOW and the
+-- queue strip (faces + EXIT) instead of the online pill; "PadMembers" picks how many are in.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -22,7 +24,12 @@ type Controls = {
 	Keys: () -> boolean,
 	InSquad: () -> boolean,
 	Online: () -> string,
+	PadRoom: () -> boolean,
+	PadMembers: () -> number,
 }
+
+-- public Roblox accounts, only for the head shots of the story
+const USERS = { 1, 156, 261, 2032622 }
 
 const SCREENS: { [string]: Vector2 } = {
 	["360x640"] = Vector2.new(360, 640),
@@ -57,6 +64,8 @@ return UILabs.CreateVideStory({
 		Keys = true,
 		InSquad = true,
 		Online = UILabs.Choose({ "200", "1", "1234", "12000", "1250000", "0" }),
+		PadRoom = true,
+		PadMembers = UILabs.Slider(2, 1, 4, 1),
 	},
 }, function(props)
 	const controls: Controls = (props.controls :: any)
@@ -111,6 +120,25 @@ return UILabs.CreateVideStory({
 			end,
 			OnPlay = function()
 				print("[LobbyHud story] play")
+			end,
+			Pad = function()
+				return if controls.PadRoom() then { Leader = true, Skip = false, Friends = true } else nil
+			end,
+			OnPad = function(action)
+				print(`[LobbyHud story] pad {action}`)
+			end,
+			Queue = function()
+				if not controls.PadRoom() then
+					return nil
+				end
+				const members: { number } = {}
+				for index = 1, math.floor(controls.PadMembers()) do
+					members[index] = USERS[index]
+				end
+				return { Members = members, Max = 4, Leader = USERS[1], Status = "Starting in 9..." }
+			end,
+			OnExit = function()
+				print("[LobbyHud story] exit")
 			end,
 			Scale = function()
 				const size = sizeOf()
