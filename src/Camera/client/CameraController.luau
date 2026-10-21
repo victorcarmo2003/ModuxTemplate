@@ -1002,7 +1002,8 @@ end
 -- Character the camera sits in for the current mode.
 function CameraController:Body(): Model?
 	const mode = Vide.untrack(self.Mode)
-	if mode == "FirstPerson" or mode == "Cutscene" then
+	-- SetBodyHidden (the talk close-up, mode Prep) keeps tracking the own body so it can hide it
+	if mode == "FirstPerson" or mode == "Cutscene" or Vide.untrack(self.BodyHidden) then
 		const own = Players.LocalPlayer.Character
 		return if own ~= nil and own.Parent ~= nil then own else nil
 	elseif mode == "Spectate" then
