@@ -835,6 +835,15 @@ Planta do Mart: MAP-01 revisão 3 §7.4 (loja 36 × 32; bancada na parede oeste;
 - **Variantes:** `AST-105_Pedestal` (B1–B5, acento Teal; 1,52 × 3,06 × 1,6; 536 tris) e `AST-105_PedestalS1` (acento Mustard + `Lamp` com 4 lâmpadas nos cantos, DEC-144; 648 tris).
 - **Partes:** `Body`, `Ring` (anel sobre o topo: material **Neon** no Roblox), `Lamp` (só S1, Neon). Âncoras em `AST-105_Pedestal*_atts.json`: `Mini_Anchor` (h 4,2), `Price_Anchor` (face frontal do capitel), `Prompt_Buy`.
 - **Arquivos:** `Assets/blender/market/AST-105_*.blend`, `Assets/import/market/AST-105_*.fbx`, renders `Assets/reference/AST-105_*.png`; script `tools/blender/mart_v2/build_pedestal.py`.
+- **Miniaturas sem peça no kit (2026-10-21, Rascunho):** as linhas sem `UpgradePieces` caíam no cubo Teal com a inicial
+  (`Minis.luau`). Montadas no Studio em `ReplicatedStorage.Assets.Equipment.Minis` (vive no place, não no Rojo; salvar
+  com Ctrl+S), só com meshes já aprovados e enviados, sem upload novo:
+  - `Mini_CoffeeShelf_L1..L3`: prateleira de madeira (Parts retas, cor da placa do `STOCK-COFFEE`) com 1/2/3 andares de
+    2 pacotes de café (cópias de `STOCK-COFFEE.Pack1/2`, com o ícone);
+  - `Mini_CoffeeMaker_L2` = AST-022; `L3` = AST-022 + copo AST-010 ao lado + `ReadyLamp` Neon verde;
+  - `Mini_Breaker_L1` = `TRL-BREAKER`; `L2` = + segunda alavanca + faixa Neon amarela;
+  - `Mini_ToppingRack_L1..L3` = AST-017 com 2/4/6 cubas abertas na ordem de liberação (Ketchup, Mustard | Cheese, Bacon |
+    Potato Sticks, Cream Cheese); as fechadas mantêm tampa e trava.
 
 ### AST-106 — Placas de seção do Mart
 
