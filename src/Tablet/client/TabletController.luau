@@ -400,8 +400,12 @@ function TabletController:SyncCloseUp()
 		self.CloseTablet = index
 		const facing = Vector3.new(head.CFrame.LookVector.X, 0, head.CFrame.LookVector.Z)
 		const forward = if facing.Magnitude > 1e-3 then facing.Unit else Vector3.zAxis
-		const eye = head.Position + forward * close.Distance + Vector3.yAxis * close.Lift
-		camera:Prep(true, CFrame.lookAt(eye, head.Position), { Fov = close.Fov, Travel = close.Travel, Min = 0.2, Look = head.Position })
+		-- a medium shot slid sideways (owner sketch): the customer on the right half, the talk card on the left. The camera
+		-- looks back along -forward; its right is (-forward) x up, so sliding the view by -right moves the customer right
+		const right = (-forward):Cross(Vector3.yAxis)
+		const aim = head.Position - Vector3.yAxis * close.Drop - right * close.Shift
+		const eye = head.Position + forward * close.Distance + Vector3.yAxis * close.Lift - right * close.Shift
+		camera:Prep(true, CFrame.lookAt(eye, aim), { Fov = close.Fov, Travel = close.Travel, Min = 0.2, Look = aim })
 		const model = spot.Model
 		if model ~= nil then
 			for _, part in model:GetDescendants() do
