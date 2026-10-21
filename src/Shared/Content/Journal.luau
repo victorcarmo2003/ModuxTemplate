@@ -92,7 +92,7 @@ const written: { Page } = {
 	}, { "No footsteps. No shadow." }, { "Refuse them: close the window." }),
 
 	page("anm_017_crawler", "The Crawler", "Hide", {
-		"Fast scratching under the trailer.",
+		"Fast scratching under the floor.",
 		"A low rumble.",
 		-- owner 2026-10-21: restaurant rule = get off the floor (Rules/ANM-017), not "hide out back"
 	}, { "The lights do NOT flicker." }, { "Get off the floor: climb the counter.", "Quick! It is fast." }),
@@ -106,6 +106,12 @@ const written: { Page } = {
 		"Never blinks. Never moves.",
 		"The head follows you everywhere.",
 	}, { "Looking at it on the cameras is safe." }, { "Refuse them: close the window.", "When it reaches you, it makes you look." }),
+
+	-- owner request 2026-10-21 (Provisional Q-437)
+	page("anm_023_on_camera", "The One on Camera", "Refuse", {
+		"Looks like any other customer.",
+		"On the cameras its body is broken and it stares at the lens.",
+	}, { "Only the cameras show it." }, { "Check the cameras when in doubt.", "Refuse it: close the window." }),
 
 	-- TASK-591 (Provisional Q-399)
 	page("anm_022_head_banger", "The Head Banger", "Careful", {

@@ -22,6 +22,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local UserInputService = game:GetService("UserInputService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local SettingsRules = require(ReplicatedStorage.shared.Settings.SettingsRules)
+local AdminSettings = require(ReplicatedStorage.shared.Admin.AdminSettings)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Backdrop = require(StarterPlayer.StarterPlayerScripts.client.Interface.Backdrop)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
@@ -53,9 +54,10 @@ function SettingsController:Setup()
 	self.Infinite = Vide.source(false) :: Vide.Source<boolean>
 end
 
--- Dev row props (TASK-332), nil outside Studio dev mode
+-- Dev row props (TASK-332), nil outside Studio dev mode and for players off the admin allow-list (the server checks
+-- again on every DevTool packet)
 function SettingsController:DevProps(): SettingsPanel.DevProps?
-	if not self.Dependencies.PlaceController:IsDev() then
+	if not self.Dependencies.PlaceController:IsDev() and not AdminSettings.IsAllowed(Players.LocalPlayer) then
 		return nil
 	end
 	const player = Players.LocalPlayer

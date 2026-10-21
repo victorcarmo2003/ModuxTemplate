@@ -6,12 +6,16 @@ local Content = require(ReplicatedStorage.shared.Content)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Api = require(ServerScriptService.server.Anomaly.AnomalyService.Api)
 local Scheduler = require(ServerScriptService.server.Anomaly.AnomalyService.Scheduler)
+local Pressure = require(ServerScriptService.server.Anomaly.AnomalyService.Pressure)
+local Trip = require(ServerScriptService.server.Anomaly.AnomalyService.Trip)
+local Director = require(ServerScriptService.server.Anomaly.AnomalyService.Director)
 
 export type Occurrence = Api.Occurrence
 export type Event = Api.Event
 export type Context = Api.Context
 export type Module = Api.Module
 export type Rule = Api.Rule
+export type Entry = Scheduler.Entry
 export type Trace = {
 	Key: string,
 	Day: number,
@@ -48,13 +52,13 @@ export type Due = { Entry: Scheduler.Entry, RetryAt: number, Done: boolean }
 export type Gaze = { Yaw: number, Pitch: number, At: number }
 export type Stare = { Time: number, Away: number, Owed: number, Taken: number }
 type TrafficHook = { Hold: (self: any, reason: string, on: boolean) -> () }
-export type Entry = Scheduler.Entry
 export type Wire = { Anomaly: string, Phase: Api.Phase, StartedAt: number, Step: number, Anchor: number }
 
 export type Public = {
 	Context: Api.Context?,
 	DevHeld: boolean,
 	DevSerial: number,
+	Director: Director.State,
 	Enabled: boolean,
 	Ended: SignalLib.Signal<string, { Player }>,
 	Example: Api.Module?,
@@ -68,6 +72,7 @@ export type Public = {
 	NextScareAt: number,
 	Opening: string,
 	Outcome: SignalLib.Signal<string, string, { Player }, number, string, Trace>,
+	Pressure: Pressure.State,
 	Queue: { Due },
 	Removing: { [number]: number },
 	Running: { [number]: Run },
@@ -79,6 +84,7 @@ export type Public = {
 	Tension: SignalLib.Signal<boolean>,
 	TensionOn: boolean,
 	Traffic: TrafficHook?,
+	Trip: Trip.State,
 	Warned: { [string]: boolean },
 	Setup: (self: Public) -> (),
 	WarnOnce: (self: Public, key: string, message: string) -> (),
@@ -114,7 +120,21 @@ export type Public = {
 	Emit: (self: Public, event: Api.Event) -> (),
 	BuildContext: (self: Public) -> Api.Context,
 	BuildAgenda: (self: Public, info: { Day: number, Night: number, IsNight: boolean, Attempt: number }) -> (),
+	SanityOf: (self: Public, player: Player) -> (number, number),
+	Scare: (self: Public, player: Player) -> (),
+	ScareGapUntil: (self: Public) -> number,
+	Queued: (self: Public) -> { Scheduler.Entry },
+	Enqueue: (self: Public, entry: Scheduler.Entry) -> (),
+	AnyRunning: (self: Public) -> boolean,
+	TripBusy: (self: Public) -> boolean,
+	TripBreaker: (self: Public) -> boolean,
+	CrewSize: (self: Public) -> number,
 	CrewEvents: (self: Public) -> number,
+	RunningCount: (self: Public) -> number,
+	BeatDueIn: (self: Public) -> number,
+	BeatClear: (self: Public, kind: string) -> boolean,
+	BeatBegin: (self: Public, key: string, hold: number?) -> (),
+	BeatEnd: (self: Public, key: string) -> (),
 	Limits: (self: Public) -> Scheduler.Limits,
 	RunningCandidates: (self: Public) -> { Scheduler.Candidate },
 	SetHold: (self: Public, hold: () -> boolean) -> (),
@@ -138,6 +158,9 @@ export type Public = {
 	DevEmit: (self: Public, event: any) -> (),
 	DevStatus: (self: Public) -> string,
 	DevAgenda: (self: Public) -> string,
+	DevPressure: (self: Public, nowToo: boolean) -> string,
+	DevTrip: (self: Public, nowToo: boolean) -> string,
+	DevBeats: (self: Public) -> string,
 }
 
 return {}

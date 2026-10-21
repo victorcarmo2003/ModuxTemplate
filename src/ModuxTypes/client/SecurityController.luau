@@ -11,6 +11,7 @@ export type Public = {
 	Cam: Vide.Source<string>,
 	Clock: Vide.Source<string>,
 	Connection: RBXScriptConnection?,
+	DeadCam: Vide.Source<string>,
 	Effect: ColorCorrectionEffect?,
 	Fov: number,
 	Frame: CFrame?,

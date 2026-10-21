@@ -4413,3 +4413,25 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - 2ª passada (dono, mesmo dia, com print): "a parte de trás tá muito escura e o boneco muito escuro; afasta a luz, coloca mais de cima e aumenta a claridade externa". Preset `ClassStage` mais claro (Brightness 0,3, Ambient (44, 42, 56)); spotlight principal mais longe e mais alto (13 à frente, 14 acima, brilho 4,5, cone 32°); raio de apagar luzes e Neon reduzido para 28 studs. Valores afinados ao vivo no Play.
 - **Girar o boneco** (dono, mesmo dia): o balanço automático continua; clicar ou tocar fora dos painéis e arrastar gira o boneco 360° (ver as costas, mouse e toque). Ao soltar, ele fica parado 2 s e volta suave para a frente. O frame raiz da tela de classes é `Active` (todo clique chega "processado"), então o arraste é bloqueado só por botão ou painel visível debaixo do dedo. Toque não testado no Studio (só mouse).
 - Impacto: `src/Interface/client/Components/ClassSelect/{init,SkinRow}.luau`, `src/Lobby/client/LobbyController/init.luau` (`HideCharacters`, `SetStageLights`), `src/Lobby/client/LobbyController/Stage.luau` (arrastar para girar), `src/Light/client/LightController.luau`, `src/Shared/Content/LightPresets.luau`.
+
+### DEC-351 — 2026-10-21 — Comandos de dev (`/dev`) ligados no jogo publicado, só para a lista de admins
+
+- Origem: chat do dono (2026-10-21): "ativa os dev comands ingame também".
+- Decidido pelo dono: os comandos `/dev` (chat, linha dev do painel de configurações) funcionam também fora do Studio.
+- **Provisório** (escolha do agente por segurança): só para os UserIds de `AdminSettings.AdminUserIds` (a mesma lista do console admin, hoje os dois do dono); no Studio, como antes, qualquer um. O servidor confere quem chamou em toda execução (`DevService:Allowed`); a linha dev do painel aparece só para quem pode.
+- Atenção: em servidor publicado os comandos mexem em dados reais (gemas, perfil, noite); as respostas saem no Output do servidor (F9 → Server).
+- Impacto: `src/Dev/server/DevService/init.luau`, `src/Settings/client/SettingsController.luau`, `docs/tech/dev-commands.md`.
+
+### DEC-352 — 2026-10-21 — Escada de sanidade: quanto mais baixa, mais alucinações, sustos e anomalias (faixas 60/40/20)
+
+- Origem: chat do dono (2026-10-21): "Preciso deixar mais na cara que a sanidade está baixa, fazendo ele alucinar mais e ver mais anomalias."
+- Decidido pelo dono: a sanidade baixa tem que ser sentida (não só o número no HUD): mais alucinações e mais anomalias quanto mais baixa.
+- **Provisório** (proposta do agente, números em `Content.Sanity.Tiers` e `Content.Sanity.Pressure`): quatro faixas nos mesmos cortes das alucinações e de `Bands` (DEC-167):
+  - **Calm** 100–60: nada novo.
+  - **Uneasy** 60–40: alucinações a cada 16–30 s (era 20–45 em qualquer sanidade), as novas da faixa pesam ×1,5; borda escura 0,22, um pouco mais fria e cinza; blur curto a cada 30–50 s; respiração presa a cada ~22 s.
+  - **Shaken** 40–20: alucinações a cada 9–18 s (×2 nas novas); **susto pessoal da família D** enviado pelo servidor só para esse jogador a cada 70–110 s; **25% de chance a cada 45 s de +1 anomalia regular** (média da equipe); borda 0,38 que respira a 0,5 Hz, tinta fria, blur a cada 14–24 s, batimento a cada 1,4 s, respiração a cada ~13 s, palavras do personagem na tela ("I NEED COFFEE"…) a cada 20 s.
+  - **Breaking** < 20: alucinações a cada 5–10 s (×3 nas novas); susto pessoal a cada 35–55 s; 50% de chance de +1 anomalia; borda 0,52 respirando a 0,9 Hz, saturação −0,28, blur a cada 6–12 s, batimento a cada 0,85 s, respiração a cada ~8 s, palavras a cada 9 s.
+  - Ao **descer** de faixa: batimento, blur curto e rajada de palavras (o degrau é percebido).
+- Regras que não mudam: o servidor decide (sustos e anomalias extras em `AnomalyService/Pressure.luau`); o client só apresenta. A anomalia extra é uma entrada comum da agenda (Admit, MinGap, simultâneas, carência, janela fechada, fim da janela) e as regras de acerto/erro de cada anomalia ficam iguais. No máximo **2 extras por noite**, nunca na Noite 1 nem durante o tutorial. Sustos da família D não contam como anomalia vista e não tiram sanidade (DEC-254, DEC-256). Tom Mild (DEC-172): sem vermelho, sem gore, sem tremer a câmera; blur ≤ 4 por ≤ 0,5 s.
+- Substitui (Provisório): o pulso "< 25" e as faixas Mid/Night da vinheta do `VitalController`, e o intervalo fixo `HallucinationRules.Interval` na rolagem (fica só como referência).
+- Impacto: `src/Shared/Content/Sanity.luau`, `src/Shared/Content/Validate.luau`, `src/Anomaly/shared/SanityTier.luau`, `src/Anomaly/server/AnomalyService/{init,Pressure,Scheduler}.luau`, `src/Hallucination/client/HallucinationController/init.luau`, `src/Vital/client/VitalController.luau`, `src/Dev/server/DevService/Commands/Pressure.luau` (`/dev pressure [now]`). TASK-635 a TASK-637.

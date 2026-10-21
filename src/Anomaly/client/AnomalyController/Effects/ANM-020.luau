@@ -25,6 +25,13 @@
 	vehicle, every light / Neon / table torch / SurfaceGui glow of the restaurant goes off locally (the emergency lamp
 	EMERG-P stays), and Lighting blends to a darker look for as long as the dark lasts, back to the night values after.
 
+	Power stays out after the occurrence (owner 2026-10-21, Provisional): the server ends the record LeaveAfter s after the
+	attack but keeps the blackout until the breaker. When the record leaves while Light/Power.Out() is still true, the
+	session is held: everything stays (the dark look, the glow, the breaker beacon, the total blackout) and the noises
+	and the shape at the corner of the eye keep coming at their closest and most frequent, the "weird things" of the
+	dark (owner 2026-10-21, Q-434), until Out goes false (the breaker held; a new shift or a restore), then it finishes
+	with the power-back sounds.
+
 	PROVISIONAL (TASK-273): look numbers below, sound keys reused from Content.Sounds until the sound-list has its own,
 	shape made of Parts until the art-director's sheet. ESCALATE_OVER only paces the presentation (the real window is
 	in Rules/ANM-020, server only).
@@ -34,6 +41,7 @@ local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local StarterPlayer = game:GetService("StarterPlayer")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -43,12 +51,13 @@ local Blackout = require(script.Parent.Kit.Blackout)
 local Jumpscare = require(script.Parent.Kit.Jumpscare)
 local Watch = require(script.Parent.Kit.Watch)
 local VehicleRoot = require(ReplicatedStorage.shared.Vehicle.VehicleRoot)
+local Power = require(StarterPlayer.StarterPlayerScripts.client.Light.Power)
 
 const ANCHOR_TAG = "Interactable"
 const BREAKER_ACTION = "breaker_reset"
 const ZONE_POINT = "TRL"
 const ATTACK_RADIUS = 24 -- studs (flat) from TRL: Rules/ANM-020 Params.Radius
-const ESCALATE_OVER = 30 -- s of dark over which noises and the shape get closer and more frequent
+const ESCALATE_OVER = 20 -- s of dark over which noises and the shape get closer and more frequent (= RestaurantWindow; Q-434 12, was 30)
 
 -- Dark look stacked over the night preset
 const CC_NAME = "ANM020_Blackout"
@@ -331,6 +340,9 @@ local function groundAt(position: Vector3, ignore: { Instance }): number?
 end
 
 local function showShape(session: Session)
+	if session.Shape.Parent == nil then
+		return -- held past the night's end: the folder took it
+	end
 	const camera = Workspace.CurrentCamera
 	const root = rootOf(Players.LocalPlayer)
 	if camera == nil or root == nil then
@@ -560,6 +572,25 @@ local function finish(session: Session)
 	tween:Play()
 end
 
+const HOLD_POLL = 0.2 -- s between two reads of Power.Out while a held session waits for the breaker
+
+-- The record left with the power still out: the session goes on as it is (dark, noises, the shape) and finishes once
+-- the power is back. The shape lives in ctx.Folder, emptied at the end of the night: step() only shows it while it is
+-- still parented.
+local function hold(session: Session)
+	task.spawn(function()
+		while not session.Ended and Power.Out() do
+			task.wait(HOLD_POLL)
+		end
+		if session.Ended then
+			return
+		end
+		finish(session)
+		session.Ctx.Play("neon_click")
+		session.Ctx.Play("post_buzz")
+	end)
+end
+
 -- The omen: the kitchen lamps blink off 1-2 times and come back (fixtures marked so LightController leaves them, then
 -- unmarked so it repaints them from the Lights set; same trick as Kit/Hide's warning)
 local function flicker(ctx: Effect.Context)
@@ -636,7 +667,11 @@ return {
 		end)
 		Vide.cleanup(function()
 			if session ~= nil then
-				finish(session :: Session)
+				if Power.Out() then
+					hold(session :: Session)
+				else
+					finish(session :: Session)
+				end
 				session = nil
 			end
 		end)

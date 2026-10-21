@@ -59,6 +59,7 @@ export type Props = {
 	Time: () -> number, -- seconds, drives every animation
 	Since: () -> number, -- Time when the view opened (elapsed stamp)
 	Static: () -> number, -- 0..1 switch burst
+	Dead: (() -> boolean)?, -- the camera shown has no picture (chore camera_static, Q-436): full static + NO SIGNAL
 	Clock: () -> string, -- game clock ("11:42 PM")
 	Night: () -> string, -- "NIGHT 3" / "DAY 2"
 	Device: () -> string, -- "KeyboardMouse" | "Gamepad" | "Touch"
@@ -178,7 +179,14 @@ return function(props: Props): Frame
 		const inset = props.Inset()
 		return (if inset > 0 then inset else TOP_MIN) / scaleOf() + TOP_GAP
 	end
+	const isDead = function(): boolean
+		const dead = props.Dead
+		return dead ~= nil and dead()
+	end
 	const grain = function(): number
+		if isDead() then
+			return 0.95
+		end
 		return math.clamp(props.Look().Noise + props.Static() * 0.8, 0, 0.95)
 	end
 
@@ -197,7 +205,10 @@ return function(props: Props): Frame
 			ImageTransparency = function()
 				return 1 - grain() * (if salt == 1 then 1 else 0.6)
 			end,
-			ZIndex = 4,
+			-- over the dead camera's cover (the snow is the picture then)
+			ZIndex = function()
+				return if isDead() then 7 else 4
+			end,
 		})
 	end
 
@@ -302,9 +313,31 @@ return function(props: Props): Frame
 			BackgroundColor3 = Color3.fromRGB(60, 66, 62),
 			BorderSizePixel = 0,
 			BackgroundTransparency = function()
+				if isDead() then
+					return 0.08
+				end
 				return 1 - props.Static() * 0.7
 			end,
 			ZIndex = 6,
+		}),
+		-- dead camera (Q-436): the grain stays on top of the cover and the line says why
+		create("TextLabel")({
+			Name = "NoSignal",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromScale(0.6, 0.12),
+			BackgroundTransparency = 1,
+			Font = Enum.Font.Code,
+			TextScaled = true,
+			Text = "NO SIGNAL",
+			TextColor3 = Color3.fromRGB(220, 226, 220),
+			TextTransparency = function()
+				if not isDead() then
+					return 1
+				end
+				return if (props.Time() % 1) < 0.6 then 0 else 0.6
+			end,
+			ZIndex = 8,
 		}),
 
 		-- viewfinder, stamps and controls, scaled with the rest of the UI

@@ -1,8 +1,10 @@
 --!strict
--- Lightning of a storm atmosphere (TASK-275, ATM-5). Pure timing: AtmosphereController adds the returned flash level
--- to Lighting. One strike per Every-second window of server time, at an offset drawn from Random(window), so every
--- client flashes at the same moment without a packet. Flash = two quick pulses inside Flash seconds; the thunder plays
--- ThunderDelay later (also drawn from the window, same on every client).
+-- Lightning (TASK-275, ATM-4 / ATM-5). Pure timing: AtmosphereController adds the returned flash level to Lighting.
+-- Natural strikes: each Every-second window of server time draws, from Random(window), whether it has a strike
+-- (Chance), when (an offset inside the window), whether it is near (Near) and the thunder delay, so every client
+-- flashes at the same moment without a packet. Forced strikes (Force: /dev bolt, AtmosphereService:Strike) come at a
+-- given server time. Flash = two quick pulses inside Flash seconds, NearScale brighter for a near one; the thunder
+-- callback runs ThunderDelay (far) or NearDelay (near) later.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 
@@ -14,13 +16,20 @@ const EDGE = 0.15 -- strikes stay inside [EDGE, 1 - EDGE] of the window, so two 
 export type Lightning = {
 	Window: number, -- last window handled
 	StrikeAt: number, -- server time of the last strike seen (0 = none)
+	StrikeScale: number, -- flash multiplier of that strike (NearScale when near)
 	Drawn: number, -- window of the cached draw below
+	DrawnHas: boolean, -- that window has a strike
 	DrawnAt: number, -- strike time of that window
+	DrawnNear: boolean,
 	DrawnDelay: number, -- thunder delay of that window
-	Listeners: { (number) -> () },
+	ForcedAt: number?, -- server time of a pending forced strike
+	ForcedNear: boolean,
+	Listeners: { (number, boolean) -> () },
 	Reset: (self: Lightning) -> (),
-	Listen: (self: Lightning, callback: (number) -> ()) -> () -> (),
-	Step: (self: Lightning, bolt: Bolt, now: number, armed: boolean, thunder: () -> ()) -> number,
+	Force: (self: Lightning, at: number, near: boolean) -> (),
+	Listen: (self: Lightning, callback: (number, boolean) -> ()) -> () -> (),
+	Strike: (self: Lightning, bolt: Bolt, at: number, near: boolean, delay: number, now: number, thunder: (boolean) -> ()) -> (),
+	Step: (self: Lightning, bolt: Bolt, now: number, natural: boolean, thunder: (boolean) -> ()) -> number,
 }
 
 local function pulse(t: number, at: number, width: number): number
@@ -35,7 +44,19 @@ const Lightning = {}
 Lightning.__index = Lightning
 
 function Lightning.new(): Lightning
-	return setmetatable({ Window = -1, StrikeAt = 0, Drawn = -1, DrawnAt = 0, DrawnDelay = 0, Listeners = {} }, Lightning) :: any
+	return setmetatable({
+		Window = -1,
+		StrikeAt = 0,
+		StrikeScale = 1,
+		Drawn = -1,
+		DrawnHas = false,
+		DrawnAt = 0,
+		DrawnNear = false,
+		DrawnDelay = 0,
+		ForcedAt = nil,
+		ForcedNear = false,
+		Listeners = {},
+	}, Lightning) :: any
 end
 
 function Lightning.Reset(self: Lightning)
@@ -43,7 +64,13 @@ function Lightning.Reset(self: Lightning)
 	self.StrikeAt = 0
 end
 
-function Lightning.Listen(self: Lightning, callback: (number) -> ()): () -> ()
+-- A strike at server time `at` (dev / scripted scare), on top of the natural ones.
+function Lightning.Force(self: Lightning, at: number, near: boolean)
+	self.ForcedAt = at
+	self.ForcedNear = near
+end
+
+function Lightning.Listen(self: Lightning, callback: (number, boolean) -> ()): () -> ()
 	table.insert(self.Listeners, callback)
 	return function()
 		const index = table.find(self.Listeners, callback)
@@ -53,27 +80,45 @@ function Lightning.Listen(self: Lightning, callback: (number) -> ()): () -> ()
 	end
 end
 
--- Flash level 0..1 at `now`; fires listeners and schedules `thunder` once per strike.
-function Lightning.Step(self: Lightning, bolt: Bolt, now: number, armed: boolean, thunder: () -> ()): number
+function Lightning.Strike(self: Lightning, bolt: Bolt, at: number, near: boolean, delay: number, now: number, thunder: (boolean) -> ())
+	self.StrikeAt = at
+	self.StrikeScale = if near then bolt.NearScale else 1
+	task.delay(math.max(0, delay - (now - at)), thunder, near)
+	for _, listener in table.clone(self.Listeners) do
+		task.spawn(listener, at, near)
+	end
+end
+
+-- Flash level at `now` (0..NearScale); fires listeners and schedules `thunder(near)` once per strike. `natural` =
+-- the row has its own Lightning and is mostly in (forced strikes play anyway).
+function Lightning.Step(self: Lightning, bolt: Bolt, now: number, natural: boolean, thunder: (boolean) -> ()): number
+	const forcedAt = self.ForcedAt
+	if forcedAt ~= nil and now >= forcedAt then
+		self.ForcedAt = nil
+		if now - forcedAt <= bolt.Flash then
+			const rng = Random.new()
+			const range = if self.ForcedNear then bolt.NearDelay else bolt.ThunderDelay
+			self:Strike(bolt, forcedAt, self.ForcedNear, rng:NextNumber(range[1], range[2]), now, thunder)
+		end
+	end
+
 	const window = math.floor(now / bolt.Every)
 	if window ~= self.Window then
 		if window ~= self.Drawn then
 			const rng = Random.new(window * SEED_SALT + 17)
 			self.Drawn = window
+			self.DrawnHas = rng:NextNumber() < bolt.Chance
 			self.DrawnAt = (window + rng:NextNumber(EDGE, 1 - EDGE)) * bolt.Every
-			self.DrawnDelay = rng:NextNumber(bolt.ThunderDelay[1], bolt.ThunderDelay[2])
+			self.DrawnNear = rng:NextNumber() < bolt.Near
+			const range = if self.DrawnNear then bolt.NearDelay else bolt.ThunderDelay
+			self.DrawnDelay = rng:NextNumber(range[1], range[2])
 		end
 		const strikeAt = self.DrawnAt
-		const delay = self.DrawnDelay
 		if now >= strikeAt then
 			self.Window = window
 			-- a strike already gone (late join, fade-in) is skipped silently
-			if armed and now - strikeAt <= bolt.Flash then
-				self.StrikeAt = strikeAt
-				task.delay(math.max(0, delay - (now - strikeAt)), thunder)
-				for _, listener in table.clone(self.Listeners) do
-					task.spawn(listener, strikeAt)
-				end
+			if natural and self.DrawnHas and now - strikeAt <= bolt.Flash then
+				self:Strike(bolt, strikeAt, self.DrawnNear, self.DrawnDelay, now, thunder)
 			end
 		end
 	end
@@ -85,7 +130,7 @@ function Lightning.Step(self: Lightning, bolt: Bolt, now: number, armed: boolean
 		return 0
 	end
 	-- main pulse (first 40%), a smaller second one (last 50%)
-	return math.max(pulse(t, 0, bolt.Flash * 0.4), 0.7 * pulse(t, bolt.Flash * 0.5, bolt.Flash * 0.5))
+	return self.StrikeScale * math.max(pulse(t, 0, bolt.Flash * 0.4), 0.7 * pulse(t, bolt.Flash * 0.5, bolt.Flash * 0.5))
 end
 
 return Lightning

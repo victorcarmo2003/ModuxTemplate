@@ -18,6 +18,9 @@ const STORE_NAME = "Player"
 const SAVE_DELAY = 2 -- RequestSave groups events within this window (architecture.md §10.3)
 const DEFAULT_CLASS = "class_dog" -- free class, fallback for unknown or unowned selections (data.md §1.5)
 const CONFIRM_TIMEOUT = 15 -- s SaveConfirmed waits for the data to reach the DataStore (architecture.md §10.1)
+const LEADERSTATS = "leaderstats"
+const STAT_NIGHTS = "Nights"
+const STAT_GEMS = "Gems"
 const CONFIRM_RETRY = 5 -- s between Save attempts while the DataStore keeps failing
 
 const ProfileService = Modux.Service(
@@ -178,6 +181,35 @@ function ProfileService:SelectedClass(profile: Profile): string
 	return selected
 end
 
+-- Roblox leaderstats (owner 2026-10-21): nights won (Stats.NightsWon) and the gem balance, on every server role.
+-- Shown where the Roblox player list is on (the lobby, DEC-339); the run keeps it off under its pills.
+function ProfileService:Leaderstats(player: Player)
+	const profile = self.Profiles[player]
+	if not profile or player.Parent == nil then
+		return
+	end
+	local folder = player:FindFirstChild(LEADERSTATS)
+	if folder == nil then
+		folder = Instance.new("Folder")
+		folder.Name = LEADERSTATS
+		folder.Parent = player
+	end
+	local function set(name: string, value: number)
+		local stat = (folder :: Instance):FindFirstChild(name)
+		if stat == nil or not stat:IsA("IntValue") then
+			const created = Instance.new("IntValue")
+			created.Name = name
+			created.Parent = folder
+			stat = created
+		end
+		(stat :: IntValue).Value = math.max(math.floor(value), 0)
+	end
+	const stats = profile.Stats()
+	-- creation order = column order in the player list
+	set(STAT_NIGHTS, if type(stats) == "table" and type(stats.NightsWon) == "number" then stats.NightsWon else 0)
+	set(STAT_GEMS, profile.Gems())
+end
+
 function ProfileService:Replicate(player: Player)
 	const profile = self.Profiles[player]
 	if not profile then
@@ -235,6 +267,7 @@ function ProfileService:Bind(player: Player, session: any): Profile
 		for key, field in profile do
 			session.Data[key] = field()
 		end
+		self:Leaderstats(player)
 		self:Replicate(player)
 	end)
 

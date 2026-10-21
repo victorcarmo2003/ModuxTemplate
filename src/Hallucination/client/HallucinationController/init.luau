@@ -10,8 +10,10 @@
 	Rolls (Content.Hallucinations, local seed):
 	  * eligible while own sanity exists (VitalController.Max > 0), the shift is the Night phase (Rules.NightOnly,
 	    RoundController.IsNight + Phase "Night"; no cutscene, finale or night-lost) and the own life state is Active;
-	  * every Rules.Interval {min, max} seconds one roll: rows with Sanity < MaxSanity (60 / 40 / 20), out of their
-	    Cooldown, whose Effects/<Effect> module exists and whose CanRun holds; pick by Weight;
+	  * every Interval {min, max} seconds of the own sanity tier (Content.Sanity.Tiers, DEC-352) one roll: rows with
+	    Sanity < MaxSanity (60 / 40 / 20), out of their Cooldown, whose Effects/<Effect> module exists and whose CanRun
+	    holds; pick by Weight, times the tier's Deep for the rows the tier unlocked (the newest, scarier ones). Dropping
+	    to a deeper tier pulls the next roll in to that tier's pace;
 	  * nothing to play -> retry in RETRY seconds; one effect at a time; leaving the eligible state cancels it and the
 	    run's cleanups undo every local write (lamps, rigs, cards, subtitle).
 
@@ -36,8 +38,10 @@ local Components = StarterPlayer.StarterPlayerScripts.client.Interface.Component
 local CallSubtitle = require(Components.CallSubtitle)
 local WhisperLine = require(Components.WhisperLine)
 local Context = require(script.Context)
+local SanityTier = require(ReplicatedStorage.shared.Anomaly.SanityTier)
 
 const RULES = Content.HallucinationRules
+const TIERS = Content.Sanity.Tiers
 const ROWS = Content.Hallucinations.List
 const NIGHT_PHASE = "Night"
 const VEHICLE_TAG = "Vehicle"
@@ -62,6 +66,8 @@ function HallucinationController:Setup()
 	self.Effects = {} :: { [string]: Context.Effect }
 	self.CooldownUntil = {} :: { [string]: number }
 	self.NextRollAt = 0 :: number -- 0 = not scheduled (not eligible)
+	-- DEC-352: sanity tier the roll pace belongs to (1 = Calm)
+	self.TierIndex = 1 :: number
 	self.Active = nil :: Context.Run?
 	self.ActiveKey = "" :: string
 	-- what the screen shows (fake call strip, whisper line)
@@ -184,9 +190,23 @@ function HallucinationController:Cancel()
 	end
 end
 
+-- Own sanity tier now (DEC-352)
+function HallucinationController:Tier(): number
+	const vital = self.Dependencies.VitalController
+	return SanityTier.index(Vide.untrack(vital.Sanity), Vide.untrack(vital.Max))
+end
+
 function HallucinationController:Schedule(now: number, seconds: number?)
-	const interval = RULES.Interval
+	const interval = TIERS[self.TierIndex].Interval
 	self.NextRollAt = now + (seconds or self.Random:NextNumber(interval[1], interval[2]))
+end
+
+-- Roll weight: the rows the current tier unlocked weigh Deep times more (DEC-352)
+function HallucinationController:Weight(row: Content.Hallucination): number
+	if row.MaxSanity <= SanityTier.ceiling(self.TierIndex) then
+		return row.Weight * TIERS[self.TierIndex].Deep
+	end
+	return row.Weight
 end
 
 function HallucinationController:CanRun(row: Content.Hallucination, env: Context.Env): boolean
@@ -298,6 +318,15 @@ function HallucinationController:Step()
 		self.NextRollAt = 0
 		return
 	end
+	const tier = self:Tier()
+	if tier ~= self.TierIndex then
+		const deeper = tier > self.TierIndex
+		self.TierIndex = tier
+		-- a step down: the next roll comes at the new tier's pace, not the old one's
+		if deeper and self.NextRollAt ~= 0 and self.NextRollAt > now + TIERS[tier].Interval[2] then
+			self:Schedule(now)
+		end
+	end
 	if self.NextRollAt == 0 then
 		self:Schedule(now) -- first roll one Interval after becoming eligible
 		return
@@ -310,7 +339,7 @@ function HallucinationController:Step()
 		return
 	end
 	const row = Context.Pick(self.Random, self:Candidates(now, env), function(candidate: Content.Hallucination): number
-		return candidate.Weight
+		return self:Weight(candidate)
 	end)
 	if row == nil then
 		self:Schedule(now, RETRY)

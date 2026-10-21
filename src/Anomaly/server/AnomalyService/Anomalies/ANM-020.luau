@@ -12,11 +12,11 @@
 --           (VehicleService:IsInside) or within Params.Radius of Params.Point (TRL). Phase Failed, cue jumpscare
 --           (Entity 0: the client shows the face to whoever stands in that zone), FaintDelay s later
 --           VitalService:Fall of each victim (Down, revivable; DEC-255: no -RuleBroken, not a lost night by
---           itself). RestoreAfter s later the power comes back (cue blackout_restore) and the occurrence ends.
+--           itself). RestoreAfter (LeaveAfter) s later the occurrence ends; the power stays out until the breaker.
 --   Stop    the blackout this occurrence began is ended (NightOver, Restore, dev stop).
 --
 -- PROVISIONAL (TASK-273): (a) nobody in the zone at the attack = no faint, Phase Failed all the same; (b) the power
--- comes back RestoreAfter s after the attack; (c) no "seen" sanity hit (the dark already drains sanity, VitalService).
+-- stays out after the occurrence until the breaker (owner 2026-10-21); (c) no "seen" sanity hit (the dark already drains sanity, VitalService).
 --
 -- Restaurant (TASK-444, owner request 2026-10-17; only with Content.Restaurant.Rules.Enabled; off = the trailer timeline
 -- above, unchanged):
@@ -28,7 +28,10 @@
 --   Error   RestaurantWindow s with the power out: EVERY active player (DEC-292; before: in the building and not in a
 --           HideZone) pays -Sanity.RuleBroken (-35, DEC-277) through ctx.Fail, with the jumpscare
 --           cue for that player only (Entity = UserId % 65536). Never a faint by itself: only a sanity that reaches 0
---           falls (VitalService). Phase Failed (the choir). The dark stays until the breaker is held, or MaxDark s.
+--           falls (VitalService). Phase Failed (the choir). LeaveAfter s later (the shape walks away) the occurrence
+--           ends, but the power STAYS OUT (owner 2026-10-21, Provisional): only the breaker brings it back (or a new
+--           shift / restore, LightService). Before: the occurrence held the dark MaxDark (20) s more and gave the
+--           power back by itself, so the anomaly took ~50 s to end and nobody had to go out.
 -- The Context has no blackout call yet, so LightService is resolved from its module (same lookup as Kit/CustomerActor;
 -- proposed for the next TASK-106 pass: Context.Light.BeginBlackout / EndBlackout / IsBlackout).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -45,14 +48,14 @@ const START_CUE = "blackout_start"
 const RESTORE_CUE = "blackout_restore"
 const WARN_CUE = "blackout_warn"
 -- Defaults when Rules/ANM-020 is missing (same numbers as the rule file)
-const DEFAULT_WINDOW = 30
+const DEFAULT_WINDOW = 12
 const DEFAULT_POINT = "TRL"
 const DEFAULT_RADIUS = 24
 const DEFAULT_FAINT = 0.7
 const DEFAULT_RESTORE = 3
 const DEFAULT_OMEN = 2
-const DEFAULT_RESTAURANT_WINDOW = 30
-const DEFAULT_MAX_DARK = 20
+const DEFAULT_RESTAURANT_WINDOW = 12
+const DEFAULT_LEAVE_AFTER = 6
 const DEFAULT_MARGIN = 1
 
 type Stage = "Omen" | "Dark" | "Attacked"
@@ -61,7 +64,7 @@ type State = {
 	Stage: Stage,
 	DarkAt: number, -- restaurant: the end of the omen
 	AttackAt: number,
-	RestoreAt: number, -- set at the attack
+	RestoreAt: number, -- set at the attack: the occurrence ends there (the power stays out)
 	Point: string,
 	Radius: number,
 	FaintDelay: number,
@@ -110,9 +113,11 @@ local function release(occ: Api.Occurrence)
 	end
 end
 
-local function restore(ctx: Api.Context, occ: Api.Occurrence)
-	release(occ)
-	ctx.Cue(occ, RESTORE_CUE, 0)
+-- The shape left: the occurrence ends, the blackout stays (LightService owns it now, the breaker ends it)
+local function leave(ctx: Api.Context, occ: Api.Occurrence)
+	if owner == occ then
+		owner = nil
+	end
 	ctx.Finish(occ)
 end
 
@@ -161,7 +166,7 @@ const Blackout: Api.Module = {
 			Point = text(rule, "Point", DEFAULT_POINT),
 			Radius = param(rule, "Radius", DEFAULT_RADIUS),
 			FaintDelay = param(rule, "FaintDelay", DEFAULT_FAINT),
-			RestoreAfter = param(rule, "MaxDark", DEFAULT_MAX_DARK),
+			RestoreAfter = param(rule, "LeaveAfter", DEFAULT_LEAVE_AFTER),
 			Margin = param(rule, "Margin", DEFAULT_MARGIN),
 		}
 		occ.State = state
@@ -203,7 +208,7 @@ const Blackout: Api.Module = {
 				attack(ctx, occ, state, now)
 			end
 		elseif now >= state.RestoreAt then
-			restore(ctx, occ)
+			leave(ctx, occ)
 		end
 	end,
 
@@ -229,8 +234,16 @@ const Blackout: Api.Module = {
 		ctx.Finish(occ)
 	end,
 
-	Stop = function(_ctx: Api.Context, occ: Api.Occurrence, _reason: Api.StopReason)
-		release(occ)
+	Stop = function(_ctx: Api.Context, occ: Api.Occurrence, reason: Api.StopReason)
+		-- Done (the shape left, or the breaker): the power is LightService's from here; night over / restore / dev
+		-- stop give it back
+		if reason == "Done" then
+			if owner == occ then
+				owner = nil
+			end
+		else
+			release(occ)
+		end
 		occ.State = nil
 	end,
 }

@@ -9,8 +9,8 @@
 	Layout (user request 2026-10-15, TASK-295): the tiles column on the LEFT, centred vertically (2 x 2 grid on short
 	screens; clear of the Roblox top-bar buttons), the gem pill alone on the RIGHT, centred vertically; the squad status
 	card and the Play button at the bottom centre, only while the player is in a squad (TASK-296: PlayShown; before
-	that the pads, the Squad tile and P are the way in). The Roblox player list is turned off in the lobby: the squad
-	panel lists the players. The windows are
+	that the pads, the Squad tile and P are the way in). The Roblox player list is on in the lobby (owner 2026-10-21:
+	leaderstats Nights and Gems). The windows are
 	centred full-screen modals over a dim backdrop and hide the HUD, so nothing sits over another screen: opening one
 	closes the previous (one Panel), the Roblox menu (Esc) closes it too, and a window shrinks to fit a narrow screen.
 	Toasts and the invite popup share one column at the top centre.
@@ -72,10 +72,12 @@
 	Zone VFX (Rings.luau): local Neon frames on the floor edges (square / ring) with rising ghost frames, one Heartbeat
 	for every zone; pad rings follow the room state (colour, breath speed, floor glow discs, sparks while occupied).
 	Floor guide (Guide.luau, owner request 2026-10-20, Provisional): Mustard chevrons on the floor from the player to
-	the nearest squad pad (free pads first) until the player steps on one or joins a squad; once the gems buy a class
+	the nearest free squad pad (no room on it: owner 2026-10-21; none free = no guide) until the player steps on one or joins a squad; once the gems buy a class
 	not owned yet, to the Classes zone instead, until the class screen opens. Each one only once per account: done goes
 	to the server (LobbyGuideDone) and comes back in the Profile packet (Guides); the pad one is done for anyone who
-	already started a run. Hidden while a screen is open.
+	already started a run. Hidden while a screen is open. Idle nudge (owner 2026-10-21): every visit, GUIDE_IDLE s after
+	the loading screen is gone while still outside a room, the guide points at a free pad again (the clock starts over
+	after every room).
 	Camera: normal third person in the lobby (CameraController External; CameraMode Classic). While the class screen
 	shows the world stage every character is hidden locally (LocalTransparencyModifier; LOBBY.md §11).
 
@@ -223,7 +225,8 @@ const LOBBY = Content.Lobby
 const HIDE_STEP = "LobbyController.HideCharacters"
 const HIDE_PRIORITY = Enum.RenderPriority.Camera.Value + 2 -- after the stock camera and CameraController
 const CLOCK_INTERVAL = 0.1 -- s between two countdown clock ticks
-const GUIDE_TAKEN = 40 -- studs a taken pad counts farther when the floor guide picks the nearest one
+const GUIDE_IDLE = 20 -- s in the lobby (after the loading screen) outside a room before the guide points at a free pad
+const LOADING_GUI = "LoadingScreen" -- Loading/boot ScreenGui: gone once the loading lifted
 const PAD_SOUND_RANGE = 24 -- studs past a pad edge where somebody stepping on / off it still clicks
 
 local function isLobby(placeRole: Roles.Role): boolean
@@ -327,6 +330,8 @@ function LobbyController:Setup()
 	-- guide due now ("" = none; Content.Lobby.Guide key) and the ones sent as done this session
 	self.GuideKey = "" :: string
 	self.GuideSent = {} :: { [string]: boolean }
+	-- os.clock() since the player is in the lobby, loaded and outside a room (nil = loading or in a room)
+	self.IdleFrom = nil :: number?
 	self.Hiding = false :: boolean
 	self.StageLights = nil :: Folder? -- local spotlights of the dark class stage (SetStageLights)
 	self.StageDimmed = nil :: any -- lights / Neon switched off around the stage while it shows (restored after)
@@ -1371,26 +1376,35 @@ function LobbyController:GuideTarget(): (string, LobbyZones.Zone?)
 		end
 	end
 	if self:GuidePending("pad") then
-		const character = Players.LocalPlayer.Character
-		const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
-		if root == nil or not root:IsA("BasePart") then
-			return "pad", nil
-		end
-		local best: LobbyZones.Zone? = nil
-		local bestScore = math.huge
-		for n = 1, PartyRules.Rules.Platforms do
-			const zone = LobbyZones.Platform(n)
-			if zone ~= nil then
-				-- a free pad first: a taken one counts as GUIDE_TAKEN studs farther
-				const score = (zone.Center - root.Position).Magnitude + (if self:PadState(n) == "Free" then 0 else GUIDE_TAKEN)
-				if score < bestScore then
-					best, bestScore = zone, score
-				end
-			end
-		end
-		return "pad", best
+		return "pad", self:FreePad()
+	end
+	-- idle nudge (owner 2026-10-21): GUIDE_IDLE s in the lobby outside a room = the pad guide again, every visit
+	const idle = self.IdleFrom
+	if idle ~= nil and os.clock() - idle >= GUIDE_IDLE then
+		return "idle", self:FreePad()
 	end
 	return "", nil
+end
+
+-- The nearest pad nobody owns (not a room counting down nor teleporting; owner 2026-10-21); nil = none free
+function LobbyController:FreePad(): LobbyZones.Zone?
+	const character = Players.LocalPlayer.Character
+	const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	if root == nil or not root:IsA("BasePart") then
+		return nil
+	end
+	local best: LobbyZones.Zone? = nil
+	local bestDistance = math.huge
+	for n = 1, PartyRules.Rules.Platforms do
+		const zone = LobbyZones.Platform(n)
+		if zone ~= nil and self:PlatformParty(n) == nil then
+			const distance = (zone.Center - root.Position).Magnitude
+			if distance < bestDistance then
+				best, bestDistance = zone, distance
+			end
+		end
+	end
+	return best
 end
 
 function LobbyController:GuideDone(key: string)
@@ -1407,8 +1421,17 @@ function LobbyController:CheckGuide()
 	if guide == nil then
 		return
 	end
-	if self:GuidePending("pad") and self:MyParty() ~= nil then
+	const inRoom = self:MyParty() ~= nil
+	if self:GuidePending("pad") and inRoom then
 		self:GuideDone("pad") -- joined a squad some other way (Play Solo, an invite)
+	end
+	-- idle clock: runs while loaded and outside a room, starts over on every room
+	const playerGui = Players.LocalPlayer:FindFirstChild("PlayerGui")
+	const loading = playerGui ~= nil and playerGui:FindFirstChild(LOADING_GUI) ~= nil
+	if loading or inRoom then
+		self.IdleFrom = nil
+	elseif self.IdleFrom == nil then
+		self.IdleFrom = os.clock()
 	end
 	const key, zone = self:GuideTarget()
 	self.GuideKey = key
@@ -1556,11 +1579,13 @@ function LobbyController:NoticeScale(): number
 	return math.max(math.min(self.Scale(), UiScale.Current()), UiScale.Floor())
 end
 
--- The top left stays free for the Roblox menu and chat (the tiles sit at the middle of the left edge): the player list
--- (top right on desktop) is off in the lobby, and the Roblox menu (Esc) closes the open window so the two never stack.
+-- The top left stays free for the Roblox menu and chat (the tiles sit at the middle of the left edge), and the Roblox
+-- menu (Esc) closes the open window so the two never stack. The player list (top right on desktop) is ON in the lobby
+-- (owner 2026-10-21): it shows the leaderstats, Nights and Gems (ProfileService:Leaderstats; ranking only in the
+-- lobby, DEC-339).
 function LobbyController:ClearLeftSide()
 	const ok, err = pcall(function()
-		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
+		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, true)
 	end)
 	if not ok then
 		warn(`[LobbyController] could not hide the player list: {err}`)

@@ -245,7 +245,8 @@ const base = Table.new({
 		3,
 		lines("Lights might go out tonight.", "Breaker's out back. Hold it."),
 		lines("Lights out? Breaker. Hold it."),
-		{ Lines = lines("Lights might go out tonight.", "Breaker's on the light panel. Hold it."), Short = lines("Lights out? Breaker. Hold it.") }
+		-- owner 2026-10-21 (at most 2 debuts a night): the copies moved here from Night 5
+		{ Lines = lines("Lights might go out tonight.", "Breaker's on the light panel. Hold it.", "Twins in line? Shut the window on the mirrored one."), Short = lines("Lights out? Breaker. Twins? Window.") }
 	),
 	nightCall(
 		4,
@@ -257,13 +258,14 @@ const base = Table.new({
 		5,
 		lines("White eyes? Twins in line? Shut the window.", "Bell rings? Light off by the third."),
 		lines("White eyes or twins? Shut the window."),
-		{ Lines = lines("White eyes? Twins in line? Shut the window.", "Red fog on the street?", "Shut it. Stay inside till it's gone."), Short = lines("Eyes, twins, red fog? Shut the window.") }
+		-- owner 2026-10-21: the copies moved to Night 3, the red fog to Night 6
+		{ Lines = lines("White eyes? A smile way too big?", "Shut the window."), Short = lines("White eyes? Shut the window.") }
 	),
 	nightCall(
 		6,
 		lines("Lights buzz? Heavy steps?", "Hide out back, behind the trailer."),
 		lines("Buzzing lights? Hide out back."),
-		{ Lines = lines("Head way too big for them?", "Shut the window."), Short = lines("Big head? Shut the window.") }
+		{ Lines = lines("Head way too big for them? Shut the window.", "Red fog on the street?", "Shut it. Stay inside till it's gone."), Short = lines("Big head, red fog? Shut the window.") }
 	),
 	nightCall(
 		7,

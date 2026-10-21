@@ -49,7 +49,6 @@ export type Live = {
 const RULES = Content.Suspense.Rules
 const TICK_RATE = 5 -- Hz
 const MAX_ID = 255 -- Suspense.Id wire range
-const NOTICE_MEMORY = 15 -- s a CustomerNoticed is deduped (two players at once); short: NpcIds come back with new customers
 const SEED_MAX = 65535
 const SEEN_GRACE = 1 -- s after EndsAt a "seen" claim is still accepted (latency)
 const GROUND_UP = 6 -- studs above the feet the floor raycast starts
@@ -119,8 +118,6 @@ const SuspenseService = Modux.Service("SuspenseService", {
 
 function SuspenseService:Setup()
 	self.Enabled = false :: boolean
-	-- NpcId -> os.clock() it was first noticed (Content.Suspense.Forgotten); cleared every shift and after NOTICE_MEMORY s
-	self.Noticed = {} :: { [number]: number }
 	-- game minutes of the night's events still to start, ascending
 	self.Agenda = {} :: { number }
 	self.Live = nil :: Live?
@@ -177,25 +174,7 @@ end
 
 -- Agenda ----------------------------------------------------------------------------------------------------------
 
--- A player caught a queue customer first (CustomerNoticed): passed on once per customer, so nobody else gets the forgotten
--- customer scare for it. Presentation only: nothing is charged
-function SuspenseService:OnNoticed(value: any, _player: Player)
-	if type(value) ~= "table" or type(value.Npc) ~= "number" then
-		return
-	end
-	const npc = value.Npc :: number
-	const at = os.clock()
-	const seen = self.Noticed[npc]
-	if seen ~= nil and at - seen < NOTICE_MEMORY then
-		return
-	end
-	self.Noticed[npc] = at
-	-- the noticer gets it back too: it already knows, nothing happens there
-	self.Libs.Net.CustomerNoticed:fireClient(self.Dependencies.NetService.Audience, { Npc = npc })
-end
-
 function SuspenseService:OnShiftStarted(info: Info)
-	table.clear(self.Noticed)
 	self.Agenda = {}
 	self.Live = nil
 	self.NextId = 0
@@ -386,11 +365,15 @@ function SuspenseService:Step()
 		t < self.RetryAt
 		or (self.BusyAt > 0 and t - self.BusyAt < RULES.AfterAnomaly)
 		or (self.LastAt > 0 and t - self.LastAt < RULES.MinGap)
+		-- the beat budget (AnomalyService:BeatClear, owner 2026-10-21): gap since the last beat, no regular anomaly due soon
+		or not self.Dependencies.AnomalyService:BeatClear("suspense")
 	then
 		return
 	end
 	const started = self:Start(nil, nil, false)
 	if started then
+		-- no verb: it takes the gap, it never counts as active
+		self.Dependencies.AnomalyService:BeatBegin("suspense", 0)
 		table.remove(self.Agenda, 1)
 	else
 		self.RetryAt = t + RULES.Retry
@@ -441,9 +424,6 @@ SuspenseService:OnInit(function(self)
 	-- Responder only here (Lync.start runs in NetService OnStart)
 	self.Libs.Net.SuspenseSeen:onServer(function(value, player: Player)
 		self:OnSeen(value, player)
-	end)
-	self.Libs.Net.CustomerNoticed:onServer(function(value, player: Player)
-		self:OnNoticed(value, player)
 	end)
 
 	const round = self.Dependencies.RoundService

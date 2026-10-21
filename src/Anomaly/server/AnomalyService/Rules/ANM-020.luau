@@ -26,7 +26,7 @@ const rule: Api.Rule = {
 	Verb = "light",
 	LikelyWrongVerb = "switch_light",
 	-- s from the power going out to the attack (proposal §3 C "30 s sem religar")
-	Window = 30,
+	Window = 20, -- owner 2026-10-21: 20 s (Q-434 cut it to 12, too short to reach the breaker; was 30)
 	IsCritical = false,
 	Params = {
 		-- who the shape attacks: inside the trailer (VehicleService:IsInside) or within Radius studs (flat) of Point
@@ -38,9 +38,14 @@ const rule: Api.Rule = {
 		RestoreAfter = 3,
 		-- Restaurant only (Content.Restaurant.Rules.Enabled; TASK-444, owner request 2026-10-17). PROVISIONAL
 		OmenFor = 2, -- s from the phone glitch to the power cut (owner 2026-10-18: "two seconds after phone_glitch, lights off"; was 2.5)
-		RestaurantWindow = 30, -- s of dark before the shape comes = the rising violin (Scary Violin UP cut at 30 s, owner 2026-10-18; was 15).
+		-- s of dark before the shape comes = the rising violin (Content.Score LayerCut). Owner 2026-10-21 (Q-434): 60 %
+		-- shorter so the weird stuff starts sooner (was 30, the Scary Violin UP cut at 30 s; before that 15)
+		-- then 20 s (owner 2026-10-21: no time to reach the breaker in 12 s)
+		RestaurantWindow = 20,
 		-- Mirrors Content.Score anomalies["ANM-020"].Ramp (the client cuts the music and shows the jumpscare at exactly this second)
-		MaxDark = 20, -- s after the attack the power comes back by itself when nobody held the breaker
+		-- s after the attack the occurrence ends (the shape walks away, HorrorScenes Failed steps ~6 s); the power stays
+		-- out until the breaker (owner 2026-10-21, Provisional; was MaxDark 20 s, then the power came back by itself)
+		LeaveAfter = 6,
 		Margin = 1, -- studs around a HideZone (HIDE-P, the pantry) that still count as hidden
 	},
 }

@@ -13,6 +13,7 @@ export type Public = {
 	Revived: { [number]: boolean },
 	Rookies: { [number]: boolean },
 	Seeded: boolean,
+	Seen: { [number]: boolean },
 	WaitAt: number,
 	WaitTold: { [number]: boolean },
 	WaitUsed: number,

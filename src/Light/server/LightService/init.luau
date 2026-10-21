@@ -23,12 +23,25 @@
 -- current vehicle, range) ends the blackout; AnomalyService sees it as the Action event. The switch does nothing while
 -- the power is out. A new shift or a restore ends it.
 --
+-- Owner 2026-10-21 (Provisional): the blackout outlives its occurrence. ANM-020 ends a few seconds after its attack but
+-- the power stays out until somebody holds the breaker (or a new shift / restore): the crew always has to go out.
+--
+-- Bulb burnout (owner request 2026-10-21, Provisional; network.md §13.2a): Content.Bulb.Toggles switch toggles within
+-- Bulb.Window s (party-wide) burn the bulb: the switch goes off, its prompt stays up with Bulb.DeadText and refuses,
+-- and the ANM-020 breaker prompt turns on (same panel, same hold, same "from outside" check). Holding it fixes the
+-- bulb and turns the switch back on. A new shift or a restore ends it. Power set record 1 = { Burnt, Out, Trip, At }.
+--
+-- Breaker trip (owner request 2026-10-21, Q-435, Provisional; Content.Breaker): TripBreaker() is the same blackout with
+-- no anomaly behind it (AnomalyService/Trip.luau picks the moment). Trip = true in the Power record tells the clients
+-- why the power went out (PowerController: the "BREAKER TRIPPED" line); the breaker or a new shift ends it.
+--
 -- Posts out (ANM-003 bell, TASK-340; AnomalyService only): BeginPostsOut() puts only the HushOff posts out at once (At = 0);
 -- the trailer and its switch are untouched (the answer is turning the trailer light off). EndPostsOut() brings them back.
 -- A new shift or a restore ends it.
 --
 -- API: IsLit(pos), IsSwitchOn(), SetSwitch(on, player?) -> boolean, BeginHush(startedAt, holdUntil), EndHush(),
--- IsHush(), BeginBlackout(), EndBlackout(), IsBlackout(), BeginPostsOut(), EndPostsOut(), GroupOn(key); signal
+-- IsHush(), BeginBlackout(), EndBlackout(), IsBlackout(), TripBreaker() -> boolean, BeginPostsOut(), EndPostsOut(),
+-- GroupOn(key), IsBurnt(); signal
 -- SwitchChanged(on, player?).
 --
 -- Current vehicle: VehicleService:Current() and its Swapped signal (architecture.md §19.2; VehicleService 620 does not
@@ -123,8 +136,13 @@ function LightService:Setup()
 	self.Hush = nil :: Hush?
 	-- server time the power went out (ANM-020); nil = power on
 	self.Blackout = nil :: number?
+	-- the current blackout is a breaker trip (Q-435), not ANM-020
+	self.Tripped = false :: boolean
 	-- ANM-003 bell (TASK-340): only the posts are out
 	self.PostsOut = false :: boolean
+	-- server time the bulb burnt (Content.Bulb); nil = fine. Toggles = os.clock() of the recent switch toggles
+	self.Burnt = nil :: number?
+	self.Toggles = {} :: { number }
 	self.Breakers = {} :: { [Instance]: boolean }
 	self.Zones = {} :: { [Instance]: Zones.Zone }
 	self.ZonesDirty = true :: boolean
@@ -169,6 +187,10 @@ end
 
 function LightService:IsBlackout(): boolean
 	return self.Blackout ~= nil
+end
+
+function LightService:IsBurnt(): boolean
+	return self.Burnt ~= nil
 end
 
 function LightService:GroupOn(key: string): boolean
@@ -274,7 +296,7 @@ function LightService:SetSwitch(on: boolean, player: Player?, force: boolean?): 
 		error("[LightService] SetSwitch needs a boolean", 2)
 	end
 	const hush = self.Hush
-	if ((hush ~= nil and not hush.PostsOnly) or self.Blackout ~= nil) and force ~= true then
+	if ((hush ~= nil and not hush.PostsOnly) or self.Blackout ~= nil or self.Burnt ~= nil) and force ~= true then
 		return false
 	end
 	if self.Switch == on then
@@ -325,6 +347,7 @@ function LightService:BeginBlackout()
 	self:EnsureBreaker()
 	self:Refresh()
 	self:RefreshBreakers()
+	self:WritePower()
 end
 
 -- Power back (breaker reset, the occurrence ended, new shift, restore).
@@ -333,8 +356,76 @@ function LightService:EndBlackout()
 		return
 	end
 	self.Blackout = nil
+	self.Tripped = false
 	self:Refresh()
 	self:RefreshBreakers()
+	self:WritePower()
+end
+
+-- AnomalyService (Q-435). The breaker trips with no anomaly: the same dark and fix as the blackout. False (nothing done)
+-- while the power is already out, the bulb is burnt, it is not night or the trailer has no breaker.
+function LightService:TripBreaker(): boolean
+	if self.Blackout ~= nil or self.Burnt ~= nil or not self.Dependencies.RoundService:IsNight() then
+		return false
+	end
+	if not self:EnsureBreaker() then
+		return false
+	end
+	self.Tripped = true
+	self:BeginBlackout()
+	return true
+end
+
+-- Bulb burnout --------------------------------------------------------------------------------------------------
+
+function LightService:PowerRecord(): { Burnt: boolean, Out: boolean, Trip: boolean, At: number }
+	return { Burnt = self.Burnt ~= nil, Out = self.Blackout ~= nil, Trip = self.Tripped, At = now() }
+end
+
+function LightService:WritePower()
+	if self.Published and self.Dependencies.NetService:IsRunning() then
+		self.Libs.Net.Power:update(1, self:PowerRecord())
+	end
+end
+
+-- Counts one switch toggle; true when it burnt the bulb (Content.Bulb.Toggles within Bulb.Window s)
+function LightService:CountToggle(): boolean
+	const clock = os.clock()
+	const recent: { number } = {}
+	for _, at in self.Toggles do
+		if clock - at <= Content.Bulb.Window then
+			table.insert(recent, at)
+		end
+	end
+	table.insert(recent, clock)
+	self.Toggles = recent
+	return #recent >= Content.Bulb.Toggles
+end
+
+function LightService:BeginBurnout(player: Player?)
+	if self.Burnt ~= nil then
+		return
+	end
+	self.Burnt = now()
+	self.Toggles = {}
+	self:SetSwitch(false, player, true)
+	self:EnsureBreaker()
+	self:RefreshSwitches()
+	self:RefreshBreakers()
+	self:WritePower()
+end
+
+-- Breaker reset, new shift, restore. The switch comes back on (the light is fixed, not just the switch).
+function LightService:EndBurnout()
+	if self.Burnt == nil then
+		return
+	end
+	self.Burnt = nil
+	self.Toggles = {}
+	self:SetSwitch(true, nil, true)
+	self:RefreshSwitches()
+	self:RefreshBreakers()
+	self:WritePower()
 end
 
 -- AnomalyService (ANM-003 bell, TASK-340): the street posts out at once, the trailer untouched.
@@ -361,6 +452,7 @@ end
 
 function LightService:Restore(data: any)
 	self.Hush = nil
+	self:EndBurnout()
 	self:EndBlackout()
 	self:EndPostsOut()
 	const saved = if type(data) == "table" then data.S else nil
@@ -442,7 +534,9 @@ function LightService:RefreshSwitches()
 			continue
 		end
 		const owner = vehicleOf(anchor)
-		interaction:SetPrompt(anchor, owner == nil or owner == vehicle)
+		-- burnt: the prompt stays up with the dead text, Validate refuses (the switch "does nothing")
+		const text = if self.Burnt ~= nil then Content.Bulb.DeadText else nil
+		interaction:SetPrompt(anchor, owner == nil or owner == vehicle, text)
 	end
 end
 
@@ -469,11 +563,11 @@ function LightService:AddBreaker(anchor: Instance)
 	self:RefreshBreakers()
 end
 
--- Prompt on while the power is out, only on the current vehicle's breaker. Its hold follows the Breaker Box upgrade
+-- Prompt on while the power is out or the bulb is burnt, only on the current vehicle's breaker. Its hold follows the Breaker Box upgrade
 -- (UPG-014, TASK-324); nil PromptHold = the table hold (Actions.breaker_reset).
 function LightService:RefreshBreakers()
 	const vehicle = self:Vehicle()
-	const out = self.Blackout ~= nil
+	const out = self.Blackout ~= nil or self.Burnt ~= nil
 	const interaction = self.Dependencies.InteractionService
 	const hold = self.Dependencies.UpgradeService:GetEffect(BREAKER_HOLD_STAT)
 	const promptHold = if hold == Content.Actions.ByKey[BREAKER_ACTION].Hold then nil else hold
@@ -538,7 +632,7 @@ function LightService:EnsureBreaker(): boolean
 end
 
 function LightService:CanReset(anchor: Instance): boolean
-	if self.Blackout == nil then
+	if self.Blackout == nil and self.Burnt == nil then
 		return false
 	end
 	const owner = vehicleOf(anchor)
@@ -549,9 +643,9 @@ end
 
 function LightService:CanToggle(anchor: Instance): boolean
 	const hush = self.Hush
-	if (hush ~= nil and not hush.PostsOnly) or self.Blackout ~= nil then
+	if (hush ~= nil and not hush.PostsOnly) or self.Blackout ~= nil or self.Burnt ~= nil then
 		-- FEAT-020: no effect during the trailer's Hush (TASK-592: the restaurant's postsOnly Hush keeps the switch, it is
-		-- the answer); ANM-020: no power, only the breaker
+		-- the answer); ANM-020: no power, only the breaker; burnt bulb: only the breaker
 		return false
 	end
 	if os.clock() - self.LastToggle < COOLDOWN then
@@ -576,7 +670,12 @@ LightService:OnInit(function(self)
 		end,
 		Run = function(player: Player, _anchor: Instance, _id: number)
 			self.LastToggle = os.clock()
-			self:SetSwitch(not self.Switch, player)
+			if not self:SetSwitch(not self.Switch, player) then
+				return
+			end
+			if self:CountToggle() then
+				self:BeginBurnout(player)
+			end
 		end,
 	})
 	-- ANM-020 breaker (hold Content.Actions.breaker_reset.Hold on the client; the server checks the power is out).
@@ -587,6 +686,7 @@ LightService:OnInit(function(self)
 			return self:CanReset(anchor) and not self.Dependencies.VehicleService:IsInside(player)
 		end,
 		Run = function(_player: Player, _anchor: Instance, _id: number)
+			self:EndBurnout()
 			self:EndBlackout()
 		end,
 	})
@@ -595,6 +695,7 @@ LightService:OnInit(function(self)
 	const round = self.Dependencies.RoundService
 	round.ShiftStarted:Connect(function(info)
 		self.Hush = nil
+		self:EndBurnout()
 		self:EndBlackout()
 		self:EndPostsOut()
 		if info.IsNight then
@@ -662,6 +763,7 @@ LightService:OnStart(function(self)
 	for index, group in Content.LightGroups.List do
 		self.Libs.Net.Lights:add(index, self.Records[group.Key])
 	end
+	self.Libs.Net.Power:add(1, self:PowerRecord())
 	self.Published = true
 end)
 

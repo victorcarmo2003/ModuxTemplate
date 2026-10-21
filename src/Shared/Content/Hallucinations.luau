@@ -27,7 +27,7 @@ export type Hallucination = {
 }
 
 export type Rules = {
-	Interval: { number }, -- {min, max} seconds between two rolls while eligible
+	Interval: { number }, -- {min, max} s between two rolls; the roll now uses Sanity.Tiers[k].Interval (DEC-352), kept for reference
 	NightOnly: boolean, -- sanity exists only at night (DEC-056)
 	ScareGap: number, -- s: after a family D scare the sanity roll waits at least this long (no two in a row)
 }

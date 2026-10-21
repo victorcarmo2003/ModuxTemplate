@@ -7,6 +7,7 @@ local OutsideService = require(ServerScriptService.server.ModuxTypes.OutsideServ
 local AtmosphereService = require(ServerScriptService.server.ModuxTypes.AtmosphereService)
 local BossService = require(ServerScriptService.server.ModuxTypes.BossService)
 local CharacterService = require(ServerScriptService.server.ModuxTypes.CharacterService)
+local ChoreService = require(ServerScriptService.server.ModuxTypes.ChoreService)
 local ClassService = require(ServerScriptService.server.ModuxTypes.ClassService)
 local CodesService = require(ServerScriptService.server.ModuxTypes.CodesService)
 local CoffeeHandService = require(ServerScriptService.server.ModuxTypes.CoffeeHandService)
@@ -68,6 +69,7 @@ export type AllServices = {
 	AtmosphereService: AtmosphereService.Public,
 	BossService: BossService.Public,
 	CharacterService: CharacterService.Public,
+	ChoreService: ChoreService.Public,
 	ClassService: ClassService.Public,
 	CodesService: CodesService.Public,
 	CoffeeHandService: CoffeeHandService.Public,

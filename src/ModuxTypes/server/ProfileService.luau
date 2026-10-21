@@ -28,6 +28,7 @@ export type Public = {
 	WithClass: (self: Public, profile: Profile, key: string) -> { [string]: boolean },
 	SaveConfirmed: (self: Public, player: Player, saved: (data: { [string]: any }) -> boolean, timeout: number?) -> boolean,
 	SelectedClass: (self: Public, profile: Profile) -> string,
+	Leaderstats: (self: Public, player: Player) -> (),
 	Replicate: (self: Public, player: Player) -> (),
 	LobbyGuides: (self: Public, profile: Profile) -> { [string]: boolean },
 	Migrate: (self: Public, data: { [string]: any }) -> (),

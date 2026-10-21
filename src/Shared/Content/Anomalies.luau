@@ -185,7 +185,9 @@ const copies = anomaly(4, "anm_004_copies", "The copies", "Customer", 1, "Party"
 	"copy_grab",
 	"copy_vanish",
 })
-copies.Night = 5 -- §5: presented with the white eyes on Night 5 (Ref keeps ANM-004)
+-- §5: presented with the white eyes on Night 5 (Ref keeps ANM-004); owner 2026-10-21 (gameplay review, at most 2 debuts
+-- a night, Provisional): Night 3, a known answer (the window) next to the blackout's new one
+copies.Night = 3
 copies.Family = "A"
 copies.Stare = true -- TASK-482: the copy turns its head first; staring distorts its face
 
@@ -274,17 +276,24 @@ whiteEyes.Stare = true -- TASK-482 (DEC-294 §8): white eyes / wrong smile
 const redFog = anomaly(5, "anm_021_red_fog", "The red fog", "World", 0, "Party", 120, true, {
 	"anm_020_blackout",
 }, { "fog_bang", "jumpscare" })
+redFog.Night = 6 -- owner 2026-10-21 (at most 2 debuts a night, Provisional): was Night 5 (already the white eyes + raincoat)
 redFog.Ref = "ANM-021"
 redFog.Family = "C"
 
 -- TASK-591: the window drags every camera to the starer when it reaches it (cue stare_front)
-const starer = odd(8, 16, "anm_016_starer", "The starer")
+-- owner 2026-10-21 (at most 2 debuts a night, Provisional): Night 9 (was 8, with the long car and the head banger)
+const starer = odd(9, 16, "anm_016_starer", "The starer")
 starer.Cues = { "jumpscare", "stare_front" }
 
 -- TASK-591 (owner 2026-10-19, Provisional Q-399): a family A customer the window does NOT send away - only the shop's
 -- lights going out do; with the window shut it beats its head on it (cue head_bang). Silent debut on Night 8.
 const headBanger = odd(8, 22, "anm_022_head_banger", "The head banger")
 headBanger.Cues = { "jumpscare", "head_bang" }
+
+-- Owner request 2026-10-21 (Provisional Q-437): a family A customer with no sign in person; only the security cameras
+-- show it broken, its head on the lens (OddCustomer "oncam"). Owner 2026-10-21 (at most 2 debuts a night,
+-- Provisional): debuts on Night 10 (was 4, with the turned neck and the stalker) - the last trick: check the cameras.
+const onCamera = odd(10, 23, "anm_023_on_camera", "The one on camera")
 
 const rows: { Anomaly } = {
 	-- ViewRange: 60 default, 80 N6, 300 N7 (FEAT-019); 100 N3/N8 and 200 N10 Provisional (C-01 ~73 studs,
@@ -307,6 +316,7 @@ const rows: { Anomaly } = {
 	blackout,
 	redFog,
 	headBanger,
+	onCamera,
 }
 
 const base = Table.new(rows)

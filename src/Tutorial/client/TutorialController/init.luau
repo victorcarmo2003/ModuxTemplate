@@ -160,6 +160,9 @@ const TALK_TIME = 7 -- s of a talk step without the call
 -- the dark spotlight on the clock for most of a minute. Past this the step moves on; what he still has to say goes on
 -- as subtitles under the goodbye
 const TALK_MAX = 14
+-- TALK_MAX of the closing talk (owner 2026-10-21: the close-up on the clock still lasted too long): spotlight intro (2 s)
+-- plus two short lines
+const SHIFT_MAX = 6
 const STEP_SOUND = "prompt_done"
 const SKIP_BIND = "TutorialSkip"
 -- Owner request 2026-10-14 (Provisional): no Skip (Q / D-pad / button) and no top tutorial panel: Walt explains every step on the
@@ -1799,8 +1802,9 @@ end
 -- Talk step: over once Walt said it (at least TALK_MIN s), or after TALK_TIME s without the call
 function TutorialController:TickTalk()
 	const elapsed = os.clock() - self.StepAt
+	const max = if Vide.untrack(self.StepKey) == SHIFT_STEP then SHIFT_MAX else TALK_MAX
 	const over = if self:Voiced()
-		then (elapsed >= TALK_MIN and not self.Call.Busy()) or elapsed >= TALK_MAX
+		then (elapsed >= TALK_MIN and not self.Call.Busy()) or elapsed >= max
 		else elapsed >= TALK_TIME
 	if over then
 		self:NextTalk()

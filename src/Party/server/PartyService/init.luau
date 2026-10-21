@@ -1099,14 +1099,13 @@ function PartyService:PollPlatforms()
 		const was = self.OnPlatform[userId] or 0
 		const now = self:PlatformOf(player, was)
 		if was > 0 and now ~= was and self:Holds(player, was) then
-			-- caged (DEC-348): seen out of the zone = a jump over the trigger height or lag at the wall while close,
-			-- else (an exploit, a glitch) put back on the pad. Exit is the only way out
+			-- caged (DEC-348): seen out of the zone = lag at the wall while close, else (an exploit, a glitch) put back
+			-- on the pad. Exit is the only way out
 			const root = rootOf(player)
 			const zone = LobbyZones.Platform(was)
 			if root ~= nil and zone ~= nil then
 				const reach = zone.Radius + TRIGGER.Hysteresis + BARRIER.Slack
-				const dy = root.Position.Y - zone.Center.Y
-				if fromPad(root.Position, was) > reach or dy < -TRIGGER.Height or dy > TRIGGER.Height + BARRIER.Height then
+				if fromPad(root.Position, was) > reach then
 					Barrier.Return(player, was)
 				end
 			end

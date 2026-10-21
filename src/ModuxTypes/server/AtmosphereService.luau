@@ -11,6 +11,8 @@ export type Public = {
 	Publish: (self: Public) -> (),
 	Set: (self: Public, key: string?) -> (),
 	Force: (self: Public, key: string?) -> (),
+	Strike: (self: Public, near: boolean) -> (),
+	Shower: (self: Public, length: number) -> (),
 	Refresh: (self: Public) -> (),
 }
 

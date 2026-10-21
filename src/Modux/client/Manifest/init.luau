@@ -10,6 +10,7 @@ local AudioController = require(StarterPlayer.StarterPlayerScripts.client.ModuxT
 local BossController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.BossController)
 local CameraController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CameraController)
 local CharacterController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CharacterController)
+local ChoreController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ChoreController)
 local ClassController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ClassController)
 local CoffeeCupController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CoffeeCupController)
 local CoffeeHandController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CoffeeHandController)
@@ -35,6 +36,7 @@ local ItemController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTy
 local JournalController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.JournalController)
 local KitchenController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.KitchenController)
 local LightController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.LightController)
+local PowerController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PowerController)
 local LoadingController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.LoadingController)
 local LobbyController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.LobbyController)
 local MarketController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.MarketController)
@@ -83,6 +85,7 @@ export type AllControllers = {
 	BossController: BossController.Public,
 	CameraController: CameraController.Public,
 	CharacterController: CharacterController.Public,
+	ChoreController: ChoreController.Public,
 	ClassController: ClassController.Public,
 	CoffeeCupController: CoffeeCupController.Public,
 	CoffeeHandController: CoffeeHandController.Public,
@@ -108,6 +111,7 @@ export type AllControllers = {
 	JournalController: JournalController.Public,
 	KitchenController: KitchenController.Public,
 	LightController: LightController.Public,
+	PowerController: PowerController.Public,
 	LoadingController: LoadingController.Public,
 	LobbyController: LobbyController.Public,
 	MarketController: MarketController.Public,

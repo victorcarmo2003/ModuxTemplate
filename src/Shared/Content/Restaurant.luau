@@ -260,7 +260,9 @@ const restaurant: Restaurant = {
 		-- owner 2026-10-18: there was no break between customers; slower nights plus a quiet stretch (Provisional)
 		-- owner 2026-10-21: nights felt empty (~5 real customers on Night 1); faster again, shorter and rarer lull
 		-- (Provisional, economy.md §5)
-		NightInterval = { 30, 29, 28, 27, 26, 25, 24, 23, 22, 22 },
+		-- owner 2026-10-21 (gameplay review, Provisional): 30..22 s kept the solo kitchen at ~90-110% with no room for the
+		-- anomalies and chores; 34..26 s leaves it at ~75-85% (design/gameplay-flow-review.md)
+		NightInterval = { 34, 33, 32, 31, 30, 29, 28, 27, 26, 26 },
 		LullEvery = 4,
 		LullSeconds = 20,
 		Day1Interval = 22,

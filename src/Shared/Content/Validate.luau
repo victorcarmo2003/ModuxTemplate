@@ -51,6 +51,7 @@ const KEY_PATTERN = "^[a-z][a-z0-9_]*$"
 -- Wire enum values (rule §1.3 exception): Shift phases and mood names.
 const VALUE_PATTERN = "^[A-Z][A-Za-z0-9_]*$"
 const BITFIELD_MAX = 32
+const MAX_DEBUTS = 2 -- agenda anomalies debuting on one night (owner 2026-10-21, gameplay review, Provisional)
 
 local function fail(name: string, index: number?, key: string?, message: string): never
 	if index then
@@ -947,6 +948,37 @@ local function checkLightsAndSanity()
 	inRange("Sanity", nil, nil, "Stare.DrainAfter", stare.DrainAfter, math.max(stare.Delay, Sanity.SeeTime), 20)
 	inRange("Sanity", nil, nil, "Stare.PerSecond", stare.PerSecond, 0, 10)
 	inRange("Sanity", nil, nil, "Stare.Cap", stare.Cap, 0, Sanity.Start)
+	-- DEC-352 sanity tiers: descending From down to 0, ranges {min <= max}, Mild screen numbers
+	local above = math.huge
+	for index, tier in Sanity.Tiers do
+		if tier.From >= above then
+			fail("Sanity", index, tier.Key, `Tiers From {tier.From} not below the tier above ({above})`)
+		end
+		above = tier.From
+		for _, pair in { { "Interval", tier.Interval }, { "Scare", tier.Scare }, { "Blur", tier.Blur } } do
+			const range = pair[2] :: { number }
+			if #range ~= 0 and (#range ~= 2 or range[1] <= 0 or range[1] > range[2]) then
+				fail("Sanity", index, tier.Key, `Tiers {pair[1]} must be empty or a pair (min, max) with 0 < min <= max`)
+			end
+		end
+		if #tier.Interval == 0 then
+			fail("Sanity", index, tier.Key, "Tiers Interval cannot be empty")
+		end
+		inRange("Sanity", index, tier.Key, "Tiers Deep", tier.Deep, 0.1, 10)
+		inRange("Sanity", index, tier.Key, "Tiers Extra", tier.Extra, 0, 1)
+		inRange("Sanity", index, tier.Key, "Tiers Vignette", tier.Vignette, 0, 0.8)
+		inRange("Sanity", index, tier.Key, "Tiers Saturation", tier.Saturation, -0.5, 0)
+		inRange("Sanity", index, tier.Key, "Tiers Tint", tier.Tint, 0, 1)
+	end
+	const last = Sanity.Tiers[#Sanity.Tiers]
+	if last == nil or last.From ~= 0 then
+		fail("Sanity", nil, nil, "Tiers: the last tier must have From = 0")
+	end
+	const pressure = Sanity.Pressure
+	inRange("Sanity", nil, nil, "Pressure.Every", pressure.Every, 5, 600)
+	inRange("Sanity", nil, nil, "Pressure.MaxExtra", pressure.MaxExtra, 0, 10)
+	inRange("Sanity", nil, nil, "Pressure.BlurSize", pressure.BlurSize, 0, 4)
+	inRange("Sanity", nil, nil, "Pressure.BlurTime", pressure.BlurTime, 0, 0.5)
 	inRange("Revive", nil, nil, "MaxPerNight", Revive.MaxPerNight, 0, 10)
 	inRange("Revive", nil, nil, "WipeWindow", Revive.WipeWindow, 1, 120)
 	inRange("Revive", nil, nil, "BodyFallback", Revive.BodyFallback, 0, 600)
@@ -1125,6 +1157,8 @@ local function checkAnomalies()
 
 	-- V2 (DEC-254): several rows may debut on one night; the night's debut is its Nights[k].NewAnomaly
 	const debut: { [number]: string } = {}
+	-- owner 2026-10-21 (gameplay review, Provisional): at most Anomalies.MaxDebuts agenda rows debut on one night
+	const debuts: { [number]: number } = {}
 	const refs: { [string]: string } = {}
 	const cueUsed: { [string]: boolean } = {}
 	const last = Nights.Windows.Last
@@ -1166,6 +1200,12 @@ local function checkAnomalies()
 		const night = Nights.List[row.Night]
 		if night and night.NewAnomaly == key then
 			debut[row.Night] = key
+		end
+		if row.Family ~= nil then
+			debuts[row.Night] = (debuts[row.Night] or 0) + 1
+			if debuts[row.Night] > MAX_DEBUTS then
+				fail("Anomalies", index, key, `night {row.Night} already has {MAX_DEBUTS} debuts (owner 2026-10-21: at most {MAX_DEBUTS})`)
+			end
 		end
 		if night and row.Family ~= nil and not table.find(night.Families, row.Family) then
 			fail("Anomalies", index, key, `debuts on night {row.Night}, where family {row.Family} is closed`)

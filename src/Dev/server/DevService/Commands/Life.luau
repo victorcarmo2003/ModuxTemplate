@@ -5,7 +5,7 @@
 --   sanity [<n>|hint|dark on|off|auto] [player]   status, set (0 = falls), Night 1 coffee hint, force the dark
 --   god [on|off]                     nobody faints (sanity stops at 1; VitalService:DevGod); no argument toggles
 --   god me [on|off] [player]         infinite sanity for one player (never drops; was `infsanity`)
---   revive [player]                  a Down or Spectator player back Active
+--   revive [player|all]              a Down or Spectator player (or every one) back Active
 --   revive auto [on|off] [player]    stands up 2 s after any faint (was `autorevive`)
 --   faint [spectator] [player]       falls now as Down (or Spectator)
 -- Old names kept hidden for their callers: down / spectate (showcase), autorevive (Admin), infsanity (DevTool).
@@ -51,8 +51,8 @@ const Life: Api.Module = function(ctx: Api.Context): { Api.Command }
 		),
 		Kit.group(
 			"revive",
-			"revive [player] | revive auto [on|off] [player]",
-			"brings a Down or Spectator player back; auto = stand up 2 s after any faint",
+			"revive [player|all] | revive auto [on|off] [player]",
+			"brings a Down or Spectator player (or all) back; auto = stand up 2 s after any faint",
 			{ auto = Kit.forward(parts.autorevive) },
 			Kit.forward(revive)
 		),

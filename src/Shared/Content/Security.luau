@@ -120,6 +120,8 @@ const security: Security = {
 	Cams = Table.new({
 		{ Key = "CAM1", Model = "CAM1", Label = "CAM 1", Fov = 70 },
 		{ Key = "CAM2", Model = "CAM2", Label = "CAM 2", Fov = 70 },
+		-- owner request 2026-10-21 (Q-437): the front, by the tip jar, down the queue (tools/assetplace/security_front_cam.luau)
+		{ Key = "CAM3", Model = "CAM3", Label = "CAM 3", Fov = 70 },
 	}),
 }
 

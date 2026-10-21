@@ -39,7 +39,7 @@ export type WalkOptions = {
 	AvoidCrossings: boolean?, -- default false: skip crosswalk edges
 	Face: boolean?, -- default true: on arrival, face the MapPoint direction of the goal (when it is a point)
 }
-export type Variant = "blank" | "mirror" | "raincoat" | "shake" | "neck" | "eyes" | "bighead" | "float" | "stare" | "banger"
+export type Variant = "blank" | "mirror" | "raincoat" | "shake" | "neck" | "eyes" | "bighead" | "float" | "stare" | "banger" | "oncam"
 
 export type Public = {
 	Active: { [number]: Npc },

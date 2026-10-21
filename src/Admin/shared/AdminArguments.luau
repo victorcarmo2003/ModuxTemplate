@@ -22,6 +22,12 @@ local function playable(): { any }
 	return out
 end
 
+-- "0:00".."23:30" every half hour (owner 2026-10-21: `time` autocompletes; type "3:" to narrow)
+const CLOCKS: { string } = {}
+for minutes = 0, 23 * 60 + 30, 30 do
+	table.insert(CLOCKS, `{minutes // 60}:{string.format("%02d", minutes % 60)}`)
+end
+
 const PLAYABLE = playable()
 const PLAYABLE_KEYS: { string } = {}
 for _, row in PLAYABLE do
@@ -41,6 +47,7 @@ return {
 	AnomalyAction = conch.args.enum_from_array("anomaly_action", { "trigger", "resolve", "wrong", "stop" }),
 	ArrivalsState = conch.args.enum_from_array("arrivals_state", { "on", "off" }),
 	GearAction = conch.args.enum_from_array("gear_action", { "open", "close", "state" }),
+	Clock = conch.args.enum_from_array("clock", CLOCKS),
 	-- Numbers (validated again in the callback: the server never trusts the parsed value)
 	Day = conch.args.number,
 	Night = conch.args.number,

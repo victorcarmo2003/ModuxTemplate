@@ -67,6 +67,7 @@ const shopWindow: ShopWindow = {
 		anm_014_big_head = "Blocks",
 		anm_015_floater = "Blocks",
 		anm_016_starer = "Blocks",
+		anm_023_on_camera = "Blocks", -- Q-437
 		anm_022_head_banger = "Blocks", -- TASK-591: it stays, the window does not send it away (lights off does)
 		-- the window is already their answer (verb "shutter" in their Rules): nothing extra
 		anm_008_long_car = "None",

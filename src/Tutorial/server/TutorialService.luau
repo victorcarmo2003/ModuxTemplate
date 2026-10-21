@@ -3,7 +3,7 @@
 -- responder of `TutorialComplete` (network.md). The tutorial is NOT saved and NOT mandatory: it is pending for every
 -- player on Day 1 of the run (normal and infinite mode alike) until that player finishes or skips it (client packet
 -- TutorialComplete, idempotent) or the run goes past Day 1 (latched: coming back to Day 1 does not reopen it). State
--- is in memory of this server (one run per server), per UserId; a player who leaves and comes back starts over.
+-- is in memory of this server (one run per server), per UserId; a player who leaves and comes back to the same run does not get it again (owner 2026-10-21).
 -- The profile field TutorialDone stays in the schema for compatibility with saved data, but nothing reads or writes
 -- it any more. Run place only.
 -- AnyPending (Provisional, user request 2026-10-11): BossService rings and holds the tutorial call (BossCalls Trigger
@@ -45,13 +45,23 @@ local Content = require(ReplicatedStorage.shared.Content)
 local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
 local Modux = require(ServerScriptService.server.Modux)
 local MetricsLog = require(ServerScriptService.server.Metrics.MetricsService.Log)
+local SessionRules = require(ReplicatedStorage.shared.Session.SessionRules)
 
 const TICK_RATE = 2 -- Hz: the pending check of the tutorial customer
 const HOT_DOG = "hot_dog"
 const PACKAGE = Content.Packages.ByKey[TutorialRules.Package]
 const BUN = if PACKAGE then PACKAGE.Ingredient else "bun"
 
-const SKIP_ATTRIBUTE = "TutorialSkipped" -- on the Player: skipped on the lobby pad (TutorialController reads it)
+const SKIP_ATTRIBUTE = "TutorialSkipped" -- on the Player: skipped on the lobby pad or back in a run (TutorialController reads it)
+
+-- Came back through the reconnect card (SessionService teleports with TeleportData { Rejoin = true })
+local function rejoined(player: Player): boolean
+	const ok, data = pcall(function()
+		return player:GetJoinData()
+	end)
+	const teleport = if ok and type(data) == "table" then data.TeleportData else nil
+	return type(teleport) == "table" and teleport[SessionRules.Rules.RejoinFlag] == true
+end
 
 const TutorialService = Modux.Service(
 	"TutorialService",
@@ -82,6 +92,8 @@ function TutorialService:Setup()
 	self.Seeded = false :: boolean
 	-- UserId -> finished or skipped in this run (memory only, never saved)
 	self.Closed = {} :: { [number]: boolean }
+	-- UserId -> was in this server before (a return is a rejoin: no tutorial)
+	self.Seen = {} :: { [number]: boolean }
 	-- UserId -> reopened by /dev tutorial reset: ignores the day gate until it ends again
 	self.Revived = {} :: { [number]: boolean }
 	-- the run went past Day 1 (latched)
@@ -478,22 +490,29 @@ TutorialService:OnInit(function(self)
 	end)
 	-- Skip tutorial on the lobby pad (owner request 2026-10-21, Provisional): the launch lists who skips; closed for the
 	-- run as a skip, and the attribute tells the client not to start it
+	-- A run in progress never shows the tutorial again (owner 2026-10-21: "quando eu logo em uma RUN já em andamento"):
+	-- a player who was in this server before (Seen) or who comes back through the reconnect card (TeleportData Rejoin,
+	-- SessionService; also after the run resumed on a fresh server) is closed for the run, without a metric.
 	const launch = self.Dependencies.RoleService:GetLaunch()
-	if launch ~= nil and #launch.SkipTutorial > 0 then
-		local function skip(player: Player)
-			if table.find(launch.SkipTutorial, player.UserId) then
-				player:SetAttribute(SKIP_ATTRIBUTE, true)
-				self:Complete(player, "skip")
-			end
+	local function arrive(player: Player)
+		if launch ~= nil and table.find(launch.SkipTutorial, player.UserId) then
+			player:SetAttribute(SKIP_ATTRIBUTE, true)
+			self:Complete(player, "skip")
+			return
 		end
-		Players.PlayerAdded:Connect(skip)
-		for _, player in Players:GetPlayers() do
-			skip(player)
+		if self.Seen[player.UserId] or rejoined(player) then
+			player:SetAttribute(SKIP_ATTRIBUTE, true)
+			self.Closed[player.UserId] = true
 		end
 	end
+	Players.PlayerAdded:Connect(arrive)
+	for _, player in Players:GetPlayers() do
+		arrive(player)
+	end
 	Players.PlayerRemoving:Connect(function(player: Player)
-		-- a player who comes back starts over (the client lost its session state too)
-		self.Closed[player.UserId] = nil
+		-- coming back to this run (rejoin) does not bring the tutorial back
+		self.Seen[player.UserId] = true
+		self.Closed[player.UserId] = true
 		self.Revived[player.UserId] = nil
 		self.Rookies[player.UserId] = nil
 	end)

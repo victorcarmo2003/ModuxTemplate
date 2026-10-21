@@ -111,7 +111,7 @@ sem teleporte, sem MemoryStore). Teleporte, reconexão e retomada **não rodam n
 | Estoque / estações | servidor (`KitchenService`) | Grupo | sets `Stock`, `Stations` | pronto | — |
 | Foco de cozinha | cliente (câmera, props) + servidor (gesto) | Eu | `Cook` (c→s), `CookOpen` (Eu); atributo local `CookStation` | — | sem exclusividade por estação: dois na mesma grelha não veem os props locais do outro (B-09, a confirmar) |
 | Pratos | servidor (`PlateService`) | Grupo | set `Restaurant.Plates` | pronto | — |
-| Clientes | servidor (`CustomerService`) | Grupo | set `Customers`; `CustomerComplain`, `CustomerNoticed` (Grupo) | pronto | escala por jogador incompleta à noite (B-01) |
+| Clientes | servidor (`CustomerService`) | Grupo | set `Customers`; `CustomerComplain` (Grupo); o susto do cliente esquecido é por jogador, sem rede (`CustomerNoticed` saiu em 2026-10-21) | pronto | escala por jogador incompleta à noite (B-01) |
 | Tablets | servidor (`TabletService`) | Grupo | set `Restaurant.Tablets` (`User` = quem atende) | pronto | — |
 | Drive-thru | servidor | Grupo | set `Restaurant.DriveCars` | pronto | `QueueByParty`/`ShareByParty` lidos por party (ok) |
 | Mesas | servidor | Grupo | set `Tables` | pronto | — |

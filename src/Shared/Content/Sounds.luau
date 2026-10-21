@@ -196,7 +196,9 @@ const UPLOADED: { [string]: string } = {
 	heartbeat = "rbxassetid://139459003161851", -- owner Studio upload "heartbeat" (2026-10-18)
 	horror_chase_stop = "rbxassetid://123355946453444",
 	ui_click = "rbxassetid://127105730240202",
-	thunder = "rbxassetid://9113169432", -- ATM-5 (TASK-275): "Artillery Distant 2 (SFX)", ProSoundEffects
+	-- owner 2026-10-21: the old "Artillery Distant 2" (9113169432) did not read as thunder; real thunder, ProSoundEffects
+	thunder = "rbxassetid://9120016256", -- far strike: "Thunder Cracks Big Rumbling Blasts Booming 3 (SFX)"
+	thunder_near = "rbxassetid://9120016021", -- near strike / shower opening: "... Booming 2 (SFX)"
 	locked_door = "rbxassetid://136518625715192", -- SFX-232 ReplicatedStorage.Assets.SFX["Locked door"] (user, ANM-004)
 	-- ANM-003 bell (TASK-340): ReplicatedStorage.Assets.SFX["Very scary bell sound/church bell"] (user upload)
 	church_bell = "rbxassetid://6891548543",
@@ -348,7 +350,8 @@ const base = Table.new({
 	studio(sfx("whispers_bed", true, { Spatial = false, Volume = 0.45 }), "Whispers"),
 	studio(sfx("heartbeat", false, { Spatial = false, Volume = 0.9 }), "heartbeat"),
 	sfx("horror_chase_stop", false, { Spatial = false, Volume = 0.4 }),
-	sfx("thunder", false, { Spatial = false, Volume = 0.6 }), -- ATM-5 storm (TASK-275)
+	sfx("thunder", false, { Spatial = false, Volume = 0.8 }), -- far lightning (TASK-275, Atmospheres)
+	sfx("thunder_near", false, { Spatial = false, Volume = 1 }), -- near lightning, shower opening (loud on purpose)
 	-- anomalies, owner requests 2026-10-15 (TASK-331..340). Id "" = silence until the owner sends the file
 	sfx("church_bell", false, { Spatial = false, Volume = 0.9 }), -- ANM-003: the three strokes
 	sfx("neck_crack", false, { Volume = 0.9, MaxDistance = 50 }), -- ANM-012: the neck turns for good (owner's SFX)
@@ -378,6 +381,13 @@ const base = Table.new({
 	sfx("suspense_drop", false, { Spatial = false, Volume = 0.8, Id = "rbxassetid://9125484700", Ref = "SFX-244 Deep Hits Big Reverberant Booms Rumbling Tail 1 (SFX), ProSoundEffects" }),
 	sfx("suspense_hiss", false, { Volume = 0.6, MaxDistance = 90, Id = "rbxassetid://9113989919", Ref = "SFX-245 Creature Vocal Spider Hiss Exhale 1 (SFX), ProSoundEffects" }),
 	sfx("floor_scratch", false, { Volume = 0.7, MaxDistance = 50, Id = "rbxassetid://9126170038", Ref = "SFX-246 Wallpaper Rip Slowed Crunchy Tears Off Wall 4 (SFX), ProSoundEffects" }),
+	-- night chores (owner request 2026-10-21, Provisional Q-436; Content.Chores). Same licences as the banks above
+	-- (docs/art/credits.md); Provisional until the owner's Play
+	sfx("fire_loop", true, { Volume = 0.7, MaxDistance = 45, Id = "rbxassetid://70454860851882", Ref = "SFX-257 Kaminfeuer mit Knistern, DistrokidOfficial" }),
+	sfx("fire_spray", false, { Volume = 0.8, MaxDistance = 45, Id = "rbxassetid://9113044265", Ref = "SFX-258 Aerosol Spray 2 (SFX), ProSoundEffects" }),
+	sfx("rat_squeak", false, { Volume = 0.7, MaxDistance = 40, Id = "rbxassetid://9118058248", Ref = "SFX-259 Rat Squeaks 18 (SFX), ProSoundEffects" }),
+	sfx("camera_static", false, { Spatial = false, Volume = 0.5, Id = "rbxassetid://9117060042", Ref = "SFX-260 Nasa Static Burst 2 (SFX), ProSoundEffects" }),
+	sfx("camera_fixed", false, { Volume = 0.6, MaxDistance = 40, Id = "rbxassetid://9118026602", Ref = "SFX-261 Radio Static 1 (SFX), ProSoundEffects" }),
 	-- TASK-483: the boards giving under the crawler (restaurant, Signal of its scene)
 	sfx("floor_creak", false, { Volume = 0.6, MaxDistance = 50, Id = "rbxassetid://9120832269", Ref = "SFX-247 Wood Creak Intense Cracking Splintering 1 (SFX), ProSoundEffects" }),
 	-- restaurant (tech/restaurant-flow.md rev. 2 §4.2; wave R0 rows, Id "" = silence until the audio list uploads them)

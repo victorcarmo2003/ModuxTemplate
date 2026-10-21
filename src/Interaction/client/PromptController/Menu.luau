@@ -120,7 +120,9 @@ const SHORT: { [string]: string } = {
 
 function Menu.ShortOf(target: Rules.Target, text: string): string
 	const action = target.Action
-	if action == "topping_add" then
+	if action == "brew_coffee" and string.sub(text, 1, 3) == "Buy" then
+		return "Buy" -- no cup ready: the machine sells a coffee for Robux (CoffeeMachine)
+	elseif action == "topping_add" then
 		const topping = string.gsub(text, "^Add ", "")
 		return topping
 	elseif string.sub(action, 1, 3) == "buy" then

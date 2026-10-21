@@ -9,6 +9,9 @@ local Animations = require(script.Animations)
 local Anomalies = require(script.Anomalies)
 local Atmospheres = require(script.Atmospheres)
 local BossCalls = require(script.BossCalls)
+local Breaker = require(script.Breaker)
+local Bulb = require(script.Bulb)
+local Chores = require(script.Chores)
 local Classes = require(script.Classes)
 local CustomerTypes = require(script.CustomerTypes)
 local Cutscenes = require(script.Cutscenes)
@@ -79,6 +82,7 @@ export type Atmosphere = Atmospheres.Atmosphere
 export type AtmosphereLight = Atmospheres.LightOverride
 export type AtmosphereRain = Atmospheres.Rain
 export type AtmosphereLightning = Atmospheres.Lightning
+export type AtmosphereShowers = Atmospheres.Showers
 export type BossCall = BossCalls.BossCall
 export type BossCallLine = BossCalls.Line
 export type BossCallRules = BossCalls.Rules
@@ -114,6 +118,9 @@ export type JournalRules = Journal.Rules
 export type FaintTip = FaintTips.Tip
 export type ItemRules = Items.ItemRules
 export type LightGroup = LightGroups.LightGroup
+export type Bulb = Bulb.Bulb
+export type Breaker = Breaker.Breaker
+export type Chore = Chores.Chore
 export type LightPreset = LightPresets.LightPreset
 export type LightPresets = LightPresets.LightPresets
 export type Lobby = Lobby.Lobby
@@ -244,6 +251,12 @@ return table.freeze({
 	BossCalls = BossCalls,
 	GemRewards = GemRewards,
 	LightGroups = LightGroups,
+	-- kitchen bulb burnout (owner request 2026-10-21, Provisional)
+	Bulb = Bulb,
+	-- breaker trips by itself (owner request 2026-10-21, Provisional)
+	Breaker = Breaker,
+	-- night chores: grill fire, back door, rats, camera static (owner request 2026-10-21, Provisional)
+	Chores = Chores,
 	Music = Sounds.Music,
 	Nights = Nights,
 	Revive = Revive,

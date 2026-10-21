@@ -1,6 +1,7 @@
 --!strict
--- Dev commands (board TASK-042; tests/wave-1.md §0.4; architecture.md §1 dev mode). Run place in Studio only:
--- when PlaceService:IsDev() is false this service returns at the top of OnInit and nothing is created.
+-- Dev commands (board TASK-042; tests/wave-1.md §0.4; architecture.md §1 dev mode). Always booted (owner 2026-10-21:
+-- "turn the dev commands on in game too"), but a player may run them only in Studio dev mode or when listed in
+-- AdminSettings.AdminUserIds (the same allow-list as the admin console); everyone else is refused on the server.
 -- Entry without Lync, two ways:
 --   Command Bar (Server view): require(game.ServerScriptService.server.Dev.DevService).Run("day", 4)
 --   Chat: /dev <command> <args>   (TextChatCommand created on the server; "/dev help" lists the commands)
@@ -10,9 +11,11 @@
 -- BindableFunction parented to this script; with dev mode off there is no bridge and Run errors.
 -- Replies go to the server Output only (Provisional, TASK-042: no Net entry for dev feedback).
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local TextChatService = game:GetService("TextChatService")
 local Api = require(script.Api)
+local AdminSettings = require(ReplicatedStorage.shared.Admin.AdminSettings)
 local Modux = require(ServerScriptService.server.Modux)
 local ModuxModules = require(ServerScriptService.server.Modux.Modules)
 
@@ -119,7 +122,18 @@ function DevService:HelpOf(name: string): string
 end
 
 -- Runs one command and prints its reply. Errors propagate (unknown command, bad args, refused by the owner).
+-- A player may run dev commands in Studio dev mode or when on the admin allow-list; nil = the Command Bar (server).
+function DevService:Allowed(caller: Player?): boolean
+	if caller == nil then
+		return true
+	end
+	return self.Dependencies.PlaceService:IsDev() or AdminSettings.IsAllowed(caller)
+end
+
 function DevService:Execute(name: string, args: { string }, caller: Player?): string?
+	if not self:Allowed(caller) then
+		error(`{PREFIX} not allowed`, 0)
+	end
 	const key = string.lower(name)
 	if key == HELP then
 		const text = if args[1] ~= nil then self:HelpOf(args[1]) else self:Help()
@@ -130,7 +144,13 @@ function DevService:Execute(name: string, args: { string }, caller: Player?): st
 	if command == nil then
 		error(`{PREFIX} unknown command "{name}" (try "help")`, 0)
 	end
-	const reply = command.Run(args, caller)
+	const place = self.Dependencies.PlaceService
+	-- an admin outside Studio dev mode: the services' dev-only checks let this one command through (DEC-351)
+	const reply = if caller ~= nil and not place:IsDev()
+		then place:AsAdmin(function(): string?
+			return command.Run(args, caller)
+		end)
+		else command.Run(args, caller)
 	const who = if caller then caller.Name else "CommandBar"
 	log(`{who}: {key} {table.concat(args, " ")}{if reply then ` -> {reply}` else ""}`)
 	return reply
@@ -189,13 +209,13 @@ end
 
 DevService:OnInit(function(self)
 	self:Setup()
-	if not self.Dependencies.PlaceService:IsDev() then
-		return
-	end
 	self.Enabled = true
 
 	-- settings panel dev row (TASK-332): the same commands as the chat, for the sender
 	self.Libs.Net.DevTool:onServer(function(data, player: Player)
+		if not self:Allowed(player) then
+			return
+		end
 		const ok, err = pcall(function()
 			if data.Tool == "Coffee" then
 				self:Execute("mycoffee", {}, player)
@@ -211,6 +231,9 @@ DevService:OnInit(function(self)
 	-- trailer capture camera (TASK-C1): the client's camera at 2 Hz, kept on the Player for `track here`
 	-- (Commands/Track.luau). Player attributes are server-written, so the client cannot store them itself.
 	self.Libs.Net.DevCameraHere:onServer(function(data, player: Player)
+		if not self:Allowed(player) then
+			return
+		end
 		player:SetAttribute(CAMERA_POS_ATTRIBUTE, data.Pos)
 		player:SetAttribute(CAMERA_LOOK_ATTRIBUTE, data.Look)
 	end)

@@ -47,6 +47,23 @@ mundo; 1–2 novidades por noite, anunciadas; janelas de calma; erro com margem 
   3,3,3,4,4,4,4,5,5,5; MinGap 30..22 → 40..30 s. Toda anomalia continua estreando e no sorteio; caem as repetições.
 - Falas novas sem voz pré-gerada até rodar `tools/voice` (tocam como texto).
 
+## 3b. Fase 2 (pedido do dono 2026-10-21, Provisória)
+
+- `Restaurant.Flow.NightInterval` 30..22 → **34..26 s** (cozinha solo de ~90–110% para ~75–85% no modelo).
+- **Diretor de batidas** (`AnomalyService/Director.luau`, `Content.Nights.Beats`): um orçamento único para tudo que
+  pede ação. Anomalias regulares da agenda (não a estreia fixa nem as roteirizadas), desarmes do disjuntor, tarefas
+  (`ChoreService`) e suspense (`SuspenseService`) perguntam `BeatClear` antes de começar e marcam `BeatBegin`.
+  `Gap` 25/22/18/15 s entre duas batidas (1–4 jogadores); `MaxActive` 1/1/2/2 batidas pedindo ação ao mesmo tempo
+  (anomalias rodando + tarefas até o prazo + desarme por `Hold` 20 s); `Reserve` 15 s: tarefa, desarme e suspense
+  esperam se uma anomalia da agenda vence em menos de 15 s. Sustos da família D e sustos pessoais da pressão não são
+  batidas. Efeito: o número configurado de tarefas/desarmes vira **teto**; nas noites cheias parte delas não cabe e
+  não acontece. `/dev beats` mostra o estado.
+- **No máximo 2 estreias por noite** (Validate `MAX_DEBUTS`): ANM-004 cópias N5 → **N3**; ANM-021 névoa vermelha N5 →
+  **N6**; ANM-016 starer N8 → **N9**; ANM-023 câmera N4 → **N10**. Estreias: N1 001 · N2 011, 009 · N3 020, 004 ·
+  N4 012, 006 · N5 013, 005 · N6 014, 021 · N7 017, 015 · N8 008, 022 · N9 019, 016 · N10 010, 023. Ligações das
+  noites 3, 5 e 6 (restaurante) ajustadas.
+- Não testado em Play; os números são Provisórios.
+
 ## 4. Propostas (dependem do dono)
 
 ### 4.1 Quatro respostas pela direção do perigo (`Q-445`)

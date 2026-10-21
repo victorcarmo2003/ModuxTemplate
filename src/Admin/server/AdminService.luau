@@ -395,6 +395,39 @@ function AdminService:Register()
 		end,
 	})
 
+	-- revive / reviveall / time (owner 2026-10-21: "dev ..." has no autocomplete in Conch): same as /dev revive and
+	-- /dev time, with typed arguments the console completes (players of the server, half-hour clocks)
+	conch.register("revive", {
+		permissions = { PERMISSION },
+		description = "Bring a Down or Spectator player back Active; no argument = yourself (DevService: revive)",
+		arguments = function()
+			return conch.args.opt(AdminArguments.Player("player", "Player to revive"))
+		end,
+		callback = function(target: Player?)
+			self:RunDev("revive", if target then { target.Name } else {})
+		end,
+	})
+
+	conch.register("reviveall", {
+		permissions = { PERMISSION },
+		description = "Bring every Down or Spectator player back Active (DevService: revive all)",
+		arguments = function() end,
+		callback = function()
+			self:RunDev("revive", { "all" })
+		end,
+	})
+
+	conch.register("time", {
+		permissions = { PERMISSION },
+		description = "Set the clock of the current phase, 24 h (3:30 in the Night = 3:30 AM); no argument = show it",
+		arguments = function()
+			return conch.args.opt(AdminArguments.Clock("clock", "h:mm, every half hour"))
+		end,
+		callback = function(clock: string?)
+			self:RunDev("time", if clock then { clock } else {})
+		end,
+	})
+
 	conch.register("scare", {
 		permissions = { PERMISSION },
 		description = "Showcase: play a hallucination (fake_call, whisper...) or 'sting:<sound key>' on your client",

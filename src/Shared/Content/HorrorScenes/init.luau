@@ -77,7 +77,7 @@ export type Rules = Types.Rules
 
 -- ANM-020 blackout, the owner's reference scene (DEC-290, DEC-291; design/horror-cinematic.md §2). TASK-467: fitted to the
 -- restaurant timeline of Rules/ANM-020 (Signal = omen ~2.5 s; Active = the dark, RestaurantWindow 15 s to hold the
--- breaker; then Failed = the shape came: whoever was not hidden pays, the dark lasts until the breaker or MaxDark).
+-- breaker; then Failed = the shape came: whoever was not hidden pays, the dark lasts until the breaker, even after the occurrence ends, Q-434).
 -- What Effects/ANM-020 + Score/ already do is NOT repeated here: the lights going out / flicker / coming back, the
 -- "lights off" snap, the music steps and the POWER OUT caption. The scene adds the directed layer: the jolt, the bell,
 -- the HIDE words ramping (few, then en masse), the vignette, the steps coming to the pantry's back door, the shadow on
@@ -89,7 +89,9 @@ const blackout: Scene = {
 	Name = "The blackout",
 	Live = true,
 	-- owner 2026-10-18: the phone glitch starts the omen (6.5 s file, played whole); 2 s later the power cuts (OmenFor 2);
-	-- the dark lasts 30 s (RestaurantWindow) under the score's Rise stage (violin notes looped, rising, over one rising note
+	-- owner 2026-10-21 (Q-434): every Active step x0.4, the dark before the shape was 12 s (was 30); then x5/3: 20 s
+	-- (owner 2026-10-21: no time to reach the breaker in 12 s)
+	-- the dark lasts 20 s (RestaurantWindow) under the score's Rise stage (violin notes looped, rising, over one rising note
 	-- cut dead at 30 s); the jumpscare lands on that second (Effects/ANM-020). Hiding no longer saves (DEC-292).
 	Steps = {
 		-- omen (Signal, 2 s): the phone glitch; its strange voice runs ~4.5 s into the dark
@@ -98,36 +100,36 @@ const blackout: Scene = {
 		{ At = 0, Phase = "Active", Kind = "Sound", Target = "power_cut" },
 		{ At = 0, Phase = "Active", Kind = "Sound", Target = "hum_die" },
 		{ At = 0, Phase = "Active", Kind = "Shake", Target = "Jolt" },
-		{ At = 0, Phase = "Active", Kind = "Fov", Value = -3, To = 0, Duration = 0.8 },
+		{ At = 0, Phase = "Active", Kind = "Fov", Value = -3, To = 0, Duration = 1.33 },
 		-- the bell the moment the lights go out (owner 2026-10-18)
 		{ At = 0, Phase = "Active", Kind = "Sound", Target = "church_bell" },
 		-- film look: black bars close in and the HUD goes (coins, shop, hotbar, chat); prompts stay (owner 2026-10-18)
-		{ At = 0, Phase = "Active", Kind = "Cinema", Value = 0.11, Duration = 0.8 },
+		{ At = 0, Phase = "Active", Kind = "Cinema", Value = 0.11, Duration = 1.33 },
 		-- the heart starts as the steps get near, speeds up, and stops dead just before the note dies: 0.6 s of
 		-- violin alone, then the jumpscare
-		{ At = 14, Phase = "Active", Kind = "Heartbeat", Value = 62, To = 150, Duration = 15 },
-		{ At = 29.4, Phase = "Active", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 9.33, Phase = "Active", Kind = "Heartbeat", Value = 62, To = 150, Duration = 10 },
+		{ At = 19.6, Phase = "Active", Kind = "Heartbeat", Value = 0, To = 0 },
 		-- the HIDE words: a few, then all over the screen (DEC-291); the edges close in
-		{ At = 5, Phase = "Active", Kind = "Whispers", Target = "blackout", Value = 0.4, To = 3, Duration = 17 },
-		{ At = 5, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.35, Duration = 17 },
+		{ At = 3.33, Phase = "Active", Kind = "Whispers", Target = "blackout", Value = 0.4, To = 3, Duration = 11.33 },
+		{ At = 3.33, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.35, Duration = 11.33 },
 		-- the steps: The Walker (AST-064) from the back alley to the pantry's exit door, its own steps on its feet; seen
 		-- only through the security cameras, never in first person (owner 2026-10-18, TASK-472)
-		{ At = 18, Phase = "Active", Kind = "Actor", Target = "AST-064_Walker", Point = "SCENE-STEPS-FAR", To = "SCENE-DOOR-OUT", Duration = 8, Sound = "walker_step", Seen = "Cameras" },
-		{ At = 18, Phase = "Active", Kind = "Fov", Value = 1, To = 0, Duration = 8 },
-		{ At = 20, Phase = "Active", Kind = "Sound", Target = "breath_held" },
-		{ At = 22, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
+		{ At = 12, Phase = "Active", Kind = "Actor", Target = "AST-064_Walker", Point = "SCENE-STEPS-FAR", To = "SCENE-DOOR-OUT", Duration = 5.33, Sound = "walker_step", Seen = "Cameras" },
+		{ At = 12, Phase = "Active", Kind = "Fov", Value = 1, To = 0, Duration = 5.33 },
+		{ At = 13.33, Phase = "Active", Kind = "Sound", Target = "breath_held" },
+		{ At = 14.67, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
 		-- its shadow comes in under the door from the side of its steps and stops there (owner 2026-10-18)
-		{ At = 24.8, Phase = "Active", Kind = "Shadow", Target = "Arrive", Point = "SCENE-DOOR", To = "SCENE-STEPS-FAR", Duration = 1.2 },
-		{ At = 26, Phase = "Active", Kind = "Sound", Target = "steps_stop", Point = "SCENE-DOOR-OUT" },
-		{ At = 26, Phase = "Active", Kind = "Vignette", Value = 0.35, To = 0.5, Duration = 3.5 },
+		{ At = 16.53, Phase = "Active", Kind = "Shadow", Target = "Arrive", Point = "SCENE-DOOR", To = "SCENE-STEPS-FAR", Duration = 2 },
+		{ At = 17.33, Phase = "Active", Kind = "Sound", Target = "steps_stop", Point = "SCENE-DOOR-OUT" },
+		{ At = 17.33, Phase = "Active", Kind = "Vignette", Value = 0.35, To = 0.5, Duration = 2.33 },
 		-- it tries the door once: the handle, a push, the latch holds - right before the note dies
-		{ At = 27, Phase = "Active", Kind = "Door", Target = "Rattle", Point = "SCENE-DOOR", Duration = 0.9 },
-		{ At = 27, Phase = "Active", Kind = "Sound", Target = "handle_rattle", Point = "SCENE-DOOR" },
-		{ At = 27, Phase = "Active", Kind = "Shake", Target = "Door", Point = "SCENE-DOOR" },
-		{ At = 28.2, Phase = "Active", Kind = "Door", Target = "Push", Point = "SCENE-DOOR", Duration = 0.5 },
-		{ At = 28.2, Phase = "Active", Kind = "Sound", Target = "door_force", Point = "SCENE-DOOR" },
-		{ At = 29, Phase = "Active", Kind = "Door", Target = "Hold", Point = "SCENE-DOOR", Duration = 0.4 },
-		{ At = 29, Phase = "Active", Kind = "Sound", Target = "latch_hold", Point = "SCENE-DOOR" },
+		{ At = 18, Phase = "Active", Kind = "Door", Target = "Rattle", Point = "SCENE-DOOR", Duration = 1.5 },
+		{ At = 18, Phase = "Active", Kind = "Sound", Target = "handle_rattle", Point = "SCENE-DOOR" },
+		{ At = 18, Phase = "Active", Kind = "Shake", Target = "Door", Point = "SCENE-DOOR" },
+		{ At = 18.8, Phase = "Active", Kind = "Door", Target = "Push", Point = "SCENE-DOOR", Duration = 0.83 },
+		{ At = 18.8, Phase = "Active", Kind = "Sound", Target = "door_force", Point = "SCENE-DOOR" },
+		{ At = 19.33, Phase = "Active", Kind = "Door", Target = "Hold", Point = "SCENE-DOOR", Duration = 0.67 },
+		{ At = 19.33, Phase = "Active", Kind = "Sound", Target = "latch_hold", Point = "SCENE-DOOR" },
 		-- 30 s (Failed): the jumpscare (Effects/ANM-020, on the beat), then it walks away; the dark stays until the breaker
 		{ At = 0, Phase = "Failed", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
 		{ At = 0, Phase = "Failed", Kind = "Heartbeat", Value = 0, To = 0 },
@@ -145,8 +147,8 @@ const blackout: Scene = {
 		{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
 		{ At = 0, Phase = "Resolved", Kind = "Vignette", Value = 0, To = 0, Duration = 0.6 },
 		-- TASK-493: the colour drains out of the dark as the steps come; a blur on the push of the door
-		{ At = 5, Phase = "Active", Kind = "Grade", Target = "Cold", Value = 0, To = 0.6, Duration = 22 },
-		{ At = 28.2, Phase = "Active", Kind = "Blur", Value = 5, To = 0, Duration = 0.8 },
+		{ At = 3.33, Phase = "Active", Kind = "Grade", Target = "Cold", Value = 0, To = 0.6, Duration = 14.67 },
+		{ At = 18.8, Phase = "Active", Kind = "Blur", Value = 5, To = 0, Duration = 1.33 },
 		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Grade", Target = "Red", Value = 0.9, To = 0.35, Duration = 3 },
 		{ At = 0, Phase = "Failed", Who = "Caught", Kind = "Blur", Value = 14, To = 0, Duration = 1.5 },
 		{ At = 0, Phase = "Resolved", Kind = "Grade", Value = 0.6, To = 0, Duration = 1.5 },
@@ -952,6 +954,7 @@ const words: { [string]: { string } } = {
 		"it isn't raining...",
 		"she's dripping",
 	},
+	-- replaced by Scenes/anm_011_shaker (shaker_close); kept in line with its rule (TASK-591: serve him plain)
 	shaker = {
 		"WHY IS IT SHAKING?",
 		"SERVE HIM PLAIN",
@@ -982,13 +985,13 @@ const words: { [string]: { string } } = {
 		"SEND IT AWAY",
 		"it's watching you",
 	},
-	-- owner 2026-10-18: Walt knocking (real hints: do not open, Walt has a key)
+	-- owner 2026-10-18: Walt knocking (real hints: Walt has a key); owner 2026-10-21: the rule is lock it (TASK-592)
 	knock = {
 		"LOCK THE DOOR",
 		"LOCK THE DOOR",
 		"THAT'S NOT WALT",
 		"WALT HAS A KEY",
-		"stay quiet...",
+		"lock it...",
 		"don't answer",
 	},
 	-- ANM-021 the red fog: shut the window, keep it shut

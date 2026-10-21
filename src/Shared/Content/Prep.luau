@@ -84,21 +84,23 @@ const build: Build = {
 	Aspect = 2.5,
 	Cut = { Y = 0.5, From = 0.04, To = 0.96, MinPoints = 6 },
 	Groove = { X = 0.5, Y = 0.5 },
-	-- DEC-311: an S wave (one and a half periods) along the hot dog, drawn as white arrows that curve over the sausage
+	-- DEC-311: an S wave (one and a half periods) along the hot dog, drawn as white arrows that curve over the sausage.
+	-- Narrower (owner 2026-10-21: the end could not be finished; "estreitar é a largura"): same length, the waves half as
+	-- tall (Y 0.21..0.79 -> 0.36..0.65), so the bends stay on the visible face of the sausage. PROVISIONAL.
 	Sauce = {
 		Path = {
 			{ X = 0.08, Y = 0.50 },
-			{ X = 0.16, Y = 0.74 },
-			{ X = 0.24, Y = 0.79 },
-			{ X = 0.32, Y = 0.62 },
-			{ X = 0.40, Y = 0.38 },
-			{ X = 0.48, Y = 0.21 },
-			{ X = 0.56, Y = 0.26 },
+			{ X = 0.16, Y = 0.62 },
+			{ X = 0.24, Y = 0.65 },
+			{ X = 0.32, Y = 0.56 },
+			{ X = 0.40, Y = 0.44 },
+			{ X = 0.48, Y = 0.36 },
+			{ X = 0.56, Y = 0.38 },
 			{ X = 0.64, Y = 0.50 },
-			{ X = 0.72, Y = 0.74 },
-			{ X = 0.80, Y = 0.79 },
-			{ X = 0.88, Y = 0.62 },
-			{ X = 0.94, Y = 0.44 },
+			{ X = 0.72, Y = 0.62 },
+			{ X = 0.80, Y = 0.65 },
+			{ X = 0.88, Y = 0.56 },
+			{ X = 0.94, Y = 0.47 },
 		},
 		Reach = 0.15,
 		Spill = 0.4,

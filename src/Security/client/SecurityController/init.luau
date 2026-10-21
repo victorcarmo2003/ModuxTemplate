@@ -67,6 +67,8 @@ function SecurityController:Setup()
 	self.Inset = Vide.source(GuiService.TopbarInset.Height) :: Vide.Source<number>
 	self.Clock = Vide.source("") :: Vide.Source<string>
 	self.NightText = Vide.source("") :: Vide.Source<string>
+	-- Key of the camera with no picture (chore camera_static, Chores set; Q-436), "" = every camera works
+	self.DeadCam = Vide.source("") :: Vide.Source<string>
 
 	self.SwitchedAt = 0 :: number
 	self.Frame = nil :: CFrame?
@@ -475,6 +477,9 @@ function SecurityController:Mount()
 				Time = self.Time,
 				Since = self.Since,
 				Static = self.Static,
+				Dead = function()
+					return self.DeadCam() ~= "" and self.DeadCam() == self.Cam()
+				end,
 				Clock = self.Clock,
 				Night = self.NightText,
 				Device = input.Device,
@@ -503,6 +508,17 @@ SecurityController:OnInit(function(self)
 	self.Libs.Net.SecurityOpen:onClient(function()
 		self:Enter()
 	end)
+	-- Q-436: a camera whose picture died (camera_static chore; Mask = its index in Content.Security.Cams)
+	const staticId = Content.Chores.IndexOf.camera_static
+	local function deadCam(id: number, record: { On: boolean, Mask: number, At: number })
+		if id ~= staticId then
+			return
+		end
+		const cam = if record.On then security.Cams.List[record.Mask] else nil
+		self.DeadCam(if cam ~= nil then cam.Key else "")
+	end
+	self.Libs.Net.Chores:onAdded(deadCam)
+	self.Libs.Net.Chores:onChanged(deadCam)
 end)
 
 SecurityController:OnStart(function(self)

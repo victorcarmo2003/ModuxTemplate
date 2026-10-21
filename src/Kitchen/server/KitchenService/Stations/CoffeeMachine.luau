@@ -10,7 +10,9 @@
 --             Tool "coffee" with Restore = CoffeeRestore of the taker (base Sanity.Coffee; Barista more). A refused
 --             Give (hands full, already holds a coffee) keeps the cup in the machine; ItemService sends the notice.
 --   Cleaning  after a take: Params.CleanTime s (60), then Empty and the next brew starts in the same tick
---   Tick 10 Hz moves the states on and keeps the prompt in step (enabled only in Ready).
+--   Not Ready (owner 2026-10-21, Provisional): the prompt stays on as "Buy Coffee (R$n)" and prompts the Robux product
+--             Shop util_coffee (ShopService's receipt handler gives the cup); a created product only (ProductId > 0).
+--   Tick 10 Hz moves the states on and keeps the prompt in step.
 -- Drinking is VitalService's (ItemService:RegisterUse("coffee"), night only, Q-170 option A Provisional): brewing and
 -- taking work day and night (Actions.brew_coffee Night = "Any"). Restock on Prompt_Restock is the core's: an empty
 -- machine waits for stock and brews as soon as a dose is there.
@@ -20,6 +22,7 @@
 --   * Restore goes in Context.Give attrs; the core forwards it to ItemService GiveOptions.Restore (TASK-057).
 --   * Snapshot "Stn": a Working or Ready cup is kept as Ready (the dose already left the stock); Cleaning comes back
 --     Empty (the next brew starts on the first tick).
+local MarketplaceService = game:GetService("MarketplaceService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local StationApi = require(script.Parent.Parent.StationApi)
@@ -40,6 +43,7 @@ const BREW_STAT = "CoffeeBrewTime"
 const RESTORE_STAT = "CoffeeRestore"
 const RESTORE_ATTRIBUTE = "Restore" -- Give attr -> ItemService GiveOptions.Restore -> Tool attribute (network.md §7.1)
 const TAKE_TEXT = "Take Coffee" -- PromptText in Ready (architecture.md §19.8)
+const PRODUCT = "util_coffee" -- Content.Shop utility sold on the prompt while no cup is ready
 const DURATION_STEP = 0.1 -- Stations.Duration is quant(0, 120, 0.1): the server uses the value the wire carries
 const DURATION_MAX = 120
 const RESTORE_MAX = 1000
@@ -119,12 +123,38 @@ local function stateOf(station: Station): State
 	return fresh
 end
 
--- (enabled, text) of Prompt_Brew for the current state: only a waiting cup can be taken.
+-- The coffee product of the shop when it is created on Roblox (ProductId > 0)
+local function product()
+	const row = Content.Shop.Utilities.ByKey[PRODUCT]
+	return if row and row.ProductId > 0 then row else nil
+end
+
+-- (enabled, text) of Prompt_Brew for the current state: a waiting cup is taken, otherwise a coffee is sold for Robux.
 local function promptFor(station: Station): (boolean, string?)
-	if record(station).State == "Ready" then
-		return hasCoffee(station), TAKE_TEXT
+	if not hasCoffee(station) then
+		return false, nil
 	end
-	return false, nil
+	if record(station).State == "Ready" then
+		return true, TAKE_TEXT
+	end
+	const row = product()
+	if row == nil then
+		return false, nil
+	end
+	return true, `Buy Coffee (R${row.Robux})`
+end
+
+local function promptBuy(player: Player)
+	const row = product()
+	if row == nil then
+		return
+	end
+	const ok, err = pcall(function()
+		MarketplaceService:PromptProductPurchase(player, row.ProductId)
+	end)
+	if not ok then
+		warn(`[CoffeeMachine] PromptProductPurchase({PRODUCT}) failed: {err}`)
+	end
 end
 
 local function refreshPrompt(ctx: Context, station: Station)
@@ -181,12 +211,14 @@ const brewAction: StationApi.Action = {
 		if station.Kind ~= KIND or not hasCoffee(station) then
 			return false, nil
 		end
-		return record(station).State == "Ready", nil
+		return record(station).State == "Ready" or product() ~= nil, nil
 	end,
-	-- Inside the station lock (KitchenService:Serialize) and revalidated there: one take per cup.
+	-- Inside the station lock (KitchenService:Serialize) and revalidated there: one take per cup; no cup = the sale.
 	Run = function(ctx: Context, station: Station, player: Player, _anchor: Instance)
 		if record(station).State == "Ready" then
 			take(ctx, station, player)
+		else
+			promptBuy(player)
 		end
 		refreshPrompt(ctx, station)
 	end,

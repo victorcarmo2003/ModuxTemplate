@@ -125,6 +125,9 @@ local function draw(pool: { string }, weights: { number }, avoid: { string }, ra
 	return last
 end
 
+-- Same draw for the sanity pressure's extra entries (Pressure.luau, DEC-352)
+Scheduler.Draw = draw
+
 -- Agenda of the night, sorted by At (scripted entries last at equal minute).
 function Scheduler.Build(input: Input, random: () -> number): { Entry }
 	const out: { Entry } = {}

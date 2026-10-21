@@ -52,7 +52,7 @@ export type Rig = Pool.Rig
 
 -- Customer-anomaly variant (architecture.md §19.13; ANM-001 blank, ANM-004 mirror, ANM-005 raincoat). Rig attribute.
 -- shake..stare: V2 family A odd customers (DEC-254, TASK-292)
-export type Variant = "blank" | "mirror" | "raincoat" | "shake" | "neck" | "eyes" | "bighead" | "float" | "stare" | "banger"
+export type Variant = "blank" | "mirror" | "raincoat" | "shake" | "neck" | "eyes" | "bighead" | "float" | "stare" | "banger" | "oncam"
 
 export type Npc = {
 	Id: number,
@@ -127,6 +127,7 @@ const VARIANTS: { [string]: true } = {
 	float = true,
 	stare = true,
 	banger = true, -- TASK-591: ANM-022 the head banger
+	oncam = true, -- Q-437: ANM-023 the one on camera
 }
 const NIGHT_PACK = "Night"
 const MAX_ID = 65535 -- NpcId wire range (Customers id, Sale.Npc)
@@ -349,7 +350,7 @@ function NpcService:Choose(r: SpawnRequest, rng: Random): (Look.Choice?, string?
 	end
 	if role == "Actor" then
 		if r.Variant == nil or not VARIANTS[r.Variant] then
-			return nil, `Role Actor needs a known Variant (blank, mirror, raincoat, shake, neck, eyes, bighead, float, stare, banger), got '{tostring(r.Variant)}'`, nil
+			return nil, `Role Actor needs a known Variant (blank, mirror, raincoat, shake, neck, eyes, bighead, float, stare, banger, oncam), got '{tostring(r.Variant)}'`, nil
 		end
 	elseif r.Variant ~= nil then
 		return nil, `Variant is for Role Actor only (Role '{role}')`, nil

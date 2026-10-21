@@ -21,6 +21,8 @@ export type NightOverride = {
 	Duration: number,
 	ClockFrom: number,
 	ClockTo: number,
+	-- seconds the phase probe cannot end it (an empty counter waits until then); nil = the probe ends it any time
+	Min: number?,
 }
 
 export type Phase = {
@@ -44,7 +46,7 @@ const base = Table.new({
 	{ Key = "Resume", Duration = 15, ClockFrom = 0, ClockTo = 0, Kind = "Any", Selling = false, SkipWithoutProbe = false },
 	-- Day shortened (user playtest 2026-10-11, PROVISIONAL Q-200): day turn ~7.7 min -> ~4.6 min (Prep 60 -> 30 s,
 	-- Open 360 -> 216 s, Closing 30 -> 20 s, Summary 15 -> 8 s; night shift: Summary 20 -> 10 s).
-	-- Prep: 7:00 -> 8:00 AM, up to 30 s; "Open Shop" ends it early (DEC-048, FEAT-003). Night: 7 -> 8 PM, 90 s.
+	-- Prep: 7:00 -> 8:00 AM, up to 30 s; "Open Shop" ends it early (DEC-048, FEAT-003). Night: 7 -> 8 PM, 36 s.
 	{
 		Key = "Prep",
 		Duration = 30,
@@ -53,7 +55,7 @@ const base = Table.new({
 		Kind = "Any",
 		Selling = false,
 		SkipWithoutProbe = false,
-		Night = { Duration = 90, ClockFrom = hours(19), ClockTo = hours(20) },
+		Night = { Duration = 36, ClockFrom = hours(19), ClockTo = hours(20) }, -- was 90 s, cut 60% (owner 2026-10-21, Provisional)
 	},
 	-- Open: 8:00 AM -> 6:00 PM in 216 s, 1 game hour = 21.6 s (DEC-048, FEAT-003; was 360 s / 36 s, Q-200).
 	{ Key = "Open", Duration = 216, ClockFrom = hours(8), ClockTo = hours(18), Kind = "Day", Selling = true, SkipWithoutProbe = false },
@@ -69,7 +71,9 @@ const base = Table.new({
 		Kind = "Any",
 		Selling = false,
 		SkipWithoutProbe = false,
-		Night = { Duration = 30, ClockFrom = hours(30), ClockTo = hours(30) },
+		-- owner 2026-10-21 (Provisional): more time after the night to buy upgrades at the Gear Stand. Was a 30 s cap that
+		-- the empty counter ended at once; now it stays at least 45 s (Min), 60 s at most
+		Night = { Duration = 60, ClockFrom = hours(30), ClockTo = hours(30), Min = 45 },
 	},
 	-- Summary: 8 s on day, 10 s at night (DEC-048, FEAT-014; was 15 / 20 s, halved by Q-200). Clock stopped.
 	{
@@ -83,10 +87,11 @@ const base = Table.new({
 		Night = { Duration = 10, ClockFrom = hours(30), ClockTo = hours(30) },
 	},
 	-- Boss call before the night; cap 120 s (BossCalls ReadyWait 20 + ring up to 15 + lines + coffee), clock stopped at
-	-- 7:00 PM (FEAT-018). Ends by the Boss probe.
+	-- 7:00 PM (FEAT-018). Ends by the Boss probe. Cap 120 -> 50 s (owner 2026-10-21, Provisional: "cut 60%"; 48 s fails the
+	-- Validate fit of call_night_1 + coffee call + ReadyWait + AutoAnswer = 50 s).
 	{
 		Key = "Call",
-		Duration = 120,
+		Duration = 50,
 		ClockFrom = hours(19),
 		ClockTo = hours(19),
 		Kind = "Night",

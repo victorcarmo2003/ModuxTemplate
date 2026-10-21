@@ -12,6 +12,7 @@ export type Public = {
 	Load: (self: Public) -> (),
 	Help: (self: Public) -> string,
 	HelpOf: (self: Public, name: string) -> string,
+	Allowed: (self: Public, caller: Player?) -> boolean,
 	Execute: (self: Public, name: string, args: { string }, caller: Player?) -> string?,
 	BindBridge: (self: Public) -> (),
 	BindChat: (self: Public) -> (),

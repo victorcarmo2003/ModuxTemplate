@@ -13,9 +13,9 @@
 -- the next read and Version() moves when a geometry really changed. A Part that leaves (streamed out on the client)
 -- keeps its last geometry. A row without any Part falls back to a circle at its MapPoint (PointId; looked up again
 -- every REFRESH s while missing; MapIndex's cache is never dropped here) or Content Center, radius Content Radius.
--- Inside(): |dy| <= Trigger.Height from the floor top, then circle = planar distance <= Radius, rectangle = the point
--- in the zone frame with |x| <= HalfX and |z| <= HalfZ; + Trigger.Hysteresis on every edge when it was already
--- inside, so the edge does not flicker.
+-- Inside(): plane XZ only, any height (owner request 2026-10-21: a jump no longer takes the player out of a zone):
+-- circle = planar distance <= Radius, rectangle = the point in the zone frame with |x| <= HalfX and |z| <= HalfZ;
+-- + Trigger.Hysteresis on every edge when it was already inside, so the edge does not flicker.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
@@ -309,9 +309,6 @@ end
 
 function LobbyZones.Inside(zone: Zone, position: Vector3, was: boolean): boolean
 	const trigger = LOBBY.Trigger
-	if math.abs(position.Y - zone.Center.Y) > trigger.Height then
-		return false
-	end
 	const margin = if was then trigger.Hysteresis else 0
 	if zone.Shape == "Circle" then
 		const dx = position.X - zone.Center.X

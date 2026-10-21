@@ -199,12 +199,8 @@ return Lync.define("game", {
 	SuspenseSeen = Lync.packet(Lync.struct({
 		Id = Lync.int(0, 255),
 	})),
-	-- c -> s and s -> group (owner 2026-10-19, Provisional; Content.Suspense.Forgotten). A player's camera caught a customer
-	-- of the queue (NpcId) for the first time: the server passes it on once per customer, so nobody else gets the
-	-- "forgotten customer" scare for it. Responder: SuspenseService. Presentation only
-	CustomerNoticed = Lync.packet(Lync.struct({
-		Npc = Lync.int(1, 65535),
-	})),
+	-- CustomerNoticed (c -> s -> group, Content.Suspense.Forgotten) left on 2026-10-21 (owner, Provisional): each player
+	-- finds a forgotten customer on their own, so the first glance is kept only on that client (SuspenseController)
 
 	-- Run sets, wave 1 ---------------------------------------------------------------------------------------------
 
@@ -437,6 +433,22 @@ return Lync.define("game", {
 	Lights = Lync.replicate(Lync.struct({
 		On = Lync.bool(), -- group lit now (night, switch/upgrade, no Hush)
 		At = Lync.f64(), -- last change; Hush: start (posts go out by Order x Step)
+	})),
+	-- §13.2a, record 1 (owner requests 2026-10-21, Provisional). Writer: LightService. Reader: PowerController. What the
+	-- breaker outside (breaker_reset) is there to fix: the kitchen bulb burnt by too many switch toggles (Content.Bulb)
+	-- and the ANM-020 blackout, which stays out after the occurrence ends until somebody holds the breaker
+	Power = Lync.replicate(Lync.struct({
+		Burnt = Lync.bool(),
+		Out = Lync.bool(), -- ANM-020 blackout on (or a breaker trip)
+		Trip = Lync.bool(), -- Out is a breaker trip with no anomaly (Content.Breaker, Q-435)
+		At = Lync.f64(), -- server time of the last change (the client plays the burn only when fresh)
+	})),
+	-- §13.2b, record = Content.Chores.IndexOf[key] (owner request 2026-10-21, Provisional Q-436). Writer: ChoreService.
+	-- Readers: ChoreController (fire, rats, lines), SecurityController (camera_static: Mask = index of the dead camera)
+	Chores = Lync.replicate(Lync.struct({
+		On = Lync.bool(),
+		Mask = Lync.int(0, 255), -- rats: bit i-1 = a rat on Chores.Rules.Spots[i]; camera_static: Security.Cams index
+		At = Lync.f64(), -- server time it started (the client plays the start only when fresh)
 	})),
 
 	-- §13.3, record 1. Writer: BossService. Line = floor((now - StartedAt) / BossCallRules.LineTime) (T44)

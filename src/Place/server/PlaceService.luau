@@ -27,6 +27,8 @@ function PlaceService:Setup()
 	const role = Roles.PlaceRole(self.Dependencies.RoleService:Get())
 	self.Role = role :: Role
 	self.Dev = (role == "Run" and game.PrivateServerId == "" and RunService:IsStudio()) :: boolean
+	-- > 0 while an admin's dev command runs on a published server (DEC-351; AsAdmin)
+	self.AdminDepth = 0 :: number
 	-- read by PlaceController (the client cannot check PrivateServerId without an engine message)
 	ReplicatedStorage:SetAttribute("PlaceDev", self.Dev)
 end
@@ -36,7 +38,19 @@ function PlaceService:Is(role: Role): boolean
 end
 
 function PlaceService:IsDev(): boolean
-	return self.Dev
+	return self.Dev or self.AdminDepth > 0
+end
+
+-- Runs `run` with IsDev() true (owner 2026-10-21: revive / time refused "dev mode only" in the published game although
+-- DEC-351 lets admins run /dev). Only DevService calls it, for a caller on the admin list. Errors propagate.
+function PlaceService:AsAdmin(run: () -> any): any
+	self.AdminDepth += 1
+	const ok, result = pcall(run)
+	self.AdminDepth -= 1
+	if not ok then
+		error(result, 0)
+	end
+	return result
 end
 
 local function report(wave: number, problems: { string }): string

@@ -2,10 +2,15 @@ Status: Rascunho (Provisório) — conjunto de comandos de dev reescrito a pedid
 
 # Comandos de dev (`/dev`)
 
-Código: `src/Dev/server/DevService` (`init.luau`, `Api.luau`, `Commands/*.luau`, `Scenarios/`). Só existe no Studio
-(`PlaceService:IsDev`). Entradas: chat `/dev <comando> <args>`, Command Bar `DevService.Run("night", 3)`, console
+Código: `src/Dev/server/DevService` (`init.luau`, `Api.luau`, `Commands/*.luau`, `Scenarios/`). Ligado também no jogo
+publicado (DEC-351): roda para quem está no modo dev do Studio (`PlaceService:IsDev`) ou na lista
+`AdminSettings.AdminUserIds` (a mesma do console admin); qualquer outro jogador é recusado no servidor. As respostas
+saem no Output do servidor (no jogo publicado: F9 → Server). Entradas: chat `/dev <comando> <args>`, Command Bar `DevService.Run("night", 3)`, console
 Conch `dev <comando>` (`AdminService`), painel do showcase (`ShowcaseService:Dev`, lista `DEV_ALLOWED`) e a linha dev
 do painel de configurações (`Net.DevTool`, roda `mycoffee` / `infsanity`).
+No jogo publicado, um comando de admin roda com `PlaceService:AsAdmin` (2026-10-21): as checagens "dev mode only" dos
+serviços (`DevRevive`, `DevSetPhaseElapsed`...) deixam passar só aquele comando. Atalhos no console Conch, com autocomplete
+(o `dev ...` não tem): `revive [player]` (jogadores do servidor), `reviveall` e `time <h:mm>` (de 30 em 30 min).
 
 Estrutura: cada arquivo de `Commands/` registra verbos vivos; os comandos antigos de um sistema só viraram
 `Parts/*.luau` (não carregados sozinhos) e o verbo repassa o subcomando para eles (`Kit.luau`: `group`, `forward`,
@@ -27,11 +32,16 @@ Anomalia = key, `ANM-###`, número (o do ANM) ou parte do nome (`blackout`, `kno
 | `trigger <anomalia> [example]` (`t`) | dispara agora; `trigger stop [anomalia]`; `trigger list` = agenda + catálogo (cortes do restaurante marcados); sem args = o que roda |
 | `scene <anomalia>` · `scene stop` · `scene score <stage\|auto>` | cena de horror da anomalia; estágio da trilha (era `score`) |
 | `scare [list\|all\|<key>...]` | susto família D |
+| `pressure [now]` | escada de sanidade (DEC-352): faixa de cada jogador, próximo susto pessoal, extras da noite; `now` = rolagem/sustos já |
 | `atm <ATM-#\|n\|nome\|off\|auto>` | atmosfera da noite (era `atmosphere`) |
+| `bolt [near\|far]` | relâmpago forçado em todos (Q-453): `far` = flash + trovão atrasado; `near` = o susto (flash forte, trovão na hora, tranco de câmera). Precisa de atmosfera ligada (noite ou `atm <key>`) |
 | `suspense [list\|status\|<spot>\|<event> [spot]]` | evento de suspense agora |
+| `trip [now]` | disjuntor desarma sozinho (Q-435): contagem da noite e o próximo; `now` = desarma assim que estiver calmo |
+| `beats` | diretor de batidas (2026-10-21): última batida, o que conta como ativo agora (anomalias, tarefas, desarme), intervalo e a próxima anomalia |
+| `chore [<key>\|now\|end [<key>\|all]]` | tarefas da noite (Q-436): `grill_fire`, `back_door`, `rats`, `camera_static`; sem args = estado; `<key>` liga agora |
 | `sanity [<n>\|hint\|dark on\|off\|auto] [player]` | sanidade |
 | `god [on\|off]` · `god me [on\|off] [player]` | ninguém desmaia (party) · sanidade infinita de um jogador |
-| `revive [player]` · `revive auto [on\|off] [player]` | volta Active · levanta 2 s após desmaio |
+| `revive [player\|all]` · `revive auto [on\|off] [player]` | volta Active (um jogador, ou `all` = todos Down/Spectator) · levanta 2 s após desmaio |
 | `faint [spectator] [player]` | cai agora como Down (ou Spectator) |
 | `coffee [n \| give \| take \| cup fill\|empty\|sip\|give\|auto]` | doses da máquina, café na mão, pegar o pronto, copo do balcão |
 | `kitchen rail [n] \| gift [topping\|all] \| stock [state\|take <pkg>\|test]` | trilho, potes de brinde, estoque |

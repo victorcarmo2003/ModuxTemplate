@@ -32,6 +32,15 @@
 --   Tension     signal Tension(on) while an occurrence of an anomaly with Anomalies[k].Tension runs; also
 --               NpcService:SetTension(on) when it exists (TASK-108). PedestrianService listens to the signal.
 --   Cleanup     NightEnd -> Stop(..., "NightOver"); NightLost, a new shift, any other phase -> "Restore"; set cleared.
+--   Pressure    DEC-352 (Pressure.luau): by the sanity tier (Content.Sanity.Tiers), personal family D scares per player
+--               and, by the crew's average, extra regular entries of tonight's pool queued like any other (Admit, grace,
+--               window). Never under the tutorial hold.
+--   Trip        Q-435 (Trip.luau, Content.Breaker): the breaker trips by itself a few times a night (LightService:
+--               TripBreaker), only while no anomaly runs; not under the tutorial hold or the grace.
+--   Beats       owner 2026-10-21 (Director.luau, Content.Nights.Beats, Provisional): one budget for everything that asks
+--               the crew to act. Regular entries (not the fixed premiere, not scripted ones), trips, chores
+--               (ChoreService) and suspense events (SuspenseService) ask BeatClear before they start and note it with
+--               BeatBegin; Gap between two starts, MaxActive at once, the agenda first (Reserve).
 --   Ended       signal Ended(key, players) when an occurrence ends (Finish, NightOver, or a Restore once it left Signal or
 --               someone failed): the members Active at its start plus whoever failed, still connected. Reader:
 --               JournalService (TASK-335, TASK-345, Anomaly Tablet pages).
@@ -51,6 +60,9 @@ local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Api = require(script.Api)
 local Rules = require(script.Rules)
 local Scheduler = require(script.Scheduler)
+local Pressure = require(script.Pressure)
+local Trip = require(script.Trip)
+local Director = require(script.Director)
 local Vision = require(script.Vision)
 local Modux = require(ServerScriptService.server.Modux)
 local ModuxModules = require(ServerScriptService.server.Modux.Modules)
@@ -127,6 +139,8 @@ const PITCH_STALE = 1.6 -- s; Pitch (TASK-484): a still look is resent only ever
 const TARGET_SLACK = 2 -- studs; a hit this close to the target does not block the line of sight
 const EYE_OFFSET = Vector3.new(0, 1.5, 0) -- HumanoidRootPart -> eye when the Head is missing
 const DOMAIN = "anomaly"
+const PRESSURE_DOMAIN = "pressure"
+const TRIP_DOMAIN = "trip"
 const NIGHT_PHASE = "Night"
 const PREFIX = "[AnomalyService]"
 
@@ -231,6 +245,12 @@ function AnomalyService:Setup()
 	self.Opening = "" :: string
 	-- server time before which no other family D scare is sent (one per Hallucinations.Rules.ScareGap, never a pile)
 	self.NextScareAt = 0 :: number
+	-- DEC-352 sanity pressure of the current night (personal scares, extra anomalies)
+	self.Pressure = Pressure.new() :: Pressure.State
+	-- Q-435 breaker trips of the current night
+	self.Trip = Trip.new() :: Trip.State
+	-- beat budget of the current night (Director.luau)
+	self.Director = Director.new() :: Director.State
 	-- SecurityService, false when this build has none (IsWatching)
 	self.Security = nil :: any
 	self.Running = {} :: { [number]: Run }
@@ -796,6 +816,8 @@ function AnomalyService:StartOccurrence(key: string, module: Api.Module, slot: n
 	end
 
 	self.LastStartAt = t
+	-- a beat (Director): the running occurrence itself counts as active, so no hold here
+	Director.begin(self.Director, "anomaly", t, 0)
 	if run.Record.Phase == "Signal" and run.Trace.Marks.Signal == nil then
 		run.Trace.Marks.Signal = 0
 	end
@@ -1072,6 +1094,9 @@ function AnomalyService:BuildAgenda(info: { Day: number, Night: number, IsNight:
 	self.Scares = {}
 	self.Opening = ""
 	self.NextScareAt = 0
+	self.Pressure = Pressure.new()
+	self.Trip = Trip.new()
+	Director.reset(self.Director)
 	if not info.IsNight or info.Night < 1 then
 		return
 	end
@@ -1104,10 +1129,9 @@ function AnomalyService:BuildAgenda(info: { Day: number, Night: number, IsNight:
 			table.insert(candidates, candidate(row))
 		end
 	end
-	const rng = Random.new(
-		Scheduler.Seed(self.Dependencies.RunStateService.Seed(), info.Day, info.Night, info.Attempt, DOMAIN)
-	)
-	const entries = Scheduler.Build({
+	const runSeed = self.Dependencies.RunStateService.Seed()
+	const rng = Random.new(Scheduler.Seed(runSeed, info.Day, info.Night, info.Attempt, DOMAIN))
+	const input: Scheduler.Input = {
 		Night = info.Night,
 		Anomalies = candidates,
 		Occurrences = Content.Nights.Occurrences,
@@ -1119,9 +1143,17 @@ function AnomalyService:BuildAgenda(info: { Day: number, Night: number, IsNight:
 		Window = Content.Nights.Windows.Shift,
 		MinGap = night.MinGap,
 		MinutesPerSecond = if night.Duration > 0 then (phase.ClockTo - phase.ClockFrom) / night.Duration else 0,
-	}, function(): number
+	}
+	const entries = Scheduler.Build(input, function(): number
 		return rng:NextNumber()
 	end)
+	-- DEC-352: its own seed, so the pressure never changes the agenda's draws
+	Pressure.reset(
+		self.Pressure,
+		input,
+		Scheduler.Seed(runSeed, info.Day, info.Night, info.Attempt, PRESSURE_DOMAIN)
+	)
+	Trip.reset(self.Trip, info.Night, Scheduler.Seed(runSeed, info.Day, info.Night, info.Attempt, TRIP_DOMAIN))
 	for _, entry in entries do
 		table.insert(self.Queue, { Entry = entry, RetryAt = 0, Done = false })
 	end
@@ -1147,16 +1179,139 @@ function AnomalyService:BuildAgenda(info: { Day: number, Night: number, IsNight:
 	end
 end
 
--- DEC-320 (Q-413): extra regular events for a bigger crew, by the members connected now (not Away), 1..4
-function AnomalyService:CrewEvents(): number
+-- Pressure host (DEC-352, Pressure.Host) ---------------------------------------------------------------------------
+
+function AnomalyService:SanityOf(player: Player): (number, number)
+	return self.Dependencies.VitalService:GetSanity(player)
+end
+
+-- one family D scare on this player's client only (the client picks what it can show now)
+function AnomalyService:Scare(player: Player)
+	self.Dependencies.HallucinationService:Scare(player, nil)
+end
+
+function AnomalyService:ScareGapUntil(): number
+	return self.NextScareAt
+end
+
+-- entries still waiting, plus the occurrences running now
+function AnomalyService:Queued(): { Scheduler.Entry }
+	const out: { Scheduler.Entry } = {}
+	for _, due in self.Queue do
+		if not due.Done then
+			table.insert(out, due.Entry)
+		end
+	end
+	for _, run in self.Running do
+		if not run.Done then
+			table.insert(out, { Key = run.Occ.Key, At = 0, Scripted = false, Slot = 0, Premiere = false })
+		end
+	end
+	return out
+end
+
+function AnomalyService:Enqueue(entry: Scheduler.Entry)
+	table.insert(self.Queue, { Entry = entry, RetryAt = 0, Done = false })
+end
+
+-- Trip host (Q-435, Trip.Host) ----------------------------------------------------------------------------------
+
+-- an occurrence is running now (ChoreService waits for a calm moment too)
+function AnomalyService:AnyRunning(): boolean
+	for _, run in self.Running do
+		if not run.Done then
+			return true
+		end
+	end
+	return false
+end
+
+-- an anomaly running now, the power already out / the bulb burnt, or the beat budget says wait (Director)
+function AnomalyService:TripBusy(): boolean
+	const light = self.Dependencies.LightService
+	return self:AnyRunning() or light:IsBlackout() or light:IsBurnt() or not self:BeatClear("trip")
+end
+
+function AnomalyService:TripBreaker(): boolean
+	const tripped = self.Dependencies.LightService:TripBreaker()
+	if tripped then
+		self:BeatBegin("trip", nil)
+	end
+	return tripped
+end
+
+-- members connected now (not Away), at least 1
+function AnomalyService:CrewSize(): number
 	local count = 0
 	for _, member in self.Dependencies.RunStateService.Members() do
 		if member.State ~= "Away" then
 			count += 1
 		end
 	end
+	return math.max(count, 1)
+end
+
+-- DEC-320 (Q-413): extra regular events for a bigger crew, by the members connected now (not Away), 1..4
+function AnomalyService:CrewEvents(): number
 	const list = Content.Nights.CrewEvents
-	return list[math.clamp(count, 1, #list)] or 0
+	return list[math.clamp(self:CrewSize(), 1, #list)] or 0
+end
+
+-- Beat director (Director.luau, Content.Nights.Beats) ---------------------------------------------------------------
+
+function AnomalyService:RunningCount(): number
+	local count = 0
+	for _, run in self.Running do
+		if not run.Done then
+			count += 1
+		end
+	end
+	return count
+end
+
+-- Real seconds until the next regular entry of the agenda is due (0 when one is overdue, math.huge if none)
+function AnomalyService:BeatDueIn(): number
+	const nights = Content.Nights.List
+	const night = nights[math.clamp(self.Shift.Night, 1, #nights)]
+	const phase = Content.Shift.ByKey[NIGHT_PHASE]
+	const span = phase.ClockTo - phase.ClockFrom
+	if night == nil or span <= 0 then
+		return math.huge
+	end
+	const minutes = self.Dependencies.RoundService:Minutes()
+	local soonest = math.huge
+	for _, due in self.Queue do
+		if not due.Done and not due.Entry.Scripted then
+			soonest = math.min(soonest, math.max(due.Entry.At - minutes, 0) * night.Duration / span)
+		end
+	end
+	return soonest
+end
+
+-- May a beat of this kind start now? kind "anomaly" = the agenda itself (no Reserve); any other kind ("chore",
+-- "trip", "suspense") also waits for a regular anomaly due within Beats.Reserve s
+function AnomalyService:BeatClear(kind: string): boolean
+	const anomaly = kind == "anomaly"
+	const dueIn = if anomaly then math.huge else self:BeatDueIn()
+	const ok = Director.clear(
+		self.Director,
+		Content.Nights.Beats,
+		now(),
+		self:CrewSize(),
+		self:RunningCount(),
+		dueIn,
+		anomaly
+	)
+	return ok
+end
+
+-- A beat started now; it counts as active for `hold` s (nil = Beats.Hold, 0 = only the gap) or until BeatEnd
+function AnomalyService:BeatBegin(key: string, hold: number?)
+	Director.begin(self.Director, key, now(), if hold ~= nil then hold else Content.Nights.Beats.Hold)
+end
+
+function AnomalyService:BeatEnd(key: string)
+	Director.finish(self.Director, key)
 end
 
 function AnomalyService:Limits(): Scheduler.Limits
@@ -1231,6 +1386,17 @@ function AnomalyService:StepAgenda(t: number)
 			self.NextScareAt = t + Content.HallucinationRules.ScareGap
 		end
 	end
+	-- DEC-352: low sanity brings personal scares (any time of the Night phase) and extra entries (not in the grace)
+	if not tutorial then
+		Pressure.scares(self.Pressure, self, t)
+		if not held then
+			Pressure.extra(self.Pressure, self, t, minutes, windowEnd)
+		end
+	end
+	-- Q-435: the breaker trips by itself (not in the grace, not past the window, never on top of an anomaly)
+	if not held and minutes < windowEnd then
+		Trip.step(self.Trip, self, t)
+	end
 	for _, due in self.Queue do
 		const entry = due.Entry
 		if due.Done or entry.At > minutes or t < due.RetryAt then
@@ -1261,6 +1427,10 @@ function AnomalyService:StepAgenda(t: number)
 			const since = if self.LastStartAt > 0 then t - self.LastStartAt else math.huge
 			const admitted = Scheduler.Admit(candidate(row), self:RunningCandidates(), limits, since)
 			if not admitted then
+				continue
+			end
+			-- the beat budget (Director): the fixed premiere does not wait for it
+			if not entry.Premiere and not self:BeatClear("anomaly") then
 				continue
 			end
 		end
@@ -1522,12 +1692,44 @@ function AnomalyService:DevAgenda(): string
 			`{string.format("%02d:%02d", minutes // 60, minutes % 60)} {row.Ref}{if entry.Scripted
 				then " scripted"
 				elseif entry.Premiere then " premiere"
+				elseif entry.Slot > Pressure.EXTRA_SLOT then " extra (sanity)"
 				else ""}{if due.Done then " done" else ""}{if self.Modules[entry.Key] == nil
 				then " (no module)"
 				else ""}`
 		)
 	end
 	return table.concat(lines, "\n")
+end
+
+-- Sanity pressure (DEC-352): each Active player's tier, the next personal scare, the extras of tonight.
+-- now = true: the next extra roll and every personal scare are due at once (the chance still holds).
+function AnomalyService:DevPressure(nowToo: boolean): string
+	self:DevCheck()
+	const t = now()
+	if nowToo then
+		Pressure.hurry(self.Pressure, t)
+	end
+	return Pressure.describe(self.Pressure, self, t)
+end
+
+-- Breaker trips (Q-435): tonight's count and the next one. now = true: the next trip is due at once (still waits for a
+-- calm moment: no anomaly running, power on, bulb fine).
+function AnomalyService:DevTrip(nowToo: boolean): string
+	self:DevCheck()
+	const t = now()
+	if nowToo then
+		Trip.hurry(self.Trip, t)
+	end
+	return Trip.describe(self.Trip, t)
+end
+
+-- Beat director: last beat, what counts as active now, the next regular anomaly
+function AnomalyService:DevBeats(): string
+	self:DevCheck()
+	const t = now()
+	const due = self:BeatDueIn()
+	const next = if due == math.huge then "none" else string.format("in %.0fs", due)
+	return `{Director.describe(self.Director, Content.Nights.Beats, t, self:CrewSize(), self:RunningCount())}; next anomaly {next}`
 end
 
 -- Lifecycle -------------------------------------------------------------------------------------------------------

@@ -2,6 +2,7 @@
 -- Revive command (docs/tech/showcase.md). Stand-in for the wave 4 ReviveService: VitalService:DevRevive brings a Down
 -- or Spectator member back Active (half sanity, new character, stash returned).
 --   revive [player]    by Name/DisplayName (exact, then unique prefix); without it the caller, or the only player
+--   revive all         every Down or Spectator player (owner 2026-10-21)
 local Players = game:GetService("Players")
 local Api = require(script.Parent.Parent.Api)
 
@@ -44,9 +45,19 @@ const Revive: Api.Module = function(ctx: Api.Context): { Api.Command }
 	return {
 		{
 			Name = "revive",
-			Usage = "revive [player]",
-			Help = "brings a Down or Spectator player back Active (dev stand-in for a revive)",
+			Usage = "revive [player|all]",
+			Help = "brings a Down or Spectator player (or all of them) back Active (dev stand-in for a revive)",
 			Run = function(args: { string }, caller: Player?): string?
+				if args[1] ~= nil and string.lower(args[1]) == "all" then
+					const lines: { string } = {}
+					for _, player in Players:GetPlayers() do
+						const ok, reply = pcall(vital.DevRevive, vital, player)
+						if ok then
+							table.insert(lines, reply)
+						end
+					end
+					return if #lines > 0 then table.concat(lines, "; ") else "nobody is Down or Spectator"
+				end
 				return vital:DevRevive(targetOf(args[1], caller))
 			end,
 		},

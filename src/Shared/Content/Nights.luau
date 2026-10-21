@@ -148,6 +148,22 @@ const occurrences: Occurrences = {
 	Old = 1,
 }
 
+-- Beat director (owner 2026-10-21, Provisional; design/gameplay-flow-review.md §3b): one budget for everything that asks
+-- the crew to act - anomaly occurrences, chores (Content.Chores), breaker trips (Content.Breaker) and suspense events
+-- (Content.Suspense). By the crew connected now (1..4 players):
+--   Gap        real seconds between two beat starts, whatever their kind
+--   MaxActive  beats asking for action at once (anomalies running + chores before their deadline + a tripped breaker)
+-- Reserve: a chore, trip or suspense event waits when a regular anomaly is due within this many real seconds, so the
+-- agenda keeps priority. Family D scares and the sanity pressure's personal scares are not beats (no verb, no cost).
+export type Beats = { Gap: { number }, MaxActive: { number }, Reserve: number, Hold: number }
+const beats: Beats = {
+	Gap = { 25, 22, 18, 15 },
+	MaxActive = { 1, 1, 2, 2 },
+	Reserve = 15,
+	-- s a beat with no end of its own counts as active (a chore with no deadline, a breaker trip)
+	Hold = 20,
+}
+
 -- DEC-320 (Q-413, Provisional): extra regular anomaly events of a night by the crew connected at its start (1..4 players):
 -- +1 with 3, +2 with 4 (more eyes make every anomaly easier)
 const crewEvents: { number } = { 0, 0, 1, 2 }
@@ -159,5 +175,6 @@ return Table.with(base, {
 	Opening = table.freeze(opening),
 	ScaresFrom = scaresFrom,
 	CrewEvents = table.freeze(crewEvents),
+	Beats = Table.record(beats),
 	Occurrences = Table.record(occurrences),
 })

@@ -50,7 +50,8 @@ export type Hijack = {
 -- after At of its queue patience is gone is a jumpscare for whoever finally looks (owner 2026-10-19: "sequestra a câmera, dá
 -- zoom no npc, treme e faz aqueles efeitos, coisa de 1-2 segundos"): the look pulled onto its head, a hard zoom held, a shake,
 -- a sting, a pulse and the edges closing.
--- Seen earlier by anyone = no scare (multiplayer: someone already found it). Not during the tutorial, not from a cooking focus
+-- Per player (owner 2026-10-21, Provisional; was "seen earlier by anyone = no scare"): each player has to find it on their
+-- own, another player's glance spares nobody else. Not during the tutorial, not from a cooking focus
 export type Forgotten = {
 	At: number, -- share of the queue patience gone (0..1) from which the first glance scares
 	Range: number, -- studs: the glance counts up to this distance

@@ -12,6 +12,9 @@
 	  bighead  ANM-014  head and everything welded to it at BIG_HEAD × size, growing up from the neck
 	  float    ANM-015  the body hovers FLOAT studs above the ground with a slow bob
 	  stare    ANM-016  the head always turns to the local camera (clamped to STARE_MAX)
+	  oncam    ANM-023  normal in person; while this client watches the security cameras (SecurityView set) the body is
+	                    broken (arms and legs bent the wrong way, the torso twisted and twitching) and the head turns to
+	                    the lens (Q-437, Provisional)
 
 	Rotations go around the torso's up axis expressed in the joint frame, so they hold whatever the R6 C0 layout is.
 	The `jumpscare` cue of every family A anomaly is handled here too (Kit/Jumpscare).
@@ -53,7 +56,12 @@ const STARE_TURN = 10 -- 1/s, how fast the head catches the camera
 const BANGER_PITCH = 28 -- degrees the head hangs forward (TASK-591, Provisional)
 const BANGER_SWAY = 4 -- degrees of slow side sway
 
-export type Variant = "shake" | "neck" | "eyes" | "bighead" | "float" | "stare" | "banger"
+const VIEW_ATTRIBUTE = Content.Security.Rules.ViewAttribute -- "" outside the cameras
+const ONCAM_HEAD_ROLL = math.rad(72) -- the head lies on its shoulder
+const ONCAM_TWITCH = 0.06 -- studs of the torso twitch
+const ONCAM_TWITCH_TURN = math.rad(6)
+
+export type Variant = "shake" | "neck" | "eyes" | "bighead" | "float" | "stare" | "banger" | "oncam"
 
 const OddCustomer = {}
 
@@ -206,6 +214,79 @@ local function stare(model: Model): Actor.Undo
 	end
 end
 
+-- Q-437 (ANM-023 the one on camera): only the security cameras see it. Each joint's pose is relative to its own C0, so
+-- it holds whatever the R6 layout is; outside the cameras every joint is back at its base.
+const ONCAM_POSE: { [string]: CFrame } = {
+	-- one arm wrenched up behind the back, the other hanging twisted backwards; the legs splayed the wrong way
+	["Left Shoulder"] = CFrame.Angles(math.rad(-160), math.rad(40), math.rad(-60)),
+	["Right Shoulder"] = CFrame.Angles(math.rad(70), math.rad(150), math.rad(20)),
+	["Left Hip"] = CFrame.Angles(math.rad(45), math.rad(-30), math.rad(55)),
+	["Right Hip"] = CFrame.Angles(math.rad(-50), math.rad(35), math.rad(-40)),
+}
+
+local function oncam(model: Model): Actor.Undo
+	const torso = model:FindFirstChild("Torso")
+	const neck = joint(model, "Torso", "Neck")
+	const root = joint(model, "HumanoidRootPart", "RootJoint")
+	if torso == nil or not torso:IsA("BasePart") then
+		return function() end
+	end
+	const limbs: { [Motor6D]: CFrame } = {}
+	for name in ONCAM_POSE do
+		const motor = joint(model, "Torso", name)
+		if motor ~= nil then
+			limbs[motor] = motor.C0
+		end
+	end
+	const neckBase = if neck ~= nil then neck.C0 else nil
+	const rootBase = if root ~= nil then root.C0 else nil
+	const rng = Random.new()
+	local broken = false
+	local function restore()
+		for motor, base in limbs do
+			motor.C0 = base
+		end
+		if neck ~= nil and neckBase ~= nil then
+			neck.C0 = neckBase
+		end
+		if root ~= nil and rootBase ~= nil then
+			root.C0 = rootBase
+		end
+	end
+	const connection = RunService.RenderStepped:Connect(function()
+		const view = Players.LocalPlayer:GetAttribute(VIEW_ATTRIBUTE)
+		const watching = type(view) == "string" and view ~= ""
+		if not watching then
+			if broken then
+				broken = false
+				restore()
+			end
+			return
+		end
+		broken = true
+		for motor, base in limbs do
+			motor.C0 = base * ONCAM_POSE[motor.Name]
+		end
+		const camera = Workspace.CurrentCamera
+		if neck ~= nil and neckBase ~= nil and camera ~= nil then
+			-- the head to the lens (the security camera is the current camera while watching), no clamp, tilted over
+			const dir = torso.CFrame:PointToObjectSpace(camera.CFrame.Position)
+			const angle = math.atan2(-dir.X, -dir.Z)
+			neck.C0 = neckBase * yaw(neckBase, angle) * CFrame.Angles(0, 0, ONCAM_HEAD_ROLL)
+		end
+		if root ~= nil and rootBase ~= nil then
+			const twitch = if rng:NextNumber() < 0.08 then 1 else 0
+			root.C0 = rootBase
+				* CFrame.new(0, 0, twitch * ONCAM_TWITCH)
+				* CFrame.Angles(math.rad(22), math.rad(35) + twitch * ONCAM_TWITCH_TURN, math.rad(24))
+		end
+	end)
+	return function()
+		connection:Disconnect()
+		restore()
+	end
+end
+
 -- TASK-591 (ANM-022 the head banger): the head hangs forward, low, as if leaning on the glass, swaying a little
 local function banger(model: Model): Actor.Undo
 	const motor = joint(model, "Torso", "Neck")
@@ -293,6 +374,8 @@ function OddCustomer.Effect(ref: string, variant: Variant): Effect.Module
 					return stare(model)
 				elseif variant == "banger" then
 					return banger(model)
+				elseif variant == "oncam" then
+					return oncam(model)
 				end
 				-- eyes: the face is the sign; the idle is held still like the blank folks
 				return Actor.HoldStill(ctx, model)

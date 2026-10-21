@@ -240,7 +240,7 @@ export type Wire = {
 export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused" | "Slow"
 
 -- Customer-anomaly variant (= NpcService.Variant; rig attribute "Variant", read by the client)
-export type Variant = "blank" | "mirror" | "raincoat" | "shake" | "neck" | "eyes" | "bighead" | "float" | "stare" | "banger"
+export type Variant = "blank" | "mirror" | "raincoat" | "shake" | "neck" | "eyes" | "bighead" | "float" | "stare" | "banger" | "oncam"
 
 -- SpawnActor request (architecture.md §19.13 Context.Spawn). Look fields force the draw (must be valid for the type);
 -- CopyOf (mirror only) copies the type, species and outfit of a live, non-actor customer that is not leaving.

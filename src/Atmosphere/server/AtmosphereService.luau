@@ -15,7 +15,14 @@
 	  * any other phase: nil (the client blends back to the day)
 	  * Force(key) (dev, `/dev atmosphere`): wins over the night until Force(nil); "" forces "no atmosphere"
 
-	API: Get() -> key?, KeyFor(night) -> key, Force(key?), IsForced(). The Scheduler does not need to call anything
+	Forced lightning (Strike(near), dev `/dev bolt`, or a scripted scare): Workspace attribute Rules.StrikeAttribute =
+	"<server time>:<0|1 near>", a hair in the future so every client flashes together. Clients play it over any
+	atmosphere (Rules.Strike when the row has no Lightning); with no atmosphere on (day) nothing shows.
+
+	Forced shower (Shower(length), dev `/dev shower`): Workspace attribute Rules.ShowerAttribute =
+	"<server time start>:<length s>" (length 0 = stop).
+
+	API: Get() -> key?, KeyFor(night) -> key, Force(key?), IsForced(), Strike(near), Shower(length). The Scheduler does not need to call anything
 	when the key lives in Content.Nights; Set(key?) exists for a scheduler that wants to drive it itself.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -26,6 +33,7 @@ local Modux = require(ServerScriptService.server.Modux)
 
 const ATMOSPHERES = Content.Atmospheres
 const RULES = ATMOSPHERES.Rules
+const STRIKE_LEAD = 0.15 -- s ahead of now a forced strike is stamped (replication time)
 
 const AtmosphereService = Modux.Service(
 	"AtmosphereService",
@@ -88,6 +96,19 @@ function AtmosphereService:Force(key: string?)
 	end
 	self.Forced = key
 	self:Publish()
+end
+
+-- One forced lightning strike on every client; `near` = the scare (bright, thunder at once, camera jolt).
+function AtmosphereService:Strike(near: boolean)
+	const at = Workspace:GetServerTimeNow() + STRIKE_LEAD
+	Workspace:SetAttribute(RULES.StrikeAttribute, `{string.format("%.3f", at)}:{if near then 1 else 0}`)
+end
+
+-- A forced shower on every client from now, `length` s (0 = stop it); it opens with its strike like a natural one.
+-- Only rows with Showers rain (all of them today).
+function AtmosphereService:Shower(length: number)
+	const now = Workspace:GetServerTimeNow()
+	Workspace:SetAttribute(RULES.ShowerAttribute, `{string.format("%.3f", now + STRIKE_LEAD)}:{math.max(0, length)}`)
 end
 
 function AtmosphereService:Refresh()

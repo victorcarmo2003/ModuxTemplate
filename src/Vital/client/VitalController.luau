@@ -15,9 +15,10 @@
 
 	Screen layer (AST-084, Draft; only on this client, DEC-038; no red, no shake):
 	  dark           vignette 0.25, Saturation -0.10
-	  band Mid       vignette 0.20
-	  band Night     vignette 0.35, Saturation -0.15, colder Tint
-	  sanity < 25    vignette breathes at 0.5 Hz; rare Blur 4 for 0.4 s
+	  sanity tier    DEC-352 (Content.Sanity.Tiers, Provisional): Calm 100-60 / Uneasy 60-40 / Shaken 40-20 / Breaking
+	                 < 20. Each step down: darker edges, greyer and colder, the edges breathe faster, short Blur 4 more
+	                 often, heartbeat, held breaths, the character's words on screen (HorrorScenes.Words.low_sanity).
+	                 Dropping into a deeper tier plays a sting (heartbeat, short blur, a burst of words) so the step is felt.
 	  Down (own)     edges close + Blur 4 in 1.5 s -> dark screen, then fades so the spectate view shows
 	Effects only while the owner is `Active` (the faint is the only exception). The skin change by band is the
 	server's `LookPack` (instant, no VFX) and is not touched here.
@@ -53,6 +54,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Vignette = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Vignette)
 local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
+local SanityTier = require(ReplicatedStorage.shared.Anomaly.SanityTier)
 
 export type LifeState = "Active" | "Down" | "Reviving" | "Spectator" | "Away"
 export type Band = "Day" | "Mid" | "Night"
@@ -70,18 +72,11 @@ export type Member = {
 }
 
 -- Screen values from AST-084 (Draft, art-director). Art numbers, not game rules: no Content table for them.
+-- The sanity tiers' numbers live in Content.Sanity.Tiers / .Pressure (DEC-352).
 const LOOK = table.freeze({
 	Dark = table.freeze({ Vignette = 0.25, Saturation = -0.10 }),
-	Mid = table.freeze({ Vignette = 0.20, Saturation = 0 }),
-	Night = table.freeze({ Vignette = 0.35, Saturation = -0.15 }),
-	SaturationFloor = -0.25, -- dark + Night together never wash the screen further
 	Tint = Color3.fromHex("#DCE4FF"), -- "Tint mais frio": cold blue-white, never red
-	PulseBelow = 25, -- sanity value under which the vignette breathes
-	PulseHz = 0.5,
-	PulseDepth = 0.2, -- +-20% of the vignette
-	BlurSize = 4, -- style guide §10: Blur <= 4 for <= 0.5 s
-	BlurTime = 0.4,
-	BlurEvery = { 25, 45 }, -- seconds between two rare blurs (random in range)
+	BlurSize = 4, -- style guide §10: Blur <= 4 for <= 0.5 s (the faint)
 	EnterTime = 1, -- "entra em 1 s"
 	FaintIn = 1.5, -- edges + blur up to a dark screen
 	FaintHold = 1,
@@ -121,12 +116,18 @@ const MACHINE_KIND = "coffee_machine"
 const MACHINE_LIFT = 1.2 -- studs between the top of the machine and the arrow tip
 const HINT_RETRY = 0.5 -- s between two looks for the machine while it is not in the Workspace yet
 const COFFEE_AFTER_ACTIVE = 1 -- s: a rise this soon after coming back to Active is the revive resend, not coffee
--- Low-sanity whispers (DEC-293, owner 2026-10-18): while sanity is in the low band ("Night", below Sanity.Bands.Mid) the
--- character's own words on screen say what to do ("LOW SANITY", "DRINK COFFEE"...): a short burst every LOW_WHISPER_EVERY s.
-const LOW_WHISPER_EVERY = 20
+-- Low-sanity whispers (DEC-293, owner 2026-10-18): the character's own words on screen say what to do ("LOW SANITY",
+-- "DRINK COFFEE"...): a short burst every Tier.Words s (DEC-352; Shaken and Breaking).
 const LOW_WHISPER_FOR = 3
 const LOW_WHISPER_RATE = 0.5
-const LOW_WHISPER_FIRST = 4 -- s after entering the band before the first burst
+const LOW_WHISPER_FIRST = 4 -- s after entering the tier before the first burst
+const TIERS = Content.Sanity.Tiers
+const PRESSURE = Content.Sanity.Pressure
+const HEARTBEAT_SOUND = "heartbeat"
+const BREATH_SOUND = "breath_held"
+const HEARTBEAT_VOLUME = 0.55 -- of the row: a pulse under the night, not a scare
+const BREATH_VOLUME = 0.8
+const BREATH_JITTER = 0.25 -- +- share of Tier.Breath
 local Whispers = require(StarterPlayer.StarterPlayerScripts.client.Anomaly.AnomalyController.Effects.Kit.Whispers)
 
 local function approach(current: number, target: number, dt: number): number
@@ -164,6 +165,11 @@ function VitalController:Setup()
 	self.ActiveSince = 0 :: number
 	self.NextBlurAt = 0 :: number
 	self.BlurUntil = 0 :: number
+	-- DEC-352: own sanity tier on screen (1 = Calm) and the clocks of its signs (0 = not scheduled)
+	self.TierIndex = 1 :: number
+	self.NextBeatAt = 0 :: number
+	self.NextBreathAt = 0 :: number
+	self.NextWordsAt = 0 :: number
 	self.Shown = { Vignette = 0, Saturation = 0, Tint = 0 } :: Shown
 	self.Color = nil :: ColorCorrectionEffect?
 	self.Blur = nil :: BlurEffect?
@@ -482,6 +488,46 @@ function VitalController:Effects(): (ColorCorrectionEffect, BlurEffect)
 	return color :: ColorCorrectionEffect, blur :: BlurEffect
 end
 
+-- Dropping into a deeper tier (DEC-352): one heartbeat, a short blur and a burst of the character's words, so the
+-- step is felt even with the HUD hidden. Mild: no red, no shake, no scare volume.
+function VitalController:EnterTier(now: number)
+	if self.TierIndex <= 1 then
+		return
+	end
+	self.BlurUntil = now + PRESSURE.EnterBlur
+	self.Dependencies.AudioController:Play(HEARTBEAT_SOUND, nil, { Volume = HEARTBEAT_VOLUME * 1.4 })
+	task.spawn(Whispers.Play, PRESSURE.EnterWords, Content.HorrorScenes.Words.low_sanity, LOW_WHISPER_RATE * 2)
+end
+
+-- The tier's steady signs: heartbeat, held breath, the words on screen (each on its own clock).
+function VitalController:Signs(now: number, tier: SanityTier.Tier)
+	const audio = self.Dependencies.AudioController
+	if tier.Heartbeat > 0 then
+		if self.NextBeatAt == 0 or now >= self.NextBeatAt then
+			if self.NextBeatAt ~= 0 then
+				audio:Play(HEARTBEAT_SOUND, nil, { Volume = HEARTBEAT_VOLUME, Vary = 0 })
+			end
+			self.NextBeatAt = now + tier.Heartbeat
+		end
+	end
+	if tier.Breath > 0 then
+		if self.NextBreathAt == 0 or now >= self.NextBreathAt then
+			if self.NextBreathAt ~= 0 then
+				audio:Play(BREATH_SOUND, nil, { Volume = BREATH_VOLUME })
+			end
+			self.NextBreathAt = now + tier.Breath * (1 + BREATH_JITTER * (math.random() * 2 - 1))
+		end
+	end
+	if tier.Words > 0 then
+		if self.NextWordsAt == 0 then
+			self.NextWordsAt = now + LOW_WHISPER_FIRST
+		elseif now >= self.NextWordsAt then
+			self.NextWordsAt = now + tier.Words
+			task.spawn(Whispers.Play, LOW_WHISPER_FOR, Content.HorrorScenes.Words.low_sanity, LOW_WHISPER_RATE)
+		end
+	end
+end
+
 local function write(target: Vide.Source<number>, value: number)
 	if math.abs(Vide.untrack(target) - value) > EPSILON or (value == 0 and Vide.untrack(target) ~= 0) then
 		target(value)
@@ -500,25 +546,36 @@ function VitalController:Step(dt: number)
 		self.Dark(dark)
 	end
 
+	-- Sanity tier (DEC-352): only at night and while Active
+	const tierIndex = if night and active then SanityTier.index(sanity, max) else 1
+	const tier = TIERS[tierIndex]
+	if tierIndex ~= self.TierIndex then
+		const deeper = tierIndex > self.TierIndex
+		self.TierIndex = tierIndex
+		self.NextBeatAt = 0
+		self.NextBreathAt = 0
+		self.NextWordsAt = 0
+		if deeper then
+			self:EnterTier(now)
+		end
+	end
+	if night and active then
+		self:Signs(now, tier)
+	end
+
 	-- Targets of the steady layer.
 	local vignette = 0
 	local saturation = 0
 	local tint = 0
 	if night and active then
-		const band = Vide.untrack(self.Band)
-		if band == "Mid" then
-			vignette = LOOK.Mid.Vignette
-			saturation += LOOK.Mid.Saturation
-		elseif band == "Night" then
-			vignette = LOOK.Night.Vignette
-			saturation += LOOK.Night.Saturation
-			tint = 1
-		end
+		vignette = tier.Vignette
+		saturation += tier.Saturation
+		tint = tier.Tint
 		if dark then
 			vignette = math.max(vignette, LOOK.Dark.Vignette)
 			saturation += LOOK.Dark.Saturation
 		end
-		saturation = math.max(saturation, LOOK.SaturationFloor)
+		saturation = math.max(saturation, PRESSURE.SaturationFloor)
 	end
 
 	const shown = self.Shown
@@ -528,21 +585,22 @@ function VitalController:Step(dt: number)
 
 	local edge = shown.Vignette
 	local blurSize = 0
-	const low = night and active and sanity < LOOK.PulseBelow
-	if low then
-		edge *= 1 + LOOK.PulseDepth * math.sin(now * 2 * math.pi * LOOK.PulseHz)
+	if night and active and tier.PulseHz > 0 then
+		edge *= 1 + tier.PulseDepth * math.sin(now * 2 * math.pi * tier.PulseHz)
+	end
+	const blurEvery = tier.Blur
+	if night and active and #blurEvery > 0 then
 		if self.NextBlurAt == 0 then
-			self.NextBlurAt = now + math.random(LOOK.BlurEvery[1], LOOK.BlurEvery[2])
+			self.NextBlurAt = now + blurEvery[1] + math.random() * (blurEvery[2] - blurEvery[1])
 		elseif now >= self.NextBlurAt then
-			self.BlurUntil = now + LOOK.BlurTime
-			self.NextBlurAt = now + math.random(LOOK.BlurEvery[1], LOOK.BlurEvery[2])
-		end
-		if now < self.BlurUntil then
-			blurSize = LOOK.BlurSize
+			self.BlurUntil = now + PRESSURE.BlurTime
+			self.NextBlurAt = now + blurEvery[1] + math.random() * (blurEvery[2] - blurEvery[1])
 		end
 	else
 		self.NextBlurAt = 0
-		self.BlurUntil = 0
+	end
+	if night and active and now < self.BlurUntil then
+		blurSize = PRESSURE.BlurSize
 	end
 
 	-- coffee: the dark edges lift and a warm glow shows (own client only, while Active)
@@ -663,24 +721,7 @@ VitalController:OnStart(function(self)
 	RunService.RenderStepped:Connect(function(dt: number)
 		self:Step(dt)
 	end)
-	-- DEC-293: hints on screen while sanity is low (a night only: Max > 0; never while down or spectating)
-	task.spawn(function()
-		local nextAt = math.huge
-		while true do
-			task.wait(1)
-			const low = Vide.untrack(self.Max) > 0
-				and Vide.untrack(self.Band) == "Night"
-				and Vide.untrack(self.LocalState) == "Active"
-			if not low then
-				nextAt = math.huge
-			elseif nextAt == math.huge then
-				nextAt = os.clock() + LOW_WHISPER_FIRST
-			elseif os.clock() >= nextAt then
-				nextAt = os.clock() + LOW_WHISPER_EVERY
-				task.spawn(Whispers.Play, LOW_WHISPER_FOR, Content.HorrorScenes.Words.low_sanity, LOW_WHISPER_RATE)
-			end
-		end
-	end)
+	-- DEC-293 hints on screen while sanity is low: now the tier's Words clock in Step (DEC-352)
 	-- PlayerGui may arrive a frame late; do not hold up the other OnStart.
 	task.spawn(function()
 		self:Mount(Players.LocalPlayer:WaitForChild("PlayerGui"))

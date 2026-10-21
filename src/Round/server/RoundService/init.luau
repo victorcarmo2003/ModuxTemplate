@@ -675,8 +675,16 @@ function RoundService:Step()
 		return
 	end
 	const phase = self.Phase()
+	-- a night override's Min: the probe cannot end it before (owner 2026-10-21: upgrade time after the night)
+	const override = if self.NightShift() then Content.Shift.ByKey[phase].Night else nil
+	const minimum = if override ~= nil and override.Min ~= nil then override.Min else 0
 	-- a held phase never ends by its probe either (the day Closing of the Day 1 upgrade lesson)
-	if Flow.CanProbe(phase) and self.HoldAt() <= 0 and now > self.PhaseStartedAt() and self:ProbeSaysEnd(phase) then
+	if
+		Flow.CanProbe(phase)
+		and self.HoldAt() <= 0
+		and now > self.PhaseStartedAt() + minimum
+		and self:ProbeSaysEnd(phase)
+	then
 		self:Advance(now)
 	end
 end

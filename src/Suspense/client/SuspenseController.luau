@@ -19,9 +19,10 @@
 	(HorrorScenes.Rules.ReduceMotion) and Screen.Pulse is skipped; no pull/zoom beyond that.
 
 	The forgotten customer (owner 2026-10-19; Content.Suspense.Rules.Forgotten): every NOTICE_STEP s, each customer of the
-	queue (Phase Queue, CustomerController) nobody has noticed yet is tested with the same glance (head on screen, in range,
-	clear line). The first glance sends CustomerNoticed (the server tells everyone: no scare for them later). If At of its
-	queue patience was already gone, the glance is a small scare: a short pull to its head, a light zoom, a sting, a pulse.
+	queue (Phase Queue, CustomerController) this player has not noticed yet is tested with the same glance (head on screen,
+	in range, clear line). Per player (owner 2026-10-21, Provisional): the first glance is kept only here, another player
+	finding it first does not spare this one (the old CustomerNoticed broadcast is gone). If At of its queue patience was
+	already gone, the glance is a small scare: a short pull to its head, a light zoom, a sting, a pulse.
 	Not during the tutorial (TutorialRunning) nor from a cooking focus (CookStation).
 ]]
 local Players = game:GetService("Players")
@@ -69,7 +70,7 @@ const SuspenseController = Modux.Controller("SuspenseController", {
 function SuspenseController:Setup()
 	self.Show = nil :: Show?
 	self.Folder = nil :: Folder?
-	-- NpcId -> true: noticed by this client or by anyone (CustomerNoticed); dropped when the customer goes
+	-- NpcId -> true: noticed by this client (each player finds it on their own); dropped when the customer goes
 	self.Noticed = {} :: { [number]: boolean }
 	self.NoticeAt = 0 :: number
 end
@@ -193,7 +194,6 @@ function SuspenseController:StepNoticed()
 			continue
 		end
 		self.Noticed[id] = true
-		self.Libs.Net.CustomerNoticed:fireServer({ Npc = id })
 		if gone >= FORGOTTEN.At then
 			self:Startle(point)
 		end
@@ -317,10 +317,6 @@ SuspenseController:OnInit(function(self)
 	self:Setup()
 	self.Libs.Net.Suspense:onClient(function(data)
 		self:Begin(data)
-	end)
-	-- someone caught a queue customer first: no forgotten-customer scare for it here
-	self.Libs.Net.CustomerNoticed:onClient(function(data)
-		self.Noticed[data.Npc] = true
 	end)
 end)
 

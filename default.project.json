@@ -245,6 +245,12 @@
 						"optional": "src/Character/server"
 					}
 				},
+				"Chore": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Chore/server"
+					}
+				},
 				"Class": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -596,6 +602,12 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Character/client"
+						}
+					},
+					"Chore": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Chore/client"
 						}
 					},
 					"Class": {

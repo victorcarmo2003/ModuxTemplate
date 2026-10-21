@@ -149,7 +149,7 @@ const stages = Table.new({
 		Hold = 1,
 		Layer = "score_violin_up",
 		LayerVolume = 0.7,
-		LayerCut = 30, -- = Rules/ANM-020 RestaurantWindow
+		LayerCut = 20, -- = Rules/ANM-020 RestaurantWindow (owner 2026-10-21: 12 s was too short; was 30)
 	}),
 	stage({
 		Key = "Climax",
@@ -182,7 +182,7 @@ const anomalies: { [string]: AnomalyScore } = {
 		Signal = nil, -- owner 2026-10-18: the omen is the phone glitch alone (HorrorScenes), no sting over it
 		Active = "Rise", -- owner 2026-10-18: notes loop + rising note, cut at the jumpscare
 		Failed = "Climax",
-		Ramp = 30, -- Rules/ANM-020 RestaurantWindow (the jumpscare second on the client, Effects/ANM-020)
+		Ramp = 20, -- Rules/ANM-020 RestaurantWindow (owner 2026-10-21: 12 s was too short; was 30) (the jumpscare second on the client, Effects/ANM-020)
 		Caption = "power_out",
 	},
 }

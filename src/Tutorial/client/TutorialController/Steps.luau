@@ -491,7 +491,8 @@ const LIST: { Step } = {
 		Text = "Your shift ends at 6:00",
 		Hint = "Keep an eye on the clock, top centre.",
 		Action = nil,
-		Say = { "One more thing.", "Your shift ends at six.", "Keep an eye on the clock." },
+		-- owner 2026-10-21: the close-up on the clock lasted too long; "One more thing." cut (the other two keep their voices)
+		Say = { "Your shift ends at six.", "Keep an eye on the clock." },
 		Talk = true,
 	},
 }

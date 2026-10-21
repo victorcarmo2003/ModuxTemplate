@@ -90,7 +90,7 @@ export type Wire = {
 	Drive: number?,
 }
 export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused" | "Slow"
-export type Variant = "blank" | "mirror" | "raincoat" | "shake" | "neck" | "eyes" | "bighead" | "float" | "stare" | "banger"
+export type Variant = "blank" | "mirror" | "raincoat" | "shake" | "neck" | "eyes" | "bighead" | "float" | "stare" | "banger" | "oncam"
 export type CustomerActorSpec = {
 	Variant: Variant,
 	CustomerType: string?,

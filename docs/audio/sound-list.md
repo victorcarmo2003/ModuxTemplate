@@ -515,6 +515,11 @@ constante no topo de cada arquivo). Mild (DEC-172).
 | SFX-254 | `float_hum` | Zumbido grave subindo de tom, cortável | ANM-015, na chegada e na subida (para no silêncio) | ~4 s | `hum_rise` | Sfx 0,5, 3D 40 studs | P2 |
 | SFX-255 | `clock_tick` | Tique de relógio de parede, um só (a cena espaça) | ANM-016, tiques desacelerando até parar | ~0,2 s | `amb_clock_tick` (clipe cortado aos 9 s) | Sfx 0,6, 3D 40 studs | P2 |
 | SFX-256 | `eyes_on` | "Whoom" suave, olhos acendendo | ANM-013, os olhos acendem | ~0,8 s | `suspense_drop` (0,5) | Sfx 0,5, tela | P3 |
+| SFX-257 | `fire_loop` | Fogo crepitando, loop | tarefa `grill_fire` (Q-436), na chapa enquanto queima | loop | — | Sfx 0,7, 3D 45 studs | P1 |
+| SFX-258 | `fire_spray` | Jato de extintor / spray | `grill_fire` apagado | ~2 s | — | Sfx 0,8, 3D 45 studs | P1 |
+| SFX-259 | `rat_squeak` | Guinchos de rato | `rats` chegam e cada rato espantado | ~1 s | — | Sfx 0,7, 3D 40 studs | P1 |
+| SFX-260 | `camera_static` | Rajada de estática | `camera_static` (reserva; o feed mostra o chiado) | ~3 s | — | Sfx 0,5, tela | P3 |
+| SFX-261 | `camera_fixed` | Estática de rádio que liga e corta | `camera_static` consertada, na câmera | ~2,7 s | — | Sfx 0,6, 3D 40 studs | P2 |
 
 Sem pedido novo: `puddle_rush` (a água correndo de ANM-005 usa `splash`) e a pancada na persiana (ANM-011 usa `window_slam`).
 `clock_tick` só desacelera de verdade se a cena tocar um tique por passo (hoje ela toca o clipe do `amb_clock_tick` uma vez e o corta aos 9 s).

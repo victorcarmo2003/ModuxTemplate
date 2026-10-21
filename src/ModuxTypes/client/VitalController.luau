@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
+local SanityTier = require(ReplicatedStorage.shared.Anomaly.SanityTier)
 
 export type LifeState = "Active" | "Down" | "Reviving" | "Spectator" | "Away"
 export type Band = "Day" | "Mid" | "Night"
@@ -36,10 +37,14 @@ export type Public = {
 	LocalState: Vide.Source<LifeState>,
 	Max: Vide.Source<number>,
 	Members: Vide.Source<{ [number]: Member }>,
+	NextBeatAt: number,
 	NextBlurAt: number,
+	NextBreathAt: number,
+	NextWordsAt: number,
 	Sanity: Vide.Source<number>,
 	Shown: Shown,
 	State: Vide.Source<{ [number]: LifeState }>,
+	TierIndex: number,
 	Unmount: (() -> ())?,
 	Vignette: Vide.Source<number>,
 	Warm: Vide.Source<number>,
@@ -60,6 +65,8 @@ export type Public = {
 	PlayLifeSound: (self: Public, userId: number, previous: LifeState, state: LifeState) -> (),
 	FaintAmount: (self: Public, now: number) -> (number, number),
 	Effects: (self: Public) -> (ColorCorrectionEffect, BlurEffect),
+	EnterTier: (self: Public, now: number) -> (),
+	Signs: (self: Public, now: number, tier: SanityTier.Tier) -> (),
 	Step: (self: Public, dt: number) -> (),
 	Mount: (self: Public, playerGui: Instance) -> (),
 	TipOf: (self: Public, cause: string, known: boolean) -> Content.FaintTip,

@@ -9,9 +9,9 @@
 -- attribute Shape = "Circle") is a circle of half its diameter; anything else is a rectangle oriented with the Part
 -- (its two horizontal sizes; attribute Shape = "Rect" forces it). Squad pads tagged "PartyPlatform" (attribute
 -- Party = n) also count for Squad n. A row with no tagged Part falls back to a circle: centre = the MapPoint PointId
--- (WORLD) when the map has it, else Center; radius = Radius. Walking in (|dy| <= Trigger.Height from the floor top)
--- opens its panel; walking out (past the edge + Trigger.Hysteresis) closes it. Squad zones (Platform 1..4) are the
--- squad platforms: the server watches them.
+-- (WORLD) when the map has it, else Center; radius = Radius. Walking in (plane XZ, any height: owner request
+-- 2026-10-21) opens its panel; walking out (past the edge + Trigger.Hysteresis) closes it. Squad zones (Platform 1..4)
+-- are the squad platforms: the server watches them.
 
 export type Panel = "Classes" | "Shop" | "Codes" | "Platform"
 
@@ -119,7 +119,6 @@ export type Lobby = {
 	Extras: Extras, -- TASK-451
 	Trigger: {
 		Hysteresis: number, -- studs added to the edge (radius / half size) to count as "out"
-		Height: number, -- studs: max |dy| between the root and the zone floor top
 		Poll: number, -- s between two client checks
 	},
 	Frame: Frame,
@@ -220,7 +219,6 @@ const lobby: Lobby = {
 	},
 	Trigger = {
 		Hysteresis = 1.25,
-		Height = 8,
 		Poll = 0.1,
 	},
 	Frame = {

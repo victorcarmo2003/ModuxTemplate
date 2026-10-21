@@ -784,6 +784,7 @@ validado). Uma task de contrato por onda escreve as entradas da onda em `src/Lib
 | `Sanity` | packet s → dono | jogador | `VitalService` | `VitalController`, `HallucinationController` | ≤ 1/s à noite; no `Ready`/respawn | 2 |
 | `LifeEvent` | packet s → grupo | grupo | `VitalService`, `TrafficService` (`Hit`) | Hud, Camera, Anim, Audio | evento | 2 |
 | `Lights` | set | `IndexOf(LightGroups)` | `LightService` | `LightController` | toque no interruptor, início da noite, Hush | 2 |
+| `Power` | set | `1` | `LightService` | `PowerController` | queima/conserto da lâmpada, início/fim do apagão (§13.2a) | — |
 | `Call` | set | `1` | `BossService` | `BossController`, `HudController` | ~3 por ligação | 2 |
 | `Thief` | set | `1` | `ThiefService` | `ThiefController` | ~4 por ladrão | 2 |
 | `Transition` | packet s → grupo | grupo | `VehicleService` | `VehicleController` | 1 por run | 2 |
@@ -860,6 +861,42 @@ Lights = Lync.replicate(Lync.struct({        -- id = Content.LightGroups.IndexOf
 | Escreve / lê | `LightService` / `LightController` (visual), `VitalController` (previsão do medidor) |
 | Por quê set | todos veem as mesmas luzes; quem reconecta no Hush vê os postes certos |
 | Fora daqui | a regra do escuro (zona ativa) é calculada no servidor (T8); o client só desenha |
+
+### 13.2a `Power` (pedidos do dono 2026-10-21; **Provisório**, Q-433, Q-434, Q-435)
+
+```lua
+Power = Lync.replicate(Lync.struct({         -- registro 1
+	Burnt = Lync.bool(),                      -- lâmpada da cozinha queimada (interruptor morto)
+	Out = Lync.bool(),                        -- apagão do ANM-020 ligado (sobrevive à ocorrência até o disjuntor) ou desarme
+	Trip = Lync.bool(),                       -- Out é o disjuntor desarmando sozinho, sem anomalia (Content.Breaker, Q-435)
+	At = Lync.f64(),                          -- instante da última troca (o client só toca a queima se for recente)
+})),
+```
+
+| | |
+|---|---|
+| Escreve / lê | `LightService` / `PowerController` (faísca, som `power_cut`, linha do `Announce`; espelha em `Light/Power` para `Effects/ANM-020` manter o escuro com `Out` depois que o registro do `Anomalies` sai) |
+| Apagão (Q-434) | o escuro antes do susto tem 12 s (era 30); o ANM-020 termina `LeaveAfter` (6) s depois do susto, mas a energia **fica cortada** até alguém segurar o disjuntor (ou turno novo / restore). Antes a ocorrência segurava mais `MaxDark` (20) s e devolvia a luz sozinha |
+| Regra | `Content.Bulb.Toggles` (6) toques no interruptor em `Bulb.Window` (8 s), por servidor, queimam a lâmpada: `trailer_interior` apaga (registro do `Lights`), o prompt do interruptor fica com `Bulb.DeadText` e recusa, e o prompt `breaker_reset` (o disjuntor lá fora do ANM-020, mesma seta guia) liga. Segurar o disjuntor conserta e reacende. Turno novo ou restore também consertam |
+| Por quê set | todos dividem a mesma luz; quem entra depois vê o estado sem a faísca (`Bulb.Fresh` s) |
+| Fora daqui | sem packet novo: o conserto é a ação `breaker_reset` que já existe |
+
+### 13.2b `Chores` (pedido do dono 2026-10-21; **Provisório**, Q-436)
+
+```lua
+Chores = Lync.replicate(Lync.struct({        -- registro = Content.Chores.IndexOf[key]
+	On = Lync.bool(),                         -- a tarefa está ligada
+	Mask = Lync.int(0, 255),                  -- rats: bit i-1 = rato em Rules.Spots[i]; camera_static: índice em Security.Cams
+	At = Lync.f64(),                          -- instante em que começou (o client só toca o início se for recente)
+})),
+```
+
+| | |
+|---|---|
+| Escreve / lê | `ChoreService` / `ChoreController` (fogo, ratos, linha do `Announce`, sons) e `SecurityController` (câmera sem imagem: chiado cheio + "NO SIGNAL") |
+| Ações | `fire_out` (segurar 2 s na chapa), `rat_shoo` (toque em cada rato), `camera_fix` (segurar 2 s, raio 22, linha de visão no servidor); a porta usa o `door_toggle` que já existe |
+| Gate | `InteractionService` gate `Chore`: os prompts da chapa pegando fogo e da estação com rato recusam; o client esconde os mesmos (`PromptController` gate `Chore`) |
+| Por quê set | estado de todos; quem entra depois vê o fogo e os ratos sem o aviso (`Rules.Fresh` s) |
 
 ### 13.3 `Call` (onda 2)
 
