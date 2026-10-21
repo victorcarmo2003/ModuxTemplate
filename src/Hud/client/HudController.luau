@@ -63,6 +63,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local CrewLooks = require(ReplicatedStorage.shared.Crew.CrewLooks)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Cinematic = require(StarterPlayer.StarterPlayerScripts.client.Interface.Cinematic)
+local HudHold = require(StarterPlayer.StarterPlayerScripts.client.Interface.HudHold)
 local Steps = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Steps)
 local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
 local HudOrder = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudOrder)
@@ -997,9 +998,10 @@ function HudController:Mount(playerGui: Instance)
 			ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			DisplayOrder = 1,
-			-- no HUD while a cinematic owns the screen (finale / credits; Interface/Cinematic)
+			-- no HUD while a cinematic owns the screen (finale / credits; Interface/Cinematic) or a horror scene's bars hold it
+			-- (Interface/HudHold; owner 2026-10-21: the blackout left it off for good when it wrote Enabled itself)
 			Enabled = function()
-				return not Cinematic.Active()
+				return not Cinematic.Active() and not HudHold.Held()
 			end,
 
 			-- Wave 2 night layer, under the wave-1 HUD so toasts stay readable on a narrow phone

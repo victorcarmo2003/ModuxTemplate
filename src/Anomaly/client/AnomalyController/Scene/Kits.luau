@@ -45,6 +45,8 @@ local Watch = require(script.Parent.Parent.Effects.Kit.Watch)
 local Seen = require(script.Parent.Seen)
 local Whispers = require(script.Parent.Parent.Effects.Kit.Whispers)
 local Steps = require(script.Parent.Steps)
+local StarterPlayer = game:GetService("StarterPlayer")
+local HudHold = require(StarterPlayer.StarterPlayerScripts.client.Interface.HudHold)
 
 type Step = Content.HorrorStep
 type State = Steps.State
@@ -709,7 +711,11 @@ end
 -- Cinema: black bars + HUD hidden -----------------------------------------------------------------------------------------
 
 const CINEMA_NAME = "HorrorCinema"
-const HUD_GUIS = { "Hud" } -- the game HUD (coins, shop, sanity...); TouchGui stays (mobile must still move)
+-- the game HUD (coins, shop, sanity...) hides through Interface/HudHold (owner 2026-10-21: writing Hud.Enabled here fought
+-- HudController's binding and the HUD stayed off after the blackout); TouchGui stays (mobile must still move)
+const HUD_HOLD = "horror_cinema"
+-- the bars close by themselves this long after the last Cinema step that opened them, if no step / undo closed them
+const CINEMA_MAX = 25
 -- World: the station outlines (Highlight) and the floating pills (BillboardGui: tips "$0", stock "9/20", "Ready!") turned
 -- off while the bars are up (owner 2026-10-18: the money still showed and the outlines flickered under the shakes).
 -- Only the workspace ones: the prompts (PromptController) and the breaker note live in PlayerGui and stay.
@@ -721,26 +727,15 @@ type Cinema = {
 	Backpack: boolean?,
 	Chat: boolean?,
 	World: { Instance }?,
+	Token: number?, -- the last Cinema step that opened / refreshed the bars (watchdog)
 }
 local cinema: Cinema? = nil
 
-local function hideHud(on: boolean, saved: { [string]: boolean }, current: Cinema)
-	const playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
-	if playerGui == nil then
-		return
-	end
-	for _, name in HUD_GUIS do
-		const gui = playerGui:FindFirstChild(name)
-		if gui ~= nil and gui:IsA("ScreenGui") then
-			if on then
-				if saved[name] == nil then
-					saved[name] = gui.Enabled
-				end
-				gui.Enabled = false
-			elseif saved[name] ~= nil then
-				gui.Enabled = saved[name]
-			end
-		end
+local function hideHud(on: boolean, _saved: { [string]: boolean }, current: Cinema)
+	if on then
+		HudHold.Hold(HUD_HOLD)
+	else
+		HudHold.Release(HUD_HOLD)
 	end
 	if on then
 		const ok, enabled = pcall(function(): boolean
@@ -845,6 +840,14 @@ const cinemaStep: Handler = function(_ctx, state, step, late)
 	end
 	const live = current :: Cinema
 	hideHud(true, live.Saved, live)
+	-- watchdog: a scene that ends without its close (or its undo) never leaves the bars and the hidden HUD behind
+	live.Token = (live.Token or 0) + 1
+	const token = live.Token
+	task.delay(CINEMA_MAX, function()
+		if cinema == live and live.Token == token then
+			closeCinema(0.6)
+		end
+	end)
 	const info = TweenInfo.new(duration, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 	TweenService:Create(live.Top, info, { Size = UDim2.fromScale(1, amount) }):Play()
 	TweenService:Create(live.Bottom, info, { Size = UDim2.fromScale(1, amount) }):Play()
