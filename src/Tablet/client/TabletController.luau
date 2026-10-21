@@ -371,6 +371,7 @@ end
 -- (CameraController:Prep, like the cooking focus), the tablet Model is hidden on my screen only (LocalTransparencyModifier)
 -- and walking is held. It lets go CloseUp.Hold s after the talk ends (an anomaly accepted scares in the close-up first).
 const CLOSE_FREEZE = "TabletCloseUpFreeze"
+const CLOSE_UP_ATTRIBUTE = "TalkCloseUp" -- on LocalPlayer while the close-up is on (the tutorial beacon hides)
 -- the default walk / jump inputs held during the close-up (the touch thumbstick goes off with TouchControlsEnabled)
 const FREEZE_INPUTS: { Enum.KeyCode } = {
 	Enum.KeyCode.W,
@@ -419,6 +420,8 @@ function TabletController:SyncCloseUp()
 			return Enum.ContextActionResult.Sink
 		end, false, DECIDE_PRIORITY - 1, table.unpack(FREEZE_INPUTS))
 		GuiService.TouchControlsEnabled = false
+		-- the tutorial's contour and arrow on the tablet hide meanwhile (TutorialController Beacon reads it)
+		Players.LocalPlayer:SetAttribute(CLOSE_UP_ATTRIBUTE, true)
 		return
 	end
 	if self.CloseTablet == nil then
@@ -437,6 +440,7 @@ function TabletController:SyncCloseUp()
 		table.clear(self.Hidden)
 		ContextActionService:UnbindAction(CLOSE_FREEZE)
 		GuiService.TouchControlsEnabled = true
+		Players.LocalPlayer:SetAttribute(CLOSE_UP_ATTRIBUTE, nil)
 		if Vide.untrack(camera.Mode) == "Prep" then
 			camera:Prep(false, nil, { Travel = close.Travel })
 		end

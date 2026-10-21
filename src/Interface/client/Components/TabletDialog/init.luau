@@ -62,8 +62,10 @@ const TAB_HEIGHT = 22
 const TAB_TEXT = 14
 const TAB_OVERLAP = 7
 const LABEL_SIZE = 14
-const CHOICE_HEIGHT = 44 -- px: a thumb target on a phone
-const CHOICE_TEXT = 18
+const CHOICE_WIDTH = 92 -- px (UI scale 1; the talk card itself is scaled up on the left)
+const CHOICE_HEIGHT = 32
+const CHOICE_TEXT = 14
+const CHOICE_GAP = 8 -- px between the card and the buttons
 
 -- Letter chip for a key with no cell in the sheet (same colours as HudOrder / PlateTicket).
 const CHIP: { [string]: { Color: Color3, Label: string } } = {
@@ -161,14 +163,15 @@ return function(props: Props): Frame
 		return props.Choice ~= nil and props.Choice()
 	end
 
-	local function choice(name: string, text: string, tone: Theme.Tone, order: number, act: (() -> ())?): any
+	local function choice(name: string, text: string, tone: Theme.Tone, at: UDim2, anchor: Vector2, act: (() -> ())?): any
 		return CartoonButton({
 			Name = name,
-			LayoutOrder = order,
 			Text = text,
 			TextSize = CHOICE_TEXT,
 			Tone = tone,
-			Size = UDim2.new(0.5, -GAP, 0, CHOICE_HEIGHT),
+			AnchorPoint = anchor,
+			Position = at,
+			Size = UDim2.fromOffset(CHOICE_WIDTH, CHOICE_HEIGHT),
 			OnActivated = function()
 				if act ~= nil and choosing() then
 					act()
@@ -283,23 +286,19 @@ return function(props: Props): Frame
 						end)
 					end),
 				}),
-				-- owner 2026-10-21 (DEC-353): SERVE / REFUSE once the customer is done talking
-				create("Frame")({
-					Name = "Choice",
-					LayoutOrder = 3,
-					Size = UDim2.new(1, 0, 0, CHOICE_HEIGHT),
-					BackgroundTransparency = 1,
-					Visible = choosing,
-					create("UIListLayout")({
-						FillDirection = Enum.FillDirection.Horizontal,
-						HorizontalAlignment = Enum.HorizontalAlignment.Center,
-						SortOrder = Enum.SortOrder.LayoutOrder,
-						Padding = UDim.new(0, GAP * 2),
-					}),
-					choice("Serve", props.ServeLabel or "SERVE", Theme.Tone.Green, 1, props.OnServe),
-					choice("Refuse", props.RefuseLabel or "REFUSE", Theme.Tone.Ketchup, 2, props.OnRefuse),
-				}),
 			},
+		}),
+
+		-- owner 2026-10-21 (DEC-353; 2nd pass with the owner's sketch): the text card on top, two small buttons under it,
+		-- one under each end (they were half the card wide and too tall)
+		create("Frame")({
+			Name = "Choice",
+			LayoutOrder = 3,
+			Size = UDim2.new(1, 0, 0, CHOICE_HEIGHT + CHOICE_GAP + TAB_OVERLAP),
+			BackgroundTransparency = 1,
+			Visible = choosing,
+			choice("Serve", props.ServeLabel or "SERVE", Theme.Tone.Green, UDim2.fromOffset(PAD, CHOICE_GAP + TAB_OVERLAP), Vector2.zero, props.OnServe),
+			choice("Refuse", props.RefuseLabel or "REFUSE", Theme.Tone.Ketchup, UDim2.new(1, -PAD, 0, CHOICE_GAP + TAB_OVERLAP), Vector2.new(1, 0), props.OnRefuse),
 		}),
 	})
 end

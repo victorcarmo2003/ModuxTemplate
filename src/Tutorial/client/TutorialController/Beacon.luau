@@ -16,6 +16,7 @@
 Local only (client parts in a Workspace folder, no collision, no query, no touch, no shadow). Pure presentation:
 	the owner (TutorialController) says what to mark (Set) and calls Step every frame.
 ]]
+local Players = game:GetService("Players")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local HintMark = require(StarterPlayer.StarterPlayerScripts.client.Interface.HintMark)
@@ -78,6 +79,8 @@ local function topOf(adornee: Instance): Vector3?
 end
 
 -- container() = the folder the effects live in (re-created by the owner when it was destroyed)
+const CLOSE_UP = "TalkCloseUp" -- LocalPlayer attribute while the order talk close-up is on (TabletController)
+
 function Beacon.new(container: () -> Instance): Beacon
 	local adornee: Instance? = nil
 	local lift = 1
@@ -155,7 +158,9 @@ function Beacon.new(container: () -> Instance): Beacon
 		end,
 		Step = function()
 			const target = adornee
-			if Cinematic.Active() then
+			-- owner 2026-10-21: the order talk's close-up (TabletController sets the attribute) hides it too - the contour and
+			-- the arrow were drawn over the customer's face
+			if Cinematic.Active() or Players.LocalPlayer:GetAttribute(CLOSE_UP) == true then
 				-- the intro / finale / credits own the screen: draw nothing, keep what is marked
 				if not hidden then
 					hidden = true

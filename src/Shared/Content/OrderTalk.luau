@@ -66,7 +66,7 @@ const talk: OrderTalk = {
 		raincoat = { "Something warm, dear. I've waited so long.", "Just a hot dog, love. Take your time." },
 	},
 	Hello = { "Hi!", "Evening!", "Hey there.", "Hello!", "Hi, how's it going?" },
-	CloseUp = { Distance = 6.5, Lift = 0.2, Drop = 0.9, Shift = 1.8, Fov = 45, Travel = 0.45, Hold = 1.2 },
+	CloseUp = { Distance = 6.5, Lift = 0.2, Drop = 0.9, Shift = 0.9, Fov = 45, Travel = 0.45, Hold = 1.2 },
 	DialogScale = 1.35,
 	Serve = "ACCEPT",
 	Refuse = "REFUSE",
