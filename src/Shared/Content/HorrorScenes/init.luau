@@ -551,8 +551,8 @@ const hush: Scene = {
 -- Fitted to Rules/ANM-009 with the restaurant on: Active 20 s + DoorGrace 2 (Resolved at 22 when nobody opened). The
 -- knocks and the voice are Effects/ANM-009 (server cues at 0 / 4.5 / 8.5 / 12.5): far and soft, closer and rhythmic,
 -- Walt's voice, the voice wrong. The scene builds around them: the room goes quiet, cold and narrow; the words say
--- don't open; after the wrong voice a dead silence (no heart, no words); then the handle, a push, the latch holds;
--- two seconds of nothing. The answer is the simplest thing - do nothing - and the scene makes it hard.
+-- lock it; after the wrong voice a dead silence (no heart, no words); then the handle, a push, the latch holds;
+-- two seconds of nothing. The answer (TASK-592) is to run and lock the door before the heavy series.
 -- Opened (Failed): the face (Effects/ANM-009 jumpscare) with a white-out blur, red, a lunge of the view and the sting
 -- for who opened; the others hear the door bang and the sting from the pantry. Ignored (Resolved): one last soft
 -- knock, the steps walk away, the room and the colour come back, a breath out.
@@ -954,8 +954,8 @@ const words: { [string]: { string } } = {
 	},
 	shaker = {
 		"WHY IS IT SHAKING?",
-		"DON'T TAKE ITS ORDER",
-		"SEND IT AWAY",
+		"SERVE HIM PLAIN",
+		"NOTHING ON IT",
 		"it can't stop...",
 	},
 	white_eyes = {
@@ -984,8 +984,8 @@ const words: { [string]: { string } } = {
 	},
 	-- owner 2026-10-18: Walt knocking (real hints: do not open, Walt has a key)
 	knock = {
-		"DON'T OPEN THE DOOR",
-		"DON'T OPEN THE DOOR",
+		"LOCK THE DOOR",
+		"LOCK THE DOOR",
 		"THAT'S NOT WALT",
 		"WALT HAS A KEY",
 		"stay quiet...",

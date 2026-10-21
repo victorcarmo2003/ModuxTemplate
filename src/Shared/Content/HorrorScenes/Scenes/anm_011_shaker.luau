@@ -3,10 +3,10 @@
 -- to the actor's record (Rules/ANM-011, TASK-591: serve him a plain hot dog = Resolved; shut the window on him or
 -- serve a topping = Failed; no deadline). The v3
 -- review found the body's tremor unreadable on a phone (Q-389), so the ROOM shakes: the bottles and cups by the
--- counter rattle (Prop Shake), the lamp over it swings (Prop Sway), a micro tremor of the camera nearby. On the
--- security cameras nothing shakes and it stands looking straight up (Seen "Cameras"). Then everything stops at once, a
--- step on the roof right above it, one last jump of the whole counter; served plain, the shaking dies out; the
--- error starts with a hard blow on the shutter. Presentation only (T10). Every number PROVISIONAL until the owner's Play; the rattle is `plate_put`
+-- counter rattle (Prop Shake), the lamp over it swings (Prop Sway), a micro tremor of the camera nearby. Then
+-- everything stops at once, one last jump of the whole counter; served plain, the shaking dies out; the error starts
+-- with a hard blow on the shutter. Owner 2026-10-21 (gameplay review): the look up and the step on the roof are gone -
+-- they are the roof walker's sign (ANM-019, "don't look up") and told the player the wrong rule. Presentation only (T10). Every number PROVISIONAL until the owner's Play; the rattle is `plate_put`
 -- until cup_rattle has an Id (sound-list.md).
 local Types = require(script.Parent.Parent.Types)
 
@@ -43,8 +43,6 @@ const scene: Types.Scene = {
 		-- R5: the hint
 		{ At = 2, Phase = "Active", Kind = "Whispers", Target = "shaker_close", Value = 0.3, To = 1.2, Duration = 6, Where = "Inside" },
 		{ At = 2, Phase = "Active", Kind = "Whispers", Target = "outside", Value = 0.3, To = 1.1, Duration = 6, Where = "Outside" },
-		-- R4: on the cameras it stands still, looking straight up
-		{ At = 2, Phase = "Active", Kind = "Pose", Target = "Lift", Value = 45, Duration = 1.5, Seen = "Cameras" },
 		-- R7: the shaking grows, the lamp swings, the heart, the colour goes sick
 		{ At = 3, Phase = "Active", Kind = "Prop", Target = "Shake", Point = COUNTER, Value = 0.05, To = 8, Duration = 5, Seen = "Eyes" },
 		{ At = 4, Phase = "Active", Kind = "Prop", Target = "Sway", Point = COUNTER, Value = 5, To = 14, Duration = 4, Seen = "Eyes" },
@@ -52,13 +50,10 @@ const scene: Types.Scene = {
 		{ At = 4, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.25, Duration = 4 },
 		{ At = 4, Phase = "Active", Kind = "Grade", Target = "Sick", Value = 0, To = 0.28, Duration = 4 },
 		{ At = 5, Phase = "Active", Kind = "Fov", Value = 1.5, To = 0, Duration = 3 },
-		-- R8: it stops dead - the props, the words, the heart, the room; it looks up
+		-- R8: it stops dead - the props, the words, the heart, the room
 		{ At = 8, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
 		{ At = 8, Phase = "Active", Kind = "Heartbeat", Value = 0, To = 0 },
 		{ At = 8, Phase = "Active", Kind = "Silence", Value = 1, To = 0.15, Duration = 0.15 },
-		{ At = 8, Phase = "Active", Kind = "Pose", Target = "Lift", Value = 40, Duration = 0.3 },
-		-- R3: one step on the roof, right above it
-		{ At = 9.4, Phase = "Active", Kind = "Sound", Target = "roof_step", Point = COUNTER, Value = 0.7 },
 		-- R9: the whole counter jumps once, the lights with it
 		{ At = 10, Phase = "Active", Kind = "Prop", Target = "Shake", Point = COUNTER, Value = 0.12, To = 8, Duration = 0.6, Seen = "Eyes" },
 		{ At = 10, Phase = "Active", Kind = "Sound", Target = "horror_sting", Value = 0.7 },
@@ -68,7 +63,6 @@ const scene: Types.Scene = {
 		{ At = 10, Phase = "Active", Kind = "Blur", Value = 5, To = 0, Duration = 1 },
 		{ At = 10, Phase = "Active", Kind = "Silence", Value = 0.15, To = 1, Duration = 2 },
 		{ At = 10.5, Phase = "Active", Kind = "Heartbeat", Value = 105, To = 110, Duration = 18 },
-		{ At = 10.6, Phase = "Active", Kind = "Pose", Target = "Lift", To = 0, Duration = 1.5 },
 		-- the work goes on
 		{ At = 16, Phase = "Active", Kind = "Cinema", Value = 0, Duration = 1.5 },
 		{ At = 16, Phase = "Active", Kind = "Vignette", Value = 0.25, To = 0.08, Duration = 4 },

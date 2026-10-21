@@ -238,7 +238,8 @@ const base = Table.new({
 		lines("Someone shaking all over?", "He's just starving. Serve him plain.", "Nothing on it."),
 		lines("Shaking? Plain hot dog."),
 		-- TASK-561: ANM-009 debuts tonight in the restaurant (back door opened by hand); Walt has a key and never knocks
-		{ Lines = lines("Someone shaking all over? Serve him plain, nothing on it.", "Knocks on the back door?", "I've got a key. Don't open."), Short = lines("Shaking? Plain. Knocks? Don't open.") }
+		-- owner 2026-10-21: the knock's rule is lock the door (TASK-592, Q-398); new lines have no voice until tools/voice runs
+		{ Lines = lines("Someone shaking all over? Serve him plain, nothing on it.", "Knocks on the back door?", "I've got a key. Lock it."), Short = lines("Shaking? Plain. Knocks? Lock the door.") }
 	),
 	nightCall(
 		3,
@@ -280,7 +281,7 @@ const base = Table.new({
 		9,
 		lines("Steps on the roof? Get out and hide.", "Knocks out back? It's not me. Don't open."),
 		lines("Roof steps? Hide. Knocks? Don't open."),
-		{ Lines = lines("Steps on the roof? Don't look up.", "Knocks on the back door?", "It's not me. Don't open."), Short = lines("Roof steps? Don't look up. Knocks? Don't open.") }
+		{ Lines = lines("Steps on the roof? Don't look up.", "Knocks on the back door?", "It's not me. Lock it."), Short = lines("Roof steps? Don't look up. Knocks? Lock the door.") }
 	),
 	nightCall(
 		10,

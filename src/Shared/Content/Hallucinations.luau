@@ -111,7 +111,7 @@ const waltLines: Lines = {
 	},
 	[9] = {
 		line("walt_n9_trust", "Steps up top? Don't look up. Trust me."),
-		line("walt_n9_cap", "My old cap out back? Don't open. Next question."),
+		line("walt_n9_cap", "My old cap out back? Lock the door. Next question."),
 	},
 	[10] = {
 		line("walt_n10_off", "Lamps going out? Shop light off. Keep it off."),
@@ -129,7 +129,7 @@ const waltLines: Lines = {
 
 const radioLines: Lines = {
 	[1] = { line("radio_n1_light", "...hello...? Is the light still on over there...?") },
-	[2] = { line("radio_n2_key", "...don't open it... I never had a key either...") },
+	[2] = { line("radio_n2_key", "...lock it... I never had a key either...") },
 	[3] = { line("radio_n3_counted", "...hold the breaker... I counted too, back then...") },
 	[4] = { line("radio_n4_faces", "...don't stare... they learn faces... like his...") },
 	[5] = { line("radio_n5_lady", "...serve the lady... she waited for me too...") },

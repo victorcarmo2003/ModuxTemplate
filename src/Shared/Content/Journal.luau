@@ -94,7 +94,8 @@ const written: { Page } = {
 	page("anm_017_crawler", "The Crawler", "Hide", {
 		"Fast scratching under the trailer.",
 		"A low rumble.",
-	}, { "The lights do NOT flicker." }, { "Out the back and hide.", "Quick! It is fast." }),
+		-- owner 2026-10-21: restaurant rule = get off the floor (Rules/ANM-017), not "hide out back"
+	}, { "The lights do NOT flicker." }, { "Get off the floor: climb the counter.", "Quick! It is fast." }),
 
 	page("anm_006_stalker", "The Stalker", "Careful", {
 		"A tall figure across the street.",
@@ -125,12 +126,14 @@ const written: { Page } = {
 	page("anm_009_knock", "The Knock", "Careful", {
 		"Knock knock knock at the back door.",
 		"It says it is Walt.",
-	}, { "Walt never knocks." }, { "Don't open the back door.", "Just wait." }),
+	-- owner 2026-10-21 (phase 1 of the gameplay review): the rule is lock the door (TASK-592, Q-398), not "just wait"
+	}, { "Walt never knocks." }, { "Run to the back door and LOCK it.", "Before the heavy knocks!" }),
 
 	page("anm_010_hush", "The Hush", "Lights", {
 		"Fog rolls in.",
 		"Street lamps go out one by one.",
-	}, { "No bell this time." }, { "Run inside the Mart.", "Stay until the lamps come back." }),
+	-- owner 2026-10-21: the Mart left the map (DEC-307); restaurant rule = shop light off, kept off (Rules/ANM-010)
+	}, { "No bell this time." }, { "Turn OFF the shop lights.", "Keep them off until the lamps come back." }),
 }
 
 local function nightOf(key: string): number

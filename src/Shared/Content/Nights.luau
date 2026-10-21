@@ -2,9 +2,11 @@
 -- The ten nights (content-data.md §6.3; FEAT-003, FEAT-009, FEAT-022; DEC-060, DEC-073, DEC-127).
 -- Owner: game-designer (numbers) + narrative-writer (calls live in BossCalls). Not a wire enum (no Keys on the wire).
 -- Duration = real seconds of the Night phase (8 PM -> 6 AM), increasing (DEC-127). Shortened with the new run flow
--- (user request 2026-10-12, Provisional Q-207): nights now follow a day shift from Day 2, so Night 1 is ~9 min and the
--- length grows 40 s per night to ~15 min on Night 10 (was 20 -> 30 min). MinGap and MaxSimultaneous did not change:
--- the agenda still fits (N10: 12 drawn starts + the scripted 5:45 AM in a 720 s window, 60 s per slot, MinGap 25 s).
+-- (user request 2026-10-12, Provisional Q-207), then cut 60% (owner 2026-10-21, Provisional): Night 1 is 3.6 min and the
+-- length grows 16 s per night to 6 min on Night 10 (was 9 -> 15 min). Owner 2026-10-21 (gameplay review phase 1,
+-- Provisional): Events and Scares rescaled to the short nights (they had kept the 9-15 min counts: one beat every
+-- 16-20 s against the ~45-55 s aim of TASK-341) and MinGap raised; every anomaly still debuts and stays in the draw,
+-- only the repeats drop.
 -- Call / ShortCall = keys of BossCalls (Trigger NightCall for this night / the single NightRepeat call).
 -- Customers.BaseInterval = seconds between spawns at night, solo (40 N1-5, 36 N6-10; Provisional, TASK-081, FEAT-009);
 -- Max = Flow.MaxCustomersNight.
@@ -86,23 +88,25 @@ local function night(
 end
 
 const base = Table.new({
-	-- Duration 540 s + 40 s per night (2026-10-12; DEC-127 shape, was 1200..1800); MaxSimultaneous and MinGap FEAT-022;
+	-- Duration 216 s + 16 s per night (owner 2026-10-21, 60% cut of 540 + 40; DEC-127 shape, was 1200..1800); MaxSimultaneous and MinGap FEAT-022;
 	-- interval FEAT-009 (40 s / 36 s, Provisional, TASK-081). V2 columns (TASK-271): new anomaly, families,
 	-- atmosphere (ATM-1 normal, 2 pitch dark, 3 red fog, 4 rain, 5 storm, 6 white fog, 7 blood moon), events, scares.
 	-- Validate checks that Events x MinGap fits the Shift window of the night.
 	-- TASK-341 (owner 2026-10-15, Provisional; anomalies-v2-proposal.md §8): D opens on Night 1 (environment scares from
 	-- the first night), the blackout is presented on Night 3 (was 4, swapped with the turned neck), more events and
 	-- scares on Nights 1-5 and one more event on Nights 6-9 so the curve keeps rising.
-	night(1, 540, "anm_001_blank_folks", { "A", "D" }, "ATM-1", 4, 4, 1, 60, 40),
-	night(2, 580, "anm_011_shaker", { "A", "D" }, "ATM-1", 6, 4, 1, 50, 40),
-	night(3, 620, "anm_020_blackout", { "A", "C", "D" }, "ATM-2", 6, 4, 1, 50, 40),
-	night(4, 660, "anm_012_turned_neck", { "A", "C", "D" }, "ATM-4", 7, 5, 2, 45, 40),
-	night(5, 700, "anm_013_white_eyes", { "A", "C", "D" }, "ATM-6", 7, 5, 2, 40, 40),
-	night(6, 740, "anm_014_big_head", { "A", "B", "C", "D" }, "ATM-3", 8, 5, 2, 40, 36),
-	night(7, 780, "anm_017_crawler", { "A", "B", "C", "D" }, "ATM-5", 8, 5, 2, 40, 36),
-	night(8, 820, "anm_008_long_car", { "A", "B", "C", "D" }, "ATM-2", 9, 6, 3, 25, 36),
-	night(9, 860, "anm_019_roof_walker", { "A", "B", "C", "D" }, "ATM-3", 10, 6, 3, 25, 36),
-	night(10, 900, "anm_010_hush", { "A", "B", "C", "D" }, "ATM-7", 12, 6, 3, 25, 36),
+	-- Owner 2026-10-21 (Provisional, gameplay review phase 1): events 4,6,6,7,7,8,8,9,10,12 -> 2,3,4,4,5,6,6,7,8,8;
+	-- scares 4,4,4,5,5,5,5,6,6,6 -> 3,3,3,4,4,4,4,5,5,5; MinGap 30..22 -> 40..30 s
+	night(1, 216, "anm_001_blank_folks", { "A", "D" }, "ATM-1", 2, 3, 1, 40, 40),
+	night(2, 232, "anm_011_shaker", { "A", "D" }, "ATM-1", 3, 3, 1, 40, 40),
+	night(3, 248, "anm_020_blackout", { "A", "C", "D" }, "ATM-2", 4, 3, 1, 40, 40),
+	night(4, 264, "anm_012_turned_neck", { "A", "C", "D" }, "ATM-4", 4, 4, 2, 38, 40),
+	night(5, 280, "anm_013_white_eyes", { "A", "C", "D" }, "ATM-6", 5, 4, 2, 38, 40),
+	night(6, 296, "anm_014_big_head", { "A", "B", "C", "D" }, "ATM-3", 6, 4, 2, 35, 36),
+	night(7, 312, "anm_017_crawler", { "A", "B", "C", "D" }, "ATM-5", 6, 4, 2, 35, 36),
+	night(8, 328, "anm_008_long_car", { "A", "B", "C", "D" }, "ATM-2", 7, 5, 3, 32, 36),
+	night(9, 344, "anm_019_roof_walker", { "A", "B", "C", "D" }, "ATM-3", 8, 5, 3, 32, 36),
+	night(10, 360, "anm_010_hush", { "A", "B", "C", "D" }, "ATM-7", 8, 5, 3, 30, 36),
 } :: { Night })
 
 const windows: Windows = {
@@ -124,7 +128,7 @@ const grace: { [number]: number } = {
 -- Owner 2026-10-20 (Provisional, Q-415): game minute of the presented anomaly's debut (NewAnomaly) on these nights,
 -- instead of a drawn slot: right after the call presented it. Not held by the grace (the tutorial still holds it).
 const premiereAt: { [number]: number } = {
-	[1] = 1320, -- Night 1: 10:00 PM, anm_001_blank_folks
+	[1] = 1350, -- Night 1: 10:30 PM (~54 s in, after the opening), anm_001_blank_folks
 }
 
 -- Owner 2026-10-20 (Provisional, Q-415): the scripted opening of these nights, a family D key (Content.Hallucinations,
@@ -132,7 +136,7 @@ const premiereAt: { [number]: number } = {
 -- of the night start after Until (game minute) so they never land on top of it.
 export type Opening = { Key: string, Until: number }
 const opening: { [number]: Opening } = {
-	[1] = { Key = "night_opening", Until = 1250 }, -- ~45 s of Night 1 (540 s for 600 min)
+	[1] = { Key = "night_opening", Until = 1325 }, -- ~45 s of Night 1 (216 s for 600 min)
 }
 
 -- Owner 2026-10-20 (Provisional, Q-415): game minute the family D scares window opens (was Windows.Shift[1], 9 PM)

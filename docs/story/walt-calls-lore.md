@@ -100,7 +100,7 @@ Walt: simpático, curto, "Rookie", "heh". O rádio: reticências, voz fraca; mai
 | | | R | "...hello...? Is the light still on over there...?" | não | alguém do outro lado procura a luz |
 | 2 | a chave; o rádio já trabalhou aqui | W | "I've got a key, Rookie. I never knock." | sim, ANM-009 | a chave (só ele tem) |
 | | | W | "Shaky one's just hungry. Feed him plain." | sim, tremedor (estreia da ligação N2) | — |
-| | | R | "...don't open it... I never had a key either..." | sim, ANM-009 | "either": o rádio foi Rookie |
+| | | R | "...lock it... I never had a key either..." | sim, ANM-009 | "either": o rádio foi Rookie |
 | 3 | o rádio fez as mesmas regras | W | "Lights out? Breaker. Hold it. Don't let go." | sim, ANM-020 | "don't let go": ele também não solta |
 | | | W | "Keep that light on. It's all they want. Heh." | sim, ANM-020 / Hush | "they": ele sabe o que querem |
 | | | R | "...hold the breaker... I counted too, back then..." | sim, ANM-020 | "back then": outro turno, outro Rookie |
@@ -121,7 +121,7 @@ Walt: simpático, curto, "Rookie", "heh". O rádio: reticências, voz fraca; mai
 | | | R | "...keep the window shut... don't let it see you..." | sim, ANM-008 | — |
 | | | R | "...it came for Walt once... he sent me instead..." | não | primeira vez que o rádio diz "Walt" |
 | 9 | o boné; o café é a armadilha | W | "Steps up top? Don't look up. Trust me." | sim, ANM-019 | "trust me" |
-| | | W | "My old cap out back? Don't open. Next question." | sim, ANM-009 | o boné do vulto é dele |
+| | | W | "My old cap out back? Lock the door. Next question." | sim, ANM-009 | o boné do vulto é dele |
 | | | R | "...the cap... he gave it to me on my tenth morning..." | não | o boné vai para quem fica |
 | | | R | "...don't look up... and don't take his coffee..." | sim, ANM-019 | o café = aceitar o turno |
 | 10 | tudo, menos o "porquê" do late crowd | W | "Lamps going out? Shop light off. Keep it off." | sim, ANM-010 | — |
