@@ -42,7 +42,7 @@
 	stick. It is camera input, not a command, so it reads UserInputService directly (no InputController bind).
 
 	Gaze (network.md §13.5): every GAZE_INTERVAL s, only at night (RoundController.IsNight), own state `Active` and mode
-	`FirstPerson` (so never spectating or in a cutscene), the camera look is sent as `Gaze { Yaw, Pitch }` in
+	`FirstPerson` or `Prep` (so never spectating or in a cutscene), the camera look is sent as `Gaze { Yaw, Pitch }` in
 	whole degrees, skipped when unchanged for less than GAZE_HEARTBEAT s. Convention for the reader (AnomalyService):
 	  Yaw   = deg(atan2(-Look.X, -Look.Z)) mod 360   (0 = -Z, grows turning left, same as CFrame.fromOrientation)
 	  Pitch = deg(asin(Look.Y)) mod 360              (angle(1) is cyclic: a pitch > 180 is pitch - 360, i.e. down)
@@ -1611,8 +1611,11 @@ function CameraController:SendGaze(now: number)
 		return
 	end
 	self.NextGaze = now + GAZE_INTERVAL
+	-- owner 2026-10-21: the cooking focus ("Prep") sends its look too - the player still has eyes while cooking
+	-- (the "behind you" sounds need to know the back is to the window)
+	const mode = Vide.untrack(self.Mode)
 	if
-		Vide.untrack(self.Mode) ~= "FirstPerson"
+		(mode ~= "FirstPerson" and mode ~= "Prep")
 		or not Vide.untrack(self.Dependencies.RoundController.IsNight)
 		or Vide.untrack(self.Dependencies.VitalController.LocalState) ~= "Active"
 	then

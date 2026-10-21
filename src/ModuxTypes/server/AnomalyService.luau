@@ -133,10 +133,11 @@ export type Public = {
 	CrewSize: (self: Public) -> number,
 	CrewEvents: (self: Public) -> number,
 	RunningCount: (self: Public) -> number,
-	BeatDueIn: (self: Public) -> number,
+	BeatDueIn: (self: Public, future: boolean?) -> number,
 	BeatClear: (self: Public, kind: string) -> boolean,
 	BeatBegin: (self: Public, key: string, hold: number?) -> (),
 	BeatEnd: (self: Public, key: string) -> (),
+	BehindWhy: (self: Public) -> string?,
 	BehindCalm: (self: Public) -> boolean,
 	BehindTargets: (self: Public) -> { Player },
 	BehindScare: (self: Public, player: Player, key: string) -> number,
@@ -165,7 +166,8 @@ export type Public = {
 	DevAgenda: (self: Public) -> string,
 	DevPressure: (self: Public, nowToo: boolean) -> string,
 	DevTrip: (self: Public, nowToo: boolean) -> string,
-	DevBehind: (self: Public, nowToo: boolean) -> string,
+	DevBehindPosture: (self: Public, player: Player) -> string,
+	DevBehind: (self: Public, arg: string?, caller: Player?) -> string,
 	DevBeats: (self: Public) -> string,
 }
 

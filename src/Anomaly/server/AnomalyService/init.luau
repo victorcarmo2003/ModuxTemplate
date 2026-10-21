@@ -1277,8 +1277,9 @@ function AnomalyService:RunningCount(): number
 	return count
 end
 
--- Real seconds until the next regular entry of the agenda is due (0 when one is overdue, math.huge if none)
-function AnomalyService:BeatDueIn(): number
+-- Real seconds until the next regular entry of the agenda is due (0 when one is overdue, math.huge if none);
+-- future = only entries not due yet (an overdue one is waiting for Admit or the director)
+function AnomalyService:BeatDueIn(future: boolean?): number
 	const nights = Content.Nights.List
 	const night = nights[math.clamp(self.Shift.Night, 1, #nights)]
 	const phase = Content.Shift.ByKey[NIGHT_PHASE]
@@ -1289,7 +1290,7 @@ function AnomalyService:BeatDueIn(): number
 	const minutes = self.Dependencies.RoundService:Minutes()
 	local soonest = math.huge
 	for _, due in self.Queue do
-		if not due.Done and not due.Entry.Scripted then
+		if not due.Done and not due.Entry.Scripted and not (future and due.Entry.At <= minutes) then
 			soonest = math.min(soonest, math.max(due.Entry.At - minutes, 0) * night.Duration / span)
 		end
 	end
@@ -1324,20 +1325,33 @@ end
 
 -- "Behind you" host (Behind.luau, Content.Nights.Behind) -------------------------------------------------------------
 
--- Nothing asks for action, the last beat is Calm s old, no regular anomaly due soon, the power on
-function AnomalyService:BehindCalm(): boolean
+-- Why the night is not calm for a "behind you" sound now (nil = calm): an anomaly running, a beat active, the last
+-- beat younger than Calm s, a regular anomaly due within Beats.Reserve (an overdue one held back by Admit or the
+-- director does not count: it waits for the gap anyway), the power out
+function AnomalyService:BehindWhy(): string?
 	const t = now()
 	const director = self.Director
-	if self:RunningCount() > 0 or Director.count(director, t) > 0 then
-		return false
+	if self:RunningCount() > 0 then
+		return "anomaly running"
+	end
+	if Director.count(director, t) > 0 then
+		return "beat active (chore / trip)"
 	end
 	if director.LastAt > 0 and t - director.LastAt < Content.Nights.Behind.Calm then
-		return false
+		return string.format("last beat %.0fs ago (calm %ds)", t - director.LastAt, Content.Nights.Behind.Calm)
 	end
-	if self:BeatDueIn() < Content.Nights.Beats.Reserve then
-		return false
+	const due = self:BeatDueIn(true)
+	if due < Content.Nights.Beats.Reserve then
+		return string.format("anomaly due in %.0fs", due)
 	end
-	return not self.Dependencies.LightService:IsBlackout()
+	if self.Dependencies.LightService:IsBlackout() then
+		return "power out"
+	end
+	return nil
+end
+
+function AnomalyService:BehindCalm(): boolean
+	return self:BehindWhy() == nil
 end
 
 -- Active players near the window's counter spot, looking more than Behind.Facing degrees away from it (fresh Gaze, not
@@ -1789,19 +1803,57 @@ function AnomalyService:DevTrip(nowToo: boolean): string
 	return Trip.describe(self.Trip, t)
 end
 
--- "Behind you": tonight's count, the next try, calm now, who faces away. now = true: the next one is due at once
-function AnomalyService:DevBehind(nowToo: boolean): string
+-- One player's "behind you" posture for dev: distance to the window spot, gaze age, angle away from it
+function AnomalyService:DevBehindPosture(player: Player): string
+	const rules = Content.Nights.Behind
+	const point = MapIndex.FindPoint(rules.Point)
+	const character = player.Character
+	const root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+	if point == nil or root == nil or not root:IsA("BasePart") then
+		return `{player.Name}: no {rules.Point} point or no character`
+	end
+	const offset = root.Position - point.Position
+	const distance = Vector2.new(offset.X, offset.Z).Magnitude
+	const gaze = self.Gazes[player]
+	if gaze == nil or now() - gaze.At > GAZE_STALE then
+		return string.format("%s: %.0f studs (near %d), no fresh gaze (first person / cooking only)", player.Name, distance, rules.Near)
+	end
+	const look = Vision.Direction(gaze.Yaw, gaze.Pitch)
+	const toward = point.Position - root.Position
+	const flatLook, flatToward = Vector3.new(look.X, 0, look.Z), Vector3.new(toward.X, 0, toward.Z)
+	local angle = 0
+	if flatLook.Magnitude > 1e-3 and flatToward.Magnitude > 1e-3 then
+		angle = math.deg(math.acos(math.clamp(flatLook.Unit:Dot(flatToward.Unit), -1, 1)))
+	end
+	return string.format("%s: %.0f studs (near %d), %.0f deg from the window (needs %d)", player.Name, distance, rules.Near, angle, rules.Facing)
+end
+
+-- "Behind you": tonight's count, the next try, why it is busy, each player's posture. arg "now" = the next one is due
+-- at once; "steps" | "creak" | "tap" = play that one on the caller right now (no calm check; the client still needs
+-- the back to the window)
+function AnomalyService:DevBehind(arg: string?, caller: Player?): string
 	self:DevCheck()
 	const t = now()
-	if nowToo then
+	if arg ~= nil and arg ~= "" and arg ~= "now" then
+		const key = `behind_{arg}`
+		if table.find(Content.Nights.Behind.Keys, key) == nil then
+			error(`unknown sound '{arg}': steps, creak or tap`, 0)
+		end
+		if caller == nil then
+			error("run it from the chat (it plays on the caller)", 0)
+		end
+		const sent = self:BehindScare(caller, key)
+		return `{key} sent to {caller.Name} ({sent} client); turn your back to the window to hear it`
+	end
+	if arg == "now" then
 		Behind.hurry(self.Behind, t)
 	end
-	const names: { string } = {}
-	for _, player in self:BehindTargets() do
-		table.insert(names, player.Name)
+	const why = self:BehindWhy()
+	const lines: { string } = { `{Behind.describe(self.Behind, t)}; {if why == nil then "calm" else `busy: {why}`}` }
+	for _, player in self:ActivePlayers() do
+		table.insert(lines, self:DevBehindPosture(player))
 	end
-	const calm = if self:BehindCalm() then "calm" else "busy"
-	return `{Behind.describe(self.Behind, t)}; {calm}; facing away: {if #names > 0 then table.concat(names, ", ") else "nobody"}`
+	return table.concat(lines, "\n")
 end
 
 -- Beat director: last beat, what counts as active now, the next regular anomaly

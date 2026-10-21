@@ -185,7 +185,7 @@ const behind: Behind = {
 	Every = { 50, 100 }, -- s of the Night phase before the first one, and between two
 	Calm = 12,
 	Point = "Q1",
-	Near = 22,
+	Near = 36, -- the kitchen stations are 18-33 studs from Q1 (measured in Studio 2026-10-21)
 	Facing = 110,
 	Keys = { "behind_steps", "behind_creak", "behind_tap" },
 }
