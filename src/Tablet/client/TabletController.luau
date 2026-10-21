@@ -383,9 +383,16 @@ const OCCLUDER_POINTS: { Vector3 } = {
 }
 function TabletController:HideBetween(eye: Vector3, rig: Model, head: BasePart)
 	const ignore: { Instance } = { rig }
+	-- owner 2026-10-21 (print): my own body stands between the lens and the customer - it hides whole on my screen
 	const character = Players.LocalPlayer.Character
 	if character ~= nil then
 		table.insert(ignore, character)
+		for _, part in character:GetDescendants() do
+			if part:IsA("BasePart") and self.Hidden[part] == nil then
+				self.Hidden[part] = part.LocalTransparencyModifier
+				part.LocalTransparencyModifier = 1
+			end
+		end
 	end
 	const params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
