@@ -105,7 +105,10 @@ const build: Build = {
 		Reach = 0.15,
 		Spill = 0.4,
 		MinPoints = 6,
-		MaxPoints = 64,
+		-- owner 2026-10-21 ("o condimento ainda falha nessa região", the end of the sausage): at STEP 0.015 a slow stroke of the
+		-- whole S takes ~158 points, so 64 stopped the line before the end without a word. Client only: the wire is
+		-- resampled to HotDogVisual.Sauce.Max (24) anyway
+		MaxPoints = 240,
 	},
 	DropSlack = 0.15,
 }
