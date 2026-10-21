@@ -12,8 +12,8 @@
 	Toasts for those Notices are HudController's job.
 
 	Where it opens: the Lobby (FEAT-001) and, in wave 1, the Run in dev mode (no lobby yet, TASK-017 Provisional).
-	Elsewhere no binding and no screen. Toggle: C (keyboard), ButtonY (gamepad), "Crew" touch button; close also
-	with ButtonB / the X button. While open the input context is "Menu" (prompts stop).
+	Elsewhere no binding and no screen. No key opens it any more (owner 2026-10-20: C / ButtonY removed, they
+	opened it mid-shift); close also with ButtonB / the X button. While open the input context is "Menu" (prompts stop).
 ]]
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -29,7 +29,6 @@ local CardState = require(StarterPlayer.StarterPlayerScripts.client.Interface.Co
 
 export type Action = "Buy" | "Select"
 
-const TOGGLE = "CrewToggle"
 const CLOSE = "CrewClose"
 const PENDING_TIMEOUT = 3 -- s without an answer: the button comes back (the server may have dropped it, 2/s)
 const PREVIEW_OUTFIT = "crew"
@@ -206,15 +205,8 @@ end
 
 function ClassController:Bind()
 	const input = self.Dependencies.InputController
-	input
-		:Bind({
-			Name = TOGGLE,
-			Key = Enum.KeyCode.C,
-			Keys = { Enum.KeyCode.ButtonY },
-		})
-		.OnPress(function()
-			self:Toggle()
-		end)
+	-- owner 2026-10-20: C (and ButtonY) no longer open this old dev Crew screen in the Run, mid-shift; the lobby has its own
+	-- class screen on C (LobbyController). Only ClassController:Toggle / SetOpen open it now.
 	input
 		:Bind({
 			Name = CLOSE,

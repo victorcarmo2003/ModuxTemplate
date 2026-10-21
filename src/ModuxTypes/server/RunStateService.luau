@@ -48,7 +48,7 @@ export type Public = {
 	SpendChance: (self: Public) -> boolean,
 	SetEndless: (self: Public, on: boolean) -> (),
 	ResetDev: (self: Public) -> boolean,
-	Notify: (self: Public, target: Target, key: string, value: number?) -> (),
+	Notify: (self: Public, target: Target, key: string, value: number?, by: Player?) -> (),
 	RegisterSnapshot: (self: Public, name: string, capture: Snapshots.Capture, restore: Snapshots.Restore) -> (),
 	Capture: (self: Public) -> Snapshots.Snapshot,
 	Restore: (self: Public, mode: RestoreMode) -> boolean,

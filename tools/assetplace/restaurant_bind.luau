@@ -2117,7 +2117,7 @@ local function doorModel(folderInst, name, x0, x1, zc, angle, mapId, lockId, hin
 	m:SetAttribute("DoorHinge", if slide then nil elseif hingeEast then "Left" else "Right")
 	m:SetAttribute("DoorAngle", if slide then nil else angle)
 	m:SetAttribute("DoorSlide", slide)
-	m:SetAttribute("DoorRadius", 7)
+	m:SetAttribute("DoorRadius", 3) -- owner 2026-10-19: was 7, opens only when the player is almost touching it
 	CS:AddTag(m, "AutoDoor")
 	return m
 end

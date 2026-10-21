@@ -495,7 +495,8 @@ return function(): Rings
 				entry.Shown = near
 				entry.Folder.Parent = if near then root else nil
 			end
-			const active = entry.Inside or entry.Occupied
+			-- owner 2026-10-20: ZoneVfx.IdleGlow keeps every zone lit (the rising rings and squares always show)
+			const active = VFX.IdleGlow or entry.Inside or entry.Occupied
 			if active ~= entry.Lit then
 				setLit(entry, active)
 			end

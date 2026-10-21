@@ -81,6 +81,10 @@ export type Stings = {
 export type ShiftPool = {
 	Day: { string }, -- keys of Sounds (Group Music, Looped = false)
 	Night: { string },
+	-- owner 2026-10-19 (Provisional): Night 1 only, the night tracks play back to back the whole night, low (immersion
+	-- for a first-timer); every other night keeps Night (silence)
+	FirstNight: { string },
+	FirstNightVolume: number, -- scale of the row Volume (0..1)
 }
 
 export type ShiftAmbient = {
@@ -160,8 +164,6 @@ const UPLOADED: { [string]: string } = {
 	cust_happy = "rbxassetid://78566355879660",
 	order_take = "rbxassetid://5646714647",
 	cust_leave = "rbxassetid://136969027013552",
-	thief_open = "rbxassetid://9098369357",
-	thief_caught = "rbxassetid://9066673412",
 	walker_step = "rbxassetid://132709106261511",
 	refuse = "rbxassetid://87519554692663",
 	error = "rbxassetid://87519554692663",
@@ -311,8 +313,6 @@ const base = Table.new({
 	sfx("smoke_poof"),
 	sfx("splash"),
 	sfx("whisper"),
-	sfx("thief_open"),
-	sfx("thief_caught"),
 	sfx("faint"),
 	sfx("revive"),
 	-- TASK-079 / TASK-119 event keys (ids empty until upload, Q-168)
@@ -416,6 +416,8 @@ const rules: SoundRules = {
 		Day = { "music_day_sunny", "music_day_small" },
 		-- owner 2026-10-18: no soundtrack at night (the street ambience stays; the horror score still plays its stages)
 		Night = {},
+		FirstNight = { "music_night_town", "music_night_fall" },
+		FirstNightVolume = 0.45,
 	},
 	ShiftMusicPhase = "Prep", -- 7 AM / 7 PM: start of every shift (Shift.luau)
 	ShiftMusicFresh = 5, -- Provisional (frontend-coder)

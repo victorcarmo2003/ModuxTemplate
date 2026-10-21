@@ -77,6 +77,7 @@ export type Public = {
 	Rescale: (self: Public, camera: Camera?) -> (),
 	WatchViewport: (self: Public) -> (),
 	Mount: (self: Public, playerGui: Instance) -> (),
+	PrepareFirstNight: (self: Public) -> (),
 }
 
 return {}

@@ -67,6 +67,9 @@ export type Grill = {
 	BurnAfter: number, -- s after Ready (UPG-016 raises it)
 	FlipFrom: number, -- fraction of the cook time: the flip window opens
 	FlipTo: number,
+	-- DEC-311: an unflipped sausage stops at this fraction of the cook time until it is flipped (the flip mini-game of the
+	-- cooking focus); flipped, it resumes from there. Provisional
+	HoldAt: number,
 	PickupPerfect: number, -- s after Ready: collected within = Perfect
 	PickupGood: number,
 }
@@ -96,6 +99,9 @@ export type Flow = {
 
 export type Drive = {
 	Enabled: boolean, -- wave R3; false = no car ever
+	-- DT-PC tablet + DT-WIN "Hand Out" anchors (TASK-574). Owner 2026-10-20 (Provisional): false = the order is taken and
+	-- the food served on the prompt of the car at the window
+	WindowAnchors: boolean,
 	UnlockNight: number,
 	Lanes: number, -- DriveCars records 1..Lanes (1 = at the window)
 	ShareByParty: ByParty, -- fraction of the spawn attempts that become a car
@@ -153,8 +159,22 @@ export type Binding = {
 	DriveWindow: string, -- anchor of drive_serve
 }
 
+-- Pickup arc (owner 2026-10-20, Provisional): the customers whose order was taken wait in an arc outside, around the pickup
+-- and a bit to one side, instead of the PU-2..n line. "Hand Over" puts the plate on the PICKUP counter (the sale is decided
+-- then, as before); the customer of that plate walks from the arc to the counter, takes it and goes (table / takeaway).
+export type PickupArc = {
+	Enabled: boolean, -- false = the PU-k line as before
+	Radius: number, -- studs from PU-1 to the arc
+	Spread: number, -- degrees each side of the outward direction
+	Shift: number, -- studs along the counter (+ = towards +X of the map) the arc centre moves from PU-1
+	Slots: number, -- plates the counter shows at once (Gap apart)
+	Gap: number, -- studs between two plates on the counter
+	CollectTimeout: number, -- s the walk arc -> counter may take before the plate goes into its hands anyway
+}
+
 export type Restaurant = {
 	Rules: Rules,
+	PickupArc: PickupArc,
 	-- MapIds of the AutoDoor Models opened by hand (prompt) instead of by proximity (owner 2026-10-18; RestaurantDoorService)
 	ManualDoors: { string },
 	-- world boxes that also count as "inside" besides the kitchen zone LZ-1 (owner 2026-10-18: the stock room / pantry;
@@ -174,6 +194,16 @@ export type Restaurant = {
 }
 
 const restaurant: Restaurant = {
+	-- owner 2026-10-20 (Provisional): numbers judged in Play; Shift away from the tablet queue (it runs towards +X)
+	PickupArc = {
+		Enabled = true,
+		Radius = 5,
+		Spread = 70,
+		Shift = -3,
+		Slots = 3,
+		Gap = 1.2,
+		CollectTimeout = 8,
+	},
 	ManualDoors = { "DOOR-B" },
 	SafeBoxes = {
 		{ Min = Vector3.new(-48.3, -1, -11.2), Max = Vector3.new(-25.5, 12, -3.4) }, -- pantry / stock room
@@ -222,7 +252,7 @@ const restaurant: Restaurant = {
 		GiveUpRefund = 1,
 	},
 	Stacks = { Bun = 3, Sausage = 3, Plates = 2, Boxes = 2 },
-	Grill = { BurnAfter = 10, FlipFrom = 0.4, FlipTo = 0.6, PickupPerfect = 3, PickupGood = 7 },
+	Grill = { BurnAfter = 10, FlipFrom = 0.4, FlipTo = 0.6, HoldAt = 0.5, PickupPerfect = 3, PickupGood = 7 },
 	Bun = { CutHold = 0.6 },
 	Tables = { Count = 4, GroupsPerTable = 2, EatTime = 12, EatJitter = 2, TableTip = 1, TrayFade = 3, SitHeadroom = 2 },
 	Flow = {
@@ -236,6 +266,7 @@ const restaurant: Restaurant = {
 	},
 	Drive = {
 		Enabled = true, -- TASK-574 (2026-10-20): DriveThruService; false = no car ever
+		WindowAnchors = false, -- owner 2026-10-20: no drive-thru tablet, the prompt is on the car
 		UnlockNight = 2,
 		Lanes = 3, -- 1 at the window + up to 2 waiting (QueueByParty)
 		ShareByParty = { 0.15, 0.20, 0.20, 0.25 },

@@ -322,7 +322,7 @@ O apagão virou a referência ("efeito de cinema"). As outras anomalias precisam
 ### 6.1 ANM-019 Sombra no teto — "não olhe para cima" (TASK-484, Provisório)
 
 Regra (servidor, `Rules/ANM-019`, T10): enquanto ela anda, o servidor lê o `Gaze` de cada jogador ativo (pitch da câmera,
-10 Hz). Câmera **acima de 35°** por **0,6 s seguidos** = pegou (olhada rápida < ~0,5 s é perdoada; sem `Gaze` fresco —
+10 Hz). Câmera **acima de 35°** por **1,2 s seguidos** = pegou (era 0,6 s; Q-396: a contagem precisa dar para ler; olhada mais curta é perdoada; sem `Gaze` fresco —
 terceira pessoa, câmeras de segurança, lag — nunca conta). O 1º segundo da caminhada também é perdoado (o reflexo de olhar
 no baque). Quem é pego paga **−RuleBroken** de sanidade (`ctx.Fail`, como toda regra quebrada; sem desmaio por si só) e a
 caminhada acaba ali. Ninguém olhou até o fim = **Resolved**. Sem ator, sem HideZone: funciona no trailer e no restaurante
@@ -332,10 +332,11 @@ estreia da noite 9; nunca junto com o apagão (`ExclusiveWith`).
 | Fase (s) | Todos | Só quem olhou (Caught) | Os outros (Safe) |
 |---|---|---|---|
 | Signal 0–3 | **baque** numa ponta do teto (poeira, lâmpadas balançam, solavanco), barras de cinema, whispers "DON'T LOOK UP / KEEP YOUR HEAD DOWN / IT'S ON THE ROOF", coração 70→90, respiração; quem estava nas câmeras volta para a cabeça | — | — |
-| Active 0–7 | passos pesados atravessando o teto até **em cima do jogador**, poeira a cada passo, lâmpadas perto balançando, tranco leve da câmera quando perto; whispers sobem; coração 90→140; bordas escurecem; **empurrão suave para baixo** se a câmera passa de 20° (3° por vez, nunca trava) | — | — |
+| Active 0–7 | passos pesados atravessando o teto até **em cima do jogador**, poeira a cada passo, **mancha escura molhada atravessando o forro e seguindo os passos, pegadas de sangue vazando atrás, gotas vermelhas pingando no chão (as poças ficam), rangidos** (Q-396; a mancha já aparece no Signal), lâmpadas perto balançando, tranco leve da câmera quando perto; whispers sobem; coração 90→140; bordas escurecem; **empurrão suave para baixo** se a câmera passa de 20° (3° por vez, nunca trava) | — | — |
 | Active 7–9,5 | **para em cima**: silêncio das palavras, coração 150–160, respiração, depois uma rajada de DON'T LOOK UP em massa | — | — |
 | Active 9,5–16 | segue até a outra ponta, palavras e coração baixando | — | — |
-| Failed (alguém olhou) | barras saem aos 3,5 s | a sombra **cai de cabeça para baixo na frente da janela** para onde ele olha, pendura com olhos brancos, tranco + FOV + puxão leve para ela, depois o rosto (`Kit/Jumpscare`, 0,6 s) e ela é puxada de volta (~1,4 s, `Effects/ANM-019`) | baque dela pulando do teto, whoosh, passos correndo e sumindo |
+| Olhando (Active ≥ 1 s, câmera > 35°) | — | **na hora, só no client dele (Q-396):** a mancha desliza para onde ele olha e **abre olhos brancos**, chiado, respiração; em ~0,95 s sobem borrão, vermelho, cor drenada, coração acelerando e tremor; as gotas aceleram. Baixou o olhar antes de 1,2 s: olhos fecham, rangido, ela volta para a caminhada, nada pago | — |
+| Failed (alguém olhou) | barras saem aos 3,5 s | a sombra **cai de cabeça para baixo do teto, de onde a mancha estava (onde ele olhou), na frente da cara**, pendura com olhos brancos, tranco + FOV + puxão leve para ela, depois o rosto (`Kit/Jumpscare`, 0,6 s) e ela é puxada de volta (~1,4 s, `Effects/ANM-019`) | baque dela pulando do teto, whoosh, passos correndo e sumindo |
 | Resolved (ninguém olhou) | baque dela saltando da outra ponta, bordas e barras voltam | — | — |
 
 Kit novo (`Scene/Kits`): passos `Roof` (Walk / Leave / Thud ao longo de uma linha pela posição do jogador; som acima do
@@ -433,3 +434,111 @@ pico → respiro, campo `Curve`) e a TASK-343 (`FeaturedScares`) estão **Penden
 | `Rules/ANM-xxx` | `Params.Echo` com os tempos curtos (`OmenFor`, aviso) — o verbo, a janela de resposta e a penalidade não mudam |
 | `Content.HorrorScenes` | passo com `Echo = true` entra na versão curta; `Where` (§3.0) |
 | TASK-342 / 343 | a assinatura é a âncora do pico da curva; o "susto D de prenúncio antes de cada C/B" da 342 vira, na assinatura, o prenúncio fixo da tabela; `FeaturedScares` (343) recebe por padrão o prenúncio da assinatura |
+
+---
+
+## 11. Régua do apagão em todas as anomalias (pedido do dono, 2026-10-19, Provisório — Q-397)
+
+Fala do dono: o apagão é o evento de que ele mais gostou; **todas** as anomalias devem subir para o mesmo nível de conteúdo,
+"bem completinho, com muitos detalhes". Ele citou do apagão: a **sombra debaixo da porta**, o monstro **só visível pelas
+câmeras**, ter que **ir lá fora** (disjuntor), o **efeito do sino**, o **FOV subindo e depois descendo**, as **cores se
+perdendo**, as **luzes apagando**, a **luz branquinha ao redor do jogador** que ilumina o que está perto.
+
+### 11.1 Os ingredientes do apagão (a régua)
+
+Toda anomalia do restaurante precisa ter **todos** os itens ● e pelo menos **um** dos ○. Nenhuma regra muda: verbo, prazo e
+penalidade continuam os de `Rules/ANM-xxx`; só a apresentação sobe.
+
+| # | Ingrediente | No apagão | Peça |
+|---|---|---|---|
+| R1 ● | **Gatilho-assinatura**: um som marcante + um pulso de câmera no primeiro segundo | estalo do quadro + sino, tranco, FOV −3° e volta | Sound, Shake, Fov |
+| R2 ● | **O mundo muda de verdade** (não só a tela): luz, cor e som ambiente | luzes apagam, cor drena (Grade Cold 0→0,6), zumbido morre | Lights, Grade, Silence, `Prop`, `Glass` |
+| R3 ● | **Presença indireta do monstro**: sente antes de ver | passos lá fora, sombra na fresta, vulto no canto do olho | Shadow, Roof, Actor, `Silhouette` |
+| R4 ● | **Camada das câmeras**: as câmeras de segurança mostram algo que o olho não vê | o Walker só existe nas câmeras | Actor `Seen = "Cameras"`, `Seen` em `Pose`/`Prop`/`Silhouette` |
+| R5 ● | **Pista diegética da saída**: o cenário aponta o que fazer | brilho mostarda + Highlight no disjuntor, palavras com dica | Text, Whispers, `Lantern` Beacon, Arrow3D |
+| R6 ● | **Tarefa sob nervos que mexe o corpo** (ir, segurar, não olhar, recusar, fechar) | ir aos fundos no escuro e segurar E | regra existente |
+| R7 ● | **Escalada em camadas**: palavras em rampa, coração, vinheta, cor, FOV que "respira" | HIDE 0,4→3, coração 62→150, vinheta 0→0,5 | Whispers, Heartbeat, Vignette, Fov |
+| R8 ● | **Silêncio de 1–2 s** antes do pico | coração para, só o violino | Silence, Heartbeat 0 |
+| R9 ● | **Clímax físico no mundo** + Caught = rosto ≤ 1 s, Red, Blur | maçaneta, porta força, trinco | Door, `Glass`, `Prop`, Kit/Jumpscare |
+| R10 ● | **Alívio em cascata**: luz, cor e som voltam aos degraus, respiração | `lamps_cascade`, Grade 0,6→0, `breath_held` | Lights Cascade, Grade, Sound |
+| R11 ○ | **Consolo local do jogador**: algo que ajuda e conforta só ele | a luz branca de 5,6 studs ao redor dele | `Lantern` |
+| R12 ○ | **Fora** (§3.0): versão para quem está fora da loja | — (falta no apagão também) | `Where` |
+
+`Peça` em `código` = passo novo (§11.3). As demais já existem em `Scene/Kits`.
+
+### 11.2 Auditoria (o que cada anomalia tem hoje × o que ganha)
+
+Legenda: ✔ tem · ◐ fraco/genérico · ✘ falta. **Assinatura nova** = o "detalhe de apagão" próprio de cada uma, o equivalente da
+sombra debaixo da porta.
+
+| Anomalia | R1 | R2 | R3 | R4 | R5 | R7 | R8 | R9 | R10 | R11/12 | Assinatura nova (o que entra) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| **020 Apagão** | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔/✘ | referência; ganha Fora (vulto na janela da rua) e a luz branca vira a peça `Lantern` |
+| 001 Sem rosto | ◐ | ✘ | ✘ | ✘ | ◐ | ◐ | ✘ | ✘ | ◐ | ✘ | lâmpada do tablet pisca 2×; ele **levanta o rosto liso** (Pose Lift); **nas câmeras ele tem rosto — e sorri para a câmera**; silêncio com a cabeça inclinada; persiana desce e **um dedo bate do outro lado** — **TASK-587 (Em QA):** `Scenes/anm_001_blank_folks`: lâmpada pisca 2× (`Lights` Flicker), `Pose` Lift do rosto liso, copos tremendo (`Prop` Shake), silêncio com `Pose` Tilt, clímax com a cabeça subindo de golpe; nas câmeras ele encara a lente (`Pose` Turn/Tilt `Seen = "Cameras"`; o rosto com sorriso nas câmeras ficou de fora: a face do variant ganha da expressão no `RigController`); batida de dedo na persiana no Resolved; Fora com olhos na rua |
+| 005 Raincoat | ◐ | ✘ | ✘ | ✘ | ◐ | ◐ | ✘ | ✘ | ◐ | ✘ | **poça que cresce** dos pés dela até o balcão (o prazo visível); goteira que **para** no silêncio; ela ergue o capuz (só a boca); **nas câmeras ela está seca**; no erro trovão perto e a água corre até quem errou — **TASK-587 (Em QA):** `Scenes/anm_005_raincoat_lady`: `Prop` Puddle cresce de Q1 até a borda do balcão em 52 s (`Seen = "Eyes"`: nas câmeras ela está seca e olha a lente), goteira gerada a cada 2,4 s que para no silêncio, capuz sobe (`Pose` Lift), **ela encara o jogador sem parar** desde a chegada até ir embora (`Pose` Turn sem prazo, pedido do dono 2026-10-19), trovão e luzes; no erro a água corre até quem errou (`Prop` Puddle Flood `To = "Player"`); Fora: olhos dela na pista do drive-thru |
+| 011 Treme | ◐ | ✘ | ✘ | ✘ | ◐ | ◐ | ✘ | ✘ | ◐ | ✘ | **o ambiente treme** (copos, garrafas, luminária balançando), micro-tremor da câmera perto; **nas câmeras ele está parado, olhando para cima**; tudo para de uma vez; **pancada na persiana** depois de recusar — **TASK-587 (Em QA):** `Scenes/anm_011_shaker`: `Prop` Shake nos copos/garrafas (`Seen = "Eyes"`), `Prop` Sway na luminária, chocalho gerado acelerando, micro-tremor da câmera (`Shake` Step); para tudo aos 8 s, um passo no telhado, o balcão inteiro pula; nas câmeras ele olha para cima (`Pose` Lift `Cameras`); pancada na persiana no Resolved; Fora: as mesas perto dele tremem |
+| 013 Olhos brancos | ◐ | ✘ | ✘ | ✘ | ◐ | ◐ | ✘ | ✘ | ◐ | ✘ | luz do tablet cai a 30 % e **os olhos dele iluminam o balcão** (o inverso da lanterna); **todos os clientes viram juntos** para o jogador; pares de olhos nas vitrines um a um; **nas câmeras há olhos em todas as janelas** — **TASK-587 (Em QA):** `Scenes/anm_013_white_eyes`: zumbido cai, **todos os clientes viram juntos** (`Pose` Turn Value 1) com estalo, olhos um a um nas aberturas de fora (janela de serviço, parada do drive-thru, porta da despensa, parada da van: `Actor`/`Lantern` Eyes; `TBL-*` são nós, não MapPoints), silêncio com **todas as luzes apagadas e só os olhos dele iluminando o balcão** (`Lights` Off + `Lantern` Eyes em Q1, `Cascade` 2,3 s depois); nas câmeras os olhos ficam em todas as janelas; olhos entre as lâminas no Resolved. A luz do tablet a 30 % precisa de `Lights` por Point (não existe; ficou o apagão curto) |
+| 014 Cabeça errada | ◐ | ✘ | ✘ | ✘ | ◐ | ◐ | ✘ | ✘ | ◐ | ✘ | **a cabeça cresce aos degraus só quando ninguém olha** (rangido de couro, FOV −1 por degrau); encosta na luminária, que balança; **nas câmeras ela já bate no teto** — **TASK-587 (Em QA):** `Scenes/anm_014_big_head`: `Pose` Scale em degraus (×1,12/1,24/1,36 sobre o ×1,9 do modificador, depois ×1,5) que **só cresce quando sai da vista** do jogador, com rangido; FOV −1 por degrau; bate na luminária (`Prop` Sway + Flicker); silêncio com `Pose` Tilt; nas câmeras ×1,7 a mais (bate no teto); Fora: a cabeça vira para ele |
+| 015 Flutuando | ◐ | ✘ | ✘ | ✘ | ◐ | ◐ | ✘ | ✘ | ◐ | ✘ | guardanapos e copos perto **sobem devagar**; **a sombra dele fica parada no chão**; zumbido que sobe e corta; **tudo cai junto** (baque + tranco); nas câmeras ele está no teto — **TASK-587 (Em QA):** `Scenes/anm_015_floater`: `Pose` Float +0,6, guardanapos e copos sobem girando (`Prop` Float), zumbido sobe; nas câmeras ele está no teto olhando para baixo; zumbido corta, **tudo cai junto** (`Prop` Drop + baque + tranco) e ele recomeça a subir devagar. A sombra parada no chão ficou de fora (sem peça para isso) |
+| 016 Não pisca | ◐ | ✘ | ✘ | ✘ | ◐ | ◐ | ✘ | ✘ | ◐ | ✘ | relógio **tiquetaqueando cada vez mais devagar até parar**; os outros clientes piscam juntos, ele não; **ele pisca uma vez e todas as luzes piscam com ele**; nas câmeras ele encara a câmera — **TASK-587 (Em QA):** `Scenes/anm_016_starer`: relógio tiquetaqueando no balcão que para aos 9 s, os outros clientes **piscam juntos a cada 3 s** (`Pose` Blink Value 1), ele não; ele pisca uma vez e as luzes piscam com ele; nas câmeras a sala inteira encara a lente (`Pose` Turn Value 1 `Cameras`). O tique que desacelera espera `clock_tick` (SFX-255) |
+| 004 Cópia | ◐ | ✘ | ◐ | ✘ | ✔ | ◐ | ✘ | ✘ | ◐ | ✘ | luz pisca quando a cópia chega; ela **imita o jogador com atraso** (vira a cabeça quando ele vira); **nas câmeras só existe um deles**; no erro o trinco da frente tranca sozinho |
+| 012 Pescoço | ✔ | ◐ | ◐ | ✘ | ✔ | ◐ | ✔ | ✘ | ✔ | ✘ | **a sombra dela no chão tem a cabeça do lado certo** (contradiz o corpo); cada estalo **apaga a lâmpada mais perto**; nas câmeras a cabeça gira devagar; no erro a cabeça completa a volta |
+| 006 Stalker | ✔ | ◐ | ✔ | ✘ | ✔ | ✔ | ✔ | ◐ | ✔ | ✘ | **vidro embaça** na altura do rosto; batida de dedo; **marca da palma escorregando**; Blur a cada passo dele; **nas câmeras ele está mais perto do que parece** — **TASK-588 (Em QA):** feito em `Scenes/anm_006_stalker` (Fog + Knock na janela ao chegar; Hand e Bang só se embaçado; o stalker parado no vidro nas câmeras desde S+2; Fora com passos atrás). O pulso de Blur "a cada passo" não entrou: os passos dependem do olhar, não do relógio |
+| 008 Carro | ✔ | ◐ | ✔ | ✘ | ✔ | ✔ | ✔ | ◐ | ✔ | ✘ | **farol varre o teto** pela janela do drive; freada + motor desliga + 2 s de nada; **farol alto cega** (bloom + Blur); persiana batendo cada vez mais forte; **nas câmeras o carro não tem motorista** — **TASK-588 (Em QA):** `Scenes/anm_008_long_car` (Glare Sweep na arrancada e na saída, Knock + Rattle na espera, Flash no farol alto só para quem olha a janela, Rattle crescente); motorista visível a olho nu e ausente nas câmeras em Effects/ANM-008 |
+| 009 Batida | ✔ | ✔ | ✔ | ✘ | ✔ | ✔ | ✔ | ✔ | ✔ | ✘ | já no padrão; ganha **nas câmeras quem bate não é o Walt** (silhueta alta demais) e Fora — **TASK-588 (Em QA):** `Scenes/anm_009_knock`; o batedor das câmeras (Effects/ANM-009) ficou 1,45× mais alto e magro com o boné do Walt; luzes piscam na voz errada; Fora com palavras próprias |
+| 010 Hush | ✔ | ✔ | ◐ | ✘ | ✔ | ✔ | ◐ | ◐ | ✔ | ✘ | **forma enorme cruza as vitrines** por fora; drone grave que **corta**; rangido de vidro a cada ~4 s; com a luz apagada o jogador ganha a **luz branca fraca** (R11) |
+| 017 Rastejador | ✔ | ◐ | ✔ | ✘ | ✔ | ✔ | ✔ | ◐ | ◐ | ✘ | **tábuas do piso levantam** na passagem dele, poeira subindo; luminárias balançando; **nas câmeras ele está debaixo do balcão** antes de sair |
+| 019 Sombra no teto | ✔ | ✔ | ✔ | ✘ | ✔ | ✔ | ✔ | ✔ | ✔ | ✘ | já no padrão; ganha **nas câmeras ela está de pé no telhado** e Fora (silhueta contra o céu) |
+| 021 Névoa vermelha | ✔ | ✔ | ◐ | ✘ | ✔ | ✔ | ✔ | ◐ | ✔ | ✘ | **vultos na névoa** que só as câmeras mostram; o vidro **flexiona** em cada pancada (+ poeira), a maior por último; Fora com Blur — **TASK-588 (Em QA):** `Scenes/anm_021_red_fog` (cada pancada é `Glass` Bang com poeira; nas câmeras um vulto vem pela fila até o vidro e uma forma alta cruza atrás das mesas; aviso na tela; Fora com Blur e passos) |
+
+Resumo: **sete** anomalias de cliente (001, 005, 011, 013–016) estão na cena curta genérica (`oddScene`) e sobem do zero;
+**seis** (004, 006, 008, 010, 012, 017) têm cena própria mas faltam mundo físico, câmeras e clímax; **três** (009, 019, 021)
+estão perto e ganham câmeras e Fora. O apagão ganha Fora.
+
+### 11.3 Peças novas do kit (uma vez, servem a todas)
+
+Complementa §3.13. Cada peça é um módulo em `AnomalyController/Scene/Kit/<Peça>.luau` que se registra sozinho
+(`Kits.Register` percorre a pasta), para as tasks correrem em paralelo sem tocar o mesmo arquivo. Cena nova ou reescrita vai
+em `Content/HorrorScenes/Scenes/<key>.luau` e substitui a embutida de mesma `Key`.
+
+| Peça | O que faz | `Seen` |
+|---|---|---|
+| `Pose` | mexe o `CustomerActor` da anomalia: Lift, Tilt, Turn (um ou todos os clientes Night), Scale, Float, Blink, Mimic (imita a câmera com atraso) | sim |
+| `Prop` | objetos locais perto do Point: Shake, Float, Sway (luminária), Puddle (Grow / Flood), Lift (tábua do piso), Drop | sim |
+| `Glass` | vidro no MapPoint: Fog, Knock, Bang (flexiona + poeira), Hand (palma escorrendo), Rattle (persiana) | — |
+| `Glare` | farol: Flash (bloom + Blur se o ponto está na vista) e Sweep (SpotLight varrendo o teto) | — |
+| `Silhouette` | forma grande escura que cruza por fora das vitrines (placa com recorte, só local) | sim |
+| `Lantern` | a luz branca do apagão como peça: Glow (ao redor do jogador), Beacon (pulso mostarda + Highlight num MapPoint), Eyes (luz branca nos olhos de um ator) | — |
+| `Where` (campo) | `"Inside"` / `"Outside"`; lê `OutsideStage` (§3.0) | — |
+| `Seen` (campo, ampliado) | `"Cameras"` = só pela câmera de segurança; `"Eyes"` = só a olho nu; nil = sempre | — |
+
+Durante o modo câmera (`Kit/Watch`) a camada `Cameras` aparece e a `Eyes` some — o "só dá para ver pelas câmeras" do apagão,
+generalizado.
+
+### 11.4 Tasks (TASK-586..TASK-590, Provisório)
+
+| ID | O quê | Dono | Depende | Status |
+|---|---|---|---|---|
+| TASK-586 | **Preparo**: `Content.HorrorScenes` vira pasta (`init` + `Types` + `Scenes/`); tipos `Pose`, `Prop`, `Glass`, `Glare`, `Silhouette`, `Lantern`, campos `Where` e `Seen` ampliado; `Scene/Kit/` auto-registrado; stubs | backend-coder | — | Feito |
+| TASK-587 | **Família A no padrão**: peças `Pose` + `Prop`; cenas completas de 001, 005, 011, 013, 014, 015, 016 | frontend-coder | 586 | Em QA |
+| TASK-588 | **Vidro e farol**: peças `Glass` + `Glare`; 006, 008, 021 e 009 no padrão | frontend-coder | 586 | Em QA |
+| TASK-589 | **Forma, lanterna e Fora**: peças `Silhouette` + `Lantern`, campo `Where` e camada `Seen` no player; 010, 017, 019, 020 (Fora) no padrão | frontend-coder | 586 | Pendente |
+| TASK-590 | **Cliente com corpo**: 004 e 012 no padrão (Mimic, sombra contraditória, lâmpadas que morrem nos estalos); usa `Pose`/`Prop` da 587 | frontend-coder | 587 | Pendente |
+
+As TASK-535..537 e 541..552 ficam **absorvidas** por estas (mesmo conteúdo, agrupado por peça para não haver dois donos no
+mesmo arquivo).
+
+## Noite 1: terror mais cedo (pedido do dono 2026-10-20, Provisório — Q-415)
+
+A Noite 1 ficava ~3 min sem nada (carência até 23h segurava eventos e sustos). Agora, sem aumentar a punição:
+
+- **Abertura roteirizada** (`night_opening`, `Nights.Opening[1]`, só na 1ª tentativa): silêncio de 2,5 s; os 8 postes
+  mais perto apagam um a um do fundo para o jogador; 1,4 s de escuro e silêncio; voltam de perto para longe. Um vulto
+  parado do outro lado da rua (ponto do mapa na borda da visão, ou sob um poste) some depois de visto, quando a câmera
+  volta. A linha do Walt chia com duas falas cortadas (placeholder). Fecha com uma respiração presa. Sem verbo, sem custo.
+- **Carência só para quem pune**: `Nights.Grace` segura só os eventos regulares; os sustos D valem desde as 20h
+  (`Nights.ScaresFrom`), um por vez (`HallucinationRules.ScareGap`). O tutorial de novato segue segurando tudo.
+- **Estreia fixa**: `anm_001_blank_folks` às 22h da Noite 1 (`Nights.PremiereAt`), logo depois da ligação, fora da carência.
+- **Sustos D novos** (desde a Noite 1): `post_figure` (o poste em vista falha e, quando volta, há um vulto sob a lâmpada;
+  visto, a lâmpada apaga e volta sem ninguém) e `shop_shadow` (vulto dentro da loja na borda da visão; ao virar para ele,
+  some com um tranco curto de câmera `Jolt` e um sopro; às vezes outro pisca do lado oposto).

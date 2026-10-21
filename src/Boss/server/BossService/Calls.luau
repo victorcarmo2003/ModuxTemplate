@@ -9,8 +9,6 @@ export type DayQuery = {
 	Day: number,
 	-- nights already played (Shift.Night of the day shift)
 	Night: number,
-	-- RunState.Counters.quentin_caught_day (0 = never)
-	CaughtDay: number,
 	Endless: boolean,
 	-- last call_day_infinite_* rung (never twice in a row), "" = none
 	LastInfinite: string,
@@ -19,9 +17,9 @@ export type DayQuery = {
 
 const VARIANT_BASE = ""
 
--- Day -> variant ("" or "quentin") -> key
+-- Day -> variant ("" = base) -> key
 const byDay: { [number]: { [string]: string } } = {}
--- night k -> variant ("" or "quentin") -> key of the first day after it (call_day_after_<k>[_quentin])
+-- night k -> variant ("" = base) -> key of the first day after it (call_day_after_<k>)
 const afterNight: { [number]: { [string]: string } } = {}
 const infinite: { string } = {}
 -- night k -> key of its NightCoffee call (Night 1)
@@ -90,12 +88,9 @@ function Calls.night(night: number): (string?, string?)
 	return row.Call, row.ShortCall
 end
 
--- Prep of a day shift: the day after night k first, then the fixed day N call (quentin variant when the thief was
--- caught the day before), then the endless pool. nil = no call today.
+-- Prep of a day shift: the day after night k first, then the fixed day N call, then the endless pool. nil = no call
+-- today.
 function Calls.day(query: DayQuery, random: Random): string?
-	-- The thief was caught the day before: the quentin variant of a day call (user request 2026-10-12: from Day 3 on
-	-- every day follows a night, so the day-after calls carry it too)
-	const quentinDay = query.CaughtDay >= 1 and query.CaughtDay == query.Day - 1
 	if query.Night >= 1 then
 		const afterVariants = afterNight[query.Night]
 		if afterVariants ~= nil then
@@ -105,7 +100,7 @@ function Calls.day(query: DayQuery, random: Random): string?
 					return nil
 				end
 			end
-			return (if quentinDay then afterVariants.quentin else nil) or afterVariants[VARIANT_BASE]
+			return afterVariants[VARIANT_BASE]
 		end
 	end
 
@@ -116,10 +111,6 @@ function Calls.day(query: DayQuery, random: Random): string?
 			if query.Played[key] then
 				return nil
 			end
-		end
-		const quentin = variants.quentin
-		if quentin ~= nil and quentinDay then
-			return quentin
 		end
 		return variants[VARIANT_BASE]
 	end

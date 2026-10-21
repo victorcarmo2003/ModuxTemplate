@@ -7,6 +7,8 @@ local TicketHud = require(StarterPlayer.StarterPlayerScripts.client.Plate.PlateC
 
 type Customer = {
 	State: string,
+	PatienceEndsAt: number,
+	PatienceSpan: number,
 	Number: number?,
 	Order: { [string]: boolean },
 	Order2: { [string]: boolean }?,
@@ -16,6 +18,7 @@ type Customer = {
 type TicketMemo = { Number: number?, Order: { string }, Order2: { string }?, Drive: boolean }
 
 export type Public = {
+	Clock: Vide.Source<number>,
 	Customers: Vide.Source<{ [number]: Customer }>,
 	Hand: TicketHud.Tracker?,
 	HudGui: ScreenGui?,

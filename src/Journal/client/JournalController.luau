@@ -49,6 +49,7 @@ const SCREEN_NAME = "Screen" -- the lit screen Part of the tablet Model (anomaly
 const STICKER_TEXT = "?" -- the sticker the badge replaces
 const CLAIM_DELAY = 0.6 -- s a new page stays on screen before its gems are claimed (the player sees it first)
 const CLAIM_RETRY = 5 -- s before a claim with no answer may be sent again
+const CLAIM_TICK = 0.15 -- s between two checks of the page on screen while the tablet is open
 const FIRST_CONTROL = "Next"
 const TURN_PREV = "JournalPrev"
 const TURN_NEXT = "JournalNext"
@@ -76,6 +77,9 @@ function JournalController:Setup()
 	self.Scale = Vide.source(1) :: Vide.Source<number>
 	self.Gui = nil :: ScreenGui?
 	self.Unseen = Vide.source(false) :: Vide.Source<boolean>
+	-- the page on screen and since when (TickClaim)
+	self.ShownKey = nil :: string?
+	self.ShownAt = 0 :: number
 	-- key -> os.clock() of a JournalClaim sent and not answered yet
 	self.Pending = {} :: { [string]: number }
 	self.ClaimSerial = 0 :: number
@@ -206,6 +210,31 @@ function JournalController:PlayCollect()
 			end)
 		end,
 	})
+end
+
+-- Watch claim (owner 2026-10-19: turning pages did not always claim; closing and opening again did): while the tablet is open,
+-- every CLAIM_TICK s the page on screen is checked; a Fresh one that has been on screen CLAIM_DELAY s is claimed, whatever event
+-- brought it there (a turn, a drag, a new page arriving, the opening).
+function JournalController:TickClaim()
+	if not Vide.untrack(self.Open) then
+		self.ShownKey = nil
+		return
+	end
+	const row = pageList[Vide.untrack(self.Index)]
+	const key = if row then row.Key else nil
+	if key ~= self.ShownKey then
+		self.ShownKey = key
+		self.ShownAt = os.clock()
+	end
+	if key == nil or not Vide.untrack(self.Fresh)[key] or os.clock() - self.ShownAt < CLAIM_DELAY then
+		return
+	end
+	const sent = self.Pending[key]
+	if sent ~= nil and os.clock() - sent < CLAIM_RETRY then
+		return
+	end
+	self.Pending[key] = os.clock()
+	self.Libs.Net.JournalClaim:fireServer(key)
 end
 
 -- Claims the page on screen once it stayed there CLAIM_DELAY s with the tablet open (any turn restarts the wait).
@@ -388,8 +417,14 @@ function JournalController:WatchAway()
 	const action = Content.Actions.ByKey[rules.Action]
 	const limit = (if action then action.Radius else 6) + AWAY
 	self.AwayThread = task.spawn(function()
+		local checked = 0
 		while Vide.untrack(self.Open) do
-			task.wait(AWAY_CHECK)
+			task.wait(CLAIM_TICK)
+			self:TickClaim()
+			if os.clock() - checked < AWAY_CHECK then
+				continue
+			end
+			checked = os.clock()
 			const character = Players.LocalPlayer.Character
 			const root = if character then character:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
 			const humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil

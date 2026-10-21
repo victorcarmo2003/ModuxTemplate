@@ -18,6 +18,8 @@ O único item rotativo da bancada é especial, não upgrade: Rescue Whistle (ITM
 
 > **Modo anomalia (pedidos do dono 2026-10-14, Provisório, sem DEC; `open-questions.md` "Pedidos do dono 2026-10-14"):** o jogo é de anomalia, quase tudo à noite: os upgrades de dia saem de venda **sem serem apagados** (`Content.Mode.DayOnly = false`; `true` = o futuro "modo só de dia" os traz de volta). **Fora de venda:** UPG-003 Counter (Wide Counter; a fila fica fixa em 2, `Q-261`), UPG-004 Cash Drawer Lock (sem ladrão), UPG-008 a UPG-011 (mesas). **Seguem:** UPG-001 Grill (grelha dupla), UPG-002 **Storage** (o 1º upgrade, lição das 18h do Dia 1), UPG-005 Trailer Lights. **Novo (só desenho):** UPG-012 Security Camera. O Gear Stand fica **fechado** no Dia 1 até o fim do turno (`Content.Mart.FirstShiftClosed`).
 
+> **Upgrades V3 (pedido do dono 2026-10-20, Provisório, `Q-417` a `Q-422`):** pedestais verdes Grill / Bun Box / Topping Rack / Coffee Shelf / Breaker Box, pedestal dourado com especial do dia por raridade (Rescue Whistle, Double Coffee Machine, ABC Blocks), loja de brinquedos e gacha de pelúcias. Proposta em `upgrades-v3-proposal.md`; este índice só muda depois das respostas.
+
 ## Template de ficha
 
 ```
@@ -33,10 +35,10 @@ Critérios de aceite
 | ID | Upgrade | Níveis | Custo total | Veículo | Onde se compra | Rotaciona? |
 |---|---|---|---|---|---|---|
 | UPG-001 | Grill | 1–3 | $210 | ambos | bancada B1 | não |
-| UPG-002 | **Storage** (era Cooler; 2026-10-14, Provisório, `Q-260`; nível 5 TASK-324) | 1–5 | $340 ($40 / $70 / $110 / $120) | trailer | bancada B2 | não |
+| UPG-002 | ~~**Storage** (era Cooler; `Q-260`)~~ **aposentado (DEC-331, `Content.Mode.RetiredUpgrades`)**; vira UPG-035 + UPG-036. O código fica (snapshots antigos carregam); a run antiga perde a capacidade comprada, sem reembolso | 1–5 | ~~$340~~ (fora de venda) | trailer | ~~bancada B2~~ | não |
 | UPG-003 | Counter — **fora de venda no modo anomalia** (2026-10-14) | 1–5 (DEC-241) | $340 | trailer | bancada B3 | não |
 | UPG-004 | Cash Drawer Lock — **fora de venda no modo anomalia** (2026-10-14) | 0–1 | $80 | trailer | bancada B4 | não |
-| UPG-005 | Trailer Lights | 0–1 | $100 | só trailer | bancada B5 (após a compra do trailer) | não |
+| UPG-005 | Trailer Lights — **aposentado (DEC-331, `Mode.RetiredUpgrades`)**; o nome na lista passou de "Patio Lights" (bug) para "Trailer Lights" | 0–1 | ~~$100~~ (fora de venda) | só trailer | ~~bancada B5~~ (B5 agora é o Breaker Box) | não |
 | ~~UPG-006~~ | ~~Food Trailer (veículo)~~ **OBSOLETO (DEC-224): veículo único desde o Day 1, sem compra** | — | ~~$300 × party~~ (sai) | — | — | — |
 | UPG-007 | Coffee Maker | incluída | $0 (vem com o trailer) | só trailer | — | — |
 | UPG-008 | Patio Tables (mesas do Pad) — Provisório | 0–5 (1 mesa por nível) | $315 | **Pad** (as duas, não recomeça na troca, `Q-179`) | na própria mesa fantasma no Pad (`Q-178`) | não |
@@ -44,8 +46,14 @@ Critérios de aceite
 | UPG-011 | Trailer Table (4 mesas do trailer, `TBL-6..9`) — Provisório (`Q-209`) | 0–4 (1 mesa por nível) | $330 ($50 / $70 / $90 / $120) | **só trailer** (`Scope = "Vehicle"`) | na própria mesa fantasma, só depois de comprar o trailer (`Q-209`) | não |
 | UPG-010 | Back Bar (bancada externa do trailer) — Provisório, cortável | 0–1 | $90 | só trailer | na própria bancada dobrada, no trailer (`Q-178`, `Q-179`) | não |
 | UPG-012 | Security Camera — **Rascunho, só desenho** (2026-10-14, FEAT-040, `Q-267`; as câmeras da TASK-285 vieram de fábrica, sem compra) | 0–2 | $320 ($120 / $200, proposta) | trailer | — (B3/B4 ficaram com UPG-013/014) | não |
-| UPG-013 | **Coffee Maker** (melhoria da cafeteira de fábrica UPG-007) — **só modo anomalia**, Provisório (TASK-324, `Q-275`) | 1–3 | $110 ($40 / $70) | trailer | bancada **B3** (o pedestal do Counter) | não |
-| UPG-014 | **Breaker Box** (disjuntor do apagão ANM-020) — **só modo anomalia**, Provisório (TASK-324, `Q-275`) | 0–2 | $90 ($30 / $60) | trailer | bancada **B4** (o pedestal do Drawer Lock) | não |
+| UPG-013 | **Coffee Maker** (melhoria da cafeteira de fábrica UPG-007) — **aposentado (DEC-331, `Mode.RetiredUpgrades`)**; era só modo anomalia (TASK-324, `Q-275`) | 1–3 | $110 ($40 / $70) | trailer | bancada **B3** (o pedestal do Counter) | não |
+| UPG-014 | **Breaker Box** (disjuntor do apagão ANM-020) — **só modo anomalia**, Provisório (TASK-324, `Q-275`) | 0–2 | $90 ($30 / $60) | trailer | bancada **B5** (DEC-331; era B4) | não |
+| UPG-035 | **Bun Box** (pão + salsicha, `BunCapacityLevel`) — **só modo anomalia**, Provisório (DEC-331, TASK-607) | 1–3 | $160 ($50 / $110) | trailer | bancada **B2** | não |
+| UPG-036 | **Topping Rack** (molhos e toppings, `ToppingCapacityLevel`) — **só modo anomalia**, Provisório (DEC-331, TASK-607) | 1–3 | $160 ($50 / $110) | trailer | bancada **B3** (divide com o Counter) | não |
+| UPG-037 | **Coffee Shelf** (estoque de café, `CoffeeCapacityLevel`) — **só modo anomalia**, Provisório (DEC-331, TASK-607) | 1–3 | $120 ($40 / $80) | trailer | bancada **B4** | não |
+
+> IDs: UPG-015 a UPG-034 estão reservados em `restaurant-flow.md` §3; por isso os novos são 035 a 037 (Provisório).
+> **DEC-331 (TASK-607, 2026-10-20):** no modo anomalia à venda ficam Grill $210 + Bun Box $160 + Topping Rack $160 + Coffee Shelf $120 + Breaker Box $90 = **$740**. Storage, Coffee Maker e Trailer Lights estão em `Content.Mode.RetiredUpgrades` (fora de venda em qualquer modo); os stats deles leem o valor fixo de `Mode.Fixed`. As somas antigas do parágrafo abaixo ficam como histórico.
 
 > UPG-008 a UPG-011 (mesas) e o Patio Lights também ficam **fora de venda no modo anomalia** (2026-10-14). Soma do que se compra no modo anomalia, Provisório: Grill $210 + Storage $220 + Trailer Lights $100 = **$530** (+ UPG-012 quando existir). **TASK-324 (2026-10-15, Provisório, `Q-275`):** Grill $210 + Storage $340 (nível 5 a $120) + Trailer Lights $100 + Coffee Maker $110 + Breaker Box $90 = **$850** (conta da run em `economy.md` §5). UPG-013 e UPG-014 são o inverso dos de dia: `Content.Mode.AnomalyOnlyUpgrades`, à venda só com `DayOnly = false`, e dividem o pedestal com o Counter (B3) e o Drawer Lock (B4) — cada modo mostra o seu.
 
@@ -117,6 +125,8 @@ veículo, então o critério da FEAT-015 "nenhum prompt de compra em equipamento
 - Critérios de aceite: cliente já no balcão recebe a paciência extra na hora da compra.
 
 ### UPG-004 — Cash Drawer Lock
+
+> **Removido (DEC-313, 2026-10-20):** o ladrão saiu do jogo e do código (`src/Thief`, `Content.Thief`, `Net.Thief`, UPG-004, notices `thief_*`, ligações "quentin"). Texto abaixo é histórico.
 
 - Origem: **[DEC-050]** · Veículo: ambos
 

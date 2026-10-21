@@ -31,6 +31,7 @@ local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Compon
 local Icons = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Icons)
 local CartoonPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.CartoonPanel)
 local CartoonLabel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.CartoonLabel)
+local UiScale = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.UiScale)
 
 const create = Vide.create
 const indexes = Vide.indexes
@@ -62,6 +63,8 @@ const TAB_TEXT = 16
 const LINE_TEXT = 14
 const MISSING_TRANSPARENCY = 0.62
 const TAG_SIZE = Vector2.new(120, 60)
+const RING = 4 -- px of the patience ring
+const RING_INSET = 5 -- px from the card's edge to the ring's middle
 
 const GRADE_TONE: { [string]: Theme.Tone } = {
 	Perfect = Theme.Tone.Mustard,
@@ -109,6 +112,10 @@ export type CardProps = {
 	Orphan: () -> boolean,
 	-- other plates carried (0 = none)
 	More: () -> number,
+	-- patience left of the ticket's customer, 0..1; negative = no ring (owner 2026-10-19: one order card, with the ring that
+	-- drains Green -> Mustard like the HudOrder one)
+	Patience: (() -> number)?,
+	WarnAt: number?,
 	Position: (() -> UDim2)?,
 	Name: string?,
 }
@@ -426,7 +433,26 @@ local function statusLine(text: () -> string, order: number): TextLabel
 	})
 end
 
+-- Opaque up to `fraction` of the border, transparent after it: the ring drains from its right end (as HudOrder's)
+local function ringTransparency(fraction: number): NumberSequence
+	if fraction >= 0.999 then
+		return NumberSequence.new(0)
+	elseif fraction <= 0.001 then
+		return NumberSequence.new(1)
+	end
+	return NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(fraction, 0),
+		NumberSequenceKeypoint.new(math.min(fraction + 0.001, 0.999), 1),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+end
+
 function TicketHud.Card(props: CardProps): Frame
+	const patience = props.Patience or function(): number
+		return -1
+	end
+	const warnAt = props.WarnAt or 1 / 3
 	local function tabText(): string
 		if props.Orphan() then
 			return "?"
@@ -540,7 +566,34 @@ function TicketHud.Card(props: CardProps): Frame
 			Outline = Theme.Outline.Thick,
 			Radius = Theme.Radius.Card,
 			Lip = LIP,
-			Padding = { Top = PAD + 4, Bottom = PAD, Left = PAD, Right = PAD },
+			Padding = { Top = PAD + 4, Bottom = PAD + 2, Left = PAD + 2, Right = PAD + 2 },
+			Decor = {
+				-- the patience ring, just inside the Ink outline, over the face
+				create("Frame")({
+					Name = "Ring",
+					Position = UDim2.fromOffset(RING_INSET, RING_INSET),
+					Size = UDim2.new(1, -RING_INSET * 2, 1, -RING_INSET * 2 - LIP),
+					BackgroundTransparency = 1,
+					ZIndex = 3,
+					create("UICorner")({ CornerRadius = UDim.new(0, Theme.Radius.Card.Offset - RING_INSET) }),
+					createRaw("UIStroke")({
+						Thickness = RING,
+						ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+						Color = Color3.new(1, 1, 1), -- the gradient below gives the colour
+						Enabled = function()
+							return patience() >= 0
+						end,
+						createRaw("UIGradient")({
+							Color = function()
+								return ColorSequence.new(if patience() > warnAt then Theme.Color.Green else Theme.Color.Mustard)
+							end,
+							Transparency = function()
+								return ringTransparency(math.clamp(patience(), 0, 1))
+							end,
+						}),
+					}),
+				}),
+			},
 			Children = {
 				create("UIListLayout")({
 					FillDirection = Enum.FillDirection.Vertical,
@@ -611,6 +664,10 @@ end
 
 -- The HUD layer: own ScreenGui, scaled like the Hud one (Theme.ScaleOf), same safe insets, off during a cinematic
 function TicketHud.Screen(props: ScreenProps): ScreenGui
+	-- owner 2026-10-20: the card read too big on a phone
+	const scaleOf = function(): number
+		return props.Scale() * UiScale.Compact(0.75)
+	end
 	return create("ScreenGui")({
 		Name = props.Name or "PlateTicketHud",
 		ResetOnSpawn = false,
@@ -623,11 +680,11 @@ function TicketHud.Screen(props: ScreenProps): ScreenGui
 		create("Frame")({
 			Name = "Layer",
 			Size = function()
-				const scale = props.Scale()
+				const scale = scaleOf()
 				return UDim2.fromScale(1 / scale, 1 / scale)
 			end,
 			BackgroundTransparency = 1,
-			createRaw("UIScale")({ Scale = props.Scale }),
+			createRaw("UIScale")({ Scale = scaleOf }),
 			TicketHud.Card(props.Card),
 		}),
 	})

@@ -7,6 +7,7 @@ export type Public = {
 	ClosesAt: number,
 	Enabled: boolean,
 	Open: Charm.Atom<boolean>,
+	OpenedAt: number,
 	Scheduled: boolean,
 	Warned: boolean,
 	Setup: (self: Public) -> (),
@@ -17,7 +18,7 @@ export type Public = {
 	OnPhase: (self: Public, phase: string) -> (),
 	Step: (self: Public) -> (),
 	OpenForLesson: (self: Public) -> (),
-	Force: (self: Public, open: boolean) -> (),
+	Force: (self: Public, open: boolean, hold: boolean?) -> (),
 	Report: (self: Public) -> string,
 }
 

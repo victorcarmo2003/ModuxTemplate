@@ -42,7 +42,6 @@ const DEV_ALLOWED: { [string]: boolean } = {
 	down = true,
 	spectate = true,
 	sanity = true,
-	thief = true,
 	traffic = true,
 	customer = true,
 	light = true,
@@ -217,9 +216,6 @@ function ShowcaseService:Clear(player: Player)
 	end)
 	pcall(function()
 		deps.KitchenService:ClearAltered()
-	end)
-	pcall(function()
-		self:Dev(player, "traffic hold ambulance off")
 	end)
 end
 

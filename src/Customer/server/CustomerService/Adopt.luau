@@ -19,7 +19,7 @@
 	    the cart Beat s, then walks to Q5;
 	  * a noticed walker nobody took (pair drawn, counter full, caps, phase change) walks on after GRACE s;
 	  * FirstDelay: the first attempt of a selling phase is pulled to FirstDelay s after the phase starts.
-	Never: the tutorial customer, anomaly actors (SpawnActor), the thief, pairs (walkers walk alone), under tension (no
+	Never: the tutorial customer, anomaly actors (SpawnActor), pairs (walkers walk alone), under tension (no
 	walkers then). Cutscenes run only in Intro / Finale, which are not selling phases.
 	Draws use an unseeded Random (walkers are cosmetic and unseeded); an adoption skips one seeded look draw.
 ]]

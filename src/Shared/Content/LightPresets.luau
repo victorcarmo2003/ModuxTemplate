@@ -219,13 +219,15 @@ const presets: LightPresets = {
 		-- Before (TASK-313, 2026-10-15): Brightness 0.55, Exposure -0.45, Ambient (64,56,68), Outdoor (68,62,82),
 		-- ShiftTop (176,128,96), ShiftBottom (30,24,36), Atm 0.34/0.5/0.2/1.2 (70,58,76)/(84,52,58),
 		-- CC -0.01/0.05/0.14 Tint (246,236,236), Bloom 0.75/28/1.1.
-		Brightness = 0.5,
-		Exposure = -0.35,
-		Ambient = Color3.fromRGB(42, 44, 64),
-		OutdoorAmbient = Color3.fromRGB(46, 56, 96), -- cold moon on the facades
+		-- Brighter pass (owner 2026-10-21: "o lobby parece estar um pouco escuro demais"; PROVISIONAL): same cold mood,
+		-- more light everywhere. Was Brightness 0.5, Exposure -0.35, Ambient (42,44,64), Outdoor (46,56,96), EnvDiffuse 0.6.
+		Brightness = 0.9,
+		Exposure = -0.1,
+		Ambient = Color3.fromRGB(72, 74, 100),
+		OutdoorAmbient = Color3.fromRGB(84, 96, 140), -- cold moon on the facades
 		ColorShiftTop = Color3.fromRGB(110, 130, 190), -- cold light from above
 		ColorShiftBottom = Color3.fromRGB(14, 14, 28),
-		EnvDiffuse = 0.6,
+		EnvDiffuse = 0.8,
 		EnvSpecular = 0.6,
 		ShadowSoftness = 0.2,
 		AtmDensity = 0.36,
@@ -238,9 +240,10 @@ const presets: LightPresets = {
 		Saturation = 0.1,
 		Contrast = 0.18,
 		Tint = Color3.fromRGB(240, 242, 255), -- a hint cold (the warmth comes from the lights)
-		BloomIntensity = 0.8,
-		BloomSize = 26,
-		BloomThreshold = 1.05,
+		-- Realistic lighting style (owner 2026-10-20: neon and the class stage blown out): 0.8/26/1.05 -> 0.55/22/1.3
+		BloomIntensity = 0.55,
+		BloomSize = 22,
+		BloomThreshold = 1.3,
 		SunRays = 0,
 		SunRaysSpread = 0.1,
 	},

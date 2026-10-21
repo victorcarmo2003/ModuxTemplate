@@ -17,8 +17,9 @@
 	  - sanity meter (HudSanity) TOP LEFT under the Roblox menu / chat bar (owner request 2026-10-12): VitalController
 	    Sanity/Max/Band, only with Max > 0 and own state Active; compact on a phone (34 px portrait, 110 x 10 bar),
 	    bigger on desktop; portrait = class icon of the AST-071 sheet on the species fur colour (letter fallback);
-	  - banners (HudBanner): night start "Night k" (repeated night: "Same night. Same rules."), 6:00 AM "You made
-	    it!", from the Shift set on a fresh phase change only (a late joiner gets no old banner); Resume phase
+	  - shift change titles (Interface/Announce, the blackout's big HorrorCaption since TASK-595): day start "DAY n",
+	    night start "NIGHT k" (repeated night: "Same night. Same rules."), 6:00 AM "You made it!", from the Shift set
+	    on a fresh phase change only (a late joiner gets no old title); banner (HudBanner) only for the Resume phase
 	    (DEC-080): "Resuming Day n" / "Resuming Night k" for the rest of the phase, late joiner included;
 	  - 10 s window (HudWipe) from Shift.WipeEndsAt (server time; WipeFrozen holds the bar, wave 4): a bar that drains
 	    with "Everyone's out!" inside, top centre, no seconds (TASK-485);
@@ -63,8 +64,10 @@ local CrewLooks = require(ReplicatedStorage.shared.Crew.CrewLooks)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Cinematic = require(StarterPlayer.StarterPlayerScripts.client.Interface.Cinematic)
 local Steps = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Steps)
+local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
 local HudOrder = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudOrder)
 local HudBanner = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudBanner)
+local Announce = require(StarterPlayer.StarterPlayerScripts.client.Interface.Announce)
 local HudRunEnd = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudRunEnd)
 local HudSanity = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudSanity)
 local HudScreen = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudScreen)
@@ -98,6 +101,12 @@ const SANITY_LEFT = 8
 const SANITY_ROW_COMPACT = 38
 const SANITY_ROW_LARGE = 50
 const DEV_PREFIX = "[HudReveal]"
+-- Lean HUD of the restaurant tutorial (owner 2026-10-19: "informação excessiva na tela"): on a first run's night, until the
+-- first coffee, these rows stay off; only Walt's subtitle, the tasks and the station UIs show. The sanity meter comes with
+-- Walt's coffee call (its CoffeeHint cue: pulse + emphasis ring), the rest pops in with the first coffee. The night ending,
+-- a skipped tutorial or `/dev hud reveal all` lift it too. The cooking focus hides its hint line meanwhile (LEAN_ATTRIBUTE).
+const LEAN: { [string]: boolean } = { clock = true, money = true, shift = true, order_card = true, sanity = true }
+const LEAN_ATTRIBUTE = "HudLean" -- local Player attribute while the lean HUD is on (CookController reads it)
 -- Real px the Roblox top-left bar (menu, chat) takes on a phone; GetGuiInset reports 0 there (user report 2026-10-12)
 const TOPBAR_REAL = 60
 -- Same threshold as HudScreen (px at UI scale 1): under it money / day stack in a column (6 + 38 + 6 + 38)
@@ -161,9 +170,7 @@ const REFUSAL: { [string]: boolean } = {
 const REFUSAL_SOUND = "error"
 const TOAST_SOUND = "toast"
 -- Notices with their own sound instead of the toast one (live packet only: nothing plays for a late joiner)
-const NOTICE_SOUND: { [string]: string } = {
-	thief_caught = "thief_caught",
-}
+const NOTICE_SOUND: { [string]: string } = {}
 const SUMMARY_SOUND = "summary"
 const GOOD: { [string]: boolean } = {
 	upgrade_bought = true,
@@ -180,7 +187,6 @@ export type Report = {
 	Completed: number,
 	Drawer: number,
 	Tips: number,
-	Stolen: number,
 	Grade: string,
 	Bonus: number,
 	Deposited: number,
@@ -247,6 +253,11 @@ function HudController:Setup()
 	self.Report = Vide.source(false :: HudSummary.Shown) :: Vide.Source<HudSummary.Shown>
 	self.Scale = Vide.source(1) :: Vide.Source<number>
 	self.Viewport = Vide.source(Vector2.new(1000, 700)) :: Vide.Source<Vector2>
+	-- the plate card is on the HUD (PlateController sets the LocalPlayer attribute TicketCard): HudOrder steps aside
+	self.TicketCard = Vide.source(Players.LocalPlayer:GetAttribute("TicketCard") == true) :: Vide.Source<boolean>
+	Players.LocalPlayer:GetAttributeChangedSignal("TicketCard"):Connect(function()
+		self.TicketCard(Players.LocalPlayer:GetAttribute("TicketCard") == true)
+	end)
 	-- progressive reveal: Content.HudReveal rows already on screen (latched for the session), the ones that opened with
 	-- a presentation pulse, and the dev switches (all = everything open, gate = apply the reveal outside a first run,
 	-- epoch = a reset happened)
@@ -255,6 +266,9 @@ function HudController:Setup()
 	self.DevAll = Vide.source(false) :: Vide.Source<boolean>
 	self.DevGate = Vide.source(false) :: Vide.Source<boolean>
 	self.Epoch = Vide.source(0) :: Vide.Source<number>
+	-- lean HUD (LEAN): Walt's coffee call reached the sanity cue / the first coffee was drunk (latched for the session)
+	self.SanityCalled = Vide.source(false) :: Vide.Source<boolean>
+	self.CoffeeDone = Vide.source(false) :: Vide.Source<boolean>
 	self.ReportThread = nil :: thread?
 	self.Gui = nil :: ScreenGui?
 	self.Unmount = nil :: (() -> ())?
@@ -313,10 +327,17 @@ function HudController:NoticeText(kind: string, value: number): string?
 	return text
 end
 
-function HudController:PushToast(kind: string, value: number)
-	const text = self:NoticeText(kind, value)
+-- by: UserId of the crewmate who did it (Notice.By, DEC-320); named in front of the text, never the own player
+function HudController:PushToast(kind: string, value: number, by: number?)
+	local text = self:NoticeText(kind, value)
 	if text == nil then
 		return
+	end
+	if by ~= nil and by ~= Players.LocalPlayer.UserId then
+		const mate = Players:GetPlayerByUserId(by)
+		if mate ~= nil then
+			text = `{mate.DisplayName}: {text}`
+		end
 	end
 	const toastKind: Toast.Kind = if ALERT[kind] then "Alert" elseif GOOD[kind] then "Good" else "Info"
 	if self:PushText(text, toastKind) then
@@ -385,7 +406,6 @@ function HudController:ShowReport(report: Report)
 		-- report.Drawer = the day take; the tips are the jar part of it (sales go straight to the shared money)
 		Sales = math.max(0, report.Drawer - report.Tips),
 		Tips = report.Tips,
-		Stolen = report.Stolen,
 		Grade = grade,
 		Bonus = report.Bonus,
 		Deposited = report.Deposited,
@@ -488,22 +508,29 @@ function HudController:ApplyShift(record: ShiftRecord)
 	if not changed or workspace:GetServerTimeNow() - record.PhaseStartedAt > BANNER_FRESH then
 		return
 	end
+	-- Shift change = the big title of the blackout (TASK-595, owner Play 2026-10-19; Interface/Announce), not the HudBanner
 	if record.IsNight and record.Night > 0 and (record.Phase == "Call" or record.Phase == "Prep") then
-		-- the night opens on Call (or Prep without a call): one banner per try of the night
+		-- the night opens on Call (or Prep without a call): one title per try of the night
 		const key = `{record.Night}:{record.Attempt}`
 		if key ~= self.BannerKey then
 			self.BannerKey = key
-			self:ShowBanner({
-				Title = `Night {record.Night}`,
+			Announce.Show(
+				`NIGHT {record.Night}`,
 				-- C3 (DEC-317): the repeated night with no chance left is the last one
-				Line = if record.Attempt > 0 and record.Chances <= 0
-					then "Last chance. Don't all faint."
-					elseif record.Attempt > 0 then "Same night. Same rules."
-					else "Stay open till 6:00 AM.",
-			})
+				if record.Attempt > 0 and record.Chances <= 0 then "Last chance. Don't all faint."
+				elseif record.Attempt > 0 then "Same night. Same rules."
+				else "Stay open till 6:00 AM."
+			)
+		end
+	elseif not record.IsNight and record.Phase == "Prep" then
+		-- a new day shift (Provisional placeholder until ui-text.md §12.2 is reviewed by narrative-writer)
+		const key = `day:{record.Day}:{record.Attempt}`
+		if key ~= self.BannerKey then
+			self.BannerKey = key
+			Announce.Show(`DAY {record.Day}`, "Doors open at 8:00 AM.")
 		end
 	elseif record.Phase == "NightEnd" then
-		self:ShowBanner({ Title = "6:00 AM", Line = "You made it!" })
+		Announce.Show("6:00 AM", "You made it!")
 	end
 end
 
@@ -727,7 +754,8 @@ function HudController:OrderCard(): Frame
 	const customer = self.Dependencies.CustomerController
 	return HudOrder({
 		Shown = function()
-			return customer:CardShown() and self:SpectateMode() == "None"
+			-- one order card (owner 2026-10-19): the plate card (PlateController TicketHud) takes over while a plate is in hand
+			return customer:CardShown() and self:SpectateMode() == "None" and not self.TicketCard()
 		end,
 		Toppings = function()
 			return customer:CardToppings()
@@ -784,8 +812,21 @@ function HudController:EvaluateReveal()
 	const finished = tutorial.Finished()
 	const stepIndex = Steps.IndexOf[tutorial.StepKey()] or 0
 	const cinematic = Cinematic.Active()
+	const skipped = finished and tutorial.EndReason == "skip"
+	const lean = TutorialRules.Restaurant
+		and gated
+		and night
+		and not everything
+		and not skipped
+		and not self.CoffeeDone()
+	const sanityCalled = self.SanityCalled()
+	-- TASK-598: Walt's closing talk ("shift ends at six") spotlights the clock, so the lean HUD lets it in for it
+	const shiftTalk = tutorial.StepKey() == "shift"
 	if not ready then
 		return
+	end
+	if (Players.LocalPlayer:GetAttribute(LEAN_ATTRIBUTE) == true) ~= lean then
+		Players.LocalPlayer:SetAttribute(LEAN_ATTRIBUTE, if lean then true else nil)
 	end
 
 	Vide.untrack(function()
@@ -801,6 +842,12 @@ function HudController:EvaluateReveal()
 			local on = false
 			if everything then
 				on = true
+			elseif lean and LEAN[row.Key] then
+				-- the sanity meter comes with Walt's coffee call, introduced by its pulse; the rest waits for the coffee
+				on = (row.Key == "sanity" and sanityCalled) or (row.Key == "clock" and shiftTalk)
+				if on and row.Key == "sanity" then
+					nextIntros[row.Key] = true
+				end
 			elseif row.Trigger == "Night" then
 				-- its own trigger, also outside a first run: the first night with it is the introduction
 				on = night and nightNumber >= row.Night
@@ -900,6 +947,21 @@ function HudController:Mount(playerGui: Instance)
 	const economy = self.Dependencies.EconomyController
 
 	const unmount, gui = Vide.root(function()
+		-- Lean HUD: Walt's coffee call (sanity cue) and the first coffee, latched
+		const vital = self.Dependencies.VitalController
+		Vide.effect(function()
+			if vital.CoffeeHint() and not Vide.untrack(self.SanityCalled) then
+				self.SanityCalled(true)
+			end
+		end)
+		Vide.effect(function()
+			-- read through a getter type: a Source of an optional type is ambiguous to call under the new solver
+			const gain = (vital.CoffeeGain :: () -> { Amount: number }?)()
+			if gain ~= nil and gain.Amount > 0 and not Vide.untrack(self.CoffeeDone) then
+				self.CoffeeDone(true)
+			end
+		end)
+
 		-- Progressive reveal: opens the HUD elements as their triggers fire (Content.HudReveal)
 		Vide.effect(function()
 			self:EvaluateReveal()
@@ -987,7 +1049,8 @@ function HudController:Mount(playerGui: Instance)
 						return self:ShiftText()
 					end,
 					IsNight = round.IsNight,
-					Cash = economy.Cash,
+					-- the money lands with the flying coins (TASK-597): EconomyController.Shown, not the raw Cash
+					Cash = economy.Shown,
 					Toasts = self.Toasts,
 					OnToastDone = function(entry)
 						self:ToastDone(entry)
@@ -1042,7 +1105,7 @@ HudController:OnInit(function(self)
 	const net = self.Libs.Net
 
 	net.Notice:onClient(function(notice)
-		self:PushToast(notice.Kind, notice.Value)
+		self:PushToast(notice.Kind, notice.Value, notice.By)
 	end)
 
 	net.ShiftReport:onClient(function(report)

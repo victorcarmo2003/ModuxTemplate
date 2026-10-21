@@ -7,12 +7,12 @@
 --
 -- Rules kept here:
 --   - never more than Content.Flow.MaxNpc rigs (12, DEC-045); Opal is not one of them (DEC-191);
---   - customers (Role "Customer") never wear the crew uniform nor the raccoon; the raccoon in the thief outfit and
---     ThiefHat is Role "Thief" only (Quick Quentin, NPC-007; DEC-159, DEC-186; TASK-072). Pedestrians: DEC-183, Q-162;
+--   - customers (Role "Customer") never wear the crew uniform nor a reserved species (the raccoon; DEC-186).
+--     Pedestrians: DEC-183, Q-162;
 --   - LookPack Day by day, Mid at night (DEC-181), refreshed at every ShiftStarted. Night is tension only (the client
 --     no longer swaps NPCs Night at low sanity, Provisional 2026-10-14; the client dresses blank / raincoat
 --     variants Night itself; anomaly mood, Q-159): SetTension(on) (AnomalyService, wave 3)
---     writes Night on Role "Customer" rigs whose outfit has the Night pack; actors and the thief keep the shift pack
+--     writes Night on Role "Customer" rigs whose outfit has the Night pack; actors keep the shift pack
 --     so the anomaly sign never changes (Q-147 c). Tension drops at every ShiftStarted (PROVISIONAL, Q-159);
 --   - Role "Actor" (wave 3, TASK-108): a customer-anomaly look (same draw as a customer, or forced) + the Variant
 --     attribute (blank, mirror, raincoat) the client applies locally (TASK-110). Counts in the cap like any NPC;
@@ -21,7 +21,7 @@
 --     collides with everything but Npc: their collision box fills the space under the lamp arm, and a pole moved in
 --     Studio onto a sidewalk lane walled the NPCs in (playtest 2026-10-11, PROVISIONAL). Players still collide;
 --   - spacing (same playtest, PROVISIONAL): a graph walk waits behind another rig standing or walking the same way
---     less than SPACING studs ahead (Blocked; Walker gate, bounded). The thief never waits; nobody waits for a pair
+--     less than SPACING studs ahead (Blocked; Walker gate, bounded). Nobody waits for a pair
 --     partner (it keeps itself beside its leader);
 --   - queue slots Q1..Q5 are never intermediate route steps (MAP-01 §9.1 note): AvoidQueue on by default;
 --   - at most ROUTES_PER_FRAME A* searches per frame (§12.3);
@@ -45,20 +45,20 @@ local Walker = require(script.Walker)
 local Modux = require(ServerScriptService.server.Modux)
 
 -- Who the NPC is (architecture.md §19.3). "Actor": customer anomaly (wave 3, CustomerService:SpawnActor).
-export type Role = "Customer" | "Thief" | "Actor"
+export type Role = "Customer" | "Actor"
 
 -- Rig of an active NPC (model, HumanoidRootPart, Humanoid, prompt anchors)
 export type Rig = Pool.Rig
 
 -- Customer-anomaly variant (architecture.md §19.13; ANM-001 blank, ANM-004 mirror, ANM-005 raincoat). Rig attribute.
 -- shake..stare: V2 family A odd customers (DEC-254, TASK-292)
-export type Variant = "blank" | "mirror" | "raincoat" | "shake" | "neck" | "eyes" | "bighead" | "float" | "stare"
+export type Variant = "blank" | "mirror" | "raincoat" | "shake" | "neck" | "eyes" | "bighead" | "float" | "stare" | "banger"
 
 export type Npc = {
 	Id: number,
 	Rig: Pool.Rig,
 	Role: Role,
-	CustomerType: string, -- "" for the thief
+	CustomerType: string,
 	Species: string,
 	Outfit: string,
 	Variant: Variant?, -- Role "Actor" only
@@ -68,7 +68,7 @@ export type Npc = {
 }
 
 export type SpawnRequest = {
-	Role: Role?, -- default "Customer". "Thief": Quick Quentin; CustomerType/Species/Outfit are ignored
+	Role: Role?, -- default "Customer"
 	Variant: Variant?, -- required with Role "Actor", refused with any other role
 	CustomerType: string?, -- default: weighted draw among the types unlocked this shift (Look.PickType)
 	Species: string?, -- forced species (must belong to the type)
@@ -83,7 +83,7 @@ export type SpawnRequest = {
 
 export type WalkOptions = {
 	AvoidQueue: boolean?, -- default true: Q1..Q5 only as start or goal
-	AvoidCrossings: boolean?, -- default false (thief, wave 2)
+	AvoidCrossings: boolean?, -- default false: skip crosswalk edges
 	Face: boolean?, -- default true: on arrival, face the MapPoint direction of the goal (when it is a point)
 }
 
@@ -112,9 +112,6 @@ const CROWD = 1.6 -- studs: centre-to-centre minimum before a rig steps onto a c
 const CROWD_MAX = 4 -- seconds a rig waits for the room before it goes anyway
 const FOLDER_NAME = "Npcs"
 const PARKING_NAME = "NpcPool"
-const THIEF_NPC = "NPC-007" -- Species/Outfits.ReservedFor of Quick Quentin
-const THIEF_HAT = "ThiefHat" -- kit name, Assets.Crew.Hats (AST-053, DEC-159)
-const THIEF_KEY = "Thief" -- pool geometry key suffix (no customer type, no accessories)
 const VARIANT_ATTRIBUTE = "Variant" -- rig attribute read by the client (TASK-110)
 const WALKER_ATTRIBUTE = "FromWalker" -- adopted passer-by: its Pedestrians slot (TASK-163/164)
 const PLAIN_KEY = "Plain" -- pool geometry key suffix of a rig without type accessories
@@ -129,6 +126,7 @@ const VARIANTS: { [string]: true } = {
 	bighead = true,
 	float = true,
 	stare = true,
+	banger = true, -- TASK-591: ANM-022 the head banger
 }
 const NIGHT_PACK = "Night"
 const MAX_ID = 65535 -- NpcId wire range (Customers id, Sale.Npc)
@@ -342,23 +340,16 @@ function NpcService:PickSpawnPoint(isNight: boolean, rng: Random): string
 	return list[#list].Point
 end
 
--- Look of a spawn request: customer draw, or the reserved thief look (Role "Thief"). nil + reason when refused;
+-- Look of a spawn request (customer draw). nil + reason when refused;
 -- the third value is a WarnOnce key for refusals that repeat every spawn attempt (no type unlocked).
 function NpcService:Choose(r: SpawnRequest, rng: Random): (Look.Choice?, string?, string?)
 	const role = r.Role or "Customer"
-	if role == "Thief" then
-		const reserved, problem = Look.Reserved(THIEF_NPC)
-		if reserved == nil then
-			return nil, problem, nil
-		end
-		return { CustomerType = "", Species = reserved.Species, Outfit = reserved.Outfit }, nil, nil
-	end
 	if role ~= "Customer" and role ~= "Actor" then
 		return nil, `unknown Role '{role}'`, nil
 	end
 	if role == "Actor" then
 		if r.Variant == nil or not VARIANTS[r.Variant] then
-			return nil, `Role Actor needs a known Variant (blank, mirror, raincoat, shake, neck, eyes, bighead, float, stare), got '{tostring(r.Variant)}'`, nil
+			return nil, `Role Actor needs a known Variant (blank, mirror, raincoat, shake, neck, eyes, bighead, float, stare, banger), got '{tostring(r.Variant)}'`, nil
 		end
 	elseif r.Variant ~= nil then
 		return nil, `Variant is for Role Actor only (Role '{role}')`, nil
@@ -373,7 +364,7 @@ function NpcService:Choose(r: SpawnRequest, rng: Random): (Look.Choice?, string?
 end
 
 -- New NPC at a spawn point. Returns its NpcId, or nil (service off, pool full, bad request, no binding).
--- Every role counts in the cap (Content.Flow.MaxNpc). The thief keeps the WalkSpeed its owner sets (ThiefService).
+-- Every role counts in the cap (Content.Flow.MaxNpc).
 function NpcService:Spawn(request: SpawnRequest?): number?
 	if not self.Enabled then
 		return nil
@@ -382,7 +373,6 @@ function NpcService:Spawn(request: SpawnRequest?): number?
 	const rng = r.Rng or self.Random
 	const info = self.Dependencies.RoundService:Info()
 	const role: Role = r.Role or "Customer"
-	const isThief = role == "Thief"
 
 	const choice, problem, onceKey = self:Choose(r, rng)
 	if choice == nil then
@@ -403,7 +393,7 @@ function NpcService:Spawn(request: SpawnRequest?): number?
 	const point = MapIndex.FindPoint(from)
 	const rotation = if r.At then r.At.Rotation elseif point then point.Rotation else CFrame.identity
 	const floor = if r.At then r.At.Position else position
-	const plain = r.Plain == true and not isThief
+	const plain = r.Plain == true
 
 	const id = self:AllocateId()
 	const parking = self.Parking
@@ -412,14 +402,12 @@ function NpcService:Spawn(request: SpawnRequest?): number?
 		return nil
 	end
 
-	const poolKey =
-		Look.Key(choice.Species, if isThief then THIEF_KEY elseif plain then PLAIN_KEY else choice.CustomerType)
+	const poolKey = Look.Key(choice.Species, if plain then PLAIN_KEY else choice.CustomerType)
 	const rig = Pool.acquire(self.Pool, poolKey, function(): Pool.Rig?
 		const spec: Pool.BuildSpec = {
 			Species = choice.Species,
 			Outfit = choice.Outfit,
-			CustomerType = if isThief or plain then nil else choice.CustomerType,
-			Hat = if isThief then THIEF_HAT else nil,
+			CustomerType = if plain then nil else choice.CustomerType,
 			Group = GROUP,
 			Parking = parking,
 		}
@@ -442,12 +430,10 @@ function NpcService:Spawn(request: SpawnRequest?): number?
 	model:SetAttribute("NpcId", id)
 	model:SetAttribute(VARIANT_ATTRIBUTE, if role == "Actor" then r.Variant else nil)
 	model:SetAttribute(WALKER_ATTRIBUTE, r.Walker)
-	if not isThief then
-		-- +-Movement.Speed.Variation per NPC (PROVISIONAL, playtest 2026-10-12): a queue does not walk in lockstep
-		const variation = Content.Movement.Speed.Variation
-		rig.Humanoid.WalkSpeed = Content.CustomerTypes.ByKey[choice.CustomerType].WalkSpeed
-			* (1 + (math.random() * 2 - 1) * variation)
-	end
+	-- +-Movement.Speed.Variation per NPC (PROVISIONAL, playtest 2026-10-12): a queue does not walk in lockstep
+	const variation = Content.Movement.Speed.Variation
+	rig.Humanoid.WalkSpeed = Content.CustomerTypes.ByKey[choice.CustomerType].WalkSpeed
+		* (1 + (math.random() * 2 - 1) * variation)
 	model:PivotTo(CFrame.new(floor + Vector3.new(0, LIFT, 0)) * rotation)
 	model.Parent = folder
 	if rig.Root:CanSetNetworkOwnership() then
@@ -620,19 +606,17 @@ function NpcService:WalkTo(id: number, target: string, options: WalkOptions?): b
 			table.insert(points, 1, way[index])
 		end
 	end
-	-- spacing gate (the thief runs: it never waits)
-	const gate: Walker.Gate? = if npc.Role == "Thief"
-		then nil
-		else function(direction: Vector3): boolean
-			return self:Blocked(id, direction)
-		end
+	-- spacing gate
+	const gate: Walker.Gate = function(direction: Vector3, remaining: number): boolean
+		return self:Blocked(id, direction, remaining)
+	end
 	const done = Walker.Follow(npc.Rig, points, alive, function(index: number)
 		if index > lead then
 			npc.Node = path[index - lead + 1]
 		elseif index == lead then
 			npc.Node = path[1]
 		end
-	end, self:Crossing(id, crossings), gate, { Ease = npc.Role ~= "Thief" })
+	end, self:Crossing(id, crossings), gate, { Ease = true })
 	if not done or not alive() then
 		return false
 	end
@@ -647,8 +631,10 @@ function NpcService:WalkTo(id: number, target: string, options: WalkOptions?): b
 end
 
 -- Spacing gate of NPC `id` walking along `direction` (flat unit): true when another rig (not a pair partner, not
--- seated) stands or walks the same way less than SPACING studs ahead. Rigs coming at it are passed, not waited for.
-function NpcService:Blocked(id: number, direction: Vector3): boolean
+-- seated) stands or walks the same way less than SPACING studs ahead. Rigs coming at it are passed, not waited for, and
+-- so is a rig past the waypoint (`remaining` studs away): the first tutorial customer standing at the pickup counter
+-- held the next one up to GATE_MAX s just short of Q1, so its Take Order showed late (owner 2026-10-20).
+function NpcService:Blocked(id: number, direction: Vector3, remaining: number?): boolean
 	const npc = self.Active[id]
 	if npc == nil then
 		return false
@@ -665,6 +651,9 @@ function NpcService:Blocked(id: number, direction: Vector3): boolean
 		const offset = Vector3.new(root.Position.X - position.X, 0, root.Position.Z - position.Z)
 		const distance = offset.Magnitude
 		if distance < 1e-3 or distance > SPACING or offset:Dot(direction) < SPACING_CONE * distance then
+			continue
+		end
+		if remaining ~= nil and offset:Dot(direction) >= remaining then
 			continue
 		end
 		const velocity = root.AssemblyLinearVelocity

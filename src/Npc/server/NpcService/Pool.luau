@@ -30,8 +30,8 @@ export type Pool = {
 export type BuildSpec = {
 	Species: string,
 	Outfit: string,
-	CustomerType: string?, -- nil for the thief (no customer accessories)
-	Hat: string?, -- kit hat replacing the cap ("ThiefHat" for the thief, DEC-159)
+	CustomerType: string?, -- nil = no customer accessories (plain passer-by)
+	Hat: string?, -- kit hat replacing the cap (Assets.Crew.Hats); none in use
 	Group: string, -- collision group of every part (architecture.md §12.3)
 	Parking: Instance,
 }

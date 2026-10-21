@@ -14,6 +14,9 @@
 	  Voices   none blocks the gate: Walt's tutorial lines (rookies) load in the background after the curtain lifts
 	           (BackgroundVoices; playtest 2026-10-11: the gate took ~45 s with all of them blocking)
 	Every step has its own timeout and the whole gate STEP_CAP (18 s); a step that fails or times out never blocks the join.
+	Intro (owner 2026-10-20): in the lobby only (not in a match), once the steps are done, the "Powered by Modux" sting plays over the curtain (attribute
+	Intro on the ScreenGui; Loading/Boot plays it and sets IntroDone). It runs before ClientReady so it never covers
+	the start of a scene; INTRO_CAP s at most, skipped after a "Skip loading".
 	After ClientReady the curtain stays while the server says a scene is Waiting for the other participants
 	(Cutscene set) up to the server's ReadyTimeout + margin, then lifts (attribute Done on the ScreenGui).
 
@@ -45,6 +48,7 @@ const MAP_TIMEOUT = 14 -- s for the meshes and textures of the map / lobby (the 
 const ASSET_TIMEOUT = 12 -- s for PreloadAsync of sounds and images
 const TUTORIAL_VOICE_TIMEOUT = 150 -- s the background load of Walt's tutorial lines may run (rookies only)
 const STEP_CAP = 18 -- s for all steps together (the server's ReadyTimeout stays 10 s above it)
+const INTRO_CAP = 6 -- s the gate waits for the intro sting (3.9 s long) before it goes on anyway
 const CREW_MARGIN = 3 -- s past the server's ReadyTimeout that the curtain waits for the others
 const POLL = 0.1
 -- weights of the steps on the bar
@@ -363,6 +367,9 @@ function LoadingController:Run()
 		self:Mark(key, 1)
 	end
 
+	-- the sting plays before the server may start a scene, so it never covers one
+	self:PlayIntro()
+
 	-- the server may start a scene now
 	self:SendReady()
 
@@ -382,6 +389,25 @@ function LoadingController:Run()
 
 	self:SetStatus("Done")
 	self:Lift()
+end
+
+-- Asks Loading/Boot for the "Powered by Modux" sting and waits until it ended (IntroDone), the player skipped or INTRO_CAP.
+-- Lobby only (owner 2026-10-20): never on the way into a match
+function LoadingController:PlayIntro()
+	const gui = self:FindGui()
+	if gui == nil or self.Skipped or not self.Dependencies.PlaceController:Is("Lobby") then
+		return
+	end
+	gui:SetAttribute("Intro", true)
+	const deadline = os.clock() + INTRO_CAP
+	while
+		gui.Parent ~= nil
+		and gui:GetAttribute("IntroDone") ~= true
+		and not self.Skipped
+		and os.clock() < deadline
+	do
+		task.wait(POLL)
+	end
 end
 
 function LoadingController:SendReady()

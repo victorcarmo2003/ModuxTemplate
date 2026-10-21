@@ -81,6 +81,15 @@ function Log.onboarding(player: Player, step: number, stepName: string?, props: 
 	RoMetrics:LogOnboardingFunnelStepEvent(player, step, stepName, props)
 end
 
+-- Declared steps of a funnel (owner 2026-10-20): the panel shows a step nobody reached with 0 instead of treating the
+-- last step seen as the end. RoMetrics 0.4.0+ (DefineFunnel); an older SDK has no such method and this is a no-op.
+function Log.define(funnel: string, steps: { string })
+	const define = (RoMetrics :: any).DefineFunnel
+	if define ~= nil then
+		(define :: any)(RoMetrics, funnel, steps)
+	end
+end
+
 -- Step of a lobby window funnel (panel_shop / panel_classes / panel_codes; MetricsService/Lobby.luau owns the session
 -- of the open window). Services call it where the act happens (equip, buy, code); nothing outside a lobby server.
 local panelHook: ((player: Player, panel: string, step: number, name: string, props: Props?) -> ())? = nil

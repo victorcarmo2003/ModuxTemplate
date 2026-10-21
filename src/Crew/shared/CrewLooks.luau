@@ -163,7 +163,6 @@ const looks: CrewLooks = {
 		civil_f = { Day = "rbxassetid://112012204265828", Mid = "rbxassetid://75810283065984", Night = "rbxassetid://72279489985274" }, -- T_Civil_F_<Pack>
 		civil_g = { Day = "rbxassetid://137849749893658", Mid = "rbxassetid://95950344902436", Night = "rbxassetid://76884338625302" }, -- T_Civil_G_<Pack>
 		civil_h = { Day = "rbxassetid://123735535525882", Mid = "rbxassetid://85568088967052", Night = "rbxassetid://129277167106216" }, -- T_Civil_H_<Pack>
-		thief = { Day = "rbxassetid://91137161763918" }, -- T_Civil_Thief_<Pack>
 	},
 	Atlas = { Mid = "rbxassetid://132760639192955", Night = "rbxassetid://123212356689218" },
 }

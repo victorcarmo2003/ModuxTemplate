@@ -11,8 +11,11 @@ type Track = {
 export type Public = {
 	Enabled: boolean,
 	LastTick: number,
+	Stand: Model?,
 	Tracks: { [Player]: Track },
 	Setup: (self: Public) -> (),
+	GearStand: (self: Public) -> Model?,
+	AtOpenStand: (self: Public, position: Vector3) -> boolean,
 	SetStage: (self: Public, player: Player, track: Track, stage: Stage, t: number) -> (),
 	Clear: (self: Public, player: Player, track: Track) -> (),
 	SpawnFor: (self: Public, root: BasePart) -> Vector3,

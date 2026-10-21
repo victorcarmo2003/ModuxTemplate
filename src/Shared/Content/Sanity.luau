@@ -33,10 +33,15 @@ export type Sanity = {
 	DarkDelay: number, -- seconds in the dark before the loss starts
 	DarkPerSecond: number, -- lost per second in the dark
 	DarkPhases: { string }, -- keys of Shift where the dark counts
+	DreadAfter: number, -- seconds in the dark before the dread (the punishment of the lights left off)
+	DreadPerSecond: number, -- lost per second in the dark once the dread is on (instead of DarkPerSecond)
+	DreadAttribute: string, -- Player attribute (true while the dread is on): the client turns the place terrifying
 	Coffee: number, -- restored by a coffee (25; Barista 35 by CoffeeRestore)
 	CoffeeDrinkTime: number, -- seconds of the drink animation
 	CoffeeNightOnly: boolean, -- Provisional (Q-170)
 	FirstNightStart: number, -- Night 1 only: the night starts at this value (capped by the class Max), teaches the coffee
+	-- Night 1: Walt's coffee call rings the first time an Active member's sanity falls to this value or below (TASK-596)
+	CoffeeCallAt: number,
 	CoffeeStock: number, -- doses in the coffee machine when the trailer comes into use (once per run)
 	CoffeeHint: number, -- seconds the Night 1 coffee emphasis lasts after Walt's coffee call ends
 	BasicLampRadius: number, -- studs of the factory lamp beyond its LightZone volumes (0: LZ-1 and LZ-2 only)
@@ -55,10 +60,18 @@ const sanity: Sanity = {
 	DarkDelay = 5, -- FEAT-020; owner 2026-10-18 "a sanidade está descendo muito rápido" (was 3)
 	DarkPerSecond = 0.5, -- FEAT-020; owner 2026-10-18 (was 1). Fractions add up in VitalService (DarkOwed)
 	DarkPhases = { "Call", "Prep", "Night" }, -- not NightEnd: the night is already won (L2-03, Provisional)
+	-- owner 2026-10-19 ("se ele passar muito tempo com as luzes apagadas, acontece alguma coisa ... deixando o ambiente bem
+	-- aterrorizante e diminuir a sanidade dele um pouco mais rápido"). Provisional, judged in Play
+	DreadAfter = 25,
+	DreadPerSecond = 1.5,
+	DreadAttribute = "DarkDread",
 	Coffee = 25, -- FEAT-021
 	CoffeeDrinkTime = 1.5, -- FEAT-021
 	CoffeeNightOnly = true, -- Q-170 option A (Provisional): brewed by day, drunk only at night
-	FirstNightStart = 50, -- Provisional (user request 2026-10-11, Night 1 teaches coffee); progression.md "10 doses"
+	-- TASK-596 (owner 2026-10-19, Provisional, Q-205): Night 1 starts at 60 (was 50) and the coffee call waits for the first
+	-- drop to CoffeeCallAt, so the rookie digests the kitchen tutorial before the coffee lesson. Other nights: Start (DEC-056)
+	FirstNightStart = 60, -- Provisional (user request 2026-10-11, Night 1 teaches coffee); progression.md "10 doses"
+	CoffeeCallAt = 50, -- Provisional (TASK-596)
 	CoffeeStock = 10, -- Provisional: initial doses; refills are bought at the Mart (Ground Coffee, 10 doses)
 	CoffeeHint = 25, -- Provisional: HUD emphasis ends at the first coffee or this many seconds after the call
 	BasicLampRadius = 0, -- Provisional (TASK-081, DEC-189)

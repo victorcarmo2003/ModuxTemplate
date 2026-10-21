@@ -4,22 +4,17 @@
 --   * Fog: the Atmosphere turns thick and red over LightController's preset (ctx.Light.Applied), and banks of red fog
 --     (particles) roll over the patio and the street, outside the service window. Rises over FOG_IN while the record is
 --     Signal / Active, goes over FOG_OUT after (the last Atmosphere write is exactly the preset again).
---   * The runner (owner 2026-10-18: "um boneco todo preto com olhos vermelhos vindo correndo até ele"): a tall black
---     figure with red eyes appears at the end of the street at RUN_FROM s of the omen and RUNS to the service window,
---     reaching it the moment the fog does (Signal end); during the bangs it beats on the glass with both arms, lunging
---     on each blow of the scene; at the end it backs off into the fog and is gone.
+--   * TASK-593 (owner Play 2026-10-19): the single runner is gone. In its place SEVERAL ghosts walk out of the fog to the
+--     window and the door, seen with the bare eye (the scene's named Silhouettes, Scene/Kit/Silhouette, Seen "Eyes");
+--     what beats on the glass is never seen: each blow leaves a black paw print and rocks the pane (Glass "Paw").
 --   * cue jumpscare: only the client whose UserId % 65536 = Entity shows the face (Kit/Jumpscare).
-local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local Workspace = game:GetService("Workspace")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Effect = require(script.Parent.Parent.Effect)
 local Jumpscare = require(script.Parent.Kit.Jumpscare)
-local RunnerKit = require(script.Parent.Kit.Runner)
 
 const ENTITY_MOD = 65536
 const FOG_IN = 8
@@ -36,17 +31,6 @@ const FOG_SIZE = Vector3.new(130, 2, 68)
 const FOG_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 const FOG_RATES = { 46, 30 } -- particles/s per bank at full fog (owner 2026-10-18: "mais névoa vermelha")
 
--- the runner
-const WINDOW_POINT = "SCENE-WINDOW-EYES" -- outside the service window (restaurant_bind)
-const RUN_START = Vector3.new(-42.5, 0.45, 72) -- end of the street, in the fog
-const RUN_FROM = 4 -- s into the omen it appears
-const OMEN = 12 -- Rules/ANM-021 OmenFor
-const STOP_OUT = 1.6 -- studs from the window point to its chest
-const BLOWS = { 0, 0.6, 1.3, 8.5, 9, 9.4 } -- s into the bangs (the scene's window_slam steps)
-const RUNNER_SCALE = 1.5 -- ~11 studs tall: reads from the counter down the street (owner 2026-10-18: "muito pequeno")
-
-type Runner = { Model: Model, Root: BasePart, Arms: { BasePart }, Window: CFrame }
-
 type State = {
 	Alpha: number,
 	Rising: boolean,
@@ -54,9 +38,7 @@ type State = {
 	Done: boolean,
 	Box: Part,
 	Emitters: { ParticleEmitter },
-	Runner: Runner?,
 	Phase: string,
-	PhaseAt: number, -- os.clock when this client saw the phase start (minus its elapsed)
 	Connection: RBXScriptConnection?,
 }
 
@@ -117,45 +99,6 @@ local function fogBox(parent: Instance): (Part, { ParticleEmitter })
 	return box, emitters
 end
 
--- the figure itself: Kit/Runner (shared with the outside chase)
-local function buildRunner(parent: Instance, window: CFrame): Runner
-	const model = RunnerKit.Build(parent, "ANM-021_Runner", RUNNER_SCALE)
-	return { Model = model, Root = model.PrimaryPart :: BasePart, Arms = {}, Window = window }
-end
-
-local function pose(runner: Runner, at: CFrame)
-	runner.Model:PivotTo(at)
-end
-
--- MapPoint by name: ctx.Point first, else the tagged part (ctx.Point only knows the points MapIndex indexed)
-local function pointOf(ctx: Effect.Context, id: string): CFrame?
-	const known = ctx.Point(id)
-	if known ~= nil then
-		return known
-	end
-	for _, instance in CollectionService:GetTagged("MapPoint") do
-		if instance.Name == id and instance:IsA("BasePart") then
-			return instance.CFrame
-		end
-	end
-	return nil
-end
-
--- window spot: just outside the glass, facing in
-local function windowCFrame(ctx: Effect.Context): CFrame?
-	const point = pointOf(ctx, WINDOW_POINT)
-	if point == nil then
-		warn("[ANM-021] no MapPoint " .. WINDOW_POINT .. ": the runner is skipped")
-		return nil
-	end
-	const kitchen = pointOf(ctx, "TRL")
-	const spot = Vector3.new(point.Position.X, 0.45, point.Position.Z)
-	const inward = if kitchen ~= nil then (kitchen.Position - spot) * Vector3.new(1, 0, 1) else Vector3.new(0, 0, -1)
-	const dir = if inward.Magnitude > 1e-3 then inward.Unit else Vector3.new(0, 0, -1)
-	const stand = spot - dir * STOP_OUT
-	return CFrame.lookAt(stand, stand + dir)
-end
-
 local function step(ctx: Effect.Context, state: State, dt: number)
 	if state.Rising and not state.Orphan then
 		state.Alpha = math.min(1, state.Alpha + dt / FOG_IN)
@@ -167,52 +110,7 @@ local function step(ctx: Effect.Context, state: State, dt: number)
 	end
 	write(ctx, state.Alpha)
 
-	const runner = state.Runner
-	if runner ~= nil then
-		const t = os.clock() - state.PhaseAt
-		const window = runner.Window
-		if state.Phase == "Signal" then
-			const run = math.clamp((t - RUN_FROM) / (OMEN - RUN_FROM), 0, 1)
-			if t < RUN_FROM then
-				runner.Model.Parent = nil
-			else
-				runner.Model.Parent = ctx.Folder()
-				const from = Vector3.new(RUN_START.X, window.Position.Y, RUN_START.Z)
-				const eased = run * run -- speeds up as it comes
-				const at = from:Lerp(window.Position, eased)
-				const bob = math.abs(math.sin(t * 13)) * 0.35
-				const lean = CFrame.Angles(math.rad(-18), 0, 0)
-				pose(runner, CFrame.lookAt(at, at + window.LookVector) * CFrame.new(0, bob, 0) * lean)
-			end
-		elseif state.Phase == "Active" then
-			runner.Model.Parent = ctx.Folder()
-			-- lunge on each blow, sway in between
-			local lunge = 0
-			for _, blow in BLOWS do
-				const d = t - blow
-				if d >= 0 and d < 0.35 then
-					lunge = math.max(lunge, 1 - d / 0.35)
-				end
-			end
-			const sway = math.sin(t * 2.3) * math.rad(5)
-			pose(runner, window * CFrame.new(0, 0, -0.9 * lunge) * CFrame.Angles(math.rad(-10 - 18 * lunge), sway, 0))
-		else
-			-- backs off into the fog, then gone
-			const back = math.clamp(t / 2.5, 0, 1)
-			pose(runner, window * CFrame.new(0, 0, 9 * back))
-			for _, p in runner.Model:GetDescendants() do
-				if p:IsA("BasePart") then
-					p.LocalTransparencyModifier = back
-				end
-			end
-			if back >= 1 then
-				runner.Model:Destroy()
-				state.Runner = nil
-			end
-		end
-	end
-
-	if state.Alpha <= 0 and not state.Rising and state.Runner == nil then
+	if state.Alpha <= 0 and not state.Rising then
 		state.Done = true
 		if state.Connection ~= nil then
 			state.Connection:Disconnect()
@@ -230,7 +128,6 @@ return {
 	Mount = function(ctx: Effect.Context, occ: Effect.Occurrence)
 		const record = Vide.untrack(occ.Record)
 		const box, emitters = fogBox(ctx.Folder())
-		const window = windowCFrame(ctx)
 		const state: State = {
 			Alpha = if record.Phase ~= "Signal" then 1 else math.clamp(occ.Elapsed() / FOG_IN, 0, 1),
 			Rising = record.Phase == "Signal" or record.Phase == "Active",
@@ -238,9 +135,7 @@ return {
 			Done = false,
 			Box = box,
 			Emitters = emitters,
-			Runner = if window ~= nil then buildRunner(ctx.Folder(), window) else nil,
 			Phase = record.Phase,
-			PhaseAt = os.clock() - occ.Elapsed(),
 			Connection = nil,
 		}
 		ctx.Audio:Loop("amb_fog", nil, true)
@@ -252,10 +147,7 @@ return {
 		Vide.effect(function()
 			const phase = occ.Record().Phase
 			Vide.untrack(function()
-				if phase ~= state.Phase then
-					state.Phase = phase
-					state.PhaseAt = os.clock() - occ.Elapsed()
-				end
+				state.Phase = phase
 				state.Rising = phase == "Signal" or phase == "Active"
 				if not state.Rising then
 					ctx.Audio:Loop("amb_fog", nil, false)
@@ -267,7 +159,6 @@ return {
 			state.Rising = false
 			if state.Phase == "Signal" or state.Phase == "Active" then
 				state.Phase = "Resolved"
-				state.PhaseAt = os.clock()
 			end
 			ctx.Audio:Loop("amb_fog", nil, false)
 		end)

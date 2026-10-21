@@ -7,8 +7,8 @@
 -- product bay (Shelves.luau: tag StockShelf, attribute Package) always gives one box of its package with take_box (anchor
 -- Prompt_TakeBox, text "Take <Package name>"): no counter, it never runs out. The box is the package Tool
 -- (ItemService:Give, Count = Package.Amount): hotbar and package limit (2, bear 3) are ItemService's (package_limit).
--- The limit lives in the stations (Stock / Capacity): Restock at the station is the existing KitchenService one (partial
--- transfer, the rest stays in the box, empty box goes away), so the crew keeps walking to the stock room to refill.
+-- The limit lives in the stations (Stock / Capacity): Restock at the station is the existing KitchenService one (fills
+-- up to Capacity and the box always leaves the hand, owner 2026-10-19), so the crew keeps walking to the stock room.
 --
 -- A bay of a package that is not on sale (KitchenService:IsBlocked of its ingredient) has its prompt off and refuses
 -- take_box. The PHONE-R phone keeps only the boss calls (answer_phone, BossService); nothing here binds it.

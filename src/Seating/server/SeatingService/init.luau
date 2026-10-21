@@ -1040,9 +1040,9 @@ function SeatingService:BuyAt(player: Player, anchor: Instance)
 	end
 	const group = GROUP_OF_UPGRADE[key]
 	if group ~= nil then
-		self.Dependencies.RunStateService:Notify("all", ADDED_NOTICE, index or (group.First + self:Owned(group) - 1))
+		self.Dependencies.RunStateService:Notify("all", ADDED_NOTICE, index or (group.First + self:Owned(group) - 1), player)
 	else
-		self.Dependencies.RunStateService:Notify("all", BOUGHT_NOTICE, Content.Upgrades.IndexOf[key])
+		self.Dependencies.RunStateService:Notify("all", BOUGHT_NOTICE, Content.Upgrades.IndexOf[key], player)
 	end
 	self:Refresh()
 end

@@ -12,6 +12,9 @@
 --                  breaks it (wait_call was a waiting row seen only when the phone was late: 1 player in 7 days).
 --                  Funnel step = index + 1 (1 = began, TutorialService; last = complete {how = done | skip | over})
 --   TutorialMilestone  step key -> TutorialFunnel index; keys not listed (waiting rows) are not logged
+--   AnomalyFunnel  the per-anomaly funnel anomaly_<key> (owner request 2026-10-20, Provisional): step i = index i, one
+--                  session per occurrence. Step 4 is the per-player outcome and is named by the result instead
+--                  (resolved / failed / cut; MetricsService.AnomalyStep)
 --   UiRate         s between two MetricUi packets of one player (the server drops faster ones)
 local Table = require(script.Parent.Table)
 
@@ -20,6 +23,7 @@ export type Metrics = {
 	TutorialSteps: { string },
 	TutorialFunnel: { string },
 	TutorialMilestone: { [string]: number },
+	AnomalyFunnel: { string },
 	UiRate: number,
 }
 
@@ -90,6 +94,7 @@ const metrics: Metrics = {
 		serve = 6,
 		money = 7,
 	},
+	AnomalyFunnel = { "start", "signal", "active" },
 	UiRate = 0.5,
 }
 

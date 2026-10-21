@@ -40,6 +40,7 @@ return {
 	AnomalyKey = conch.args.enum_from_array("anomaly_key", PLAYABLE_KEYS),
 	AnomalyAction = conch.args.enum_from_array("anomaly_action", { "trigger", "resolve", "wrong", "stop" }),
 	ArrivalsState = conch.args.enum_from_array("arrivals_state", { "on", "off" }),
+	GearAction = conch.args.enum_from_array("gear_action", { "open", "close", "state" }),
 	-- Numbers (validated again in the callback: the server never trusts the parsed value)
 	Day = conch.args.number,
 	Night = conch.args.number,

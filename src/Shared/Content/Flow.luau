@@ -8,7 +8,7 @@
 -- shift. Point = MapPoint/NpcNode id of the MAP-01 binding (attribute Spawn / Despawn on the point). Every point is a
 -- building door (D1, DR-APT) or a street end beyond the player limits, out of sight of the Pad and the Mart; route to
 -- Q5 <= ~100 studs (<= 10 s at 13 studs/s). Weight 0 = known point, not drawn (SP-A: 136 studs; SP-B: 151 studs).
--- The thief keeps Content.Thief.Spawn / Exits; pedestrians start/end on the ends of Content.WalkPaths.
+-- Pedestrians start/end on the ends of Content.WalkPaths.
 -- Groups (TASK-144; FEAT-038; Q-182 A, Provisional): one spawn attempt may bring a pair (leader + partner) that takes
 -- ONE queue slot, orders 2 hot dogs, pays per hot dog and counts 2 on the shift grade. Chance per attempt by shift
 -- from FromDay / FromNight; a pair needs room for 2 in the customer cap and the NPC cap, else 1 customer spawns.
@@ -96,7 +96,10 @@ export type Flow = {
 	Adopt: Adopt, -- TASK-163 (Provisional)
 	Guarantee: Guarantee, -- Q-202 (Provisional)
 	FullRetry: number, -- s: a spawn attempt skipped by a full counter tries again after this (DEC-241, Provisional)
+	ReopenPause: number, -- s with no new arrival after the service window reopens (owner 2026-10-20, Provisional)
 	NightQueueSize: number, -- counter slots at night, whatever the Counter level (TASK-287, Provisional)
+	-- counter slots at night by connected members 1..4 (DEC-320, Q-413: 2 slots with 3+ players); wins over NightQueueSize
+	NightQueueByParty: { number },
 	-- s (min, max) after the counter frees at night before the next customer may come (owner 2026-10-18: "quando eu
 	-- recuso um cliente vem outro logo após"); drawn again each time
 	CounterGap: { number },
@@ -182,9 +185,11 @@ const flow: Flow = {
 	-- DEC-241 (user decision 2026-10-13, Provisional): the counter holds 1 customer by default, so most attempts meet it
 	-- full; instead of waiting the whole interval, an attempt skipped for a full counter tries again after ~3.5 s.
 	FullRetry = 3.5,
+	ReopenPause = 15,
 	-- TASK-287 (owner request 2026-10-14, Provisional): at night ONE NPC at the counter at a time. An anomaly actor
 	-- (CustomerService:SpawnActor) takes the ordinary customer's turn; the next one comes when the current one leaves.
 	NightQueueSize = 1,
+	NightQueueByParty = { 1, 1, 2, 2 }, -- DEC-320 (Q-413), Provisional
 	CounterGap = { 10, 20 }, -- owner 2026-10-18, Provisional
 	CounterLeave = 5, -- owner 2026-10-18: "a contagem deve só iniciar quando o cliente que estava na frente sair"
 }

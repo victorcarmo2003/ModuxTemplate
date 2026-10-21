@@ -81,7 +81,8 @@ const TOP = 6
 const BIG = 32 -- money, day and clock: ONE height, text size and outline so they sit on the same line (2026-10-12; 38 -> 32 owner 2026-10-17)
 const BIG_TEXT = 17
 -- round buttons on touch (gear, cart): a bit under the 44 px target, the pair sits in the corner (owner 2026-10-17: too big)
-const TOUCH_BUTTON = 38
+const TOUCH_BUTTON = 54 -- gear / cart on a touch screen (38 -> 54 owner 2026-10-20: too small on a phone at UI scale 0.6)
+const ROUND_BUTTON = 40 -- gear / cart with a mouse / controller (was BIG, 32; owner 2026-10-20)
 const ROW_GAP = 6
 const ROW_MIN_WIDTH = 520 -- px at UI scale 1: the row (day 84 + money 84 + gaps + buttons) must clear the centred clock (96 px)
 -- Toasts (owner request 2026-10-12): bottom centre, stacking up. The bottom edge sits above the Roblox hotbar (84 px, as
@@ -91,7 +92,7 @@ const TOAST_SIDE = 180 -- px at UI scale 1 kept free on each side (>= 180)
 const TOAST_WIDTH = 220
 const TOAST_MIN_WIDTH = 140 -- portrait phones cannot keep 180 px on both sides: the card shrinks to this
 const SHOP_PAD = Enum.KeyCode.DPadRight -- the controller button of the shop (ShopController)
-const NUDGE_TOP = 128 -- px under TOP: below the gear / cart column (2 x 38 + 2 key labels + gaps)
+const NUDGE_TOP = 132 -- px under TOP: below the gear / cart column (2 x ROUND_BUTTON + 2 key labels + gaps)
 const SHORT_SCREEN = 480 -- px at UI scale 1: under this height 2 toasts show at a time, not 3
 
 return function(props: Props): Frame
@@ -119,7 +120,7 @@ return function(props: Props): Frame
 	end
 	-- round buttons: pill height with a mouse / controller, a full touch target on a touch screen
 	const buttonSize = function(): number
-		return if device() == "Touch" then TOUCH_BUTTON else BIG
+		return if device() == "Touch" then TOUCH_BUTTON else ROUND_BUTTON
 	end
 	const calm = function(): boolean
 		return props.Calm ~= nil and props.Calm()
@@ -258,6 +259,10 @@ return function(props: Props): Frame
 						return Money(math.floor(rolled() + 0.5))
 					end,
 					Bump = props.Cash,
+					-- green while the money rolls up to the coins that just landed (TASK-597)
+					TextColor = function()
+						return if rolled() < props.Cash() - 0.5 then Theme.Color.Green else Theme.Color.Text
+					end,
 					Shown = function()
 						return revealed("money")
 					end,

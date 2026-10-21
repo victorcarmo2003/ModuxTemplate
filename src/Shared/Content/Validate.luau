@@ -141,7 +141,34 @@ local function checkEffects(name: string, index: number, key: string, effects: {
 	end
 end
 
+-- Game modes an upgrade can be on sale in (Content.Mode, DEC-331): retired = none, day-only = Day, anomaly-only = Anomaly, rest = both
+local function modesOf(key: string): { [string]: boolean }
+	if table.find(Mode.RetiredUpgrades, key) ~= nil then
+		return {}
+	elseif table.find(Mode.DayOnlyUpgrades, key) ~= nil then
+		return { Day = true }
+	elseif table.find(Mode.AnomalyOnlyUpgrades, key) ~= nil then
+		return { Anomaly = true }
+	end
+	return { Day = true, Anomaly = true }
+end
+
+local function shareMode(a: string, b: string): boolean
+	const first = modesOf(a)
+	for mode in modesOf(b) do
+		if first[mode] then
+			return true
+		end
+	end
+	return false
+end
+
 local function checkUpgrades()
+	for _, key in Mode.RetiredUpgrades do
+		if not Upgrades.ByKey[key] then
+			fail("Mode", nil, key, "RetiredUpgrades has a key that is not in Upgrades")
+		end
+	end
 	for index, row in Upgrades.List do
 		const where = setOf(row.Vehicles)
 		if #row.Vehicles == 0 then
@@ -180,10 +207,9 @@ local function checkUpgrades()
 			end
 			for other = 1, index - 1 do
 				const otherKey = Upgrades.List[other].Key
-				-- TASK-324: one day-only and one anomaly-only upgrade may share a pedestal (never both on sale)
-				const shared = (table.find(Mode.DayOnlyUpgrades, otherKey) ~= nil and table.find(Mode.AnomalyOnlyUpgrades, row.Key) ~= nil)
-					or (table.find(Mode.AnomalyOnlyUpgrades, otherKey) ~= nil and table.find(Mode.DayOnlyUpgrades, row.Key) ~= nil)
-				if Upgrades.List[other].BenchSpot == row.BenchSpot and not shared then
+				-- TASK-324, DEC-331: two upgrades may share a pedestal only when they are never on sale in the same mode
+				-- (retired / day-only / anomaly-only, Mode.RetiredUpgrades ...)
+				if Upgrades.List[other].BenchSpot == row.BenchSpot and shareMode(otherKey, row.Key) then
 					fail("Upgrades", index, row.Key, `BenchSpot {row.BenchSpot} already used by '{otherKey}'`)
 				end
 			end
@@ -230,13 +256,27 @@ local function checkUpgrades()
 			inRange("Upgrades", index, row.Key, "Requires.Level", requires.Level, 1, 9)
 		end
 	end
-	if not Upgrades.ByKey.cooler or not Upgrades.ByKey.cooler.Levels.trailer then
-		fail("Upgrades", nil, nil, "cooler with trailer levels is required (Ingredients.Capacity)")
+end
+
+-- Levels of the upgrade that owns a capacity Stat (DEC-331): the one whose first trailer row has it in Effects; a retired
+-- upgrade only counts when no live one has it
+local function capacityOwner(stat: string): number?
+	local found: number? = nil
+	for _, upgrade in Upgrades.List do
+		const levels = upgrade.Levels.trailer
+		const first = if levels then levels[1] else nil
+		if first and (first.Effects :: any)[stat] ~= nil then
+			if table.find(Mode.RetiredUpgrades, upgrade.Key) == nil then
+				return #(levels :: { any })
+			elseif found == nil then
+				found = #(levels :: { any })
+			end
+		end
 	end
+	return found
 end
 
 local function checkIngredients()
-	const coolerLevels = #Upgrades.ByKey.cooler.Levels.trailer
 	for index, row in Ingredients.List do
 		if not Stations.ByKey[row.Station] then
 			fail("Ingredients", index, row.Key, `Station '{row.Station}' not in Stations`)
@@ -247,8 +287,11 @@ local function checkIngredients()
 		if (row.UnlockDay == 0) ~= (row.Vehicle ~= nil) then
 			fail("Ingredients", index, row.Key, "UnlockDay = 0 exactly when the ingredient depends on a Vehicle")
 		end
-		if #row.Capacity ~= coolerLevels then
-			fail("Ingredients", index, row.Key, `Capacity has {#row.Capacity} entries, Cooler has {coolerLevels} levels`)
+		const ownerLevels = capacityOwner(row.CapacityStat)
+		if ownerLevels == nil then
+			fail("Ingredients", index, row.Key, `CapacityStat '{tostring(row.CapacityStat)}' is not an Effect of any upgrade with trailer levels`)
+		elseif #row.Capacity ~= ownerLevels then
+			fail("Ingredients", index, row.Key, `Capacity has {#row.Capacity} entries, the upgrade of {row.CapacityStat} has {ownerLevels} levels`)
 		end
 		for level, amount in row.Capacity do
 			inRange("Ingredients", index, row.Key, `Capacity[{level}]`, amount, 1, 999)
@@ -519,6 +562,17 @@ local function checkRecords()
 	if #Flow.PartyMult ~= 4 then
 		fail("Flow", nil, nil, "PartyMult needs 4 entries (party 1..4)")
 	end
+	for index, action in RunParams.AntiAfkWork do
+		if Actions.ByKey[action] == nil then
+			fail("RunParams", index, action, "AntiAfkWork is not a key of Content.Actions")
+		end
+	end
+	if #Flow.NightQueueByParty ~= 4 then
+		fail("Flow", nil, nil, "NightQueueByParty needs 4 entries (party 1..4)")
+	end
+	for index, slots in Flow.NightQueueByParty do
+		inRange("Flow", index, nil, "NightQueueByParty", slots, 1, 5)
+	end
 	for index, row in Vehicles.List do
 		inRange("Vehicles", index, row.Key, "RailSlots", row.RailSlots, 1, 30)
 		inRange("Vehicles", index, row.Key, "BoardSlots", row.BoardSlots, 1, 9)
@@ -597,6 +651,7 @@ const SHUT_LINE_MAX = 28 -- chars: the bubble over a customer's head
 local function checkShopWindow()
 	inRange("ShopWindow", nil, nil, "ShutGrace", ShopWindow.ShutGrace, 0, 30)
 	inRange("ShopWindow", nil, nil, "ComplainTime", ShopWindow.ComplainTime, 0.5, 10)
+	inRange("ShopWindow", nil, nil, "WaitShutGrace", ShopWindow.WaitShutGrace, ShopWindow.ShutGrace, 60)
 	inRange("ShopWindow", nil, nil, "LeaveJitter", ShopWindow.LeaveJitter, 0, 5)
 	if not Moods.ByKey[ShopWindow.LeaveMood] then
 		fail("ShopWindow", nil, nil, `LeaveMood '{ShopWindow.LeaveMood}' is not a Moods key`)

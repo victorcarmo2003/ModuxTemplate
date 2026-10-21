@@ -12,7 +12,7 @@
 -- inside the outline, the title on a small Ink tab over the top-left corner.
 -- Pair order (FEAT-038, TASK-148): `Toppings2` returning a list adds a 2nd row (bun + sausage + its toppings) under
 -- the first; nil (or no prop) keeps the single-row card. Existing callers are unchanged.
--- Progressive reveal (Content.HudReveal): `Revealed` scales the card in (0.25 s, Motion.Reveal) the first time the order
+-- Progressive reveal (Content.HudReveal): `Revealed` pops the card in (Motion.RevealPop) the first time the order
 -- card is released; nil = always. Position (HudController): top-left, under the sanity meter when that is on screen.
 -- Talk reveal (FEAT-043, TASK-384): `Reveal` = items said so far at the tablet, in the talk order (bun, sausage, the
 -- toppings of row 1, then bun, sausage, toppings of row 2; TabletController:MyTalk().Reveal). The hot dog icon shows from
@@ -182,7 +182,7 @@ return function(props: Props): Frame
 	const empty = props.Empty or function(): boolean
 		return false
 	end
-	const reveal = Motion.Reveal(function()
+	const reveal = Motion.RevealPop(function()
 		return props.Revealed == nil or props.Revealed()
 	end)
 

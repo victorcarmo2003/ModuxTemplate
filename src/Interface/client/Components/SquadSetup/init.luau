@@ -2,11 +2,12 @@
 -- SquadSetup: the squad setup window (user request 2026-10-11, Provisional), cartoon kit (AST-091), mobile first.
 -- Behind the gear beside START (DEC-344, TASK-619): stepping on a pad no longer opens it; the room already exists and
 -- the leader starts it from the HUD. Also opened by "Create Squad" for the new invite squad.
--- A LobbyWindow (560 x 320 at Scale 1):
---   left   the squad: `MaxPlayers` slots (head shot, name, "Leader" tag); empty slots faded
---   right  Who can join (tap to cycle) · Max players  -  n  +  (the leader changes them; the others only read them);
---          Start (leader) or "Waiting for the leader..." (members) · Cancel while starting; while starting:
---          "Starting in n...". No draft and no ready step (DEC-344).
+-- A LobbyWindow (560 x 360 at Scale 1; layout per user request 2026-10-20, Provisional):
+--   top    the squad (about half the body): `MaxPlayers` cards (head shot, name, "Leader" tag) in a row, always
+--          centred whatever the count; empty cards faded
+--   bottom left: Who can join (tap to cycle) · Max players  -  n  +  (the leader changes them; the others only read
+--          them). Right: Start (leader) or "Waiting for the leader..." (members) · Cancel while starting; while
+--          starting: "Starting in n...". No draft and no ready step (DEC-344).
 --   foot   platform squad: hint "Step off the platform to leave"
 --          invite squad: Invite players (leader) · Leave · hint "Step on a free pad to take your squad there"
 -- Pure: only props. The caller sends PartyConfigure / PartyStart / PartyCancel / PartyLeave and the server decides
@@ -58,14 +59,19 @@ export type Props = {
 }
 
 const WIDTH = 560
-const HEIGHT = 320
-const LEFT = 250
+const HEIGHT = 360
 const GAP = 12
 const FOOT = 44
-const SLOT = 42
-const SLOT_GAP = 4
+-- player cards: about half the body (282 px at HEIGHT 360)
+const CARDS = 128
+const CARD_WIDTH = 120
+const CARD_GAP = 10
 const BUTTON = 44
-const AVATAR = 32
+const AVATAR = 60
+-- the settings / action band under the cards (two rows of BUTTON + the list padding)
+const BAND = BUTTON * 2 + 8
+-- control column of an option row: the access toggle (130) and "- n +" (44 + 28 + 44 + 2 gaps of 6)
+const CONTROL = 130
 
 -- who can join (PartyRules.Access): cycle order, button text and tone
 const ACCESS_ORDER = { "Open", "Friends", "Invite", "Closed" }
@@ -109,14 +115,17 @@ return function(props: Props): Frame
 		return list
 	end
 
+	-- one card per allowed player, centred: 1 sits in the middle, 2-4 spread out from it
 	const slotList = create("Frame")({
 		Name = "Slots",
-		Size = UDim2.new(0, LEFT, 1, -(FOOT + 4)),
+		Size = UDim2.new(1, 0, 0, CARDS),
 		BackgroundTransparency = 1,
 		create("UIListLayout")({
-			FillDirection = Enum.FillDirection.Vertical,
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
 			SortOrder = Enum.SortOrder.LayoutOrder,
-			Padding = UDim.new(0, SLOT_GAP),
+			Padding = UDim.new(0, CARD_GAP),
 		}),
 		indexes(slots, function(slot: () -> Slot, index: number)
 			const member = function(): Member?
@@ -128,7 +137,7 @@ return function(props: Props): Frame
 			return CartoonPanel({
 				Name = `Slot{index}`,
 				LayoutOrder = index,
-				Size = UDim2.new(1, 0, 0, SLOT),
+				Size = UDim2.fromOffset(CARD_WIDTH, CARDS - 6),
 				Tone = function()
 					const m = member()
 					return if m and m.Me then Theme.Tone.Mustard else Theme.Tone.Cream
@@ -140,12 +149,12 @@ return function(props: Props): Frame
 				Radius = Theme.Radius.Chip,
 				Lip = 3,
 				Gloss = false,
-				Padding = { Left = 6, Right = 8 },
+				Padding = { Top = 8, Bottom = 6, Left = 6, Right = 6 },
 				Children = {
 					create("ImageLabel")({
 						Name = "Avatar",
-						AnchorPoint = Vector2.new(0, 0.5),
-						Position = UDim2.fromScale(0, 0.5),
+						AnchorPoint = Vector2.new(0.5, 0),
+						Position = UDim2.fromScale(0.5, 0),
 						Size = UDim2.fromOffset(AVATAR, AVATAR),
 						BackgroundColor3 = Theme.Color.Cream,
 						Image = function()
@@ -156,10 +165,9 @@ return function(props: Props): Frame
 					}),
 					CartoonLabel({
 						Name = "Name",
-						Position = UDim2.fromOffset(AVATAR + 6, 0),
-						Box = UDim2.new(1, -(AVATAR + 6) - 64, 1, 0),
+						Position = UDim2.fromOffset(0, AVATAR + 4),
+						Box = UDim2.new(1, 0, 0, 20),
 						TextSize = 16,
-						XAlignment = Enum.TextXAlignment.Left,
 						Color = Theme.Color.Dark,
 						Stroke = 0,
 						Truncate = true,
@@ -173,8 +181,9 @@ return function(props: Props): Frame
 					}),
 					CartoonLabel({
 						Name = "Tag",
-						AnchorPoint = Vector2.new(1, 0.5),
-						Position = UDim2.fromScale(1, 0.5),
+						AnchorPoint = Vector2.new(0, 1),
+						Position = UDim2.fromScale(0, 1),
+						Box = UDim2.new(1, 0, 0, 16),
 						TextSize = Theme.MinTextSize,
 						Color = Theme.Color.Green,
 						Stroke = 0,
@@ -195,10 +204,14 @@ return function(props: Props): Frame
 			LayoutOrder = order,
 			Size = UDim2.new(1, 0, 0, BUTTON),
 			BackgroundTransparency = 1,
+			-- left of the control (CONTROL px wide): shrinks to fit, never under the buttons (owner 2026-10-20, phone)
 			CartoonLabel({
 				Name = "Label",
-				Box = UDim2.new(0.5, 0, 1, 0),
+				Box = UDim2.new(1, -(CONTROL + 6), 1, -12),
+				Position = UDim2.fromOffset(0, 6),
 				TextSize = 16,
+				Scaled = true,
+				MaxTextSize = 16,
 				XAlignment = Enum.TextXAlignment.Left,
 				Text = label,
 			}),
@@ -206,7 +219,7 @@ return function(props: Props): Frame
 				Name = "Control",
 				AnchorPoint = Vector2.new(1, 0),
 				Position = UDim2.fromScale(1, 0),
-				Size = UDim2.new(0.5, 0, 1, 0),
+				Size = UDim2.new(0, CONTROL, 1, 0),
 				BackgroundTransparency = 1,
 				create("UIListLayout")({
 					FillDirection = Enum.FillDirection.Horizontal,
@@ -220,9 +233,10 @@ return function(props: Props): Frame
 		}) :: Frame
 	end
 
-	const room = create("Frame")({
-		Name = "Room",
-		Size = UDim2.fromScale(1, 1),
+	-- bottom left: who can join · max players
+	const options = create("Frame")({
+		Name = "Options",
+		Size = UDim2.new(0.5, -GAP / 2, 1, 0),
 		BackgroundTransparency = 1,
 		create("UIListLayout")({
 			FillDirection = Enum.FillDirection.Vertical,
@@ -286,6 +300,21 @@ return function(props: Props): Frame
 				end,
 			}),
 		}),
+	})
+
+	-- bottom right: Start / Cancel and the status line
+	const actions = create("Frame")({
+		Name = "Actions",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.fromScale(1, 0),
+		Size = UDim2.new(0.5, -GAP / 2, 1, 0),
+		BackgroundTransparency = 1,
+		create("UIListLayout")({
+			FillDirection = Enum.FillDirection.Vertical,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 8),
+		}),
 		CartoonButton({
 			Name = "Start",
 			LayoutOrder = 3,
@@ -341,11 +370,11 @@ return function(props: Props): Frame
 
 	const settings = create("Frame")({
 		Name = "Settings",
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.fromScale(1, 0),
-		Size = UDim2.new(1, -(LEFT + GAP), 1, -(FOOT + 4)),
+		Position = UDim2.fromOffset(0, CARDS + 8),
+		Size = UDim2.new(1, 0, 0, BAND),
 		BackgroundTransparency = 1,
-		room,
+		options,
+		actions,
 	})
 
 	const foot = create("Frame")({

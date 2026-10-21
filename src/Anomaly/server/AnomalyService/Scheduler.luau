@@ -13,7 +13,9 @@
 --               Occurrences.Premiere, 1-2 nights later Recent, older Old); never the same anomaly in two neighbouring
 --               slots when the pool has another one
 --   premiere    Input.Premiere (Nights[k].NewAnomaly, the boss call) gets one entry in a slot inside the first third of
---               the window (FEAT-022: the player has just heard about it), when it is in the pool
+--               the window (FEAT-022: the player has just heard about it), when it is in the pool; with
+--               Input.PremiereAt (owner 2026-10-20, Provisional Q-415) it takes the first slot at that fixed minute and
+--               the later slots are pushed to stay MinGap after it
 --   scripted    an anomaly whose Scripted.Night is N gets one fixed entry at Scripted.Clock (outside the window) on top
 --               of the draws (N10: the Hush and the Walker at 5:45 AM, FEAT-024/027), whatever its family
 --   times       window Nights.Windows.Shift (9 PM-5 AM, game minutes) cut in Events equal slots, one start per slot,
@@ -52,6 +54,8 @@ export type Input = {
 	Events: number,
 	-- key the boss presents (Nights[k].NewAnomaly); nil = none
 	Premiere: string?,
+	-- fixed game minute of the premiere (Nights.PremiereAt[k]); nil = a drawn slot in the first third
+	PremiereAt: number?,
 	-- { from, to } game minutes (Nights.Windows.Shift)
 	Window: { number },
 	-- real seconds between two starts (Nights[k].MinGap)
@@ -62,7 +66,8 @@ export type Input = {
 
 -- At = game minute of the Night phase clock. Slot = index in the regular order (0 for scripted): seeds the
 -- occurrence's own Random.
-export type Entry = { Key: string, At: number, Scripted: boolean, Slot: number }
+-- Premiere = the presented anomaly at its fixed minute (Input.PremiereAt): the night's grace does not hold it.
+export type Entry = { Key: string, At: number, Scripted: boolean, Slot: number, Premiere: boolean }
 
 export type Limits = { MaxSimultaneous: number, MaxActors: number, MinGap: number }
 
@@ -129,7 +134,7 @@ function Scheduler.Build(input: Input, random: () -> number): { Entry }
 	for _, row in input.Anomalies do
 		const scripted = row.Scripted
 		if scripted ~= nil and scripted.Night == input.Night and row.Night <= input.Night then
-			table.insert(out, { Key = row.Key, At = scripted.Clock, Scripted = true, Slot = 0 })
+			table.insert(out, { Key = row.Key, At = scripted.Clock, Scripted = true, Slot = 0, Premiere = false })
 		end
 		if not Scheduler.Eligible(row, input) then
 			continue
@@ -156,8 +161,16 @@ function Scheduler.Build(input: Input, random: () -> number): { Entry }
 			times[index] = from + (index - 1) * slot + random() * (slot - gap)
 		end
 		const order: { string? } = {}
-		-- the presented anomaly first, in a slot inside the first third of the window
-		if premiere ~= nil then
+		const fixed = input.PremiereAt
+		if premiere ~= nil and fixed ~= nil then
+			-- owner 2026-10-20 (Provisional Q-415): the presented anomaly at its fixed minute, the others kept MinGap after
+			order[1] = premiere
+			times[1] = math.clamp(fixed, from, to)
+			for index = 2, n do
+				times[index] = math.min(math.max(times[index], times[index - 1] + gap), to)
+			end
+		elseif premiere ~= nil then
+			-- the presented anomaly first, in a slot inside the first third of the window
 			const third = from + length / 3
 			const eligible: { number } = {}
 			for index = 1, n do
@@ -183,7 +196,13 @@ function Scheduler.Build(input: Input, random: () -> number): { Entry }
 			order[index] = draw(pool, weights, avoid, random)
 		end
 		for index = 1, n do
-			table.insert(out, { Key = order[index] :: string, At = times[index], Scripted = false, Slot = index })
+			table.insert(out, {
+				Key = order[index] :: string,
+				At = times[index],
+				Scripted = false,
+				Slot = index,
+				Premiere = fixed ~= nil and index == 1 and order[index] == premiere,
+			})
 		end
 	end
 

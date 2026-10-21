@@ -19,12 +19,18 @@
 	ButtonX lifts the curtain at once and sets the local attribute LoadingSkipped = true on the LocalPlayer (and
 	Skipped on the ScreenGui): LoadingController lets the player in (ClientReady, Ready) while its steps keep loading
 	in the background.
+	Intro (owner 2026-10-20): when LoadingController sets Intro = true (steps done, before ClientReady) the
+	"Powered by Modux" sting (Interface/Components/ModuxIntro) fades in over the curtain on black and plays; at its end
+	this script sets IntroDone = true and the black stays (with the crew status if a scene waits for the others) until
+	Done, which fades the black away instead of lifting the curtain. A sting that cannot mount sets IntroDone at once.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local GuiService = game:GetService("GuiService")
 -- texts: src/Loading/replicatedfirst/Tips.luau (ReplicatedFirst.client.Loading.Tips, replicated with this script).
 -- This file sits in src/Loading/boot, mapped by .rogen.json straight into ReplicatedFirst (rogen would route any
@@ -59,6 +65,10 @@ const SKIP_KEY = Enum.KeyCode.ButtonX -- gamepad key of the skip button (its chi
 const SKIP_CHIP = "X"
 const SKIP_TEXT = "Skip loading"
 const SKIPPED_ATTRIBUTE = "LoadingSkipped" -- on the LocalPlayer (local only), read by LoadingController
+const INTRO_COMPONENT = "ModuxIntro"
+const INTRO_DURATION = 3.9 -- s of the sting (ModuxIntro timeline)
+const INTRO_FADE_IN = 0.3 -- s of the black fading in over the curtain
+const INTRO_Z = 5 -- above the cover (1) and the cartoon kit (2)
 const BACKDROP = Color3.fromHex("#F6B71B")
 const INK = Color3.fromHex("#2B2233")
 
@@ -161,6 +171,11 @@ local skipKey: ((string?) -> string)? = nil
 local skippable = false
 local skipInput: RBXScriptConnection? = nil
 local lastInput: RBXScriptConnection? = nil
+-- the cartoon kit's frame, and the sting once it mounted (its black stays until Done)
+local kitFrame: GuiObject? = nil
+local intro: Frame? = nil
+local introStop: (() -> ())? = nil
+local introClock: RBXScriptConnection? = nil
 
 local function finish()
 	if lifted then
@@ -174,18 +189,41 @@ local function finish()
 	if lastInput ~= nil then
 		lastInput:Disconnect()
 	end
-	const setShown = shown
-	if setShown ~= nil then
-		setShown(false)
-	else
+	const black = intro
+	if black ~= nil then
+		-- the sting played: the black fades straight to the game, the curtain is not shown again
+		const kit = kitFrame
+		if kit ~= nil then
+			kit.Visible = false
+		end
 		cover.Visible = false
+		for _, child in black:GetChildren() do
+			if child:IsA("GuiObject") then
+				child.Visible = false
+			end
+		end
+		TweenService:Create(black, TweenInfo.new(LIFT_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundTransparency = 1,
+		}):Play()
+	else
+		const setShown = shown
+		if setShown ~= nil then
+			setShown(false)
+		else
+			cover.Visible = false
+		end
 	end
 	task.delay(LIFT_TIME, function()
-		const stop = unmount
-		unmount = nil
-		if stop ~= nil then
-			pcall(stop)
+		if introClock ~= nil then
+			introClock:Disconnect()
 		end
+		for _, stop in { unmount, introStop } do
+			if stop ~= nil then
+				pcall(stop)
+			end
+		end
+		unmount = nil
+		introStop = nil
 		gui:Destroy()
 	end)
 end
@@ -258,6 +296,89 @@ end
 coverSkip.Activated:Connect(skip)
 task.delay(SKIP_AFTER, showSkip)
 
+-- 3. the "Powered by Modux" sting --------------------------------------------------------------------------------
+local function playIntro()
+	if lifted or intro ~= nil then
+		return
+	end
+	const ok, problem = pcall(function()
+		const packages = ReplicatedStorage:FindFirstChild("Packages")
+		const vide = if packages ~= nil then packages:FindFirstChild("Vide") else nil
+		-- the steps are done by now: everything replicated, no waiting
+		const scripts = StarterPlayer:FindFirstChild("StarterPlayerScripts")
+		const client = if scripts ~= nil then scripts:FindFirstChild("client") else nil
+		const interface = if client ~= nil then client:FindFirstChild("Interface") else nil
+		const components = if interface ~= nil then interface:FindFirstChild("Components") else nil
+		const module = if components ~= nil then components:FindFirstChild(INTRO_COMPONENT) else nil
+		if vide == nil or module == nil then
+			error("ModuxIntro or Vide not replicated")
+		end
+		const Vide = (require :: any)(vide)
+		const ModuxIntro = (require :: any)(module)
+		const time = Vide.source(0)
+		const stop, frame = Vide.root(function()
+			return ModuxIntro({
+				Name = "Intro",
+				Time = time,
+				Accent = function()
+					return Color3.new(1, 1, 1)
+				end,
+			})
+		end)
+		frame.ZIndex = INTRO_Z
+		frame.BackgroundTransparency = 1
+		frame.Active = true
+
+		-- a scene waiting for the others after the sting: its status, small, on the black
+		const crew = Instance.new("TextLabel")
+		crew.Name = "Crew"
+		crew.AnchorPoint = Vector2.new(0.5, 1)
+		crew.Position = UDim2.new(0.5, 0, 1, -48)
+		crew.Size = UDim2.new(0.8, 0, 0, 20)
+		crew.BackgroundTransparency = 1
+		crew.Font = Enum.Font.Gotham
+		crew.TextSize = 15
+		crew.TextColor3 = Color3.fromHex("#8A8A94")
+		crew.Text = ""
+		crew.Parent = frame
+		local function refreshCrew()
+			crew.Text = if gui:GetAttribute("Status") == Tips.Status.Crew then Tips.Status.Crew else ""
+		end
+		gui:GetAttributeChangedSignal("Status"):Connect(refreshCrew)
+
+		frame.Parent = gui
+		intro = frame
+		introStop = stop
+		local elapsed = 0
+		introClock = RunService.Heartbeat:Connect(function(dt: number)
+			elapsed += dt
+			time(math.min(elapsed, INTRO_DURATION))
+			if not lifted then
+				frame.BackgroundTransparency = 1 - math.clamp(elapsed / INTRO_FADE_IN, 0, 1)
+			end
+			if elapsed >= INTRO_DURATION then
+				const clock = introClock
+				if clock ~= nil then
+					clock:Disconnect()
+				end
+				introClock = nil
+				refreshCrew()
+				gui:SetAttribute("IntroDone", true)
+			end
+		end)
+	end)
+	if not ok then
+		warn(`[Loading] intro sting unavailable, skipped: {problem}`)
+		gui:SetAttribute("IntroDone", true)
+	end
+end
+
+gui:GetAttributeChangedSignal("Intro"):Connect(function()
+	if gui:GetAttribute("Intro") == true then
+		playIntro()
+	end
+end)
+
 -- 2. the cartoon kit, once it replicated ---------------------------------------------------------------------------
 local function waitPath(root: Instance, path: { string }): Instance?
 	local node: Instance? = root
@@ -312,6 +433,7 @@ task.spawn(function()
 		end)
 		frame.ZIndex = 2
 		frame.Parent = gui
+		kitFrame = frame
 		unmount = stop
 		shown = visible
 		skipShown = skipVisible

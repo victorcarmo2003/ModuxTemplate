@@ -1,5 +1,5 @@
 --!strict
--- Money text for the HUD and the shift summary: 1234 -> "$1,234"; negative -> "-$20" (summary "Stolen" line).
+-- Money text for the HUD and the shift summary: 1234 -> "$1,234"; negative -> "-$20".
 -- Whole dollars only (FEAT-014: "dinheiro inteiro").
 
 local function digits(value: number): string

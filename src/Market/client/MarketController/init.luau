@@ -34,7 +34,9 @@
 	  * plate = GearTag (name, effect, price pill; fixed pixels, AlwaysOnTop, Cream card with Ink outline) FLOATING ABOVE
 	    the miniature (user feedback 2026-10-11: the old BenchCard under the glass was unreadable). Adornee = a local
 	    invisible part at the miniature centre + Mart.Plate.Lift; without a pedestal it hangs over the prompt anchor.
-	    Hidden while the shutter is down. "Sold out" (grey) while the line rests after a purchase;
+	    Hidden while the shutter is down. "Sold out" (grey) while the line rests after a purchase. ONE plate at a time
+	    (TASK-595, owner Play 2026-10-19: the plates showed through the walls into the shop, stacked): the one looked
+	    at within Mart.Plate.Focus studs and Cone, with a clear line of sight (StepFocus), else none;
 	  * cooldown (Q-203 Provisional, server-authoritative): Upgrades[].Wait = shifts left; > 0 and a next level exists
 	    -> the miniature is gone (Empty), the plate says "Sold out - Back next shift", the prompt is off (server). Back
 	    on sale the miniature rises out of the pedestal again;
@@ -77,6 +79,9 @@ const MAP_WAIT = 60 -- s MapIndex.WaitReady may wait before the fallback shutter
 const PLATE_OVER_PROMPT = Vector3.new(0, 1.6, 0)
 const HOURS = MART.Hours
 const SFX_HOLD = 6 -- s a Studio fallback door Sound lives before it is cleaned up
+const NO_FOCUS = "" -- Focus value when no plate is shown
+const SEE_THROUGH = 0.5 -- parts at least this transparent (glass) do not block a plate's line of sight
+const SIGHT_PASSES = 4 -- raycasts per plate before giving up (each skips one see-through part)
 
 export type View = {
 	Visible: boolean,
@@ -162,6 +167,8 @@ function MarketController:Setup()
 	self.Pedestals = {} :: { [string]: Instance }
 	self.LastStep = os.clock() :: number
 	self.LastRelocate = 0 :: number
+	-- bench slot whose plate is shown (TASK-595: one at a time); NO_FOCUS = none
+	self.Focus = Vide.source(NO_FOCUS :: string) :: Vide.Source<string>
 end
 
 -- Bench anchor of a GEAR WALL position (B1..B5), nil when not mounted (streamed out)
@@ -247,7 +254,7 @@ end
 
 -- Pure view of one fixed position (B1..B5) from the current vehicle, its level and the cash.
 function MarketController:BenchView(upgrade: Content.Upgrade, vehicle: string, level: number, wait: number): View
-	-- anomaly mode (Content.Mode, owner request 2026-10-14): Wide Counter and Drawer Lock are not on the stand
+	-- anomaly mode (Content.Mode, owner request 2026-10-14): Wide Counter is not on the stand
 	if Content.Mode.IsOff(upgrade.Key) then
 		return HIDDEN
 	end
@@ -414,7 +421,7 @@ function MarketController:MountBench(anchor: Instance, slot: string): Mounted?
 				Name = "GearTag_" .. slot,
 				Adornee = adornee,
 				Visible = function()
-					return open()
+					return open() and self.Focus() == slot
 				end,
 				Mode = function(): GearTag.Mode
 					return "Empty"
@@ -453,7 +460,7 @@ function MarketController:MountBench(anchor: Instance, slot: string): Mounted?
 			Name = "GearTag_" .. slot,
 			Adornee = adornee,
 			Visible = function()
-				return view().Visible and open()
+				return view().Visible and open() and self.Focus() == slot
 			end,
 			Mode = function()
 				return view().Mode
@@ -692,7 +699,7 @@ end
 function MarketController:NeverBought(): boolean
 	for _, upgrade in Content.Upgrades.List do
 		const level = Vide.untrack(self.Levels[upgrade.Key])
-		if upgrade.SoldAt == "Bench" and level ~= UNKNOWN_LEVEL and level > upgrade.StartLevel then
+		if upgrade.SoldAt == "Bench" and not Content.Mode.IsOff(upgrade.Key) and level ~= UNKNOWN_LEVEL and level > upgrade.StartLevel then
 			return false
 		end
 	end
@@ -842,6 +849,72 @@ function MarketController:StepHint()
 	hint:Set(target ~= nil) -- the hint moves its own Beacon every frame (Hint.luau)
 end
 
+-- Clear line of sight from the camera to a plate: opaque parts block, glass (SEE_THROUGH) and the character do not.
+function MarketController:InSight(from: Vector3, to: Vector3): boolean
+	const skip: { Instance } = {}
+	const character = Players.LocalPlayer.Character
+	if character then
+		table.insert(skip, character)
+	end
+	const folder = workspace:FindFirstChild(PLATE_PARTS)
+	if folder then
+		table.insert(skip, folder)
+	end
+	const params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	for _ = 1, SIGHT_PASSES do
+		params.FilterDescendantsInstances = skip
+		const hit = workspace:Raycast(from, to - from, params)
+		if hit == nil then
+			return true
+		end
+		const part = hit.Instance
+		if part.Transparency < SEE_THROUGH then
+			return false
+		end
+		table.insert(skip, part)
+	end
+	return false
+end
+
+-- TASK-595: the plate shown is the one closest to the look direction among those within Focus studs, in the Cone and
+-- in sight; the current one keeps priority while it still qualifies (no flicker between two neighbours).
+function MarketController:StepFocus(camera: Camera)
+	const eye = camera.CFrame.Position
+	const look = camera.CFrame.LookVector
+	const current = Vide.untrack(self.Focus)
+	local best: string = NO_FOCUS
+	local bestDot = -math.huge
+	for _, mounted in self.Mounted do
+		const slot = mounted.Slot
+		const adornee = mounted.Gui.Adornee
+		if slot == nil or adornee == nil or not adornee:IsA("BasePart") then
+			continue
+		end
+		const at = (adornee :: BasePart).Position + mounted.Gui.StudsOffsetWorldSpace
+		const offset = at - eye
+		const distance = offset.Magnitude
+		if distance > MART.Plate.Focus or distance < 1e-3 then
+			continue
+		end
+		const dot = look:Dot(offset.Unit)
+		if dot < MART.Plate.Cone or not self:InSight(eye, at) then
+			continue
+		end
+		if slot == current then
+			best = slot
+			break
+		end
+		if dot > bestDot then
+			best = slot
+			bestDot = dot
+		end
+	end
+	if best ~= current then
+		self.Focus(best)
+	end
+end
+
 function MarketController:Step()
 	const now = os.clock()
 	const dt = math.min(now - self.LastStep, 0.25)
@@ -857,6 +930,7 @@ function MarketController:Step()
 	const camera = workspace.CurrentCamera
 	if camera then
 		self.Minis:Step(now, dt, camera.CFrame.Position, Vide.untrack(self.KioskOpen))
+		self:StepFocus(camera)
 	end
 end
 

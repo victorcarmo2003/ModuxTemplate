@@ -132,7 +132,7 @@ local function attackRestaurant(ctx: Api.Context, occ: Api.Occurrence, state: St
 		return
 	end
 	for _, player in victims do
-		ctx.Cue(occ, SCARE_CUE, Hide.EntityOf(player))
+		ctx.Cue(occ, SCARE_CUE, Hide.EntityOf(player), player.UserId)
 	end
 	ctx.Fail(occ, victims)
 end

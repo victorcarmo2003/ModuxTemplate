@@ -16,6 +16,7 @@
 	    light shows its Pool_Decal (On_Fake, AST-036) when lit.
 	  * Lighting preset (Content.LightPresets, warm pass 2026-10-11): lobby servers = Lobby (fixed night clock); game =
 	    day locked with ClockTime following the clock, golden hour 4 -> 6 PM; night interpolated Night 1 -> Night 10.
+	    Before the first Shift record the run's first shift decides (Shift.RunStartsAtNight = true: night, Night 1).
 	    While a cutscene with a Look plays (attribute CutsceneLook of the local player, set by CutsceneController) the
 	    day preset is replaced by Content.LightPresets.Cinematic (owner request 2026-10-12) and comes back after it.
 	    On a night shift (the intro of a run that starts on Night 1, DEC-300) the look is a late afternoon at
@@ -147,6 +148,19 @@ const SWITCH_OFF = Content.LightPresets.SwitchOff
 const DARK_STEP = "LightController_SwitchOff"
 const DARK_PRIORITY = Enum.RenderPriority.Camera.Value + 4
 
+-- Own light in the total dark (owner 2026-10-19: "uma luz branca suave no personagem que acende só quando ele está totalmente no
+-- escuro (luzes apagadas ou apagão), com bom alcance"): a local PointLight in the own character's head, faded in while the kitchen
+-- switch is off (self.Dark) or the Lighting Ambient left by every writer (blackout, switch) is darker than DarkAmbient on its
+-- brightest channel; never in the lobby. Only the local player sees it (local instance). Provisional, judged in Play
+const GLOW = {
+	Name = "LightController_SelfGlow",
+	Range = 6, -- owner 2026-10-19: half the reach (was 22)
+	Brightness = 0.9,
+	Color = Color3.fromHex("#EEF2FF"),
+	DarkAmbient = 0.13, -- Night 1 Ambient peaks near 0.23, the blackout look at 0.11, the switch-off at 0.03
+	FadeIn = 0.6,
+	FadeOut = 0.8,
+}
 const ROOM_MARGIN = 2 -- studs around the kitchen zone for AddRoomLights (LIT-DT hangs 1 stud past LZ-1)
 const ROOM_KEEP: { [string]: boolean } = {}
 for _, name in Content.LightPresets.Blackout.KeepNames do
@@ -268,6 +282,8 @@ function LightController:Setup()
 	self.Dark = 0 :: number
 	self.DarkBase = nil :: { Ambient: Color3, EnvDiffuse: number, EnvSpecular: number }?
 	self.DarkWritten = nil :: { Ambient: Color3, EnvDiffuse: number, EnvSpecular: number }?
+	-- own light in the total dark: 0 = off, 1 = full
+	self.Glow = 0 :: number
 end
 
 -- Night number of the shift (RoundController.Night lands with TASK-055; until then first night).
@@ -280,6 +296,16 @@ function LightController:NightNumber(): number
 		end
 	end
 	return FIRST_NIGHT
+end
+
+-- Night shift? Before the first Shift record (join, squad gate, loading) the run's first shift decides: a run that
+-- starts at night (Shift.RunStartsAtNight, DEC-300) shows the night at once instead of a day sky until the run starts.
+function LightController:IsNight(): boolean
+	const round = self.Dependencies.RoundController
+	if round.Ready() then
+		return round.IsNight()
+	end
+	return Content.Shift.RunStartsAtNight
 end
 
 -- Hour of the shift clock (0..24) from RoundController's interpolated clock; nil before the first record.
@@ -642,7 +668,7 @@ function LightController:GroupOn(key: string): boolean
 	end
 	const group = Content.LightGroups.ByKey[key]
 	const round = self.Dependencies.RoundController
-	if group == nil or not round.IsNight() then
+	if group == nil or not self:IsNight() then
 		return false
 	end
 	if group.Kind == "Upgrade" then
@@ -739,8 +765,7 @@ function LightController:BaseTarget(): (Preset, number, string)
 	if self.Dependencies.PlaceController:Is("Lobby") then
 		return LOBBY, LOBBY_CLOCK, "lobby"
 	end
-	const round = self.Dependencies.RoundController
-	if round.IsNight() then
+	if self:IsNight() then
 		const night = self:NightNumber()
 		const t = if LAST_NIGHT > FIRST_NIGHT then (night - FIRST_NIGHT) / (LAST_NIGHT - FIRST_NIGHT) else 0
 		return blend(NIGHT_1, NIGHT_10, t), NIGHT_CLOCK, `night:{night}`
@@ -895,6 +920,49 @@ function LightController:StepDark(dt: number)
 	end
 end
 
+-- Own light in the dark -------------------------------------------------------------------------------------------
+
+-- Totally dark around the player: the switch-off dark, or a Lighting Ambient this dark (after every writer of the frame)
+function LightController:InTotalDark(): boolean
+	if self.Dark >= 0.5 then
+		return true
+	end
+	if not self.Dependencies.RoundController.IsNight() or self.Dependencies.PlaceController:Is("Lobby") then
+		return false
+	end
+	const ambient = Lighting.Ambient
+	return math.max(ambient.R, ambient.G, ambient.B) < GLOW.DarkAmbient
+end
+
+function LightController:StepGlow(dt: number)
+	if self:InTotalDark() then
+		self.Glow = math.min(1, self.Glow + dt / GLOW.FadeIn)
+	else
+		self.Glow = math.max(0, self.Glow - dt / GLOW.FadeOut)
+	end
+	const character = Players.LocalPlayer.Character
+	const head = if character then character:FindFirstChild("Head") else nil
+	if head == nil or not head:IsA("BasePart") then
+		return
+	end
+	local light = head:FindFirstChild(GLOW.Name) :: PointLight?
+	if light == nil then
+		if self.Glow <= 0 then
+			return
+		end
+		const made = Instance.new("PointLight")
+		made.Name = GLOW.Name
+		made.Range = GLOW.Range
+		made.Color = GLOW.Color
+		made.Shadows = false
+		made.Parent = head
+		light = made
+	end
+	const current = light :: PointLight
+	current.Brightness = GLOW.Brightness * self.Glow
+	current.Enabled = self.Glow > 0
+end
+
 -- Switch click ---------------------------------------------------------------------------------------------------
 
 -- Marks every night / attempt / vehicle change (the Lights records that change with it are not a click)
@@ -1013,6 +1081,7 @@ LightController:OnStart(function(self)
 	self:WatchContext()
 	RunService:BindToRenderStep(DARK_STEP, DARK_PRIORITY, function(dt: number)
 		self:StepDark(dt)
+		self:StepGlow(dt)
 	end)
 end)
 

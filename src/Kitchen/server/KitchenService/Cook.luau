@@ -14,7 +14,7 @@
 --     Cut      1 bun from the stock -> lowest free place of the cut-bun pile, cut score kept with it (Board.Place);
 --              board_full / out_of_stock
 --     Place    a sausage from the stock onto the free grill slot `Slot`
---     Flip     flips the sausage of `Slot` (the score comes from the server clock, Grill.FlipAt)
+--     Flip     flips the sausage of `Slot` held at Restaurant.Grill.HoldAt; Score = the flip mini-game (DEC-311, Grill.FlipAt)
 --     Collect  the Ready sausage of `Slot` -> the rest rail with its flip score (Grill.CollectAt); rail_full
 --     Topping  `Key` on the hot dog in hand (stock, repeat, MaxToppings, gift bowl, locked), Scores[Key] = Score, the drawn
 --              sauce `Points` into the Tool attribute Sauce (HotDogVisual.Sauce)
@@ -58,23 +58,31 @@ const HOT_DOG = PlateTool.HotDog
 
 type Bucket = { Tokens: number, At: number }
 
+-- The middle of what a station shows: the box of its visible parts (a Model's pivot can sit anywhere: the cutting board's sat on
+-- the cut-bun crate and its "Cut Bun" prompt floated there, owner 2026-10-19); an Attachment / a part as such
 local function positionOf(instance: Instance): Vector3?
-	if instance:IsA("Model") then
-		return instance:GetPivot().Position
-	elseif instance:IsA("BasePart") then
+	if instance:IsA("BasePart") then
 		return instance.Position
 	elseif instance:IsA("Attachment") then
 		return instance.WorldPosition
 	end
-	-- a Folder: the middle of its parts
-	local sum, count = Vector3.zero, 0
+	local low = Vector3.new(math.huge, math.huge, math.huge)
+	local high = -low
 	for _, part in instance:GetDescendants() do
-		if part:IsA("BasePart") then
-			sum += part.Position
-			count += 1
+		if part:IsA("BasePart") and part.Transparency < 1 then
+			const half = part.Size / 2
+			for _, corner in { Vector3.new(-1, -1, -1), Vector3.new(1, 1, 1), Vector3.new(-1, 1, 1), Vector3.new(1, -1, -1) } do
+				const point = (part.CFrame * CFrame.new(half * corner)).Position
+				low = low:Min(point)
+				high = high:Max(point)
+			end
 		end
 	end
-	return if count > 0 then sum / count else nil
+	if low.X == math.huge then
+		return if instance:IsA("Model") then instance:GetPivot().Position else nil
+	end
+	-- the middle on the floor plan, at the top (the prompt rises from there)
+	return Vector3.new((low.X + high.X) / 2, high.Y, (low.Z + high.Z) / 2)
 end
 
 const Cook = {}
@@ -150,7 +158,11 @@ function Cook.new(kitchen: any): Cook
 		anchor:SetAttribute(COOK_ATTRIBUTE, station)
 		anchor:SetAttribute("PromptText", PROMPT_TEXT[station])
 		anchor.Parent = host
-		anchor.WorldPosition = middle + Vector3.new(0, 0.9, 0)
+		-- Toppings: over the host pan, not the empty middle of the pans; the tutorial lights the pan the anchor hangs on,
+		-- and the button floated outside it (owner 2026-10-20: the ketchup lit, "Toppings" beside it)
+		anchor.WorldPosition = if station == "Toppings"
+			then host.Position + Vector3.new(0, host.Size.Y / 2 + 0.6, 0)
+			else middle + Vector3.new(0, 0.6, 0)
 		CollectionService:AddTag(anchor, ANCHOR_TAG)
 	end
 
@@ -238,7 +250,7 @@ function Cook.new(kitchen: any): Cook
 		end
 	end
 
-	local function grillCall(player: Player, act: string, slot: number)
+	local function grillCall(player: Player, act: string, slot: number, score: number)
 		const grill = Grill.Find(kitchen:GetVehicle())
 		if grill == nil then
 			return
@@ -257,7 +269,11 @@ function Cook.new(kitchen: any): Cook
 					notify(player, notice)
 				end
 			elseif act == "Flip" then
-				Grill.FlipAt(ctx, grill, slot, player:GetNetworkPing())
+				-- the score of the flip mini-game (DEC-311)
+				const flipped = Grill.FlipAt(ctx, grill, slot, player:GetNetworkPing(), score)
+				if flipped ~= nil then
+					ctx.Emit("grill_flip", player, { Score = flipped })
+				end
 			elseif act == "Collect" then
 				const ok, reason = Grill.CollectAt(ctx, grill, slot)
 				if not ok and reason == "RailFull" then
@@ -303,6 +319,7 @@ function Cook.new(kitchen: any): Cook
 			if not items():AddTopping(hotDog, key) then
 				return
 			end
+			kitchen.ToppingAdded:Fire(player, hotDog, key)
 			PlateTool.SetScore(hotDog, key, score)
 			const clean = if points ~= nil then Sauce.Clean(points) else nil
 			if clean ~= nil then
@@ -338,7 +355,7 @@ function Cook.new(kitchen: any): Cook
 				topping(player, data.Key, score, data.Points)
 			end
 		elseif data.Slot >= 1 then
-			grillCall(player, kind, data.Slot)
+			grillCall(player, kind, data.Slot, score)
 		end
 	end
 

@@ -73,6 +73,9 @@ export type Data = {
 	-- key worn with that class (absent = the crew uniform). Reconcile adds both as {} to older profiles, so no migration.
 	Skins: { [string]: number },
 	EquippedSkins: { [string]: string },
+	-- Lobby floor guides shown (owner request 2026-10-20, Provisional): Content.Lobby.Guide key -> os.time() it was done.
+	-- Writer: LobbyService (LobbyGuideDone). Reconcile adds it as {} to older profiles, so no migration.
+	LobbyGuides: { [string]: number },
 }
 
 const Template: Data = {
@@ -130,6 +133,9 @@ const Template: Data = {
 	-- Class skins: SkinService
 	Skins = {},
 	EquippedSkins = {},
+
+	-- Lobby floor guides: LobbyService
+	LobbyGuides = {},
 }
 
 return Template

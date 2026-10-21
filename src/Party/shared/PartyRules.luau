@@ -63,6 +63,10 @@ const RULES = table.freeze({
 	Platforms = 4, -- LOBBY-SQUAD-1..4 (user 2026-10-11: 4 pads are enough; = #Content.Lobby.Zones with Platform > 0)
 	Countdown = Content.Lobby.Squad.Countdown, -- s between Start and the teleport (every squad, platform or not)
 	CancelCutoff = 0.5, -- s before StartAt after which PartyCancel is refused (the client hides the button then)
+	-- pad rooms (owner request 2026-10-21, Provisional): auto countdown on the first step, joinable until JoinCutoff
+	PadCountdown = Content.Lobby.Squad.PadCountdown,
+	StartNow = Content.Lobby.Squad.StartNow,
+	JoinCutoff = Content.Lobby.Squad.JoinCutoff,
 	DefaultMaxPlayers = Content.Lobby.Squad.DefaultMaxPlayers,
 })
 

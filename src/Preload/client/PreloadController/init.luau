@@ -8,10 +8,12 @@
 	  * Critical images (Images.CriticalUi / CriticalWorld: jumpscare face, anomaly looks, horror overlays, HUD icons, tablet photos):
 	    the loading screen waits for them (LoadingController:StepAssets).
 	  * Face shelf: once RigController warmed the kit, one hidden copy of the face shell per CrewExpressions entry and
-	    one head per species head texture (every pack, Blank) sit far under the map on this client (Folder
-	    Workspace.PreloadShelf, local only). The textures stay in use, so a mood swap or the Night pack never shows a
-	    face that is still being fetched or was dropped from memory.
+	    one head per species head texture (every pack, Blank) and per skin texture (SkinLooks: outfit sheet, atlas, head;
+	    every pack) sit far under the map on this client (Folder Workspace.PreloadShelf, local only). The textures stay in
+	    use, so a mood swap, the Night pack or a skin previewed on the class screen never shows a texture that is still
+	    being fetched or was dropped from memory (owner 2026-10-20: the limited skins were always loading).
 	  * Background, after the curtain (LoadingController.Ready), BATCH items per PreloadAsync, GAP s apart:
+	    the skin circle icons first (SkinIcons: the class screen is the lobby's first shop), then
 	    Images.BackgroundUi / BackgroundWorld (crew / NPC looks, skins, UI art), then every kit under ReplicatedStorage.Assets but Crew
 	    (RigController loads that one), then the pre-generated voice lines (Content.VoiceLines) through the one audio
 	    LoadQueue as background jobs, Walt's first.
@@ -26,8 +28,10 @@ local Workspace = game:GetService("Workspace")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local CrewLooks = require(ReplicatedStorage.shared.Crew.CrewLooks)
+local SkinLooks = require(ReplicatedStorage.shared.Crew.SkinLooks)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local LoadQueue = require(StarterPlayer.StarterPlayerScripts.client.Audio.AudioController.LoadQueue)
+local SkinIcons = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ClassSelect.SkinIcons)
 local Images = require(script.Images)
 
 const BATCH = 16 -- items per background PreloadAsync
@@ -158,14 +162,21 @@ function PreloadController:BuildShelf()
 	end
 	if headShell ~= nil then
 		const seen: { [string]: boolean } = {}
-		local function head(id: string?)
+		local function head(id: string?, name: string?)
 			if id == nil or id == "" or seen[id] then
 				return
 			end
 			seen[id] = true
-			const part = bare(headShell, "Head")
+			const part = bare(headShell, name or "Head")
 			part.TextureID = id
 			place(part)
+		end
+		local function sheets(set: SkinLooks.Sheets?, name: string)
+			if set ~= nil then
+				head(set.Day, name)
+				head(set.Mid, name)
+				head(set.Night, name)
+			end
 		end
 		for _, look in CrewLooks.Species do
 			for _, id in look.Head do
@@ -175,6 +186,13 @@ function PreloadController:BuildShelf()
 				head(look.Blank.Head)
 			end
 		end
+		-- skin textures: any mesh keeps them in use, the UV does not matter here
+		for key, look in SkinLooks.BySkin do
+			const name = `Skin_{key}`
+			sheets({ Day = look.Day, Mid = look.Mid, Night = look.Night }, name)
+			sheets(look.Atlas, name)
+			sheets(look.Head, name)
+		end
 	end
 	shelf.Parent = Workspace
 	self.Shelf = shelf
@@ -183,6 +201,13 @@ end
 
 function PreloadController:Background()
 	-- images written in code (looks, skins, UI art)
+	-- skin circles of the class screen first (their textures are on the shelf)
+	stage("Skins")
+	const icons: { string } = {}
+	for _, id in SkinIcons do
+		table.insert(icons, id)
+	end
+	trickle(holders(icons, {}))
 	stage("Images")
 	trickle(holders(Images.BackgroundUi, Images.BackgroundWorld))
 	-- every kit but the crew (RigController warms that one)

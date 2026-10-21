@@ -86,6 +86,7 @@ local function input(night)
 		Atmosphere = night.Atmosphere,
 		Events = night.Events,
 		Premiere = night.NewAnomaly,
+		PremiereAt = Nights.PremiereAt[night.Index], -- owner 2026-10-20 (Provisional Q-415)
 		Window = Nights.Windows.Shift,
 		MinGap = night.MinGap,
 		MinutesPerSecond = (CLOCK_TO - CLOCK_FROM) / night.Duration,

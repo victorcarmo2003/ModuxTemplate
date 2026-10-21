@@ -427,7 +427,7 @@ return function(props: Props): Frame
 	const pop = Motion.Pop(props.Visible)
 	const area = source(Vector2.zero)
 	const scale = function(): number
-		const base = if props.Scale then math.max(math.min(props.Scale(), UiScale.Current()), Theme.Scale.Min) else 1
+		const base = if props.Scale then math.max(math.min(props.Scale(), UiScale.Current()), UiScale.Floor()) else 1
 		return UiScale.Fit(base, area(), DESIGN)
 	end
 	const images = props.Images or Images

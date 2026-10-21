@@ -180,6 +180,8 @@ function Whispers.Play(seconds: number, words: { string }?, rate: number?)
 	gui.Name = "HideWhispers"
 	gui.ResetOnSpawn = false
 	gui.IgnoreGuiInset = true
+	gui.ScreenInsets = Enum.ScreenInsets.None
+	gui.ClipToDeviceSafeArea = false
 	gui.DisplayOrder = 45
 	gui.Parent = playerGui
 	const rng = Random.new()

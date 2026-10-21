@@ -14,6 +14,12 @@
 -- ticket, which takes the oldest ticket that lands while it is held (OnTicket) or the oldest one at the hand-over (Pickup).
 -- A customer that leaves frees its plates: Ticket 0 (the plate is judged against whoever takes it at the hand-over).
 --
+-- Plate slots (owner 2026-10-19, DEC-311): the plates of the front counter (the parts with PlateIndex 1..8, Kitchen/Plates/MarkN/
+-- PLATE-n) each stand for ONE ticket line. A free ticket line (order taken, no plate in a hand) gets the lowest empty slot; the slot
+-- part carries the attributes Ticket (NpcId) and TicketLine for the clients (the plate shows, with the order card over it) and its
+-- Prompt_Plate is on. An empty slot has no Ticket: the client hides the plate and the prompt is off. Take Plate on a slot ties
+-- the plate to THAT slot's ticket line (the player picks which order to make).
+--
 -- PICKUP (kitchen-world.md §1 #10): the gate "PlateTicket" on pickup_serve (and serve on a PU-n rig) refuses a `plate` not
 -- made yet (plate_not_ready) and a hot dog whose ticket customer is not Waiting in the pickup line (ticket_other, Value = #n).
 -- The sale and the grade are CustomerService's (Grade.Assembly at SellLine).
@@ -27,6 +33,9 @@ local Restaurant = require(ReplicatedStorage.shared.Libs.Net.Restaurant)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local PlateTool = require(ReplicatedStorage.shared.Plate.PlateTool)
 local Modux = require(ServerScriptService.server.Modux)
+
+-- One plate slot of the front counter
+export type Slot = { Index: number, Part: BasePart, Anchor: Attachment, Npc: number, Line: number }
 
 -- One live plate (a Tool in a hand)
 export type Entry = {
@@ -52,6 +61,11 @@ const TAKE = "plate_take"
 const PICKUP_SERVE = "pickup_serve"
 const SERVE = "serve"
 const TAKE_ORDER = "take_order"
+const SLOT_INDEX = "PlateIndex" -- attribute of a slot part (1..8) and of its Prompt_Plate
+const SLOT_TICKET = "Ticket" -- slot part: NpcId of the ticket line it shows (nil = empty)
+const SLOT_LINE = "TicketLine" -- slot part: 1 / 2 of a pair
+const SLOT_ANCHOR = "Prompt_Plate"
+const SLOT_RATE = 2 -- Hz: slots re-read the tickets
 const TICKET_GATE = "PlateTicket"
 const WAITING = "Waiting"
 const LEAVING = "Leaving"
@@ -111,6 +125,8 @@ function PlateService:Setup()
 	self.NoticeAt = {} :: { [Player]: { [string]: number } }
 	-- A plate changed (id): born, filled, ticket, gone (dev, QA, Metrics)
 	self.Changed = self.Libs.Signal.new() :: SignalLib.Signal<number>
+	-- Plate slots of the front counter by PlateIndex (DEC-311)
+	self.Slots = {} :: { [number]: Slot }
 end
 
 -- Reads ---------------------------------------------------------------------------------------------------------------
@@ -312,6 +328,8 @@ function PlateService:Follow(player: Player)
 		self:Publish(id)
 		self.Changed:Fire(id)
 	end
+	-- a plate that left a hand unserved (bin, drop, death) gives its ticket line back to a slot
+	self:RefreshSlots()
 end
 
 -- plate_take ----------------------------------------------------------------------------------------------------------
@@ -334,10 +352,14 @@ function PlateService:ValidateTake(player: Player): boolean
 	return true
 end
 
--- Pile -> hand: an empty plate tied to the oldest free ticket line
-function PlateService:Take(player: Player): Entry?
+-- Slot -> hand: an empty plate tied to the ticket line of the slot `anchor` belongs to (no slot: the oldest free line)
+function PlateService:Take(player: Player, anchor: Instance?): Entry?
 	if not self:ValidateTake(player) then
 		return nil
+	end
+	const slot = if anchor ~= nil then self:SlotOf(anchor) else nil
+	if slot ~= nil and slot.Npc == 0 then
+		return nil -- an empty slot (its prompt is off; a stale request)
 	end
 	const id = self:FreeId()
 	if id == nil then
@@ -352,11 +374,113 @@ function PlateService:Take(player: Player): Entry?
 	tool:SetAttribute(ATTR.Sausage, false)
 	const entry: Entry = { Id = id, Player = player, Tool = tool, Ticket = 0, Line = 0, Since = 0 }
 	self.Plates[id] = entry
-	self:Stamp(entry)
-	self:Bind(entry)
+	if slot ~= nil then
+		const ticket = self.Dependencies.CustomerService.Tickets[slot.Npc]
+		entry.Ticket = slot.Npc
+		entry.Line = slot.Line
+		entry.Since = if ticket ~= nil then ticket.TakenAt else 0
+		self:Stamp(entry)
+	else
+		self:Stamp(entry)
+		self:Bind(entry)
+	end
 	self:Publish(id)
 	self.Changed:Fire(id)
+	self:RefreshSlots()
 	return entry
+end
+
+-- Slots -----------------------------------------------------------------------------------------------------------------
+
+-- The slot an anchor (Prompt_Plate) or slot part belongs to, nil = none
+function PlateService:SlotOf(instance: Instance): Slot?
+	local current: Instance? = instance
+	while current ~= nil and current ~= workspace do
+		const index = current:GetAttribute(SLOT_INDEX)
+		if type(index) == "number" then
+			const slot = self.Slots[index]
+			if slot ~= nil and (slot.Part == current or slot.Anchor == current or current:IsAncestorOf(slot.Part)) then
+				return slot
+			end
+		end
+		current = current.Parent
+	end
+	return nil
+end
+
+-- Finds the slot parts of the map (a BasePart with PlateIndex and MapId PLATE-n) and gives each one a Prompt_Plate
+function PlateService:BindSlots()
+	table.clear(self.Slots)
+	for _, part in workspace:GetDescendants() do
+		const index = part:GetAttribute(SLOT_INDEX)
+		const mapId = part:GetAttribute("MapId")
+		if not part:IsA("BasePart") or type(index) ~= "number" or type(mapId) ~= "string" or string.sub(mapId, 1, 6) ~= "PLATE-" then
+			continue
+		end
+		-- the counter's MarkN model names the slot (copied marks may keep the PlateIndex of the one they came from)
+		const mark = part:FindFirstAncestorOfClass("Model")
+		const number = if mark ~= nil then tonumber(string.match(mark.Name, "^Mark(%d+)$")) else nil
+		const slotIndex = number or index
+		if self.Slots[slotIndex] ~= nil then
+			warn(`[PlateService] two plate slots with index {slotIndex}: {part:GetFullName()} is skipped`)
+			continue
+		end
+		local anchor = part:FindFirstChild(SLOT_ANCHOR)
+		if anchor == nil or not anchor:IsA("Attachment") then
+			const made = Instance.new("Attachment")
+			made.Name = SLOT_ANCHOR
+			made.Position = Vector3.new(0, 0.5, 0)
+			made.Parent = part
+			anchor = made
+		end
+		const attachment = anchor :: Attachment
+		attachment:SetAttribute("PromptAction", TAKE)
+		attachment:SetAttribute(SLOT_INDEX, slotIndex)
+		part:SetAttribute(SLOT_INDEX, slotIndex)
+		CollectionService:AddTag(attachment, "Interactable")
+		self.Slots[slotIndex] = { Index = slotIndex, Part = part, Anchor = attachment, Npc = 0, Line = 0 }
+	end
+	self:RefreshSlots()
+end
+
+-- Every free ticket line keeps its slot or gets the lowest empty one; a slot whose line got a plate (or left) empties
+function PlateService:RefreshSlots()
+	const free = self:FreeTickets()
+	const open: { [string]: boolean } = {}
+	for _, ticket in free do
+		open[`{ticket.Npc}:{ticket.Line}`] = true
+	end
+	const shown: { [string]: boolean } = {}
+	for _, slot in self.Slots do
+		if slot.Npc ~= 0 and not open[`{slot.Npc}:{slot.Line}`] then
+			slot.Npc, slot.Line = 0, 0
+		elseif slot.Npc ~= 0 then
+			shown[`{slot.Npc}:{slot.Line}`] = true
+		end
+	end
+	const indexes: { number } = {}
+	for index in self.Slots do
+		table.insert(indexes, index)
+	end
+	table.sort(indexes)
+	for _, ticket in free do
+		if shown[`{ticket.Npc}:{ticket.Line}`] then
+			continue
+		end
+		for _, index in indexes do
+			const slot = self.Slots[index]
+			if slot.Npc == 0 then
+				slot.Npc, slot.Line = ticket.Npc, ticket.Line
+				break
+			end
+		end
+	end
+	const interaction = self.Dependencies.InteractionService
+	for _, slot in self.Slots do
+		slot.Part:SetAttribute(SLOT_TICKET, if slot.Npc ~= 0 then slot.Npc else nil)
+		slot.Part:SetAttribute(SLOT_LINE, if slot.Npc ~= 0 then slot.Line else nil)
+		interaction:SetPrompt(slot.Anchor, slot.Npc ~= 0)
+	end
 end
 
 -- Tickets -------------------------------------------------------------------------------------------------------------
@@ -379,6 +503,7 @@ function PlateService:OnTicket(_npc: number)
 		self:Publish(entry.Id)
 		self.Changed:Fire(entry.Id)
 	end
+	self:RefreshSlots()
 end
 
 -- The customer left (served, gave up, shift end): its plates lose the ticket. Returns how many plates it touched.
@@ -395,6 +520,7 @@ function PlateService:Release(npc: number): number
 			count += 1
 		end
 	end
+	self:RefreshSlots()
 	return count
 end
 
@@ -413,6 +539,7 @@ function PlateService:Clear()
 		self:Publish(id)
 		self.Changed:Fire(id)
 	end
+	self:RefreshSlots()
 end
 
 -- PICKUP ----------------------------------------------------------------------------------------------------------------
@@ -533,8 +660,8 @@ PlateService:OnInit(function(self)
 		Validate = function(player: Player, _anchor: Instance): boolean
 			return self:ValidateTake(player)
 		end,
-		Run = function(player: Player, _anchor: Instance)
-			self:Take(player)
+		Run = function(player: Player, anchor: Instance)
+			self:Take(player, anchor)
 		end,
 	})
 	-- Only the ticket owner gets a ticketed hot dog at the PICKUP (Q-383 A); a half plate never
@@ -550,6 +677,8 @@ PlateService:OnInit(function(self)
 			end
 		end
 		self.NoticeAt[player] = nil
+		-- owner 2026-10-20: the plate of a player who left goes back to the table now (its ticket line gets a slot again)
+		self:RefreshSlots()
 	end)
 end)
 
@@ -557,9 +686,10 @@ PlateService:OnStart(function(self)
 	if not self.Enabled then
 		return
 	end
-	-- the plate pile prompt is on from the start (InteractionService watches the tagged anchors)
+	-- the plate slots of the counter (DEC-311); a Take Plate anchor outside them (an old pile) stays on
+	self:BindSlots()
 	for _, anchor in CollectionService:GetTagged("Interactable") do
-		if anchor:GetAttribute("PromptAction") == TAKE and anchor:IsDescendantOf(workspace) then
+		if anchor:GetAttribute("PromptAction") == TAKE and anchor:IsDescendantOf(workspace) and self:SlotOf(anchor) == nil then
 			self.Dependencies.InteractionService:SetPrompt(anchor, true)
 		end
 	end
@@ -585,5 +715,13 @@ PlateService:OnStart(function(self)
 		self:Clear()
 	end)
 end)
+
+-- The slots follow the tickets every SLOT_RATE: the tutorial customer's order never fires Acted (take_order), and a ticket line
+-- freed by a lost plate shows again without waiting for another event
+PlateService:OnTick(function(self)
+	if self.Enabled and next(self.Slots) ~= nil then
+		self:RefreshSlots()
+	end
+end, SLOT_RATE)
 
 return PlateService

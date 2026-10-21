@@ -138,7 +138,9 @@ end
 -- Spawn -------------------------------------------------------------------------------------------------------------------
 
 -- CustomerService:Attempt hook: the NpcId when this attempt became a car
-function DriveThruService:Try(party: number): number?
+-- Balance (owner 2026-10-20, Provisional): `counter` = customers at / walking to the counter. More of them than cars = this
+-- attempt is a car (when the lane has room); more cars than them = it goes to the counter; even = the ShareByParty draw.
+function DriveThruService:Try(party: number, counter: number): number?
 	const lane = self.Lane
 	if not self.Enabled or lane == nil then
 		return nil
@@ -149,15 +151,43 @@ function DriveThruService:Try(party: number): number?
 		if self.Dependencies.RoundService:Info().Night < drive.UnlockNight then
 			return nil
 		end
-		const share = drive.ShareByParty[math.clamp(party, 1, #drive.ShareByParty)] or 0
-		if self.Rng:NextNumber() >= share then
+		local cars = 0
+		for _, car in self.Cars do
+			if car.State ~= "Leaving" then
+				cars += 1
+			end
+		end
+		if cars > counter then
 			return nil
+		elseif cars == counter then
+			const share = drive.ShareByParty[math.clamp(party, 1, #drive.ShareByParty)] or 0
+			if self.Rng:NextNumber() >= share then
+				return nil
+			end
 		end
 	end
 	const spot = self:NextSpot(if forced then drive.Lanes else self:Allowed(party))
 	if spot == 0 then
 		return nil
 	end
+	return self:Spawn(spot, false)
+end
+
+-- The tutorial customer as a car (owner 2026-10-20, Provisional): any night, no draw; nil = lane full / no NPC
+function DriveThruService:TryTutorial(): number?
+	if not self.Enabled or self.Lane == nil then
+		return nil
+	end
+	const spot = self:NextSpot(Content.Restaurant.Drive.Lanes)
+	if spot == 0 then
+		return nil
+	end
+	return self:Spawn(spot, true)
+end
+
+-- A car with its driver at lane `spot` (Create with the spot); nil = no NPC
+function DriveThruService:Spawn(spot: number, tutorial: boolean): number?
+	const lane = self.Lane :: Lane.Lane
 	const to = Lane.Spot(lane, spot)
 	const npc = self.Dependencies.NpcService
 	const id = npc:Spawn({ Rng = self.Rng, At = self:DriverPose(to) })
@@ -170,7 +200,7 @@ function DriveThruService:Try(party: number): number?
 		model:SetAttribute(HIDDEN, true)
 	end
 	self:Anchor(id, true)
-	self.Dependencies.CustomerService:Create(id, nil, nil, nil, spot)
+	self.Dependencies.CustomerService:Create(id, nil, nil, if tutorial then true else nil, spot)
 	const looks = Content.Traffic.Looks
 	const t = now()
 	const car: Car = {
@@ -617,10 +647,17 @@ DriveThruService:OnStart(function(self)
 		return
 	end
 	self.Lane = lane
-	self:MakeAnchors()
+	-- owner 2026-10-20 (Provisional): no DT-PC tablet nor DT-WIN "Hand Out" any more; the car at the window carries the
+	-- prompt (CustomerService:FrontDrive / SetPrompts). MakeAnchors stays for a rollback.
+	if Content.Restaurant.Drive.WindowAnchors then
+		self:MakeAnchors()
+	end
 	self.Dependencies.CustomerService:SetDriver({
-		Try = function(party: number): number?
-			return self:Try(party)
+		Try = function(party: number, counter: number): number?
+			return self:Try(party, counter)
+		end,
+		TryTutorial = function(): number?
+			return self:TryTutorial()
 		end,
 		Left = function(id: number)
 			self:Left(id)

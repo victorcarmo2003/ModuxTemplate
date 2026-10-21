@@ -34,6 +34,12 @@
 -- into; its leader may still take it to a free platform.
 -- Cancel (PartyCancel, user request 2026-10-12): the leader aborts the countdown until Rules.CancelCutoff s before the
 -- teleport (Token invalidates the pending Fire; Launched / late = "CancelTooLate"); idle state again, solo squad gone.
+-- Pad room (owner request 2026-10-21, Provisional; emends DEC-344): stepping on a free pad creates the room (Access
+-- "Open") already "Starting", with Rules.PadCountdown s on the clock. Others step on and join while it counts down
+-- (until Rules.JoinCutoff s before the teleport); stepping off leaves, the last one out ends it. The pad bar (PartyPad):
+-- StartNow (leader) drops the clock to Rules.StartNow s, SkipTutorial (each member) rides TeleportData SkipTutorial
+-- so the run closes that member's tutorial, FriendsOnly (leader) switches Access Friends / Open. No cancel on a pad: a
+-- failed or Studio teleport ends the room, and whoever still stands there starts a fresh one.
 -- Server never trusts the client: membership, leadership, state, size, presence of the target, friendship and rate
 -- are checked here; TeleportData is written only by this service.
 -- Tracked (analytics, owner request 2026-10-17; MetricsService listens): (kind, party, userId, detail) at Created,
@@ -64,6 +70,7 @@ export type Party = {
 	Launched: boolean, -- countdown over: reserve / teleport running
 	Solo: boolean, -- quick play "Solo": disbanded instead of going back to the idle state
 	Token: number, -- bumped by every Begin and Cancel: a countdown thread only fires for the token it was born with
+	Skip: { [number]: boolean }, -- members who skip the run's tutorial (pad bar)
 }
 type Invite = { From: number, ExpiresAt: number }
 type Flight = { Options: TeleportOptions, Tries: number, PartyId: number }
@@ -75,6 +82,7 @@ type Record = {
 	Access: string,
 	MaxPlayers: number,
 	StartAt: number,
+	Skip: { [number]: boolean },
 }
 
 const RULES = PartyRules.Rules
@@ -211,6 +219,7 @@ local function record(party: Party): Record
 		Access = party.Access,
 		MaxPlayers = party.MaxPlayers,
 		StartAt = party.StartAt,
+		Skip = table.clone(party.Skip),
 	}
 end
 
@@ -254,6 +263,7 @@ function PartyService:Create(leader: number, platform: number, access: string): 
 		Launched = false,
 		Solo = false,
 		Token = 0,
+		Skip = {},
 	}
 	self.Parties[party.Id] = party
 	self.PartyOf[leader] = party.Id
@@ -298,6 +308,7 @@ function PartyService:RemoveMember(userId: number, kicked: boolean)
 	if index ~= nil then
 		table.remove(party.Members, index)
 	end
+	party.Skip[userId] = nil
 	self.Tracked:Fire("Left", party, userId, if kicked then "kicked" else "")
 	if kicked then
 		self:Notice(userId, "Kicked", nil)
@@ -523,25 +534,81 @@ function PartyService:HandleStart(player: Player)
 		return
 	end
 	if not isOpen(party) then
+		if party.Platform > 0 then
+			self:StartNow(party) -- a pad room already counts down: START = start now
+			return
+		end
 		self:Notice(player, "Busy", nil)
 		return
 	end
-	self:Begin(party)
+	self:Begin(party, RULES.Countdown, true)
 end
 
--- Countdown, then Fire (checks already done by the caller).
-function PartyService:Begin(party: Party)
+-- Countdown of `seconds`, then Fire (checks already done by the caller). `notify` = the "Starting" notice.
+function PartyService:Begin(party: Party, seconds: number, notify: boolean)
 	party.State = "Starting"
-	party.StartAt = workspace:GetServerTimeNow() + RULES.Countdown
+	party.StartAt = workspace:GetServerTimeNow() + seconds
 	party.Token += 1
 	const token = party.Token
 	self:Publish(party, false)
-	self:NoticeParty(party, "Starting", nil)
-	task.delay(RULES.Countdown, function()
+	if notify then
+		self:NoticeParty(party, "Starting", nil)
+	end
+	task.delay(seconds, function()
 		if party.Token == token then
 			self:Fire(party)
 		end
 	end)
+end
+
+-- START NOW: the clock of a starting room drops to Rules.StartNow s (a shorter one is kept).
+function PartyService:StartNow(party: Party)
+	if party.State ~= "Starting" or party.Launched then
+		return
+	end
+	if party.StartAt - workspace:GetServerTimeNow() <= RULES.StartNow then
+		return
+	end
+	self:Begin(party, RULES.StartNow, true)
+end
+
+-- The pad bar (PartyPad; owner request 2026-10-21, Provisional).
+function PartyService:HandlePad(player: Player, action: string, on: boolean)
+	const userId = player.UserId
+	const party = self:PartyOfUser(userId)
+	if party == nil then
+		self:Notice(player, "NotInParty", nil)
+		return
+	end
+	if party.Launched then
+		self:Notice(player, "Busy", nil)
+		return
+	end
+	if action == "SkipTutorial" then
+		if (party.Skip[userId] == true) ~= on then
+			party.Skip[userId] = if on then true else nil
+			self:Publish(party, false)
+		end
+		return
+	end
+	if party.Leader ~= userId then
+		self:Notice(player, "NotLeader", nil)
+		return
+	end
+	if action == "StartNow" then
+		if party.State == "Starting" then
+			self:StartNow(party)
+		else
+			self:Begin(party, RULES.StartNow, true)
+		end
+	elseif action == "FriendsOnly" then
+		const access = if on then "Friends" else "Open"
+		if party.Access ~= access then
+			party.Access = access
+			self:Publish(party, false)
+			self.Tracked:Fire("Configured", party, userId, access)
+		end
+	end
 end
 
 -- Leader aborts the countdown (user request 2026-10-12, Provisional; network.md §16.8). Allowed only while the squad is
@@ -556,8 +623,8 @@ function PartyService:HandleCancel(player: Player)
 		self:Notice(player, "NotLeader", nil)
 		return
 	end
-	if party.State ~= "Starting" then
-		return -- idempotent: already cancelled (or never started)
+	if party.State ~= "Starting" or party.Platform > 0 then
+		return -- idempotent: already cancelled (or never started); a pad room has no cancel (step off to leave)
 	end
 	if party.Launched or workspace:GetServerTimeNow() >= party.StartAt - RULES.CancelCutoff then
 		self:Notice(player, "CancelTooLate", nil)
@@ -593,7 +660,7 @@ function PartyService:HandleQuickPlay(player: Player, mode: string)
 	if mode == "Solo" then
 		party.Solo = true
 		party.MaxPlayers = 1
-		self:Begin(party)
+		self:Begin(party, RULES.Countdown, true)
 	else
 		self:Notice(player, "Created", nil)
 	end
@@ -601,12 +668,24 @@ end
 
 -- Teleport ---------------------------------------------------------------------------------------------------------
 
+-- UserIds of the members who skip the run's tutorial (TeleportData SkipTutorial)
+local function skippers(party: Party): { number }
+	const out: { number } = {}
+	for _, userId in party.Members do
+		if party.Skip[userId] == true then
+			table.insert(out, userId)
+		end
+	end
+	return out
+end
+
 function PartyService:LaunchData(party: Party): { [string]: any }
 	return {
 		Role = "Game",
 		PartyId = party.Id,
 		Members = table.clone(party.Members),
 		Leader = party.Leader,
+		SkipTutorial = skippers(party),
 	}
 end
 
@@ -648,8 +727,9 @@ function PartyService:Reopen(party: Party, notify: boolean)
 			self.Teleporting[userId] = nil
 		end
 	end
-	if party.Solo then
-		-- a solo quick play is not a squad to keep: gone, and Play offers the choice again
+	if party.Solo or party.Platform > 0 then
+		-- a solo quick play is not a squad to keep: gone, and Play offers the choice again. A pad room too: whoever
+		-- still stands on the pad starts a fresh one (PollPlatforms)
 		if notify then
 			self:NoticeParty(party, "TeleportFailed", nil)
 		end
@@ -767,8 +847,11 @@ end
 
 -- nil = may join; else the PartyNotice key of the refusal.
 function PartyService:CanJoinPlatform(party: Party, platform: number): string?
-	if self.Parties[party.Id] ~= party or party.Platform ~= platform or not isOpen(party) then
+	if self.Parties[party.Id] ~= party or party.Platform ~= platform or party.Launched then
 		return "Busy"
+	end
+	if party.State == "Starting" and party.StartAt - workspace:GetServerTimeNow() <= RULES.JoinCutoff then
+		return "Busy" -- the teleport is about to go
 	end
 	if party.Access == "Closed" then
 		return "RoomClosed"
@@ -818,17 +901,17 @@ function PartyService:EnterPlatform(player: Player, platform: number)
 	const owner = self:PartyOnPlatform(platform)
 	if owner == nil then
 		if current ~= nil and current.Platform == 0 and current.Leader == userId then
-			-- the leader of an invite squad takes the platform with the squad
+			-- the leader of an invite squad takes the platform with the squad, and its countdown starts
 			current.Platform = platform
-			current.State = "Configuring"
-			self:Publish(current, false)
+			self:Begin(current, RULES.PadCountdown, false)
 			return
 		end
 		if current ~= nil then
 			self:RemoveMember(userId, false)
 		end
-		if self:Create(userId, platform, "Friends") ~= nil then
-			self:Notice(player, "Created", nil)
+		const room = self:Create(userId, platform, "Open")
+		if room ~= nil then
+			self:Begin(room, RULES.PadCountdown, false)
 		end
 		return
 	end
@@ -972,6 +1055,11 @@ PartyService:OnInit(function(self)
 	net.PartyCancel:onServer(function(_, player: Player)
 		if self:Gate(player) then
 			self:HandleCancel(player)
+		end
+	end)
+	net.PartyPad:onServer(function(data, player: Player)
+		if self:Gate(player) then
+			self:HandlePad(player, data.Action, data.On == true)
 		end
 	end)
 	net.PartyQuickPlay:onServer(function(data, player: Player)

@@ -26,6 +26,7 @@
 	heap to the pill. Keys still missing from Content.Sounds are skipped quietly.
 ]]
 local Players = game:GetService("Players")
+local GuiService = game:GetService("GuiService")
 local TweenService = game:GetService("TweenService")
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -55,11 +56,18 @@ const TIP_SPEED = 1.2 -- tip with no `tip` row yet: the coin again, higher (Prov
 const CUSTOMER_TAG = "AnimalRig" -- customer rigs carry the NpcId attribute
 const COUNTER_LIFT = 1.5 -- studs above the customer's root: where the sale money starts
 const SALE_COINS = 3 -- 2D coins that follow a sale's "+$N" to the pill
--- "Collect Cash" (Q-201): "+$N" leaves the register and flies to the money pill of the HUD (HudScreen: left 10, top 6, 38 tall)
+-- "Collect Cash" (Q-201): "+$N" leaves the register and flies to the money pill of the HUD. TASK-597 (owner Play
+-- 2026-10-19: the money flew to the top LEFT): the target is the real "Cash" pill of the Hud ScreenGui (top right since
+-- 2026-10-12), read every flight; HUD_PILL is only the fallback while the pill is not on screen
 const FLY_TIME = 0.8 -- s
 const FLY_COINS = 8 -- coins of the burst at the register
 const BILL_COLOR = Color3.fromHex("#6FB26B") -- note green (same as the 3D bills)
-const HUD_PILL = Vector2.new(10 + 56, 6 + 19) -- px at scale 1: where the money pill reads
+const HUD_PILL = Vector2.new(10 + 56, 6 + 19) -- px at scale 1 from the top RIGHT corner: fallback target
+const HUD_GUI = "Hud" -- HudController's ScreenGui
+const PILL_NAME = "Cash" -- HudScreen's money pill
+-- TASK-597: the money shown on the HUD (Shown) catches up with Cash when the first pieces land, so the pill pops, turns
+-- green and rolls up in sync with the coins (HudScreen). A drop shows at once.
+const LAND_TIME = FLY_TIME + 0.1 -- s after a Cash increase
 
 type Mount = {
 	Vehicle: Instance,
@@ -82,6 +90,9 @@ const EconomyController =
 
 function EconomyController:Setup()
 	self.Cash = Vide.source(0) :: Vide.Source<number>
+	-- money the HUD shows (TASK-597): follows Cash, an increase lands LAND_TIME s later with the flying coins
+	self.Shown = Vide.source(0) :: Vide.Source<number>
+	self.LandSerial = 0 :: number
 	self.Drawer = Vide.source(0) :: Vide.Source<number>
 	-- true once the first Economy record arrived
 	self.Ready = Vide.source(false) :: Vide.Source<boolean>
@@ -101,6 +112,7 @@ end
 function EconomyController:Apply(record: Record)
 	if self.Cash() ~= record.Cash then
 		self.Cash(record.Cash)
+		self:Land(record.Cash, self.Ready())
 	end
 	const before = self.Drawer()
 	const ready = self.Ready()
@@ -120,6 +132,21 @@ function EconomyController:Apply(record: Record)
 	if not ready then
 		self.Ready(true)
 	end
+end
+
+-- HUD money (Shown): a drop or the first record shows at once; a rise waits for the coins (LAND_TIME), the newest wins
+function EconomyController:Land(cash: number, ready: boolean)
+	self.LandSerial += 1
+	if not ready or cash < Vide.untrack(self.Shown) then
+		self.Shown(cash)
+		return
+	end
+	const serial = self.LandSerial
+	task.delay(LAND_TIME, function()
+		if serial == self.LandSerial then
+			self.Shown(Vide.untrack(self.Cash))
+		end
+	end)
 end
 
 function EconomyController:Pop(amount: number)
@@ -269,6 +296,22 @@ function EconomyController:FlyScreen(): ScreenGui?
 	return screen
 end
 
+-- Centre of the HUD money pill in the flight ScreenGui's space (IgnoreGuiInset): the Hud ScreenGui keeps the inset, so
+-- its AbsolutePosition is under the top bar. Fallback HUD_PILL (scaled, top right) while the pill is hidden or not built.
+function EconomyController:PillTarget(scale: number, viewport: Vector2): Vector2
+	const playerGui = self.Gui
+	const hud = if playerGui then playerGui:FindFirstChild(HUD_GUI) else nil
+	if hud and hud:IsA("ScreenGui") then
+		for _, item in hud:GetDescendants() do
+			if item.Name == PILL_NAME and item:IsA("GuiObject") and item.Visible and item.AbsoluteSize.X > 0 then
+				const inset = if hud.IgnoreGuiInset then Vector2.zero else GuiService:GetGuiInset()
+				return item.AbsolutePosition + item.AbsoluteSize / 2 + inset
+			end
+		end
+	end
+	return Vector2.new(viewport.X - HUD_PILL.X * scale, HUD_PILL.Y * scale)
+end
+
 -- One small bill or coin (2D) from a world position to the money pill of the HUD
 function EconomyController:FlyPiece(position: Vector3?, coin: boolean, delay: number)
 	const camera = workspace.CurrentCamera
@@ -307,7 +350,7 @@ function EconomyController:FlyPiece(position: Vector3?, coin: boolean, delay: nu
 			return
 		end
 		piece.Visible = true
-		const target = HUD_PILL * scale
+		const target = self:PillTarget(scale, viewport)
 		const tween = TweenService:Create(
 			piece,
 			TweenInfo.new(FLY_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
@@ -349,7 +392,7 @@ function EconomyController:Fly(amount: number, position: Vector3?)
 	label.TextStrokeColor3 = Theme.Color.Ink
 	label.ZIndex = 5
 	label.Parent = screen
-	const target = HUD_PILL * scale
+	const target = self:PillTarget(scale, viewport)
 	const tween = TweenService:Create(
 		label,
 		TweenInfo.new(FLY_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.In),

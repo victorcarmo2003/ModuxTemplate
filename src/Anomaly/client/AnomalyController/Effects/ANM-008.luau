@@ -18,20 +18,26 @@
 	    then is destroyed. Engine hum (`car_engine`) on the car, pitched up while it rushes.
 	Cues: `car_highbeam` (beam on), `car_flash` (beam blinks twice), `car_honk` (low soft honk on the car),
 	`trailer_blackout` (trailer lights off locally for the cue Duration), `jumpscare` (Entity = UserId % 65536: only that
-	client shows the face; the faint is the server's).
+	client is BLINDED by the beam - white-out, bloom, washed grade - and then shows the face; the sanity loss is the
+	server's, no faint: owner 2026-10-19).
+	Parked, the two kit SpotLights (`HighBeam` in Light_HighL/R) are re-aimed at the service window (TrailerFront.Window),
+	not left along the body (owner 2026-10-19: they lit the diagonal).
 
 	PROVISIONAL (TASK-331) - numbers Rules/ANM-008 must match on the server: ARRIVE_TIME = SLOW + RUSH + BRAKE = 8.2 s
-	after StartedAt the car is braked; the beam comes BeamDelay (2.5 s) later (server cue/phase). Brake screech `car_screech` (Id "" until
+	after StartedAt the car is braked; the beam comes BeamDelay (5 s) later (server cue/phase). Brake screech `car_screech` (Id "" until
 	the owner sends it: silence).
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local TrailerFront = require(ReplicatedStorage.shared.Anomaly.TrailerFront)
 local Effect = require(script.Parent.Parent.Effect)
 local Jumpscare = require(script.Parent.Kit.Jumpscare)
+local Watch = require(script.Parent.Kit.Watch)
 
 -- Route: the Ninth WB lane comes in at E-IN (position + LookVector = travel direction), so the route follows the map
 -- whatever its orientation in the place (2026-10-10: the place is turned 180 in Y).
@@ -82,6 +88,30 @@ const HONK_VOLUME = 0.8
 -- mounts it (late joiner) does not honk.
 const GOOFY_HONK = "car_honk_goofy"
 
+-- Blinding (owner 2026-10-19: "estourar a visão"): the caught player is blown out by the high beam, then the face.
+const BLIND_NAME = "ANM008_Blind"
+const BLIND_ORDER = 49 -- under the jumpscare face (Kit/Jumpscare DisplayOrder 50)
+const BLIND_HOLD = 0.35 -- s of pure white before the fade
+const BLIND_FADE = 2.6 -- s back to normal
+const BLIND_BRIGHTNESS = 1.2 -- ColorCorrection at the peak: blown out, cold, no colour
+const BLIND_CONTRAST = -0.4
+const BLIND_SATURATION = -1
+const BLIND_BLOOM_INTENSITY = 4
+const BLIND_BLOOM_SIZE = 56
+const BLIND_BLOOM_THRESHOLD = 0.3
+const BLIND_SPOT_BRIGHTNESS = 14 -- the high beam flares for this client while it blinds
+const BLIND_SPOT_RANGE = 60
+const FACE_DELAY = 0.45 -- s into the white-out the face pops
+
+-- Driver (TASK-588; design/horror-cinematic.md §11.2 "nas câmeras o carro não tem motorista"): a dark head and shoulders
+-- behind the wheel, seen with the bare eye only; on a security camera (Kit/Watch) the seat is empty. Placeholder Parts
+-- (PROVISIONAL), on the window side of the car, a third of the way back from the nose.
+const DRIVER_COLOR = Color3.fromHex("#07060B")
+const DRIVER_SIDE = -0.22 -- share of the car width from the centre (the driver's side; -X = left)
+const DRIVER_BACK = 0.3 -- share of the car length from the nose
+const DRIVER_HEAD = 1.1 -- studs
+const DRIVER_SHOULDERS = Vector3.new(1.7, 1.1, 0.9)
+
 -- Trailer blackout (cue trailer_blackout): groups of the trailer, lamp look when off (LightController's)
 const BLACKOUT_GROUPS = { "trailer_interior", "trailer_lights" }
 const LAMP_OFF_COLOR = Color3.fromHex("#EAD6B0")
@@ -116,6 +146,8 @@ type CarState = {
 	Orphan: boolean, -- the record left the set
 	Done: boolean,
 	Connection: RBXScriptConnection?,
+	Driver: { BasePart }, -- TASK-588: hidden on the cameras
+	DriverWatch: RBXScriptConnection?,
 }
 
 -- occurrence id -> live car (Cue reaches the car of its occurrence)
@@ -287,6 +319,39 @@ local function makeBeam(from: Attachment, to: Attachment): Beam
 	return beam
 end
 
+-- TASK-588: the driver nobody sees on the cameras, added to the car model (it moves with it)
+local function addDriver(model: Model): { BasePart }
+	const pivot = model:GetPivot()
+	const _, size = model:GetBoundingBox()
+	const length = math.max(size.Z, size.X)
+	const width = math.min(size.Z, size.X)
+	const seat = pivot * CFrame.new(width * DRIVER_SIDE, size.Y * 0.62, -length / 2 + length * DRIVER_BACK)
+	const parts: { BasePart } = {}
+	for _, piece in {
+		{ "DriverShoulders", Enum.PartType.Block, DRIVER_SHOULDERS, CFrame.new() },
+		{ "DriverHead", Enum.PartType.Ball, Vector3.one * DRIVER_HEAD, CFrame.new(0, DRIVER_SHOULDERS.Y / 2 + DRIVER_HEAD * 0.45, 0) },
+	} do
+		const part = Instance.new("Part")
+		part.Name = piece[1] :: string
+		part.Shape = piece[2] :: Enum.PartType
+		part.Size = piece[3] :: Vector3
+		part.CFrame = seat * (piece[4] :: CFrame)
+		part.Color = DRIVER_COLOR
+		part.Material = Enum.Material.SmoothPlastic
+		part.CastShadow = false
+		part.Parent = model
+		table.insert(parts, part)
+	end
+	return parts
+end
+
+local function showDriver(parts: { BasePart })
+	const modifier = if Watch.Watching() then 1 else 0
+	for _, part in parts do
+		part.LocalTransparencyModifier = modifier
+	end
+end
+
 local function buildCar(ctx: Effect.Context, occ: Effect.Occurrence): CarState
 	const lanes = route(ctx)
 	const spot = lanes.Front.Stop
@@ -294,6 +359,7 @@ local function buildCar(ctx: Effect.Context, occ: Effect.Occurrence): CarState
 	model.Name = `LongCar_{occ.Id}`
 	const body = model.PrimaryPart :: BasePart
 	const pivot = model:GetPivot()
+	const driver = addDriver(model)
 	const parts: { BasePart } = {}
 	const offsets: { CFrame } = {}
 	const lamps: { BasePart } = {}
@@ -370,7 +436,12 @@ local function buildCar(ctx: Effect.Context, occ: Effect.Occurrence): CarState
 		Orphan = false,
 		Done = false,
 		Connection = nil,
+		Driver = driver,
+		DriverWatch = Watch.Changed(function()
+			showDriver(driver)
+		end),
 	}
+	showDriver(driver)
 	model:PivotTo(arrivePose(spot, lanes, ctx.Now() - startedAt))
 	model.Parent = ctx.Folder()
 	state.Engine = ctx.Audio:Loop("car_engine", body, true)
@@ -408,6 +479,10 @@ local function finish(state: CarState, occId: number)
 		connection:Disconnect()
 		state.Connection = nil
 	end
+	if state.DriverWatch ~= nil then
+		state.DriverWatch:Disconnect()
+		state.DriverWatch = nil
+	end
 	state.Ctx.Audio:Loop("car_engine", state.Body, false)
 	state.Model:Destroy()
 	state.Target:Destroy()
@@ -422,6 +497,17 @@ local function place(state: CarState, pivot: CFrame)
 		cframes[i] = pivot * offset
 	end
 	workspace:BulkMoveTo(state.Parts, cframes, Enum.BulkMoveMode.FireCFrameChanged)
+end
+
+-- The high beam straight at the service window: each kit SpotLight's attachment turned to the beam target
+local function aimLights(state: CarState)
+	const target = beamTarget(state.Route)
+	for _, spot in state.Spots do
+		const holder = spot.Parent
+		if holder ~= nil and holder:IsA("Attachment") then
+			holder.WorldCFrame = CFrame.lookAt(holder.WorldPosition, target)
+		end
+	end
 end
 
 local function step(state: CarState, occId: number)
@@ -474,6 +560,7 @@ local function step(state: CarState, occId: number)
 		if not state.Parked then
 			state.Parked = true
 			place(state, state.Spot)
+			aimLights(state)
 		end
 	else
 		state.Parked = false
@@ -517,6 +604,61 @@ local function blackout(ctx: Effect.Context, duration: number)
 			fixture.Live = nil
 		end
 	end
+end
+
+-- White-out for this client only (cue jumpscare for us): own effects in Lighting, a white sheet under the face, the
+-- beam flaring; everything eases back over BLIND_FADE and is destroyed.
+local function blind(state: CarState?)
+	const tint = Instance.new("ColorCorrectionEffect")
+	tint.Name = BLIND_NAME
+	tint.TintColor = BEAM_COLOR
+	tint.Brightness = BLIND_BRIGHTNESS
+	tint.Contrast = BLIND_CONTRAST
+	tint.Saturation = BLIND_SATURATION
+	tint.Parent = Lighting
+	const bloom = Instance.new("BloomEffect")
+	bloom.Name = BLIND_NAME
+	bloom.Intensity = BLIND_BLOOM_INTENSITY
+	bloom.Size = BLIND_BLOOM_SIZE
+	bloom.Threshold = BLIND_BLOOM_THRESHOLD
+	bloom.Parent = Lighting
+	const gui = Instance.new("ScreenGui")
+	gui.Name = BLIND_NAME
+	gui.IgnoreGuiInset = true
+	gui.ScreenInsets = Enum.ScreenInsets.None
+	gui.ClipToDeviceSafeArea = false
+	gui.ResetOnSpawn = false
+	gui.DisplayOrder = BLIND_ORDER
+	const sheet = Instance.new("Frame")
+	sheet.Size = UDim2.fromScale(1, 1)
+	sheet.BackgroundColor3 = BEAM_COLOR
+	sheet.BorderSizePixel = 0
+	sheet.Parent = gui
+	gui.Parent = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	const spots: { [SpotLight]: { number } } = {}
+	if state ~= nil and not state.Done then
+		for _, spot in state.Spots do
+			spots[spot] = { spot.Brightness, spot.Range }
+			spot.Brightness = BLIND_SPOT_BRIGHTNESS
+			spot.Range = BLIND_SPOT_RANGE
+		end
+	end
+	task.delay(BLIND_HOLD, function()
+		const info = TweenInfo.new(BLIND_FADE, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		TweenService:Create(tint, info, { TintColor = Color3.new(1, 1, 1), Brightness = 0, Contrast = 0, Saturation = 0 })
+			:Play()
+		TweenService:Create(bloom, info, { Intensity = 0 }):Play()
+		TweenService:Create(sheet, info, { BackgroundTransparency = 1 }):Play()
+		for spot, was in spots do
+			if spot.Parent ~= nil then
+				TweenService:Create(spot, info, { Brightness = was[1], Range = was[2] }):Play()
+			end
+		end
+		task.wait(BLIND_FADE)
+		tint:Destroy()
+		bloom:Destroy()
+		gui:Destroy()
+	end)
 end
 
 local function flash(state: CarState)
@@ -578,7 +720,8 @@ return {
 			blackout(ctx, cue.Row.Duration)
 		elseif cue.Cue == "jumpscare" then
 			if cue.Entity == Players.LocalPlayer.UserId % ENTITY_MOD then
-				Jumpscare.Show(ctx)
+				blind(state)
+				task.delay(FACE_DELAY, Jumpscare.Show, ctx)
 			end
 		end
 	end,

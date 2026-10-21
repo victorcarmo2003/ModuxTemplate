@@ -144,7 +144,7 @@ cutscene -> dia 1 (tutorial) -> dia 2 -> noite 1 (carrinho) -> dia 3 -> noite 2 
 **Lobby "Bramble's Corner Dogs HQ"** (`levels/LOBBY.md`, v2, Provisório): praça noturna quente com varal de lâmpadas e neon em tubo, para até ~30 jogadores.
 - **Palco de classes** com o carrinho original exposto e a tela "Crew".
 - **Gem Shop** (quiosque com pedestais) e canto dos **Codes** (mural).
-- **8 plataformas de squad** (duas fileiras de 4): pisar numa cria ou entra no squad, com opções "Friends only" e "Max players", contagem de 5 s e a van "START SHIFT".
+- **4 plataformas de squad** (`PartyRules.Rules.Platforms`; eram 8 no LOBBY v2): pisar numa cria ou entra no squad, com opções "Friends only" e "Max players", contagem de 5 s e a van "START SHIFT".
 - Extras de ambiente: food court com trailer parado, fonte, cabine de foto, jardim.
 
 ## 7. História e tom

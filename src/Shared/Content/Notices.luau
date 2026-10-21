@@ -33,6 +33,10 @@ return Table.new({
 	{ Key = "gear_closed", Text = "Gear Stand is closed", Audience = "Player", ValueFrom = "None", Wave = 1 },
 	-- Day Last call (DEC-240, user decision 2026-10-13): 6 PM, no new customer, the trailer stays open until the line and the
 	-- tables are served. Sent by CustomerService when the day Closing starts. Provisional text
+	-- DEC-320 (Q-412): to a player who is done while the clock waits for a rookie (TutorialService, once per wait)
+	{ Key = "tutorial_wait", Text = "Waiting for the rookie to finish the tutorial", Audience = "Player", ValueFrom = "None", Wave = 1 },
+	-- DEC-320 (B-15): a 5th player on a run server with no squad launch (Studio, Team Test): not a member, no character
+	{ Key = "run_full", Text = "This shift is full ({value} crew)", Audience = "Player", ValueFrom = "Number", Wave = 1 },
 	{ Key = "last_call", Text = "Last call! Serve who is still here.", Audience = "Party", ValueFrom = "None", Wave = 1 },
 	{ Key = "ingredient_unlocked", Text = "New: {item}!", Audience = "Party", ValueFrom = "Ingredients", Wave = 1 }, -- FEAT-032
 	-- gift bowl still closed (owner request 2026-10-14, Provisional): use / restock refused until "Open"
@@ -62,6 +66,8 @@ return Table.new({
 	-- (trailer_available / trailer_waiting / trailer_cash / trailer_bought left with the trailer purchase, 2026-10-12)
 	{ Key = "gems_gained", Text = "+{value} Gems!", Audience = "Player", ValueFrom = "Number", Wave = 2 }, -- DEC-104
 	{ Key = "afk_no_gems", Text = "No gems today. Serve 3 full orders!", Audience = "Party", ValueFrom = "None", Wave = 2 },
+	-- DEC-320 (Q-411): to a present player who did no kitchen or service action this shift (RewardService)
+	{ Key = "afk_no_gems_you", Text = "No gems this shift: lend the crew a hand!", Audience = "Player", ValueFrom = "None", Wave = 2 },
 	{
 		Key = "achievement",
 		Text = "Badge unlocked: {achievement}!",
@@ -69,8 +75,6 @@ return Table.new({
 		ValueFrom = "Achievements",
 		Wave = 2,
 	}, -- DEC-058
-	{ Key = "thief_caught", Text = "Nice catch! +${value}", Audience = "Party", ValueFrom = "Number", Wave = 2 }, -- DEC-050
-	{ Key = "thief_stole", Text = "The drawer got raided! -${value}", Audience = "Party", ValueFrom = "Number", Wave = 2 },
 	{ Key = "coffee_full", Text = "Already wide awake. Save it!", Audience = "Player", ValueFrom = "None", Wave = 2 },
 	-- drink refused by day while Q-170 option A stands (Provisional)
 	{ Key = "coffee_night_only", Text = "Save it for the night shift.", Audience = "Player", ValueFrom = "None", Wave = 2 },

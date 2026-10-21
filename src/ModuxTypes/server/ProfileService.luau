@@ -29,6 +29,7 @@ export type Public = {
 	SaveConfirmed: (self: Public, player: Player, saved: (data: { [string]: any }) -> boolean, timeout: number?) -> boolean,
 	SelectedClass: (self: Public, profile: Profile) -> string,
 	Replicate: (self: Public, player: Player) -> (),
+	LobbyGuides: (self: Public, profile: Profile) -> { [string]: boolean },
 	Migrate: (self: Public, data: { [string]: any }) -> (),
 	Bind: (self: Public, player: Player, session: any) -> Profile,
 	Load: (self: Public, player: Player) -> (),

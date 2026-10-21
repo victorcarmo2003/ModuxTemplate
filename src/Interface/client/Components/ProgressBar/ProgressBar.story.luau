@@ -20,7 +20,6 @@ return UILabs.CreateVideStory({
 	controls = {
 		Progress = UILabs.Slider(0.4, 0, 1, 0.01),
 		Auto = false,
-		Thief = false,
 		ShowText = false,
 		InWorld = true,
 	},
@@ -41,9 +40,6 @@ return UILabs.CreateVideStory({
 	end
 
 	local function fillColor(): Color3
-		if controls.Thief() then
-			return Theme.Color.Violet
-		end
 		return if progress() >= 1 then Theme.Color.Ready else Theme.Color.Cooking
 	end
 

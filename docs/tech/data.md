@@ -96,6 +96,10 @@ return {
 	-- memória do TutorialService; o campo permanece para não quebrar dados salvos nem o packet Profile
 	TutorialDone = false,
 
+	-- Setas de chão do lobby (Provisório, pedido do dono 2026-10-20): chave de Content.Lobby.Guide → os.time() de quando
+	-- terminou. Cada seta aparece 1x por conta. Reconcile acrescenta {} aos perfis antigos, sem migração
+	LobbyGuides = {} :: { [string]: number },
+
 	-- Códigos resgatados (Provisório, pedido do usuário 2026-10-11; §1.7): código normalizado → os.time() do resgate
 	RedeemedCodes = {} :: { [string]: number },
 }
@@ -128,6 +132,7 @@ Notas:
 | `Gems`, `Classes`, `RedeemedCodes` | `CodesService` | L+R | código resgatado (§1.7) | `RequestSave` |
 | `Stats` | `RewardService`, `ReviveService` | R | eventos | `RequestSave` |
 | `TutorialDone` | ninguém (legado; Q-193) | — | — | — |
+| `LobbyGuides` | `LobbyService` (`LobbyGuideDone`) | L | seta do lobby chegou ao alvo | `RequestSave` |
 
 Custo de escrita: ≤ 4 eventos por turno por jogador → muito abaixo de 60 + 40 × jogadores escritas/min por servidor.
 Limite por chave hoje é 4 MB/min (sem o antigo cooldown de 6 s).

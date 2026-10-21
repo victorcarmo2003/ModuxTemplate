@@ -8,7 +8,9 @@
 --   Locked   Cream card, Teal pill "Trailer only"
 --   Empty    one centred line ("Nothing special today", S1)
 -- Fixed pixel size like PatienceBar / OrderBubble (BillboardGui: the global ScreenGui UI scale does not reach it),
--- AlwaysOnTop so the glass and the miniature never hide it, bottom of the card at the adornee. Text >= 14 px.
+-- bottom of the card at the adornee (it floats above the glass, Mart.Plate.Lift). NOT AlwaysOnTop (TASK-595, owner Play
+-- 2026-10-19: the plates showed through the walls into the shop): walls hide it; the caller shows one plate at a time.
+-- Text >= 14 px.
 -- Pure: only props; the caller parents the BillboardGui and decides every text.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
@@ -16,8 +18,10 @@ local Cinematic = require(script.Parent.Parent.Cinematic)
 local Theme = require(script.Parent.Theme)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonLabel = require(script.Parent.CartoonLabel)
+local WorldScale = require(script.Parent.WorldScale)
 
 const create = Vide.create
+const effect = Vide.effect
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
 export type Mode = "Buy" | "NoCash" | "SoldOut" | "Maxed" | "Locked" | "Empty"
@@ -88,14 +92,14 @@ return function(props: Props): BillboardGui
 		return not empty()
 	end
 
-	return create("BillboardGui")({
+	const width = props.Width or WIDTH
+	const gui = create("BillboardGui")({
 		Name = props.Name or "GearTag",
 		Adornee = props.Adornee,
-		Size = function()
-			return UDim2.fromOffset(props.Width or WIDTH, if empty() then EMPTY_HEIGHT else HEIGHT)
-		end,
+		-- WorldScale owns the Size from here (design px x the distance scale)
+		Size = UDim2.fromOffset(width, HEIGHT),
 		SizeOffset = Vector2.new(0, 0.5),
-		AlwaysOnTop = true,
+		AlwaysOnTop = false,
 		StudsOffsetWorldSpace = props.Offset or Vector3.zero,
 		MaxDistance = props.MaxDistance or 45,
 		LightInfluence = 0,
@@ -166,5 +170,12 @@ return function(props: Props): BillboardGui
 				}),
 			},
 		}),
-	})
+	}) :: BillboardGui
+	-- shrinks with distance like the pedestal under it: a px card stayed the same size on screen, so from the aisle it
+	-- outgrew the stand and the shelves in front cut it (owner 2026-10-20)
+	WorldScale.Track(gui, width, HEIGHT)
+	effect(function()
+		WorldScale.Resize(gui, width, if empty() then EMPTY_HEIGHT else HEIGHT)
+	end)
+	return gui
 end

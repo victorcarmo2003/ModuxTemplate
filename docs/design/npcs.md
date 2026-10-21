@@ -181,6 +181,8 @@ Critérios de aceite (clientes normais):
 
 ### NPC-007 — Quick Quentin (o ladrão)
 
+> **Removido (DEC-313, 2026-10-20):** o ladrão saiu do jogo e do código (`src/Thief`, `Content.Thief`, `Net.Thief`, UPG-004, notices `thief_*`, ligações "quentin"). Texto abaixo é histórico.
+
 - Papel: ladrão · Turno: só dia · Custo: 1 · Origem: **[DEC-018, DEC-050, DEC-023]**; personagem CHR-004 (aparência e falas em `characters.md`)
 - Falas: 1 balão por evento (espreitar, pego, fugindo), pool do narrative-writer.
 - **DEC-159 (2026-10-10):** Quentin é um **guaxinim** da crew (DEC-149). Roupa por textura `T_Civil_Thief_Day` (**só dia**, sem variante de noite), chapéu `AST-053_ThiefHat`, rosto `T_Expr_Thief`. Regras e números abaixo **não mudam**. "Mesma roupa" da invariante própria = esse conjunto.
@@ -372,6 +374,8 @@ Invariantes (base para a ANM-008): **nunca para no meio-fio**; nunca estaciona; 
 
 ### NPC-023 — Ambulância
 
+> **Descartado (DEC-314, 2026-10-20):** a ambulância e os médicos não serão feitos; o corpo fica no chão até o reviver ou o fim da noite (`Revive.BodyFallback`). Texto abaixo sobre ambulância é histórico.
+
 - Papel: veículo roteirizado de resgate · Turno: noite (só quando alguém cai) · Custo: 1 no teto de veículos; no máximo 1 por servidor · Origem: **[DEC-091, DEC-023, DEC-114]**; sequência e tabela `Ambulance` em FEAT-034 (fonte única dos números); assets com o art-director (Q-104)
 
 | Estado | Regra | Números (tabela `Ambulance`, FEAT-034) |
@@ -387,6 +391,8 @@ Invariantes: sempre o mesmo modelo, cor e sirene; sirene suave (nunca susto, DEC
 - Critérios de aceite: os de FEAT-034; nunca há 2 ambulâncias no mapa; nenhuma colisão dela derruba jogador.
 
 ### NPC-024 — Médicos da ambulância (2)
+
+> **Descartado (DEC-314, 2026-10-20):** a ambulância e os médicos não serão feitos; o corpo fica no chão até o reviver ou o fim da noite (`Revive.BodyFallback`). Texto abaixo sobre ambulância é histórico.
 
 - Papel: atores visuais da coleta · Turno: noite · Custo: 0 (dirigidos pela linha do tempo do servidor, renderizados no client, como os atores de cutscene; fora do teto de 12) · Origem: **[DEC-091, DEC-089, DEC-114]**; personagem CHR-008 (`story/characters.md`); ficha de asset com o art-director (ainda não existe, AD-2 do relatório de consistência)
 

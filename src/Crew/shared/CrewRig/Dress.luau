@@ -5,8 +5,8 @@
 -- swap (DEC-168 Night for the observer in the low band) is never undone by replication.
 --
 -- Pack: outfit sheet (CrewLooks.Outfits[outfit][pack]), head (CrewLooks.Species[species].Head[pack]) and the atlas
--- pieces (CrewLooks.Atlas[pack]; Day = the piece's own DayTextureID). An outfit without that pack (thief: Day only,
--- DEC-159) dresses the whole rig in Day, so head and coat never disagree.
+-- pieces (CrewLooks.Atlas[pack]; Day = the piece's own DayTextureID). An outfit without that pack (Day only)
+-- dresses the whole rig in Day, so head and coat never disagree.
 -- Blank (ANM-001 / ANM-004, AST-060): `blank = true` swaps the head and the atlas pieces for the species' Blank
 -- textures (CrewLooks.Species[k].Blank: smooth skin-colour head, ears / tail / nose repainted in that colour) of the
 -- worn pack. Silent fallback to the ordinary textures when the species has no Blank row. The face is the caller's

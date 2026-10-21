@@ -1,13 +1,12 @@
 --!strict
 -- NpcService/Look: what a customer looks like (DEC-149, DEC-188; content-data.md §3.10a, §3.10b, §3.16). TASK-031.
 -- Pure: only Content. Customer type -> one of its fixed species + a civil outfit drawn uniformly (DEC-188 b). Never
--- the crew uniform (Looks.NpcNeverUses) nor a reserved species (raccoon = Quick Quentin, DEC-159, DEC-186).
+-- the crew uniform (Looks.NpcNeverUses) nor a reserved species (raccoon, DEC-186).
 -- Pedestrians (NPC-019) are wave 2 (DEC-183, Q-162): Pick refuses any type whose Role is not "Customer".
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 
 export type Choice = { CustomerType: string, Species: string, Outfit: string }
-export type Reserved = { Species: string, Outfit: string }
 
 const Look = {}
 
@@ -109,29 +108,6 @@ function Look.Pick(customerType: string, rng: Random, species: string?, outfit: 
 		Outfit = outfit or pickFrom(outfitList, rng),
 	},
 		nil
-end
-
--- Reserved look of an NPC id (Species.ReservedFor / Outfits.ReservedFor): "NPC-007" = Quick Quentin, raccoon in the
--- thief outfit (DEC-159, DEC-186). nil + reason when Content has no single species and outfit for it.
-function Look.Reserved(owner: string): (Reserved?, string?)
-	local species: string? = nil
-	for _, row in Content.Species.List do
-		if row.ReservedFor == owner then
-			species = row.Key
-			break
-		end
-	end
-	local outfit: string? = nil
-	for _, row in Content.Outfits.List do
-		if row.Use == "Reserved" and row.ReservedFor == owner then
-			outfit = row.Key
-			break
-		end
-	end
-	if species == nil or outfit == nil then
-		return nil, `no reserved species/outfit for {owner} in Content`
-	end
-	return { Species = species, Outfit = outfit }, nil
 end
 
 return table.freeze(Look)

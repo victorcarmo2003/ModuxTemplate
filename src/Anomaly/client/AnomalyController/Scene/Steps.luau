@@ -271,6 +271,13 @@ const handlers: { [string]: Handler } = {
 	Shadow = stub("TASK-465"),
 	Actor = stub("TASK-467"),
 	Lightning = stub("TASK-467"),
+	-- TASK-586 (design/horror-cinematic.md §11.3): replaced by the modules of Scene/Kit
+	Pose = stub("TASK-587"),
+	Prop = stub("TASK-587"),
+	Glass = stub("TASK-588"),
+	Glare = stub("TASK-588"),
+	Silhouette = stub("TASK-589"),
+	Lantern = stub("TASK-589"),
 }
 
 -- API -----------------------------------------------------------------------------------------------------------------

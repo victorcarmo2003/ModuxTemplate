@@ -4,8 +4,9 @@
 --   centre   the class rig standing, facing the camera: the world stage (LobbyController moves the camera, nothing
 --            here) or `Stage` (a ClassStage viewport) behind the panels; the class name (shrinks to fit) over the
 --            arrows under it, which cycle the classes (TASK-298)
---   sides    list and card centred on the vertical, BODY_SHARE of the screen tall (TASK-297), clear of the header
---            and of the Roblox buttons (top left: the title tab sits right of them)
+--   sides    list and card, BODY_SHARE of the screen tall at most (TASK-297), each centred in its own band: the list
+--            under the header and the Roblox buttons (top left: the title tab sits right of them), the card under
+--            the header and over its skin row
 --   left     Ink list of every class (Content.Classes): icon, name, animal, lock / "Soon" / equipped check; scrolls
 --   right    Cream card of the focused class (TASK-299): round portrait, big name, species / price chips; a flavour
 --            line, attribute bars around the Rookie line (middle), passive skill cards (TASK-302), packed together at the top
@@ -156,19 +157,20 @@ const PORTRAIT = 58
 const CHIP = 24
 const STAT_ROW = 18
 const STAT_BAR = 10
-const STAT_LABEL = 52
-const STAT_VALUE = 64
+const STAT_LABEL = 62 -- "Sanity" / "Speed" at 14 px are ~50 px wide: 52 put the bar over their end (owner 2026-10-20)
+const STAT_VALUE = 48 -- "100%" fits
 const SECTION_GAP = 12 -- blurb, attributes and skills stay together at the top; the free height goes above the buttons
 const SKILL_GAP = 8 -- between two skill cards
 const SKILL_ICON = 40 -- square skill art (TASK-302)
 const EDGE = 4 -- room inside the clipped body for the outlines (2 px Outside stroke + 2 px lip)
+const SCROLL_BAR = 4 -- card body scroll bar, px
 -- Skill name / line width in px: a fixed width wraps reliably inside the auto-sized card (a scale width under the
 -- kit's measured AutomaticSize kept one line and cut the text). Card inner width minus padding, art and gap.
-const SKILL_TEXT = CARD_WIDTH - PAD * 2 - EDGE * 2 - 14 - 4 - SKILL_ICON - 8
+const SKILL_TEXT = CARD_WIDTH - PAD * 2 - EDGE * 2 - SCROLL_BAR - 14 - 4 - SKILL_ICON - 8
 const SKILL_LINES = 36 -- the skill line always has room for 2 lines (14 px); AutomaticSize grows it past that
 const STAT_TWEEN = 0.25 -- s, bar fill on a class swap (none with reduced motion)
 const FIT_GAP = 0.08 -- the section gaps, as a share of the content, when deciding to shrink
-const FIT_MIN = 0.7 -- smallest body scale (14 px text x 0.7 ~ 10 px at the phone floor: still readable)
+const FIT_MIN = 0.9 -- smallest body scale; under it the body scrolls (owner 2026-10-20: the skills were cut on a phone)
 -- Margins, list, card and the name between them, at scale 1.
 const DESIGN = Vector2.new(MARGIN * 2 + LIST_WIDTH + CARD_WIDTH + 16 + NAME_WIDTH, 340)
 -- Roblox buttons while GuiService.TopbarInset is unknown (real px; HudController TOPBAR_REAL).
@@ -210,7 +212,8 @@ return function(props: Props): Frame
 	const origin = source(Vector2.zero)
 	const topbar = source(GuiService.TopbarInset)
 	const scale = function(): number
-		const base = if props.Scale then math.max(math.min(props.Scale(), UiScale.Current()), Theme.Scale.Min) else 1
+		-- a touch phone gets Theme.Scale.MinPhone (the PC proportions, owner 2026-10-20) through UiScale.Floor
+		const base = if props.Scale then math.max(math.min(props.Scale(), UiScale.Current()), UiScale.Floor()) else 1
 		return UiScale.Fit(base, area(), DESIGN)
 	end
 	const pop = Motion.Pop(props.Visible)
@@ -233,17 +236,43 @@ return function(props: Props): Frame
 	const titleX = function(): number
 		return math.max(MARGIN, reserved().X + 8)
 	end
-	-- List and card height (px at scale 1): BODY_SHARE of the screen, centred, clear of the header and of the Roblox
-	-- buttons on top (the same room at the bottom keeps them centred).
-	const body = function(): number
+	-- List and card bands (real px): each panel is BODY_SHARE of the screen tall at most, centred in its own band. The
+	-- list clears the header and the Roblox buttons above it; the card clears only the header (the Roblox buttons are
+	-- on the left) and keeps the skin row under it. A phone reported a far taller Roblox block than Studio, and the old
+	-- shared, mirrored clearance left the card at BODY_MIN with nothing past the blurb (owner 2026-10-20).
+	const skinRoom = function(): number
+		return if props.Skins then (SKIN_TOP + SKIN + 14) * scale() else 0
+	end
+	type Band = { Top: number, Bottom: number }
+	const listBand = function(): Band
+		const s = scale()
+		-- the Roblox block is capped at its real height: a phone reported about twice as much and the list hung low
+		return { Top = math.max(8 + HEADER * s + 6, math.min(reserved().Y, TOPBAR_HEIGHT) + 6), Bottom = MARGIN }
+	end
+	const cardBand = function(): Band
+		const s = scale()
+		return { Top = 8 + HEADER * s + 6, Bottom = MARGIN + skinRoom() }
+	end
+	-- panel height in px at scale 1
+	local function heightIn(band: Band): number
 		const s = scale()
 		const height = area().Y
 		if height <= 0 then
 			return BODY_MIN
 		end
-		const clear = math.max(8 + HEADER * s + 6, reserved().Y + 6)
-		const real = math.min(height * BODY_SHARE, height - clear * 2)
+		const real = math.min(height * BODY_SHARE, height - band.Top - band.Bottom)
 		return math.max(real / s, BODY_MIN)
+	end
+	-- centre of a band, as an offset from the screen middle (real px)
+	local function centreOf(band: Band): number
+		const height = area().Y
+		return if height > 0 then (band.Top + (height - band.Bottom)) / 2 - height / 2 else 0
+	end
+	const listHeight = function(): number
+		return heightIn(listBand())
+	end
+	const cardHeight = function(): number
+		return heightIn(cardBand())
 	end
 
 	-- List rows ---------------------------------------------------------------------------------------------------
@@ -845,10 +874,11 @@ return function(props: Props): Frame
 	}) :: UIListLayout
 	const fitFrame = create("Frame")({
 		Name = "Fit",
+		-- width follows the Body; height grows with the sections (the Body scrolls past its own height)
 		Size = function()
-			const s = fit()
-			return UDim2.fromScale(1 / s, 1 / s)
+			return UDim2.fromScale(1 / fit(), 0)
 		end,
+		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
 		createRaw("UIScale")({ Scale = fit }),
 		fitLayout,
@@ -857,7 +887,8 @@ return function(props: Props): Frame
 			PaddingTop = UDim.new(0, EDGE),
 			PaddingBottom = UDim.new(0, EDGE),
 			PaddingLeft = UDim.new(0, EDGE),
-			PaddingRight = UDim.new(0, EDGE),
+			-- the scroll bar draws over this side (an inset made the content wider than the window: right outline cut)
+			PaddingRight = UDim.new(0, EDGE + SCROLL_BAR),
 		}),
 		CartoonLabel({
 			Name = "Blurb",
@@ -950,15 +981,29 @@ return function(props: Props): Frame
 			end, skillCard),
 		}),
 	}) :: Frame
-	const bodyFrame = create("Frame")({
+	-- Scrolls when the sections still do not fit at FIT_MIN (a phone): attributes and skills stay reachable.
+	const bodyFrame = createRaw("ScrollingFrame")({
 		Name = "Body",
 		LayoutOrder = 2,
 		Size = UDim2.fromScale(1, 0),
 		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
 		ClipsDescendants = true,
+		ScrollBarThickness = SCROLL_BAR,
+		ScrollBarImageColor3 = Theme.Color.Ink,
+		ScrollingDirection = Enum.ScrollingDirection.Y,
+		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		Selectable = false,
 		createRaw("UIFlexItem")({ FlexMode = Enum.UIFlexMode.Fill }),
 		fitFrame,
-	}) :: Frame
+	}) :: ScrollingFrame
+	-- a new class (or skin) starts at the top of its body
+	effect(function()
+		props.Focus()
+		skinKey()
+		bodyFrame.CanvasPosition = Vector2.zero
+	end)
 	-- Shrink the body when its sections do not fit (a phone); back to 1 when they do. The sizes are read at the
 	-- current `fit`, so the natural height does not depend on it (no feedback loop; a small dead band).
 	const refit = function()
@@ -1145,7 +1190,7 @@ return function(props: Props): Frame
 					return UDim2.new(0.5, 0, 1, -MARGIN - FOOT * scale())
 				end,
 				Size = function()
-					return UDim2.fromOffset(STAGE_WIDTH, body())
+					return UDim2.fromOffset(STAGE_WIDTH, cardHeight())
 				end,
 				BackgroundTransparency = 1,
 				ZIndex = 0,
@@ -1260,10 +1305,10 @@ return function(props: Props): Frame
 			-- anchored at its centre (left edge at MARGIN once fully open): the open pop grows from the middle
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = function()
-				return UDim2.new(0, MARGIN + LIST_WIDTH * scale() / 2, 0.5, 0)
+				return UDim2.new(0, MARGIN + LIST_WIDTH * scale() / 2, 0.5, centreOf(listBand()))
 			end,
 			Size = function()
-				return UDim2.fromOffset(LIST_WIDTH, body())
+				return UDim2.fromOffset(LIST_WIDTH, listHeight())
 			end,
 			BackgroundTransparency = 1,
 			createRaw("UIScale")({ Scale = scaled }),
@@ -1310,10 +1355,10 @@ return function(props: Props): Frame
 			-- anchored at its centre (right edge at MARGIN once fully open): the open pop grows from the middle
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = function()
-				return UDim2.new(1, -MARGIN - CARD_WIDTH * scale() / 2, 0.5, 0)
+				return UDim2.new(1, -MARGIN - CARD_WIDTH * scale() / 2, 0.5, centreOf(cardBand()))
 			end,
 			Size = function()
-				return UDim2.fromOffset(CARD_WIDTH, body())
+				return UDim2.fromOffset(CARD_WIDTH, cardHeight())
 			end,
 			BackgroundTransparency = 1,
 			createRaw("UIScale")({ Scale = scaled }),
@@ -1327,7 +1372,7 @@ return function(props: Props): Frame
 				AnchorPoint = Vector2.new(0.5, 0),
 				Position = function()
 					const s = scale()
-					return UDim2.new(1, -MARGIN - CARD_WIDTH * s / 2, 0.5, (body() / 2 + SKIN_TOP) * s)
+					return UDim2.new(1, -MARGIN - CARD_WIDTH * s / 2, 0.5, centreOf(cardBand()) + (cardHeight() / 2 + SKIN_TOP) * s)
 				end,
 				Size = UDim2.fromOffset(CARD_WIDTH, SKIN + 14),
 				BackgroundTransparency = 1,

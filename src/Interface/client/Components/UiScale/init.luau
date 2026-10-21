@@ -71,8 +71,34 @@ local function fit(base: number, area: Vector2, design: Vector2): number
 	return math.min(base, math.max(limit, FIT_FLOOR))
 end
 
+-- Short screen = a phone in landscape: the touch floor kept Theme.ScaleOf at 0.8 there, which left the in-run panels too
+-- big (owner 2026-10-20: tasks, subtitle, order card, rejoin popup). Those multiply their scale by `Compact(factor)`.
+-- A touch phone now gets Theme.Scale.MinPhone (the PC proportions) from the rule itself: there `factor` is undone by
+-- the lower floor (factor x MinTouch / MinPhone, at most 1), so the panels do not shrink twice.
+local function compact(factor: number): number
+	current()
+	const camera = workspace.CurrentCamera
+	if camera == nil or camera.ViewportSize.Y <= 0 or camera.ViewportSize.Y > Theme.Scale.PhoneHeight then
+		return 1
+	end
+	if Theme.FloorOf(camera.ViewportSize) == Theme.Scale.MinPhone then
+		return math.min(factor * Theme.Scale.MinTouch / Theme.Scale.MinPhone, 1)
+	end
+	return factor
+end
+
+-- Floor for a scale a component caps with `Current()` (replaces Theme.Scale.Min there): MinPhone on a touch phone.
+-- Reactive on the viewport (through the shared scale).
+local function floor(): number
+	current()
+	const camera = workspace.CurrentCamera
+	return if camera then Theme.FloorOf(camera.ViewportSize) else Theme.Scale.Min
+end
+
 return table.freeze({
 	Current = current,
+	Compact = compact,
+	Floor = floor,
 	Fit = fit,
 	-- Same rule for a given viewport (and optional fixed layout to keep on screen); see Theme.ScaleOf.
 	Of = Theme.ScaleOf,

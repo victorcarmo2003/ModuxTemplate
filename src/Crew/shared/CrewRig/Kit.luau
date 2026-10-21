@@ -73,7 +73,7 @@ function Kit.CapEarsUp(): Instance
 	return need(Kit.Crew(), "CapEarsUp")
 end
 
--- Hats/<name> (ThiefHat). Explicit request from the caller: missing = error.
+-- Hats/<name>. Explicit request from the caller: missing = error.
 function Kit.Hat(name: string): Instance
 	return need(need(Kit.Crew(), "Hats"), name)
 end

@@ -486,7 +486,17 @@ function Slots.ReadyMark(at: () -> Vector3?, on: () -> boolean)
 	end)
 end
 
-function Slots.Bar(spot: Spot, height: number, progress: () -> number, visible: () -> boolean)
+-- onTop: the bar is drawn over everything (grill, owner 2026-10-20: "coloca os billboards da grill por cima de tudo")
+-- flip/marker: the bar turns into the flip bar while `flip()` (ProgressBar flip mode; the grill passes FlipMeter.State)
+function Slots.Bar(
+	spot: Spot,
+	height: number,
+	progress: () -> number,
+	visible: () -> boolean,
+	onTop: boolean?,
+	flip: (() -> boolean)?,
+	marker: (() -> number)?
+)
 	if not WORLD_BARS then
 		-- conveyor kitchen (Q-381 A): no bar; the colour of the food says the cooking, the Check says "ready"
 		Slots.ReadyMark(function(): Vector3?
@@ -514,6 +524,9 @@ function Slots.Bar(spot: Spot, height: number, progress: () -> number, visible: 
 		end,
 		StudsOffset = Vector3.zero,
 		MaxDistance = BAR_MAX_DISTANCE,
+		AlwaysOnTop = onTop,
+		Flip = flip,
+		Marker = marker,
 	})
 	gui.Parent = spot.Host
 	cleanup(gui)

@@ -1,6 +1,6 @@
 --!strict
 -- SpeechBalloon: short line in a white rounded balloon above a head (style guide §7, "Falas em balão": Opal,
--- Quentin, Raincoat Lady -> smaller white balloon, no icon, 3 s). World element, never on the screen HUD.
+-- Raincoat Lady -> smaller white balloon, no icon, 3 s). World element, never on the screen HUD.
 -- Sized in pixels (not studs) so the text stays >= 14 px on the smallest phone at any distance; lines are at most
 -- 70 characters (content-data.md §3.19), three lines at most at this width. Pops in with a bouncy spring.
 -- Cartoon pass (AST-091 "balão de fala menor"): white CartoonPanel (gradient, lip, thick Ink outline) with the tail

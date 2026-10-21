@@ -33,7 +33,7 @@ const Theme = {
 		Teal = Color3.fromHex("#3FA7B5"),
 		Green = Color3.fromHex("#5FA36A"),
 		Cream = Color3.fromHex("#FFF1D6"),
-		Violet = Color3.fromHex("#6A5ACD"), -- thief bar (§7.3)
+		Violet = Color3.fromHex("#6A5ACD"), -- accent (§7.3)
 		Slate = Color3.fromHex("#8A8FA3"), -- grade D on the shift summary (§7.4, never red)
 		Gold = Color3.fromHex("#FFD86B"), -- sanity full (§7.2 #FFD45A family)
 		Pink = Color3.fromHex("#F4A7B9"), -- the paw's pads and toe beans (TASK-265; soft, never the alert red)
@@ -101,6 +101,10 @@ const Theme = {
 		Factor = 1.4,
 		Min = 0.86, -- mouse / gamepad: 14 px text x 0.86 = 12 real px
 		MinTouch = 0.8, -- touch: 44 px targets -> 35 real px, 14 px text -> 11 (owner 2026-10-17: phone UI covered the counter; was 1)
+		-- touch phone in landscape (viewport up to PhoneHeight): the PC proportions, owner 2026-10-20 "1:1 with the PC,
+		-- everything still too big" (390 px tall -> 0.51 by the rule; 14 px text x 0.6 = 8.4 real px)
+		MinPhone = 0.6,
+		PhoneHeight = 500,
 		Max = 1.6,
 	},
 	-- Text stroke for small text (kept for callers outside the kit). Bigger text: Theme.TextStroke(size).
@@ -148,6 +152,15 @@ local function textStroke(size: number): number
 	return if size >= 40 then 4 elseif size >= 22 then 3 else 2
 end
 
+-- Smallest UI scale for a viewport: MinPhone on a touch phone, MinTouch on another touch screen, Min elsewhere.
+local function floorOf(viewport: Vector2): number
+	const rule = Theme.Scale
+	if UserInputService.TouchEnabled then
+		return if viewport.Y > 0 and viewport.Y <= rule.PhoneHeight then rule.MinPhone else rule.MinTouch
+	end
+	return rule.Min
+end
+
 -- Global UI scale for a viewport (Theme.Scale). `fit` = px size of a fixed layout that must stay on screen (a panel
 -- drawn at scale 1): the scale never makes it overflow, but never goes under the floor (touch targets, text).
 local function scaleOf(viewport: Vector2, fit: Vector2?): number
@@ -156,8 +169,7 @@ local function scaleOf(viewport: Vector2, fit: Vector2?): number
 	if fit ~= nil then
 		value = math.min(value, viewport.X / fit.X, viewport.Y / fit.Y)
 	end
-	const floor = if UserInputService.TouchEnabled then rule.MinTouch else rule.Min
-	return math.clamp(value, floor, rule.Max)
+	return math.clamp(value, floorOf(viewport), rule.Max)
 end
 
 -- Two-tone vertical gradient of a Tone (UIGradient.Color, Rotation 90).
@@ -190,6 +202,7 @@ return table.freeze({
 	MinChip = Theme.MinChip,
 	Scale = table.freeze(Theme.Scale),
 	ScaleOf = scaleOf,
+	FloorOf = floorOf,
 	Stroke = Theme.Stroke,
 	Outline = table.freeze(Theme.Outline),
 	Lip = Theme.Lip,

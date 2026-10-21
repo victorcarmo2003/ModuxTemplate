@@ -65,6 +65,19 @@ export type Entry = Scheduler.Entry
 -- Anomalies set record (network.md §13.5)
 export type Wire = { Anomaly: string, Phase: Api.Phase, StartedAt: number, Step: number, Anchor: number }
 
+-- Analytics trace of one occurrence (MetricsService funnel anomaly_<key>, owner 2026-10-20): Party = the run's UserIds
+-- (shared table), Marks = seconds since StartedAt the first time each wire phase was reached, FailedAt = same per failure
+export type Trace = {
+	Key: string,
+	Day: number,
+	Night: number,
+	Attempt: number,
+	StartedAt: number,
+	Party: { number },
+	Marks: { [string]: number },
+	FailedAt: { [number]: number },
+}
+
 export type Run = {
 	Occ: Api.Occurrence,
 	Row: Content.Anomaly,
@@ -74,7 +87,7 @@ export type Run = {
 	Starting: boolean,
 	FinishPending: boolean,
 	Done: boolean,
-	Cues: { { Cue: string, Entity: number } },
+	Cues: { { Cue: string, Entity: number, User: number? } },
 	Failed: { [number]: boolean },
 	CriticalSent: boolean,
 	Seen: { [number]: number },
@@ -83,6 +96,9 @@ export type Run = {
 	Stares: { [number]: Stare },
 	-- UserIds Active when the occurrence started (Ended, TASK-335)
 	Party: { number },
+	Trace: Trace,
+	-- Started was fired: Staged only follows it
+	Announced: boolean,
 }
 
 export type Due = { Entry: Scheduler.Entry, RetryAt: number, Done: boolean }
@@ -101,8 +117,12 @@ const STEP_MAX = 20 -- Anomalies.Step wire range
 const ANCHOR_MAX = 65535 -- Anomalies.Anchor / AnomalyCue.Entity wire range
 const SEED_MAX = 65535 -- AnomalyCue.Seed wire range
 const RETRY = 1 -- s between two Start attempts of the same due entry (Start returned false)
+const OPENING_AFTER = 2 -- game minutes into the Night phase before the scripted opening is sent (owner 2026-10-20, Q-415)
 const LINGER = 1 -- s a finished record stays in the set so clients see its last Phase
-const GAZE_STALE = 1 -- s; the client sends at 10 Hz, an older gaze means it stopped (day, not Active)
+-- s; the client sends at 10 Hz while the look changes, but a STILL look only every 1 s (CameraController
+-- GAZE_HEARTBEAT) on an unreliable packet: a stale limit of 1 s dropped a steady stare between two heartbeats (ANM-006
+-- only counted while the camera moved). Older than this = it stopped sending (day, not Active, not first person).
+const GAZE_STALE = 1.6
 const PITCH_STALE = 1.6 -- s; Pitch (TASK-484): a still look is resent only every 1 s (CameraController GAZE_HEARTBEAT)
 const TARGET_SLACK = 2 -- studs; a hit this close to the target does not block the line of sight
 const EYE_OFFSET = Vector3.new(0, 1.5, 0) -- HumanoidRootPart -> eye when the Head is missing
@@ -207,6 +227,10 @@ function AnomalyService:Setup()
 	self.Queue = {} :: { Due }
 	-- family D scares of the night (TASK-274): game minutes still to fire, ascending (V2, DEC-254)
 	self.Scares = {} :: { number }
+	-- owner 2026-10-20 (Provisional Q-415): the scripted opening of this night (Nights.Opening key), "" = none or played
+	self.Opening = "" :: string
+	-- server time before which no other family D scare is sent (one per Hallucinations.Rules.ScareGap, never a pile)
+	self.NextScareAt = 0 :: number
 	-- SecurityService, false when this build has none (IsWatching)
 	self.Security = nil :: any
 	self.Running = {} :: { [number]: Run }
@@ -220,6 +244,8 @@ function AnomalyService:Setup()
 	self.DevSerial = 0 :: number
 	-- dev showcase: the natural agenda waits while true (ShowcaseService; never set outside dev mode)
 	self.DevHeld = false :: boolean
+	-- TutorialService (owner 2026-10-19): while it says so, no regular anomaly or scare starts (the tutorial customer comes first)
+	self.Hold = nil :: (() -> boolean)?
 	-- the Night phase of this shift has started (the agenda is dropped when it ends)
 	self.InNight = false :: boolean
 	self.Gazes = {} :: { [Player]: Gaze }
@@ -230,10 +256,12 @@ function AnomalyService:Setup()
 	self.Tension = self.Libs.Signal.new() :: SignalLib.Signal<boolean>
 	-- Ended(key, players): one occurrence is over for these players (TASK-335, TASK-345; JournalService connects in its OnInit)
 	self.Ended = self.Libs.Signal.new() :: SignalLib.Signal<string, { Player }>
-	-- analytics (MetricsService, owner 2026-10-16): Started(key, party size); Outcome(key, phase, failed players, party
-	-- size, stop reason) once per occurrence that ran
-	self.Started = self.Libs.Signal.new() :: SignalLib.Signal<string, number>
-	self.Outcome = self.Libs.Signal.new() :: SignalLib.Signal<string, string, { Player }, number, string>
+	-- analytics (MetricsService, owner 2026-10-16; trace 2026-10-20): Started(key, party size, trace); Staged(trace, phase)
+	-- every wire phase change after Started; Outcome(key, phase, failed players, party size, stop reason, trace) once per
+	-- occurrence that ran
+	self.Started = self.Libs.Signal.new() :: SignalLib.Signal<string, number, Trace>
+	self.Staged = self.Libs.Signal.new() :: SignalLib.Signal<Trace, string>
+	self.Outcome = self.Libs.Signal.new() :: SignalLib.Signal<string, string, { Player }, number, string, Trace>
 end
 
 function AnomalyService:WarnOnce(key: string, message: string)
@@ -522,11 +550,21 @@ function AnomalyService:Publish(occ: Api.Occurrence, fields: Api.Fields)
 	then
 		return
 	end
+	const before = run.Record.Phase
 	run.Record = record
+	if record.Phase ~= before then
+		const trace = run.Trace
+		if trace.Marks[record.Phase] == nil then
+			trace.Marks[record.Phase] = now() - trace.StartedAt
+		end
+		if run.Announced then
+			self.Staged:Fire(trace, record.Phase)
+		end
+	end
 	self:Write(run)
 end
 
-function AnomalyService:FireCue(run: Run, cue: string, entity: number)
+function AnomalyService:FireCue(run: Run, cue: string, entity: number, user: number?)
 	const net = self.Dependencies.NetService
 	if not self.Live or not net:IsRunning() then
 		return
@@ -536,10 +574,12 @@ function AnomalyService:FireCue(run: Run, cue: string, entity: number)
 		Cue = cue,
 		Entity = entity,
 		Seed = run.Occ.Rng:NextInteger(0, SEED_MAX),
+		User = user,
 	})
 end
 
-function AnomalyService:Cue(occ: Api.Occurrence, cue: string, entity: number?)
+-- user: full UserId when the cue is personal (DEC-320, B-13; the modules pass it with Entity = UserId % 65536)
+function AnomalyService:Cue(occ: Api.Occurrence, cue: string, entity: number?, user: number?)
 	const run = self:RunOf(occ)
 	if run == nil then
 		return
@@ -550,10 +590,10 @@ function AnomalyService:Cue(occ: Api.Occurrence, cue: string, entity: number?)
 	end
 	const target = if finite(entity) then wireInt(entity :: number, 0, ANCHOR_MAX) else 0
 	if run.Starting then
-		table.insert(run.Cues, { Cue = cue, Entity = target })
+		table.insert(run.Cues, { Cue = cue, Entity = target, User = user })
 		return
 	end
-	self:FireCue(run, cue, target)
+	self:FireCue(run, cue, target, user)
 end
 
 -- Who pays (DEC-204): a list = who acted / who failed; "active" = every active member (omission, party target).
@@ -573,6 +613,7 @@ function AnomalyService:Fail(occ: Api.Occurrence, who: { Player } | "active")
 			continue
 		end
 		run.Failed[player.UserId] = true
+		run.Trace.FailedAt[player.UserId] = now() - run.Trace.StartedAt
 		if not critical then
 			vital:Penalize(player, `anomaly:{occ.Key}`)
 		end
@@ -602,7 +643,7 @@ function AnomalyService:EmitEnded(run: Run, reason: Api.StopReason)
 			table.insert(failedPlayers, player)
 		end
 	end
-	self.Outcome:Fire(run.Occ.Key, run.Record.Phase, failedPlayers, #run.Party, reason)
+	self.Outcome:Fire(run.Occ.Key, run.Record.Phase, failedPlayers, #run.Party, reason, run.Trace)
 	if reason == "Restore" and run.Record.Phase == "Signal" and next(run.Failed) == nil then
 		return
 	end
@@ -707,6 +748,7 @@ function AnomalyService:StartOccurrence(key: string, module: Api.Module, slot: n
 		),
 		State = nil,
 	}
+	const party: { number } = {}
 	const run: Run = {
 		Occ = occ,
 		Row = row,
@@ -722,7 +764,18 @@ function AnomalyService:StartOccurrence(key: string, module: Api.Module, slot: n
 		Seen = {},
 		SeenDone = {},
 		Stares = {},
-		Party = {},
+		Party = party,
+		Trace = {
+			Key = key,
+			Day = shift.Day,
+			Night = shift.Night,
+			Attempt = shift.Attempt,
+			StartedAt = t,
+			Party = party,
+			Marks = {},
+			FailedAt = {},
+		},
+		Announced = false,
 	}
 	for _, player in self:ActivePlayers() do
 		table.insert(run.Party, player.UserId)
@@ -743,7 +796,11 @@ function AnomalyService:StartOccurrence(key: string, module: Api.Module, slot: n
 	end
 
 	self.LastStartAt = t
-	self.Started:Fire(key, #run.Party)
+	if run.Record.Phase == "Signal" and run.Trace.Marks.Signal == nil then
+		run.Trace.Marks.Signal = 0
+	end
+	run.Announced = true
+	self.Started:Fire(key, #run.Party, run.Trace)
 	-- TASK-284 (Content.ShopWindow, Provisional Q-270): this anomaly slams the service window shut as it starts
 	if Content.ShopWindow.Anomalies[key] == "Closes" then
 		self.Dependencies.VehicleService:SetShutter(true, nil, true)
@@ -753,7 +810,7 @@ function AnomalyService:StartOccurrence(key: string, module: Api.Module, slot: n
 		run.Added = true
 	end
 	for _, cue in run.Cues do
-		self:FireCue(run, cue.Cue, cue.Entity)
+		self:FireCue(run, cue.Cue, cue.Entity, cue.User)
 	end
 	run.Cues = {}
 	self:RefreshTension()
@@ -895,8 +952,8 @@ function AnomalyService:BuildContext(): Api.Context
 		Publish = function(occ: Api.Occurrence, fields: Api.Fields)
 			self:Publish(occ, fields)
 		end,
-		Cue = function(occ: Api.Occurrence, cue: string, entity: number?)
-			self:Cue(occ, cue, entity)
+		Cue = function(occ: Api.Occurrence, cue: string, entity: number?, user: number?)
+			self:Cue(occ, cue, entity, user)
 		end,
 		Fail = function(occ: Api.Occurrence, who: { Player } | "active")
 			self:Fail(occ, who)
@@ -1013,6 +1070,8 @@ end
 function AnomalyService:BuildAgenda(info: { Day: number, Night: number, IsNight: boolean, Attempt: number })
 	self.Queue = {}
 	self.Scares = {}
+	self.Opening = ""
+	self.NextScareAt = 0
 	if not info.IsNight or info.Night < 1 then
 		return
 	end
@@ -1054,8 +1113,9 @@ function AnomalyService:BuildAgenda(info: { Day: number, Night: number, IsNight:
 		Occurrences = Content.Nights.Occurrences,
 		Families = night.Families,
 		Atmosphere = night.Atmosphere,
-		Events = night.Events,
+		Events = night.Events + self:CrewEvents(),
 		Premiere = night.NewAnomaly,
+		PremiereAt = Content.Nights.PremiereAt[info.Night],
 		Window = Content.Nights.Windows.Shift,
 		MinGap = night.MinGap,
 		MinutesPerSecond = if night.Duration > 0 then (phase.ClockTo - phase.ClockFrom) / night.Duration else 0,
@@ -1067,8 +1127,17 @@ function AnomalyService:BuildAgenda(info: { Day: number, Night: number, IsNight:
 	end
 	-- family D (TASK-274): night.Scares scares without a verb, one per equal slice of the window, jittered inside it.
 	-- Drawn after the agenda so the agenda's draws never change.
-	const window = Content.Nights.Windows.Shift
-	const count = if table.find(night.Families, "D") ~= nil then night.Scares else 0
+	-- Owner 2026-10-20 (Provisional Q-415): the window opens at 8 PM (Nights.ScaresFrom, was 9 PM) and the grace no longer
+	-- holds it; a night with a scripted opening (Nights.Opening, first attempt) plays it first and draws after its end.
+	const hasD = table.find(night.Families, "D") ~= nil
+	const opening = Content.Nights.Opening[info.Night]
+	local from = Content.Nights.ScaresFrom
+	if hasD and opening ~= nil and info.Attempt == 0 then
+		self.Opening = opening.Key
+		from = math.max(from, opening.Until)
+	end
+	const window = { from, Content.Nights.Windows.Shift[2] }
+	const count = if hasD then night.Scares else 0
 	if count > 0 then
 		const slice = (window[2] - window[1]) / count
 		for index = 1, count do
@@ -1076,6 +1145,18 @@ function AnomalyService:BuildAgenda(info: { Day: number, Night: number, IsNight:
 		end
 		table.sort(self.Scares)
 	end
+end
+
+-- DEC-320 (Q-413): extra regular events for a bigger crew, by the members connected now (not Away), 1..4
+function AnomalyService:CrewEvents(): number
+	local count = 0
+	for _, member in self.Dependencies.RunStateService.Members() do
+		if member.State ~= "Away" then
+			count += 1
+		end
+	end
+	const list = Content.Nights.CrewEvents
+	return list[math.clamp(count, 1, #list)] or 0
 end
 
 function AnomalyService:Limits(): Scheduler.Limits
@@ -1095,18 +1176,59 @@ function AnomalyService:RunningCandidates(): { Scheduler.Candidate }
 end
 
 -- Due entries of the agenda (Night phase only).
+-- Holds the regular agenda while `hold` says so (TutorialService: a rookie's tutorial runs). Errors count as "no".
+function AnomalyService:SetHold(hold: () -> boolean)
+	self.Hold = hold
+end
+
+-- The tutorial holds everything now (regular events, the premiere, the scares and the opening)
+function AnomalyService:TutorialHeld(): boolean
+	const hold = self.Hold
+	if hold ~= nil then
+		const ok, held = pcall(hold)
+		if ok and held then
+			return true
+		end
+	end
+	return false
+end
+
+-- The night's grace minute (Content.Nights.Grace) is not reached yet. Owner 2026-10-20 (Provisional Q-415): it holds only
+-- the regular events that punish; the family D scares, the opening and the fixed premiere ignore it.
+function AnomalyService:InGrace(minutes: number): boolean
+	const grace = Content.Nights.Grace[self.Dependencies.RoundService:Info().Night]
+	return grace ~= nil and (minutes % 1440) < grace and (minutes % 1440) >= Content.Nights.Windows.Calm[1]
+end
+
+-- The regular agenda waits now: the tutorial holds it, or the night's grace minute is not reached yet
+function AnomalyService:Held(minutes: number): boolean
+	return self:TutorialHeld() or self:InGrace(minutes)
+end
+
 function AnomalyService:StepAgenda(t: number)
 	if self.DevHeld then
 		return
 	end
 	const minutes = self.Dependencies.RoundService:Minutes()
+	const tutorial = self:TutorialHeld()
+	const held = tutorial or self:InGrace(minutes)
 	const windowEnd = Content.Nights.Windows.Shift[2]
 	const limits = self:Limits()
-	-- family D: every scare due now plays for everyone (any key of the D catalogue); none past the window
-	while #self.Scares > 0 and self.Scares[1] <= minutes do
+	-- owner 2026-10-20 (Provisional Q-415): the scripted opening first, as the Night phase starts (only the tutorial holds it)
+	-- (OPENING_AFTER game minutes in, so the clients already show the Night phase and do not cancel it)
+	if not tutorial and self.Opening ~= "" and minutes >= Content.Nights.Windows.Calm[1] + OPENING_AFTER then
+		const key = self.Opening
+		self.Opening = ""
+		self.Dependencies.HallucinationService:Scare(nil, { key })
+		self.NextScareAt = t + Content.HallucinationRules.ScareGap
+	end
+	-- family D: a scare due now plays for everyone (any key of the D catalogue); none past the window. Owner 2026-10-20
+	-- (Provisional Q-415): not held by the grace, and one at a time (ScareGap apart) when several are due together
+	if not tutorial and t >= self.NextScareAt and #self.Scares > 0 and self.Scares[1] <= minutes then
 		table.remove(self.Scares, 1)
 		if minutes < windowEnd then
 			self.Dependencies.HallucinationService:Scare(nil, nil)
+			self.NextScareAt = t + Content.HallucinationRules.ScareGap
 		end
 	end
 	for _, due in self.Queue do
@@ -1123,6 +1245,11 @@ function AnomalyService:StepAgenda(t: number)
 		if not entry.Scripted then
 			if minutes >= windowEnd then
 				due.Done = true
+				continue
+			end
+			-- waits for the tutorial / the grace minute (Admit spaces the ones that piled up); the fixed premiere
+			-- (owner 2026-10-20, Provisional Q-415) only for the tutorial
+			if tutorial or (held and not entry.Premiere) then
 				continue
 			end
 			const row = Content.Anomalies.ByKey[entry.Key]
@@ -1218,6 +1345,7 @@ function AnomalyService:OnPhase(phase: string)
 		self.InNight = false
 		self.Queue = {}
 		self.Scares = {}
+		self.Opening = ""
 	end
 	if next(self.Running) ~= nil or next(self.Removing) ~= nil then
 		self:StopAll(if phase == "NightEnd" then "NightOver" else "Restore")
@@ -1393,6 +1521,7 @@ function AnomalyService:DevAgenda(): string
 			lines,
 			`{string.format("%02d:%02d", minutes // 60, minutes % 60)} {row.Ref}{if entry.Scripted
 				then " scripted"
+				elseif entry.Premiere then " premiere"
 				else ""}{if due.Done then " done" else ""}{if self.Modules[entry.Key] == nil
 				then " (no module)"
 				else ""}`

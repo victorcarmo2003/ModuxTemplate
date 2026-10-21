@@ -7,13 +7,13 @@ local Look = require(ServerScriptService.server.Npc.NpcService.Look)
 local Pool = require(ServerScriptService.server.Npc.NpcService.Pool)
 local Walker = require(ServerScriptService.server.Npc.NpcService.Walker)
 
-export type Role = "Customer" | "Thief" | "Actor"
+export type Role = "Customer" | "Actor"
 export type Rig = Pool.Rig
 export type Npc = {
 	Id: number,
 	Rig: Pool.Rig,
 	Role: Role,
-	CustomerType: string, -- "" for the thief
+	CustomerType: string,
 	Species: string,
 	Outfit: string,
 	Variant: Variant?, -- Role "Actor" only
@@ -22,7 +22,7 @@ export type Npc = {
 	Tether: boolean, -- moved by MoveToward / Teleport (pair partner): other rigs never wait for it
 }
 export type SpawnRequest = {
-	Role: Role?, -- default "Customer". "Thief": Quick Quentin; CustomerType/Species/Outfit are ignored
+	Role: Role?, -- default "Customer"
 	Variant: Variant?, -- required with Role "Actor", refused with any other role
 	CustomerType: string?, -- default: weighted draw among the types unlocked this shift (Look.PickType)
 	Species: string?, -- forced species (must belong to the type)
@@ -36,10 +36,10 @@ export type SpawnRequest = {
 }
 export type WalkOptions = {
 	AvoidQueue: boolean?, -- default true: Q1..Q5 only as start or goal
-	AvoidCrossings: boolean?, -- default false (thief, wave 2)
+	AvoidCrossings: boolean?, -- default false: skip crosswalk edges
 	Face: boolean?, -- default true: on arrival, face the MapPoint direction of the goal (when it is a point)
 }
-export type Variant = "blank" | "mirror" | "raincoat" | "shake" | "neck" | "eyes" | "bighead" | "float" | "stare"
+export type Variant = "blank" | "mirror" | "raincoat" | "shake" | "neck" | "eyes" | "bighead" | "float" | "stare" | "banger"
 
 export type Public = {
 	Active: { [number]: Npc },
@@ -81,7 +81,7 @@ export type Public = {
 	Route: (self: Public, from: string, to: string, options: WalkOptions?) -> { string }?,
 	PickLane: (self: Public, cw: string, direction: Vector3) -> number,
 	WalkTo: (self: Public, id: number, target: string, options: WalkOptions?) -> boolean,
-	Blocked: (self: Public, id: number, direction: Vector3) -> boolean,
+	Blocked: (self: Public, id: number, direction: Vector3, remaining: number?) -> boolean,
 	Crowded: (self: Public, id: number) -> boolean,
 	Crossing: (self: Public, id: number, at: { [number]: string }) -> Walker.Crossing?,
 	GetRig: (self: Public, id: number) -> Rig?,

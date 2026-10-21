@@ -12,6 +12,16 @@ export type Event = Api.Event
 export type Context = Api.Context
 export type Module = Api.Module
 export type Rule = Api.Rule
+export type Trace = {
+	Key: string,
+	Day: number,
+	Night: number,
+	Attempt: number,
+	StartedAt: number,
+	Party: { number },
+	Marks: { [string]: number },
+	FailedAt: { [number]: number },
+}
 export type Run = {
 	Occ: Api.Occurrence,
 	Row: Content.Anomaly,
@@ -21,7 +31,7 @@ export type Run = {
 	Starting: boolean,
 	FinishPending: boolean,
 	Done: boolean,
-	Cues: { { Cue: string, Entity: number } },
+	Cues: { { Cue: string, Entity: number, User: number? } },
 	Failed: { [number]: boolean },
 	CriticalSent: boolean,
 	Seen: { [number]: number },
@@ -30,6 +40,9 @@ export type Run = {
 	Stares: { [number]: Stare },
 	-- UserIds Active when the occurrence started (Ended, TASK-335)
 	Party: { number },
+	Trace: Trace,
+	-- Started was fired: Staged only follows it
+	Announced: boolean,
 }
 export type Due = { Entry: Scheduler.Entry, RetryAt: number, Done: boolean }
 export type Gaze = { Yaw: number, Pitch: number, At: number }
@@ -46,19 +59,23 @@ export type Public = {
 	Ended: SignalLib.Signal<string, { Player }>,
 	Example: Api.Module?,
 	Gazes: { [Player]: Gaze },
+	Hold: (() -> boolean)?,
 	InNight: boolean,
 	LastStartAt: number,
 	Live: boolean,
 	Modules: { [string]: Api.Module },
 	NextId: number,
-	Outcome: SignalLib.Signal<string, string, { Player }, number, string>,
+	NextScareAt: number,
+	Opening: string,
+	Outcome: SignalLib.Signal<string, string, { Player }, number, string, Trace>,
 	Queue: { Due },
 	Removing: { [number]: number },
 	Running: { [number]: Run },
 	Scares: { number },
 	Security: any,
 	Shift: { Day: number, Night: number, IsNight: boolean, Attempt: number },
-	Started: SignalLib.Signal<string, number>,
+	Staged: SignalLib.Signal<Trace, string>,
+	Started: SignalLib.Signal<string, number, Trace>,
 	Tension: SignalLib.Signal<boolean>,
 	TensionOn: boolean,
 	Traffic: TrafficHook?,
@@ -81,8 +98,8 @@ export type Public = {
 	AllocateId: (self: Public) -> number?,
 	Write: (self: Public, run: Run) -> (),
 	Publish: (self: Public, occ: Api.Occurrence, fields: Api.Fields) -> (),
-	FireCue: (self: Public, run: Run, cue: string, entity: number) -> (),
-	Cue: (self: Public, occ: Api.Occurrence, cue: string, entity: number?) -> (),
+	FireCue: (self: Public, run: Run, cue: string, entity: number, user: number?) -> (),
+	Cue: (self: Public, occ: Api.Occurrence, cue: string, entity: number?, user: number?) -> (),
 	Fail: (self: Public, occ: Api.Occurrence, who: { Player } | "active") -> (),
 	Succeed: (self: Public, occ: Api.Occurrence) -> (),
 	EmitEnded: (self: Public, run: Run, reason: Api.StopReason) -> (),
@@ -97,8 +114,13 @@ export type Public = {
 	Emit: (self: Public, event: Api.Event) -> (),
 	BuildContext: (self: Public) -> Api.Context,
 	BuildAgenda: (self: Public, info: { Day: number, Night: number, IsNight: boolean, Attempt: number }) -> (),
+	CrewEvents: (self: Public) -> number,
 	Limits: (self: Public) -> Scheduler.Limits,
 	RunningCandidates: (self: Public) -> { Scheduler.Candidate },
+	SetHold: (self: Public, hold: () -> boolean) -> (),
+	TutorialHeld: (self: Public) -> boolean,
+	InGrace: (self: Public, minutes: number) -> boolean,
+	Held: (self: Public, minutes: number) -> boolean,
 	StepAgenda: (self: Public, t: number) -> (),
 	StepRuns: (self: Public, t: number) -> (),
 	StepRemovals: (self: Public, t: number) -> (),

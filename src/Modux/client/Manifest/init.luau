@@ -15,10 +15,12 @@ local CoffeeCupController = require(StarterPlayer.StarterPlayerScripts.client.Mo
 local CoffeeHandController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CoffeeHandController)
 local CookController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CookController)
 local NameTagController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.NameTagController)
+local ProximityFadeController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ProximityFadeController)
 local RigController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.RigController)
 local CustomerController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CustomerController)
 local CutsceneController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.CutsceneController)
 local DeliveryController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.DeliveryController)
+local DevCameraController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.DevCameraController)
 local DoorController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.DoorController)
 local DriveThruController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.DriveThruController)
 local EconomyController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.EconomyController)
@@ -28,6 +30,7 @@ local HapticsController = require(StarterPlayer.StarterPlayerScripts.client.Modu
 local InputController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.InputController)
 local PromptController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.PromptController)
 local BackdropController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.BackdropController)
+local TextSizeController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TextSizeController)
 local ItemController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ItemController)
 local JournalController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.JournalController)
 local KitchenController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.KitchenController)
@@ -63,7 +66,6 @@ local StageController = require(StarterPlayer.StarterPlayerScripts.client.ModuxT
 local SupplyController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SupplyController)
 local SuspenseController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.SuspenseController)
 local TabletController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TabletController)
-local ThiefController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.ThiefController)
 local TrafficController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TrafficController)
 local TrafficLightController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TrafficLightController)
 local TutorialController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.TutorialController)
@@ -86,10 +88,12 @@ export type AllControllers = {
 	CoffeeHandController: CoffeeHandController.Public,
 	CookController: CookController.Public,
 	NameTagController: NameTagController.Public,
+	ProximityFadeController: ProximityFadeController.Public,
 	RigController: RigController.Public,
 	CustomerController: CustomerController.Public,
 	CutsceneController: CutsceneController.Public,
 	DeliveryController: DeliveryController.Public,
+	DevCameraController: DevCameraController.Public,
 	DoorController: DoorController.Public,
 	DriveThruController: DriveThruController.Public,
 	EconomyController: EconomyController.Public,
@@ -99,6 +103,7 @@ export type AllControllers = {
 	InputController: InputController.Public,
 	PromptController: PromptController.Public,
 	BackdropController: BackdropController.Public,
+	TextSizeController: TextSizeController.Public,
 	ItemController: ItemController.Public,
 	JournalController: JournalController.Public,
 	KitchenController: KitchenController.Public,
@@ -134,7 +139,6 @@ export type AllControllers = {
 	SupplyController: SupplyController.Public,
 	SuspenseController: SuspenseController.Public,
 	TabletController: TabletController.Public,
-	ThiefController: ThiefController.Public,
 	TrafficController: TrafficController.Public,
 	TrafficLightController: TrafficLightController.Public,
 	TutorialController: TutorialController.Public,

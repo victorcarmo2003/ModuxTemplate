@@ -23,8 +23,8 @@ const revive: Revive = {
 	WipeWindow = 10, -- DEC-094
 	BodyFallback = 20, -- architect (T54)
 	CauseTime = 3, -- DEC-318
-	DownWindow = 15, -- DEC-318
-	ReviveAllWindow = 15, -- DEC-318
+	DownWindow = 10, -- DEC-327 (was 15, DEC-318)
+	ReviveAllWindow = 10, -- DEC-327 (was 15, DEC-318)
 	TeamLife = false, -- DEC-319: parked with RunParams.Chances = 0
 }
 

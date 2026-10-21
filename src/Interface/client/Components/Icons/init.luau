@@ -63,7 +63,6 @@ const RECTS: { [string]: { number } } = {
 	["Reaction/scribble_cloud"] = { 128, 768, 128, 128 },
 	["Reaction/star"] = { 0, 768, 128, 128 },
 	["Reaction/steam"] = { 256, 768, 128, 128 },
-	["Upgrade/cash_drawer_lock"] = { 768, 384, 128, 128 },
 	["Upgrade/coffee_machine"] = { 128, 512, 128, 128 },
 	["Upgrade/cooler/1"] = { 0, 384, 128, 128 },
 	["Upgrade/cooler/2"] = { 128, 384, 128, 128 },

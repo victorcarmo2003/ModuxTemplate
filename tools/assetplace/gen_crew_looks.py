@@ -50,7 +50,6 @@ OUTFITS = {
     "crew": "Crew_Uniform",
     "civil_a": "Civil_A", "civil_b": "Civil_B", "civil_c": "Civil_C", "civil_d": "Civil_D",
     "civil_e": "Civil_E", "civil_f": "Civil_F", "civil_g": "Civil_G", "civil_h": "Civil_H",
-    "thief": "Civil_Thief",  # Day only (DEC-159)
 }
 
 # Outfits whose sheets exist but are not uploaded yet (Provisional, owner has not approved the look): registered in

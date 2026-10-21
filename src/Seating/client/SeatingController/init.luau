@@ -50,6 +50,7 @@ local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local TableSign = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TableSign)
 local OrderBubble = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.OrderBubble)
 local Pop = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.DrawerValue.Pop)
+local WorldScale = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.WorldScale)
 local Fx = require(StarterPlayer.StarterPlayerScripts.client.Kitchen.KitchenController.Fx)
 local Look = require(script.Look)
 local Tray = require(script.Tray)
@@ -660,7 +661,7 @@ function SeatingController:Cleaned(spot: Spot, tip: number)
 		end)
 	end
 	unmount, billboard = Vide.root(function()
-		return Vide.create("BillboardGui")({
+		const pop = Vide.create("BillboardGui")({
 			Name = `TablePop_{spot.Index}`,
 			Adornee = top,
 			Size = UDim2.fromOffset(POP_WIDTH, POP_HEIGHT),
@@ -672,6 +673,9 @@ function SeatingController:Cleaned(spot: Spot, tip: number)
 			ResetOnSpawn = false,
 			Pop.Render({ Amount = tip }, { Bottom = POP_HEIGHT, OnDone = finish }),
 		})
+		-- shrinks with distance like the table under it (a pixel pop grew next to it from far away, owner 2026-10-20)
+		WorldScale.Track(pop, POP_WIDTH, POP_HEIGHT)
+		return pop
 	end)
 	if billboard then
 		billboard.Parent = gui

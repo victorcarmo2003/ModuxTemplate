@@ -10,6 +10,10 @@
 -- taken out on lobby servers, so nobody spawns as a crew rig. When the experience forces R6 avatars (Creator Hub
 -- setting), the loaded R6 character is swapped once for an R15 model of the same avatar
 -- (Players:CreateHumanoidModelFromDescription).
+-- Players never collide with Players in the lobby either (owner 2026-10-20; same "Players" group as CharacterService).
+-- Floor guides (owner request 2026-10-20, Provisional): LobbyGuideDone { key } saves the key in the profile field
+-- LobbyGuides (once; cosmetic, so the client is trusted), and the Profile packet stops the guide on every later visit.
+local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -23,9 +27,10 @@ const SPREAD = 6 -- studs: random offset around the point so a squad does not st
 const TEMPLATE_NAME = "StarterCharacter"
 const R15_ATTRIBUTE = "LobbyR15" -- on a character this service built as R15
 const ROOT_WAIT = 5 -- s
+const COLLISION_GROUP = "Players" -- CharacterService (DEC-175) uses the same group in the run
 
 const LobbyService = Modux.Service("LobbyService", {
-	Require = { "RoleService", "PlayerService" },
+	Require = { "RoleService", "PlayerService", "ProfileService" },
 	Priority = 675,
 })
 
@@ -88,7 +93,25 @@ function LobbyService:SwapToR15(player: Player, old: Model, at: CFrame)
 	old:Destroy()
 end
 
+local function setGroup(instance: Instance)
+	if instance:IsA("BasePart") then
+		instance.CollisionGroup = COLLISION_GROUP
+	end
+end
+
+function LobbyService:SetupCollision()
+	if not PhysicsService:IsCollisionGroupRegistered(COLLISION_GROUP) then
+		PhysicsService:RegisterCollisionGroup(COLLISION_GROUP)
+	end
+	PhysicsService:CollisionGroupSetCollidable(COLLISION_GROUP, COLLISION_GROUP, false)
+end
+
 function LobbyService:OnCharacter(player: Player, character: Model)
+	for _, descendant in character:GetDescendants() do
+		setGroup(descendant)
+	end
+	-- dies with the character (Destroy disconnects it)
+	character.DescendantAdded:Connect(setGroup)
 	if character:GetAttribute(R15_ATTRIBUTE) == true then
 		return -- built here, already placed
 	end
@@ -106,11 +129,33 @@ function LobbyService:OnCharacter(player: Player, character: Model)
 	end)
 end
 
+-- Guides -----------------------------------------------------------------------------------------------------------
+
+function LobbyService:GuideDone(player: Player, key: string)
+	const profiles = self.Dependencies.ProfileService
+	const profile = profiles:Get(player)
+	if profile == nil then
+		return
+	end
+	const saved = profile.LobbyGuides()
+	if type(saved) == "table" and saved[key] ~= nil then
+		return
+	end
+	const guides = if type(saved) == "table" then table.clone(saved) else {}
+	guides[key] = os.time()
+	profiles:Update(player, { LobbyGuides = guides })
+	profiles:RequestSave(player)
+end
+
 LobbyService:OnInit(function(self)
 	self:Setup()
 	if not self.Dependencies.RoleService:IsLobby() then
 		return
 	end
+
+	self.Libs.Net.LobbyGuideDone:onServer(function(key, player: Player)
+		self:GuideDone(player, key)
+	end)
 
 	const parked = StarterPlayer:FindFirstChild(TEMPLATE_NAME)
 	if parked ~= nil then
@@ -118,6 +163,7 @@ LobbyService:OnInit(function(self)
 		parked.Parent = nil
 	end
 	Players.CharacterAutoLoads = true -- the avatar, loaded and respawned by Roblox
+	self:SetupCollision()
 
 	self.Dependencies.PlayerService.CharacterAdded:Connect(function(player, character)
 		self:OnCharacter(player, character)

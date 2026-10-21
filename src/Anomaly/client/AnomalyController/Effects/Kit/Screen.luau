@@ -91,6 +91,7 @@ local function ensure(): ScreenGui?
 			ResetOnSpawn = false,
 			IgnoreGuiInset = true,
 			ScreenInsets = Enum.ScreenInsets.None,
+			ClipToDeviceSafeArea = false,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			DisplayOrder = 0, -- under the HUD (1): the words and the dark never hide a button
 

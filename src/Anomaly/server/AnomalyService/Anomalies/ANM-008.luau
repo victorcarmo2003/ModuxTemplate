@@ -11,20 +11,20 @@
 --            Phase Signal.
 --   Beam     ArriveAt + BeamDelay: Phase Active, cues car_highbeam + car_honk. Every active player in the trailer zone
 --            (inside the trailer, or within ZoneRadius of ZonePoint) is tested: not protected -> scared (V2 error,
---            DEC-255: cue jumpscare with Entity = UserId % 65536, ScareFaint s later VitalService:Fall); protected ->
+--            DEC-255: cue jumpscare with Entity = UserId % 65536 + ctx.Fail = -Sanity.RuleBroken, no faint, owner
+--            2026-10-19); protected ->
 --            watched until the car leaves. Outside the zone = not tested (Mart).
 --   Stay     beam .. beam + StayFor: whoever opens the window is scared (Shutter event, who acted, DEC-204); a watched
 --            player who leaves the trailer (5 Hz check) is scared.
 --   Leave    beam + StayFor: Phase Failed when anyone was scared, else Resolved (the client backs the car out and drives
 --            it away), then the record stays LeaveLinger s and Finish. The Hold is released by Stop.
 --   Seen     1 s in the gaze cone of the braked car (ViewRange 100) between parking and leaving.
--- PROVISIONAL (TASK-331): numbers in the rule; the old -RuleBroken became the V2 jumpscare + faint.
+-- PROVISIONAL (TASK-331): numbers in the rule. Owner 2026-10-19: the caught player is blinded and loses sanity, no faint.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local TrailerFront = require(ReplicatedStorage.shared.Anomaly.TrailerFront)
 local Api = require(script.Parent.Parent.Api)
-local Kit = require(script.Parent.Kit.CustomerActor)
 
 const REF = "ANM-008"
 const TRAILER_POINT = "TRL"
@@ -38,10 +38,9 @@ const CAR_HEIGHT = 2.5 -- studs above the ground: body of the car (target of the
 const MAX_DT = 0.5 -- s; a late tick never counts more than this
 -- Defaults when Rules/ANM-008 is missing (same numbers as the rule file)
 const DEFAULT_ARRIVE_AT = 8.2
-const DEFAULT_BEAM_DELAY = 2.5
+const DEFAULT_BEAM_DELAY = 5
 const DEFAULT_STAY_FOR = 6
 const DEFAULT_LEAVE_LINGER = 6
-const DEFAULT_SCARE_FAINT = 0.7
 const DEFAULT_ZONE_POINT = "TRL"
 const DEFAULT_ZONE_RADIUS = 24
 
@@ -55,7 +54,6 @@ type State = {
 	BeamAt: number,
 	LeaveAt: number,
 	FinishAt: number,
-	ScareFaint: number,
 	ZonePoint: string,
 	ZoneRadius: number,
 	-- userId -> player protected at the beam, still watched until the car leaves
@@ -103,7 +101,8 @@ local function inZone(ctx: Api.Context, state: State, player: Player): boolean
 	return ctx.Vehicle.IsInside(player) or ctx.InZone(player, state.ZonePoint, state.ZoneRadius)
 end
 
--- V2 error (DEC-255): only this player's client shows the face, then the faint. Once per player per occurrence.
+-- V2 error (DEC-255): only this player's client is blinded by the beam and shows the face. No faint (owner
+-- 2026-10-19: "a scare, not a kill"): ctx.Fail = -Sanity.RuleBroken (35). Once per player per occurrence.
 local function scare(ctx: Api.Context, occ: Api.Occurrence, state: State, player: Player)
 	const userId = player.UserId
 	state.Watched[userId] = nil
@@ -112,12 +111,8 @@ local function scare(ctx: Api.Context, occ: Api.Occurrence, state: State, player
 	end
 	state.Scared[userId] = true
 	state.AnyFailed = true
-	ctx.Cue(occ, SCARE_CUE, userId % ENTITY_MOD)
-	task.delay(state.ScareFaint, function()
-		if player.Parent ~= nil then
-			Kit.Vital():Fall(player)
-		end
-	end)
+	ctx.Cue(occ, SCARE_CUE, userId % ENTITY_MOD, userId)
+	ctx.Fail(occ, { player })
 end
 
 -- The high beam: test every active player in the trailer zone.
@@ -181,7 +176,6 @@ const LongCar: Api.Module = {
 			BeamAt = beamAt,
 			LeaveAt = leaveAt,
 			FinishAt = leaveAt + param(rule, "LeaveLinger", DEFAULT_LEAVE_LINGER),
-			ScareFaint = param(rule, "ScareFaint", DEFAULT_SCARE_FAINT),
 			ZonePoint = text(rule, "ZonePoint", DEFAULT_ZONE_POINT),
 			ZoneRadius = param(rule, "ZoneRadius", DEFAULT_ZONE_RADIUS),
 			Watched = {},

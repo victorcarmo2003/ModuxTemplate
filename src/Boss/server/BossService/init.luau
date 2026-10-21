@@ -2,7 +2,7 @@
 -- Boss (Walt) phone calls (FEAT-018, FEAT-024; DEC-025, 077, 124, 194; architecture.md §19.9; network.md §13.3;
 -- data.md §3.3 "Bs"; ui-text.md §11; TASK-070). Run place only. Single writer of the Call set (record 1).
 --
--- Triggers (§19.9): PhaseChanged("Prep") of a day -> call_day_after_<k> / call_day_<N> (quentin variant) / endless
+-- Triggers (§19.9): PhaseChanged("Prep") of a day -> call_day_after_<k> / call_day_<N> / endless
 -- pool; PhaseChanged("Call") -> call_night_<N> (first attempt) or the night's ShortCall (Attempt > 0), after the
 -- pending lost-night calls; NightResolved("Lost") ->
 -- call_lost_critical (reason critical) + call_lost_last_chance when a chance is left (none left = call_run_over,
@@ -35,9 +35,10 @@
 -- purchase call, no money top-up and no FOR SALE sign focus any more (the rows and cues left BossCalls).
 --
 -- PROVISIONAL (TASK-070): chaining without a new ring; Resume blocks calls like NightLost.
--- Require follows architecture.md §19.2: VehicleService (phones of the current vehicle) and ThiefService (owner of the
--- quentin_caught_day counter read through RunStateService); neither requires Boss, no cycle.
+-- Require follows architecture.md §19.2: VehicleService (phones of the current vehicle); it does not require Boss, no
+-- cycle.
 local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Charm = require(ReplicatedStorage.Packages.Charm)
@@ -60,15 +61,17 @@ const TAG = "Interactable"
 const VEHICLE_TAG = "Vehicle"
 const VEHICLE_ATTRIBUTE = "Vehicle"
 const PHONE_ACTION = "answer_phone"
-const CAUGHT_COUNTER = "quentin_caught_day" -- written by ThiefService (TASK-072)
+const WRONG_TOPPING = "topping_wrong" -- hint event (not a prompt): a topping the ticket's order does not have
 const SNAPSHOT = "Bs"
 const AUTO_ANSWER = Content.BossCallRules.AutoAnswer
+-- s of a Call phase the first ring waits for every active member's ClientReady (Provisional)
+const READY_WAIT = Content.BossCallRules.ReadyWait
 const MAX_QUEUE = 32 -- far above any real sequence; guards a runaway trigger
 const TUTORIAL = Content.BossCallRules.Tutorial
 -- Day 1 upgrade lesson call (owner request 2026-10-14, Provisional; Trigger UpgradeLesson, Once)
 const LESSON_CALL = TutorialRules.Upgrade.Call
 -- day phases where the tutorial call may ring and talk
-const TUTORIAL_PHASES: { [string]: boolean } = { Prep = true, Open = true }
+const TUTORIAL_PHASES: { [string]: boolean } = { Prep = true, Open = true, Call = true, Night = true }
 -- No call starts here; entering one hangs up (architecture.md §19.9 "Fila")
 const BLOCKED: { [string]: boolean } = { Finale = true, NightLost = true, RunEnd = true, Resume = true }
 -- Entering one of these also empties the queue
@@ -85,10 +88,11 @@ const BossService = Modux.Service("BossService", {
 		"RoundService",
 		"RunStateService",
 		"InteractionService",
-		"ThiefService",
 		"TutorialService",
 		"EconomyService",
 		"VitalService",
+		"KitchenService",
+		"CustomerService",
 	},
 	Priority = 560,
 })
@@ -104,12 +108,19 @@ function BossService:Setup()
 	self.Played = {} :: { [string]: boolean }
 	-- Lost-night calls for the Call phase of the repeated night (survive the RepeatNight restore)
 	self.Pending = {} :: { string }
+	-- Night 1 coffee call held back until a member's sanity falls to Sanity.CoffeeCallAt and TutorialService:CoffeeDue
+	-- (TASK-596, owner 2026-10-19), nil = none waiting
+	self.CoffeeLater = nil :: string?
 	self.LastInfinite = "" :: string
 	self.Random = Random.new() :: Random
 	-- the tutorial call was answered once while a tutorial is pending: it never rings again, it resumes Talking
 	self.TutorialAnswered = false :: boolean
 	-- cues already run for the call that is talking (id = key # index @ StartedAt)
 	self.Cued = {} :: { [string]: boolean }
+	-- players whose client finished loading (ClientReady); the Call ring waits for them
+	self.Loaded = {} :: { [Player]: boolean }
+	-- os.clock() the current Call phase began
+	self.CallSince = 0 :: number
 end
 
 -- Reads -----------------------------------------------------------------------------------------------------------
@@ -273,6 +284,23 @@ function BossService:Finish(at: number)
 	end
 end
 
+-- The Call phase opens with the clients still on the loading screen: the ring (and the lines on the server clock)
+-- wait for every active member's ClientReady, or Rules.ReadyWait s of the phase. Later turns pass at once (Loaded stays).
+function BossService:WaitsForClients(): boolean
+	if self.Dependencies.RoundService:GetPhase() ~= "Call" or os.clock() - self.CallSince >= READY_WAIT then
+		return false
+	end
+	for userId, member in self.Dependencies.RunStateService.Members() do
+		if member.State ~= "Away" then
+			const player = Players:GetPlayerByUserId(userId)
+			if player ~= nil and not self.Loaded[player] then
+				return true
+			end
+		end
+	end
+	return false
+end
+
 -- answer_phone, or AutoAnswer
 function BossService:Answer()
 	const record = self.Record()
@@ -288,6 +316,7 @@ function BossService:Step()
 	const record = self.Record()
 	const t = now()
 	self:StepTutorial(t)
+	self:StepCoffee()
 	self:StepLesson()
 	if record ~= self.Record() then
 		return
@@ -302,7 +331,7 @@ function BossService:Step()
 		if t >= self.EndsAt then
 			self:Finish(t)
 		end
-	elseif #self.Queue > 0 and self:CanStart() then
+	elseif #self.Queue > 0 and self:CanStart() and not self:WaitsForClients() then
 		const key = self:Pop()
 		if key ~= nil then
 			if key == TUTORIAL.Call and self.TutorialAnswered then
@@ -340,9 +369,10 @@ end
 
 -- Tutorial call ----------------------------------------------------------------------------------------------------
 
+-- Night too (owner 2026-10-19: the run starts at night, the tutorial is Night 1's): TUTORIAL_PHASES says when
 function BossService:TutorialAllowed(): boolean
 	const round = self.Dependencies.RoundService
-	return self.Enabled and round:IsStarted() and not round:IsNight() and TUTORIAL_PHASES[round:GetPhase()] == true
+	return self.Enabled and round:IsStarted() and TUTORIAL_PHASES[round:GetPhase()] == true
 end
 
 -- Queues the tutorial call; the Hint rows it teaches count as heard (and leave the queue)
@@ -390,6 +420,43 @@ function BossService:StepTutorial(t: number)
 	end
 end
 
+-- Lowest sanity among the Active members with a sanity bar (math.huge = none)
+function BossService:LowestSanity(): number
+	const vital = self.Dependencies.VitalService
+	local lowest = math.huge
+	for _, player in Players:GetPlayers() do
+		if vital:IsActive(player) then
+			const value, max = vital:GetSanity(player)
+			if max > 0 and value < lowest then
+				lowest = value
+			end
+		end
+	end
+	return lowest
+end
+
+-- The held Night 1 coffee call (TASK-596, owner 2026-10-19: no coffee lesson right after the tutorial): rings in the night's
+-- selling phase the first time a member's sanity falls to Sanity.CoffeeCallAt (Night 1 starts at FirstNightStart, above
+-- it), never on top of a pending tutorial (CoffeeDue)
+function BossService:StepCoffee()
+	const key = self.CoffeeLater
+	if key == nil then
+		return
+	end
+	const round = self.Dependencies.RoundService
+	if not round:IsNight() then
+		self.CoffeeLater = nil -- the night is over: the lesson is for another night
+		return
+	end
+	if round:GetPhase() == "Night"
+		and self:LowestSanity() <= Content.Sanity.CoffeeCallAt
+		and self.Dependencies.TutorialService:CoffeeDue()
+	then
+		self.CoffeeLater = nil
+		self:Enqueue(key)
+	end
+end
+
 -- Day 1 upgrade lesson: queued once the first shift is over and the last-call line is empty (TutorialService decides)
 function BossService:StepLesson()
 	if self.Played[LESSON_CALL] or self:IsQueued(LESSON_CALL) or self.Record().Call == LESSON_CALL then
@@ -407,7 +474,6 @@ function BossService:OnDayPrep(day: number, night: number)
 	const key = Calls.day({
 		Day = day,
 		Night = night,
-		CaughtDay = runState.Counters()[CAUGHT_COUNTER] or 0,
 		Endless = runState.Endless(),
 		LastInfinite = self.LastInfinite,
 		Played = self.Played,
@@ -436,14 +502,17 @@ function BossService:OnNightCall(night: number, attempt: number)
 	table.clear(self.Pending)
 	const call, short = Calls.night(night)
 	const key = if attempt > 0 then short else call
-	if key then
+	-- owner 2026-10-19: with a rookie's tutorial ahead, Walt's tutorial call replaces the night's rules call ("Good evening,
+	-- Rookie. First, open the store."); the rules call counts as heard
+	if key and self.Dependencies.TutorialService:AnyPending() then
+		self.Played[key] = true
+		self:QueueTutorial()
+	elseif key then
 		self:Enqueue(key)
 	end
-	-- Night 1 teaches the coffee: after the rules call (lower Priority), on a repeat too (the night starts at 50 again)
-	const coffee = Calls.nightCoffee(night)
-	if coffee then
-		self:Enqueue(coffee)
-	end
+	-- Night 1 teaches the coffee, on a repeat too (the night starts at FirstNightStart again). TASK-596 (owner 2026-10-19):
+	-- never right after the rules call / the tutorial; it waits for the first drop to Sanity.CoffeeCallAt (StepCoffee)
+	self.CoffeeLater = Calls.nightCoffee(night)
 end
 
 function BossService:OnPhase(phase: string, day: number, night: number)
@@ -459,6 +528,7 @@ function BossService:OnPhase(phase: string, day: number, night: number)
 	if phase == "Prep" and not round:IsNight() then
 		self:OnDayPrep(day, night)
 	elseif phase == "Call" then
+		self.CallSince = os.clock()
 		self:OnNightCall(night, round:Info().Attempt)
 	end
 	self:RefreshPhones()
@@ -483,6 +553,21 @@ function BossService:OnNightResolved(result: string, reason: string?)
 	const lastChance = Calls.ofKind("LostLastChance")
 	if lastChance then
 		table.insert(self.Pending, lastChance)
+	end
+end
+
+-- A topping went on a hot dog: one its ticket's order does not have = the "wrong topping" hint (owner 2026-10-19: Walt's "Messed
+-- up? Toss it." rings the first time this happens, not on a discard)
+function BossService:OnTopping(tool: Tool, key: string)
+	const npc = tool:GetAttribute("Ticket")
+	const line = tool:GetAttribute("TicketLine")
+	if type(npc) ~= "number" or npc <= 0 then
+		return
+	end
+	const ticket = (self.Dependencies.CustomerService :: any).Tickets[npc]
+	const row = if ticket ~= nil then ticket.Lines[if line == 2 then 2 else 1] else nil
+	if row ~= nil and table.find(row.Toppings, key) == nil then
+		self:OnPerformed(WRONG_TOPPING)
 	end
 end
 
@@ -612,6 +697,12 @@ BossService:OnInit(function(self)
 	-- In OnInit: RoundService (750) starts the run in its own OnStart, before ours; the probe and the signals must
 	-- already be there for the first PhaseChanged.
 	round:SetPhaseProbe("Call", function(): boolean
+		-- the answered tutorial call stays on the line while the rookie works (owner 2026-10-19: the tutorial is Night 1's):
+		-- the night goes on to its Prep under it
+		const record = self.Record()
+		if record.Call == TUTORIAL.Call and record.State == "Talking" and #self.Queue == 0 then
+			return true
+		end
 		return not self:IsBusy()
 	end)
 	round.PhaseChanged:Connect(function(phase, day, night)
@@ -619,6 +710,14 @@ BossService:OnInit(function(self)
 	end)
 	round.NightResolved:Connect(function(_info, result, reason)
 		self:OnNightResolved(result, reason)
+	end)
+
+	-- Lync packets take several listeners: CutsceneService listens to the same ClientReady
+	self.Libs.Net.ClientReady:onServer(function(_, player: Player)
+		self.Loaded[player] = true
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		self.Loaded[player] = nil
 	end)
 
 	runState:RegisterSnapshot(SNAPSHOT, function()
@@ -638,6 +737,10 @@ BossService:OnInit(function(self)
 	-- Listeners run inside the per-target queue: no yield here
 	interaction.Performed:Connect(function(_player, action)
 		self:OnPerformed(action)
+	end)
+	-- KitchenService (650) made its signals in its OnInit, before this one (560)
+	self.Dependencies.KitchenService.ToppingAdded:Connect(function(_player: Player, tool: Tool, key: string)
+		self:OnTopping(tool, key)
 	end)
 end)
 

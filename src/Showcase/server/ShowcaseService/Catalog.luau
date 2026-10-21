@@ -6,7 +6,7 @@
 -- Item.Tab: "Anomalies" | "Scares" | "Mechanics". Group = sub-heading. Actions are buttons; the client sends back
 -- ShowcaseDo { Action = action.Id, Id = item.Id, Arg = action.Arg }:
 --   trigger / resolve / wrong / stop   anomaly lifecycle (Id = ANM Ref)
---   dev      Arg = a DevService command line ("thief now L2"); only commands in ShowcaseService.DEV_ALLOWED
+--   dev      Arg = a DevService command line ("traffic hold cutscene on"); only commands in ShowcaseService.DEV_ALLOWED
 --   sc       Arg = a ShowcaseService helper ("revive", "tp:SS", ...)
 --   scare    Id = hallucination key or "sting:<sound key>" (plays on the player's client)
 --   scarestop  stops the hallucination playing on the client
@@ -247,25 +247,13 @@ local function mechanicItems(): { Item }
 			"Sanity and life",
 			"mech_faint",
 			"Faint, Down, Spectator",
-			"Sanity 0 with revives left: Down (ragdoll, items stashed, until 6 AM). Out of revives: Spectator. The body fades after the fallback time (no ambulance in this build).",
-			"A teammate revives (wave 4); here use Revive",
+			"Sanity 0 with revives left: Down (ragdoll, items stashed, until 6 AM). Out of revives: Spectator. The body fades after the fallback time.",
+			"Use Revive",
 			{
 				act("dev", "Faint (Down)", "down"),
 				act("dev", "Spectator", "spectate"),
 				act("sc", "Revive", "revive"),
 				act("dev", "Status", "sanity"),
-			}
-		),
-		mech(
-			"Sanity and life",
-			"mech_ambulance",
-			"Ambulance and medics",
-			"NOT IN THIS BUILD (wave 4: AmbulanceService, Revive Kit, medics). The default body fallback fades a fallen body; 'Revive' stands in for the ambulance.",
-			"n/a (stand-in: Revive in Faint)",
-			{
-				act("sc", "Revive (stand-in)", "revive"),
-				act("dev", "Hold traffic (ambulance)", "traffic hold ambulance on"),
-				act("dev", "Release traffic", "traffic hold ambulance off"),
 			}
 		),
 		mech(
@@ -303,20 +291,6 @@ local function mechanicItems(): { Item }
 			"The coffee machine restores sanity (night only, cooldown). Night 1 teaches it with a HUD emphasis and an arrow.",
 			"Drink coffee at the machine",
 			{ act("dev", "Fill machine", "coffee 10"), act("dev", "Night 1 hint", "sanity hint") }
-		),
-		mech(
-			"Street",
-			"mech_thief",
-			"Thief (Quick Quentin)",
-			"By day a thief lurks near the trailer and grabs from the drawer. Whistle or catch him. The panel spawns him now at a lurk spot.",
-			"Chase or whistle him away",
-			{
-				act("dev", "Spawn (any)", "thief now"),
-				act("dev", "Lurk L1", "thief now L1"),
-				act("dev", "Lurk L2", "thief now L2"),
-				act("dev", "Lurk L3", "thief now L3"),
-				act("dev", "Status", "thief"),
-			}
 		),
 		mech(
 			"Street",

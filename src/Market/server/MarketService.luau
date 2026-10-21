@@ -114,7 +114,7 @@ end
 function MarketService:OnSale(upgrade: Content.Upgrade): boolean
 	const upgrades = self.Dependencies.UpgradeService
 	return upgrades:GetLevel(upgrade.Key) ~= nil
-		and not Content.Mode.IsOff(upgrade.Key) -- anomaly mode: Wide Counter, Drawer Lock off the stand
+		and not Content.Mode.IsOff(upgrade.Key) -- anomaly mode: Wide Counter off the stand
 		and upgrades:NextLevel(upgrade.Key) ~= nil
 		and self.Dependencies.RoundService:GetDay() >= upgrade.UnlockDay
 		and upgrades:GetWait(upgrade.Key) == 0
@@ -146,11 +146,11 @@ function MarketService:CheapestOnSale(): number?
 	return cheapest
 end
 
--- Nothing bought yet on the current vehicle (any Bench line still at its start level)
+-- Nothing bought yet on the current vehicle (any Bench line still at its start level; lines that are off, Mode.IsOff, do not count)
 function MarketService:NeverBought(): boolean
 	const upgrades = self.Dependencies.UpgradeService
 	for _, upgrade in Content.Upgrades.List do
-		const level = if upgrade.SoldAt == "Bench" then upgrades:GetLevel(upgrade.Key) else nil
+		const level = if upgrade.SoldAt == "Bench" and not Content.Mode.IsOff(upgrade.Key) then upgrades:GetLevel(upgrade.Key) else nil
 		if level ~= nil and level > upgrade.StartLevel then
 			return false
 		end

@@ -5,13 +5,13 @@
 -- Stations set (record id = StationId * 100 + Slot, written from Station.Records of the station modules).
 -- Stations are found by tag Station inside a tag Vehicle; each StationKind is run by a module in Stations/*.luau
 -- (StationApi.Module, discovered here: TASK-026/027/028 add files without touching this one). "restock" is ours.
--- Stock: Amount per ingredient (atom); Capacity = Ingredients[k].Capacity[Cooler level of the current vehicle]
+-- Stock: Amount per ingredient (atom); Capacity = Ingredients[k].Capacity[level of Ingredients[k].CapacityStat on the current vehicle]
 -- (DEC-184) and Blocked = Day < UnlockDay or another vehicle are derived, never stored. Snapshot "Stk" = Amounts
 -- (data.md §3.3); "Stn" = what each module's Capture returns (nil = the station restarts empty, data.md §2.2).
 -- Public reads for other services (Customer order draw, Market "Out of stock"): GetStock, GetCapacity, IsBlocked,
 -- Stock; write: TakeStock. The free package of the unlock day is TASK-046 (board N-03), not here.
 -- Wave 2 (TASK-057; architecture.md §19.5, T36, T60; DEC-184, DEC-200):
---   * VehicleService.Swapped (connected in OnStart) -> Stock set (Capacity at the new Cooler, Blocked: coffee opens in
+--   * VehicleService.Swapped (connected in OnStart) -> Stock set (Capacity at the new capacity levels, Blocked: coffee opens in
 --     the trailer) and prompts: the old vehicle's anchors off, the new one's back to what its module last asked for
 --     (Wanted, kept by Context.SetPrompt). Amount passes whole: above the new capacity it stays (Q-169 A,
 --     Provisional) and reads as e.g. 30/12; Restock is refused until it drops below capacity.
@@ -78,7 +78,6 @@ const RESTOCK = "restock"
 const DISCARD = "discard"
 const STOCK_FULL = "stock_full"
 const PACKAGE = "Package"
-const COOLER_STAT = "StockCapacityLevel"
 const UNLOCK_NOTICE = "ingredient_unlocked"
 const WRAPPED_NOTICE = "topping_wrapped"
 const UNWRAP = "topping_unwrap"
@@ -115,8 +114,12 @@ const LEGACY_KINDS: { [string]: boolean } = { prep = true, cut = true }
 const PENDING_KIND = "PendingStationKind"
 
 -- The dish of the kit plate (ReplicatedStorage.Assets.Items.Tools.plate) welded under a hot dog Tool that was a plate, so the
--- plate never vanishes from the hand (owner 2026-10-19). Its top meets the bottom of the hot dog Handle. Idempotent.
+-- plate never vanishes from the hand (owner 2026-10-19). Its top sits DISH_DROP under the bottom of the hot dog Handle, at
+-- DISH_SCALE of the kit plate (TASK-594, owner 2026-10-19: the plate was too big next to the bun and covered the sauces; the kit
+-- rim is 1.75 studs for a 1.0 bun). Provisional, judged in Play. Idempotent.
 const DISH = "Dish"
+const DISH_SCALE = 0.72
+const DISH_DROP = 0.05
 local function attachDish(hotDog: Tool)
 	if hotDog:FindFirstChild(DISH) ~= nil then
 		return
@@ -133,7 +136,7 @@ local function attachDish(hotDog: Tool)
 	const folder = Instance.new("Model")
 	folder.Name = DISH
 	-- the kit plate's top (Handle +Y) under the hot dog's bottom
-	const base = handle.CFrame * CFrame.new(0, -handle.Size.Y / 2, 0)
+	const base = handle.CFrame * CFrame.new(0, -handle.Size.Y / 2 - DISH_DROP, 0)
 	const kitTop = kitHandle.CFrame * CFrame.new(0, kitHandle.Size.Y / 2, 0)
 	for _, part in kit:GetDescendants() do
 		if part:IsA("BasePart") then
@@ -141,6 +144,8 @@ local function attachDish(hotDog: Tool)
 			for _, child in copy:GetChildren() do
 				if not child:IsA("DataModelMesh") and not child:IsA("SurfaceAppearance") and not child:IsA("Decal") then
 					child:Destroy()
+				elseif child:IsA("SpecialMesh") then
+					child.Scale *= DISH_SCALE
 				end
 			end
 			copy.Name = if part == kitHandle then "DishBase" else part.Name
@@ -149,7 +154,9 @@ local function attachDish(hotDog: Tool)
 			copy.CanQuery = false
 			copy.CanTouch = false
 			copy.Massless = true
-			copy.CFrame = base * kitTop:ToObjectSpace(part.CFrame)
+			const offset = kitTop:ToObjectSpace(part.CFrame)
+			copy.Size *= DISH_SCALE
+			copy.CFrame = base * (offset - offset.Position + offset.Position * DISH_SCALE)
 			const weld = Instance.new("WeldConstraint")
 			weld.Part0 = handle
 			weld.Part1 = copy
@@ -189,7 +196,7 @@ local function blockedOn(row: Content.Ingredient, day: number, vehicle: string):
 	return row.Vehicle ~= nil and row.Vehicle ~= vehicle
 end
 
--- Run start: full at Cooler 1 for what is open on Day 1 with the starting vehicle (DEC-049, RunParams.StartStockFull);
+-- Run start: full at capacity level 1 for what is open on Day 1 with the starting vehicle (DEC-049, RunParams.StartStockFull);
 -- 0 for what unlocks later (Provisional: the unlock day brings its free package, DEC-071 / TASK-046).
 local function startAmounts(): Amounts
 	const out: Amounts = {}
@@ -262,6 +269,8 @@ function KitchenService:Setup()
 	self.StockChanged = self.Libs.Signal.new() :: SignalLib.Signal<string, number>
 	-- Wave 3 (TASK-109). Throw Away removed a Tool: (player, item key, Altered attribute, "Vehicle" | "Street").
 	self.Discarded = self.Libs.Signal.new() :: SignalLib.Signal<Player, string, boolean, DiscardWhere>
+	-- a topping went on a hot dog (player, the hot dog Tool, Ingredients key): BossService's "wrong topping" hint reads it
+	self.ToppingAdded = self.Libs.Signal.new() :: SignalLib.Signal<Player, Tool, string>
 	-- Wave 3 (TASK-109). Context.Emit of a station module: (event name, player or nil, data or nil).
 	self.Emitted = self.Libs.Signal.new() :: SignalLib.Signal<string, Player?, { [string]: any }?>
 	self.Context = self:BuildContext() :: StationApi.Context
@@ -275,13 +284,14 @@ function KitchenService:GetVehicle(): string
 	return self.Dependencies.UpgradeService:GetVehicle()
 end
 
--- Capacity at the Cooler level of the current vehicle (DEC-184). Unknown ingredient = 0.
+-- Capacity at the level of the ingredient's CapacityStat (Bun Box / Topping Rack / Coffee Shelf, DEC-331) on the current vehicle
+-- (DEC-184). Unknown ingredient = 0.
 function KitchenService:GetCapacity(ingredient: string): number
 	const row = Content.Ingredients.ByKey[ingredient]
 	if row == nil then
 		return 0
 	end
-	const level = self.Dependencies.UpgradeService:GetEffect(COOLER_STAT)
+	const level = self.Dependencies.UpgradeService:GetEffect(row.CapacityStat)
 	return math.min(capacityAt(row, level), AMOUNT_MAX)
 end
 
@@ -366,7 +376,7 @@ function KitchenService:RestoreOpened(data: any)
 	self.Opened(table.freeze(opened))
 end
 
--- (current, capacity). Current can read above capacity after the swap to a vehicle with a smaller Cooler (Q-169 A,
+-- (current, capacity). Current can read above capacity after the swap to a vehicle with a smaller capacity (Q-169 A,
 -- Provisional): nothing paid is lost, Restock waits until it drops below capacity.
 function KitchenService:GetStock(ingredient: string): (number, number)
 	const capacity = self:GetCapacity(ingredient)
@@ -836,7 +846,7 @@ function KitchenService:Publish(station: StationApi.Station)
 	end
 end
 
--- Stock set: the 9 records as they read now (Amount, Capacity of the current Cooler, Blocked).
+-- Stock set: the 9 records as they read now (Amount, Capacity at the current levels, Blocked).
 function KitchenService:PushStock()
 	const records: { StockRecord } = {}
 	for index, row in Content.Ingredients.List do
@@ -994,6 +1004,8 @@ function KitchenService:CheckRestock(
 end
 
 -- Moves min(left in the package, capacity - current); the leftover stays in the package, an empty one disappears.
+-- Restaurant stock room (Content.Restaurant.Supply.Enabled; owner 2026-10-19): the box comes from an infinite bay, so
+-- it always leaves the hand after a restock (the leftover is dropped, not carried).
 function KitchenService:Restock(player: Player, station: StationApi.Station, anchor: Instance)
 	const ingredient = self:IngredientOf(station, anchor)
 	if ingredient == nil then
@@ -1009,7 +1021,8 @@ function KitchenService:Restock(player: Player, station: StationApi.Station, anc
 		return
 	end
 	self:SetAmount(ingredient, amount + moved)
-	self.Dependencies.ItemService:SetCount(tool, count - moved)
+	const left = if Content.Restaurant.Supply.Enabled then 0 else count - moved
+	self.Dependencies.ItemService:SetCount(tool, left)
 end
 
 -- Street bin Model that owns an anchor (nearest StreetBin ancestor), only when no Station owns it.
@@ -1553,7 +1566,7 @@ KitchenService:OnStart(function(self)
 	for index, row in Content.Ingredients.List do
 		net.Stock:add(index, self:Stock(row.Key))
 	end
-	-- Amount, Cooler level, vehicle and Day are all atoms read in here: purchase, restock, restore, new day and
+	-- Amount, capacity levels, vehicle and Day are all atoms read in here: purchase, restock, restore, new day and
 	-- vehicle swap land in the same effect. Restock prompts follow Blocked from the same reads.
 	self.Libs.Charm.effect(function()
 		self:PushStock()

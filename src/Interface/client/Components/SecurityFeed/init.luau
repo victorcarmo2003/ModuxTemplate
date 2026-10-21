@@ -215,8 +215,8 @@ return function(props: Props): Frame
 		end
 		table.insert(list, {
 			Key = "View",
-			Text = keyOf(props, "N", "Y") .. (if props.View() == "Night" then "Normal" else "Night Vision"),
-			Active = false,
+			Text = keyOf(props, "N", "Y") .. "Night Vision",
+			Active = props.View() == "Night",
 			Action = props.OnView,
 		})
 		table.insert(list, {
@@ -413,7 +413,11 @@ return function(props: Props): Frame
 						end,
 						TextSize = 16,
 						Tone = function()
-							return if row().Active then Theme.Tone.Mustard else Theme.Tone.Cream
+							-- owner 2026-10-20: Exit red; cameras and Night Vision green when on, grey when off
+							if row().Key == "Exit" then
+								return Theme.Tone.Ketchup
+							end
+							return if row().Active then Theme.Tone.Green else Theme.Tone.Slate
 						end,
 						LayoutOrder = index,
 						OnActivated = function()

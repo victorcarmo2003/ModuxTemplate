@@ -270,7 +270,9 @@ function BossController:Apply(record: Record)
 	self.StartedAt = record.StartedAt
 	self.LinesNight = self:Night()
 	self.Lines = if key == NONE then {} else Content.BossCalls.LinesOf(key, self.LinesNight)
-	self.LineIndex = 0
+	-- -1 = rewrite the strip on the Refresh below (0 would read as "nothing shown": a call that ends while its last line is up
+	-- left that line on screen for good, owner 2026-10-19)
+	self.LineIndex = -1
 	Vide.batch(function()
 		self.Call(key)
 		self.State(record.State)
@@ -367,7 +369,9 @@ function BossController:GuidePhone(ringing: boolean)
 	const objective = self.Dependencies.ObjectiveController
 	const phone = self.Phone
 	const target = if phone then phone.Model else nil
-	if ringing and target ~= nil then
+	-- the tutorial guides to the phone itself (one arrow, owner 2026-10-19)
+	const tutorial = Players.LocalPlayer:GetAttribute("TutorialRunning") == true
+	if ringing and target ~= nil and not tutorial then
 		if self.PhoneGuided ~= target then
 			self.PhoneGuided = target
 			objective:Mark(target)
@@ -771,8 +775,20 @@ BossController:OnInit(function(self)
 	end)
 end)
 
+-- Night 1 opens straight on the Call phase: its calls are voiced from the start so the voices are loaded by the
+-- time the phone rings (the rest waits for PREPARE_AFTER)
+function BossController:PrepareFirstNight()
+	for _, row in Content.BossCalls.List do
+		const kind = row.Trigger.Kind
+		if (kind == "NightCall" or kind == "NightCoffee") and row.Trigger.Night == 1 then
+			self:PrepareCall(row.Key, 1)
+		end
+	end
+end
+
 BossController:OnStart(function(self)
 	self:WatchViewport()
+	self:PrepareFirstNight()
 	-- PlayerGui may arrive a frame late; do not hold up the other OnStart.
 	task.spawn(function()
 		self:Mount(Players.LocalPlayer:WaitForChild("PlayerGui"))

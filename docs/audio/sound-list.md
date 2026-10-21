@@ -295,6 +295,8 @@ Sem dublagem (`script.md`: "murmúrio de voz de telefone, sem dublagem" + "heh")
 
 ### 5.8 Ladrão (FEAT-013, NPC-007 Quick Quentin)
 
+> **Removido (DEC-313, 2026-10-20):** o ladrão saiu do jogo e do código (`src/Thief`, `Content.Thief`, `Net.Thief`, UPG-004, notices `thief_*`, ligações "quentin"). Texto abaixo é histórico.
+
 | ID | Nome curto | Quando toca | Duração/loop | Tom/referência | Prioridade | Variações |
 |---|---|---|---|---|---|---|
 | SFX-090 | Quentin espreita | andando até a gaveta (4 s), só perto | loop 1 s | passos na ponta dos pés, cômicos | P3 | 1 |
@@ -484,6 +486,38 @@ viu de relance**; nada toca quando a criatura aparece.
 | SFX-247 | `floor_creak` | Tábuas cedendo sob o rastejador (TASK-483) | aviso do rastejador, sob o piso | ~11 s | `9120832269` "Wood Creak Intense Cracking Splintering 1 (SFX)", ProSoundEffects | Sfx 0,6, 3D 50 studs | P1 |
 
 Estalo de osso (TASK-486): `neck_crack` (ANM-012) já usa o upload do dono "Bone crack"; reserva PSE `9113542363` "Bone Cracks 10 (SFX)".
+
+### 5.21 Vidro e farol (TASK-588, `design/horror-cinematic.md` §11.3; Provisório)
+
+Peças `Scene/Kit/Glass` e `Scene/Kit/Glare` (ANM-006, 008, 021). Pedidos novos, ainda sem Id: até o upload, cada peça toca a
+reserva da coluna "Hoje" (chave que já existe). Mild (DEC-172), nada de vidro estilhaçando: o vidro aguenta.
+
+| ID | Chave | Nome curto | Quando toca | Duração | Hoje (reserva) | Grupo / volume / espaço | Prioridade |
+|---|---|---|---|---|---|---|---|
+| SFX-248 | `glass_knock` | Batida de unha/dedo no vidro, seca | `Glass` Knock (ANM-006 no vidro, ANM-008 na janela do drive) | ~0,2 s por toque | `door_knock` (0,45) | Sfx 0,5, 3D 40 studs | P1 |
+| SFX-249 | `palm_squeak` | Palma escorregando em vidro molhado (rangido curto) | `Glass` Hand (ANM-006 depois de fechar) | ~1,5 s | `door_creak` (0,5) | Sfx 0,5, 3D 30 studs | P2 |
+| SFX-250 | `glass_breath` | Respiração lenta contra o vidro, abafada | `Glass` Fog (passo pode pedir com `Sound`) | ~2 s | — (sem som) | Sfx 0,4, 3D 25 studs | P2 |
+
+`Glass` Bang usa `window_slam` e `Glass` Rattle usa `handle_rattle` (persiana do drive) — já existem. `Glare` não toca som (o motor, a
+buzina e o farol são do Effects/ANM-008).
+
+### 5.22 Família A no padrão do apagão (TASK-587, `design/horror-cinematic.md` §3.1–3.10, §11.2; Provisório)
+
+Cenas `Content/HorrorScenes/Scenes/anm_0{01,05,11,13,14,15,16}_*.luau` e peças `Scene/Kit/Pose` + `Scene/Kit/Prop`. Pedidos novos,
+ainda sem Id: até o upload, a cena toca a reserva da coluna "Hoje" (chave que já existe). Ao subir, trocar a chave na cena (a
+constante no topo de cada arquivo). Mild (DEC-172).
+
+| ID | Chave | Nome curto | Quando toca | Duração | Hoje (reserva) | Grupo / volume / espaço | Prioridade |
+|---|---|---|---|---|---|---|---|
+| SFX-251 | `drip_loop` | Gota d'água caindo numa poça (uma gota, o loop é a cena) | ANM-005, a cada ~2,4 s no balcão, mais alta perto do prazo; para no silêncio | ~0,4 s | `splash` (0,2–0,65) | Sfx 0,5, 3D 30 studs | P1 |
+| SFX-252 | `cup_rattle` | Copos e garrafas tilintando no balcão (vibração) | ANM-011, cada vez mais rápido até parar de vez; o pulo final | ~0,3 s | `plate_put` (0,25–1) | Sfx 0,6, 3D 30 studs | P1 |
+| SFX-253 | `stretch_creak` | Couro esticando, rangido grave | ANM-014, cada degrau da cabeça (toca quando ela cresce) | ~0,6 s | `door_creak` | Sfx 0,6, 3D 30 studs | P1 |
+| SFX-254 | `float_hum` | Zumbido grave subindo de tom, cortável | ANM-015, na chegada e na subida (para no silêncio) | ~4 s | `hum_rise` | Sfx 0,5, 3D 40 studs | P2 |
+| SFX-255 | `clock_tick` | Tique de relógio de parede, um só (a cena espaça) | ANM-016, tiques desacelerando até parar | ~0,2 s | `amb_clock_tick` (clipe cortado aos 9 s) | Sfx 0,6, 3D 40 studs | P2 |
+| SFX-256 | `eyes_on` | "Whoom" suave, olhos acendendo | ANM-013, os olhos acendem | ~0,8 s | `suspense_drop` (0,5) | Sfx 0,5, tela | P3 |
+
+Sem pedido novo: `puddle_rush` (a água correndo de ANM-005 usa `splash`) e a pancada na persiana (ANM-011 usa `window_slam`).
+`clock_tick` só desacelera de verdade se a cena tocar um tique por passo (hoje ela toca o clipe do `amb_clock_tick` uma vez e o corta aos 9 s).
 
 ---
 

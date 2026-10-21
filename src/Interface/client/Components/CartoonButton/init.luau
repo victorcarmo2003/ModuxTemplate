@@ -173,11 +173,13 @@ return function(props: Props): TextButton
 		-- multiply both measures alike, so the ratio holds while the Body squashes
 		const measure = function()
 			const real = body.AbsoluteSize
-			if real.Y <= 0 then
+			const height = Vide.untrack(baseSize).Y.Offset
+			const localHeight = if height > 0 then height else Theme.MinTouch
+			-- a Body squashed near 0 (pop-in / pop-out) gives a garbage ratio: keep the last width (CartoonPanel)
+			if real.Y < localHeight * 0.25 then
 				return
 			end
-			const height = Vide.untrack(baseSize).Y.Offset
-			const px = real.X / real.Y * (if height > 0 then height else Theme.MinTouch)
+			const px = real.X / real.Y * localHeight
 			if math.abs(px - Vide.untrack(width)) > 0.5 then
 				width(math.ceil(px))
 			end

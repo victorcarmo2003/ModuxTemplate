@@ -75,6 +75,7 @@ local NightWatch = require(script.NightWatch)
 
 const MAX_BUBBLES = 8 -- TASK-034 acceptance; <= 8 customers by day (network.md §3.6)
 const REACTION_TIME = 3 -- s
+const COMPLAINT_MEMORY = 10 -- s a CustomerComplain still shields its customer from the neutral Refused bubble
 const TICK_RATE = 10 -- Hz, patience ring clock (only while a bubble is mounted)
 const HEAD_GAP = 0.6 -- studs between the top of the head and the tip of the bubble
 const MAX_DISTANCE = 60
@@ -156,6 +157,8 @@ function CustomerController:Setup()
 	self.Models = {} :: { [number]: Model }
 	self.Tracked = {} :: { [Model]: Tracked }
 	self.Reactions = {} :: { [Model]: Reaction }
+	-- NpcId -> os.clock() of its last CustomerComplain (the Refused Sale that follows keeps that bubble)
+	self.Complained = {} :: { [number]: number }
 	self.Mounted = 0 :: number
 	self.Now = Vide.source(workspace:GetServerTimeNow()) :: Vide.Source<number>
 	self.Gui = nil :: Instance?
@@ -260,9 +263,8 @@ function CustomerController:WriteRecord(id: number, record: Record?)
 		Pickup = record.Pickup,
 	}
 	const old = Vide.untrack(entry.Record)
-	if old ~= false and old.State ~= "Waiting" and copy.State == "Waiting" then
-		self:Cue(id, "order_take")
-	end
+	-- (order_take when the order was taken: the restaurant's tablet talk murmurs line by line now, TabletController:Cue; owner
+	-- 2026-10-19: no murmur once the talk is over)
 	const oldSecond = if old ~= false then old.Order2 else nil
 	if old ~= false and oldSecond ~= nil and copy.Order2 == nil and copy.State == "Waiting" then
 		-- one hot dog of the pair resolved: Order unchanged = the 2nd row went, else the 1st
@@ -518,8 +520,9 @@ function CustomerController:Mount(entry: Entry, model: Model)
 	self.Mounted += 1
 end
 
--- Sale packet: reaction bubble over the rig (presentation only; the drawer comes from the Economy set).
-function CustomerController:React(id: number, result: string)
+-- Reaction bubble over the rig (presentation only; the drawer comes from the Economy set). Sale packet: the kind and
+-- line come from the result (Reactions.For); CustomerComplain passes its own ("Complaint", ShutLines text).
+function CustomerController:React(id: number, result: string, kindOverride: Reactions.Kind?, textOverride: string?)
 	const model = self.Models[id]
 	const gui = self.Gui
 	if model == nil or gui == nil then
@@ -531,7 +534,11 @@ function CustomerController:React(id: number, result: string)
 	end
 	self:ClearReaction(model)
 
-	const kind, line = Reactions.For(result, self.Random)
+	local kind, line = Reactions.For(result, self.Random)
+	if kindOverride ~= nil then
+		kind = kindOverride
+		line = textOverride or ""
+	end
 	const unmount, billboard = Vide.root(function()
 		return ReactionBubble({
 			Name = `ReactionBubble_{id}`,
@@ -911,8 +918,24 @@ CustomerController:OnInit(function(self)
 	end)
 
 	net.Sale:onClient(function(sale)
-		self:React(sale.Npc, sale.Result)
+		-- a customer that just complained about the closed window keeps its complaint bubble over the neutral Refused one
+		const complainedAt = self.Complained[sale.Npc]
+		const keepsComplaint = sale.Result == "Refused" and complainedAt ~= nil and os.clock() - complainedAt < COMPLAINT_MEMORY
+		self.Complained[sale.Npc] = nil
+		if not keepsComplaint then
+			self:React(sale.Npc, sale.Result)
+		end
 		self:Feedback(sale.Npc, sale.Result)
+	end)
+	-- The service window shut: the customer complains over its head, then the Sale (Refused) and the walk off follow
+	net.CustomerComplain:onClient(function(complaint)
+		const text = Content.ShopWindow.ShutLines[complaint.Line]
+		if text == nil then
+			return
+		end
+		self.Complained[complaint.Npc] = os.clock()
+		self:React(complaint.Npc, "Slow", "Complaint", text)
+		self:Feedback(complaint.Npc, "Slow")
 	end)
 end)
 

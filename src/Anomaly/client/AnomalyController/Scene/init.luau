@@ -20,7 +20,11 @@
 	  - Live gate: Scene.Live = true plays it in the real game. Scenes still under Effects/ modules that do the same
 	    job (ANM-020 blackout: Kit/Blackout, its cues, Score/) stay Live = nil until TASK-467 so nothing is doubled;
 	    `/dev scene <key>` (Dev/Commands/Scene) sets ReplicatedStorage attribute DevHorrorScene = key, which plays it.
-	  - Steps.luau has one handler per Kind; TASK-463/464/465 plug theirs in with Scene.Handle(kind, handler).
+	  - Where (TASK-589, design/horror-cinematic.md §3.0): "Inside" / "Outside" plays only for a client inside / outside
+	    the shop (LocalPlayer OutsideStage set = outside), checked when the step fires; nil = both.
+	  - Seen (TASK-589): each kit piece shows its step only to the eyes it names (Scene/Seen: Cameras / Eyes / All).
+	  - Steps.luau has one handler per Kind; TASK-463/464/465 plug theirs in with Scene.Handle(kind, handler); the pieces
+	    of Scene/Kit register themselves through Kits.Register (TASK-586).
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -52,10 +56,12 @@ const RULES = SCENES.Rules
 const DEV_ATTRIBUTE = "DevHorrorScene"
 const ENTITY_MOD = 65536 -- AnomalyCue.Entity range (Kit/Hide.EntityOf on the server)
 const CAUGHT_CUE = "jumpscare"
+const OUTSIDE_ATTRIBUTE = "OutsideStage" -- OutsideService: set while the player is outside the shop
 -- Actor (TASK-472): a late joiner gets the walking model where it should be (the handler skips `late` s of the walk)
 -- HeadDown (TASK-484): a late joiner still gets the head-down help for the rest of the walk
+-- Lantern, Silhouette (TASK-589): the light around him and the shape outside, where they should be
 const HELD: { [string]: boolean } =
-	{ Lights = true, Vignette = true, Lightning = true, Music = true, Whispers = true, Actor = true, HeadDown = true }
+	{ Lights = true, Vignette = true, Lightning = true, Music = true, Whispers = true, Actor = true, HeadDown = true, Lantern = true, Silhouette = true }
 
 -- scene key -> phase -> steps by At (ties keep the data order)
 const QUEUES: { [string]: { [string]: { Step } } } = {}
@@ -98,7 +104,16 @@ local function playable(scene: Content.HorrorScene): boolean
 	return scene.Live == true or ReplicatedStorage:GetAttribute(DEV_ATTRIBUTE) == scene.Key
 end
 
+-- TASK-589 (design/horror-cinematic.md §3.0): outside the shop = the attribute OutsideService puts on the player
+local function outside(): boolean
+	return Players.LocalPlayer:GetAttribute(OUTSIDE_ATTRIBUTE) ~= nil
+end
+
 local function allowed(run: Run, step: Step): boolean
+	const where = step.Where
+	if where ~= nil and (where == "Outside") ~= outside() then
+		return false
+	end
 	const who = step.Who or "All"
 	if who == "Caught" then
 		return run.Caught
@@ -226,8 +241,16 @@ function Scene.Remove(id: number)
 end
 
 -- AnomalyController:OnCue: the caught cue marks this client "Caught" for the live runs of that anomaly
-function Scene.Cue(anomaly: string, cue: string, entity: number)
-	if cue ~= CAUGHT_CUE or entity == 0 or entity ~= Players.LocalPlayer.UserId % ENTITY_MOD then
+-- user: the full UserId the cue is for (AnomalyCue.User); when present it decides alone (family A: Entity is the actor)
+function Scene.Cue(anomaly: string, cue: string, entity: number, user: number?)
+	if cue ~= CAUGHT_CUE then
+		return
+	end
+	if user ~= nil then
+		if user ~= Players.LocalPlayer.UserId then
+			return
+		end
+	elseif entity == 0 or entity ~= Players.LocalPlayer.UserId % ENTITY_MOD then
 		return
 	end
 	for _, run in runs do

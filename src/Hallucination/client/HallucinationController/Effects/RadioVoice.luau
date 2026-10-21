@@ -5,18 +5,13 @@
 -- Source: a part named like "Radio" in the vehicle; else the vehicle's centre (the trailer has no radio model yet).
 -- Static = `phone_glitch` (Provisional until a radio static key exists). Lines are original, short and Mild.
 local Context = require(script.Parent.Parent.Context)
+local Lines = require(script.Parent.Parent.Lines)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VehicleRoot = require(ReplicatedStorage.shared.Vehicle.VehicleRoot)
 
 const STATIC_KEY = "phone_glitch"
 const SPEAKER = "Radio"
-const LINES = {
-	"...anyone still open out there...?",
-	"...so hungry... so hungry...",
-	"...almost there now...",
-	"...don't wait up for me...",
-	"...is the grill still on...?",
-}
+-- TASK-601: the lines are Content.Hallucinations.RadioLines, by night (Lines.Next "Radio")
 const NEAR = 8 -- studs of margin around the vehicle box
 const LINE_TIME = 2.6
 const STEP = 0.1
@@ -75,7 +70,11 @@ const RadioVoice: Context.Effect = {
 		if not hold(env, run, 0.9) then
 			return
 		end
-		const line = LINES[env.Random:NextInteger(1, #LINES)]
+		const picked = Lines.Next("Radio", env.Night(), env.Random)
+		if picked == nil then
+			return
+		end
+		const line = picked.Text
 		env.Subtitle(SPEAKER, line)
 		-- owner 2026-10-18: the stranger is voiced (pre-generated "radio" voice, Speech through BossController)
 		pcall(function()

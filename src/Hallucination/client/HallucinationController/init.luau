@@ -46,7 +46,14 @@ const RETRY = 5 -- s: next try when nothing could play
 const SPEAKER = "Walt"
 
 const HallucinationController = Modux.Controller("HallucinationController", {
-	Require = { "VitalController", "RoundController", "AudioController", "BossController", "KitchenController" },
+	Require = {
+		"VitalController",
+		"RoundController",
+		"AudioController",
+		"BossController",
+		"KitchenController",
+		"CameraController",
+	},
 	Priority = 600,
 })
 
@@ -120,6 +127,9 @@ function HallucinationController:BuildEnv(): Context.Env
 		CallIdle = function(): boolean
 			return Vide.untrack(deps.BossController.State) == "Idle"
 		end,
+		Night = function(): number
+			return Vide.untrack(deps.RoundController.Night)
+		end,
 		SlotState = function(recordId: number): string?
 			const record = Vide.untrack(function()
 				return deps.KitchenController:SlotOf(recordId)
@@ -139,11 +149,21 @@ function HallucinationController:BuildEnv(): Context.Env
 		Whisper = function(text: string)
 			self.WhisperText(text)
 		end,
+		-- owner 2026-10-20 (Provisional Q-415): the short scare jolt of the shop shadow (camera, Rules.Shakes profile)
+		Shake = function(profile: string, scale: number?)
+			deps.CameraController:HorrorShake(profile, scale)
+		end,
 	}
 end
 
 -- Eligible for hallucinations right now (own sanity, Night phase, Active).
+-- owner 2026-10-19: nothing plays under a rookie's tutorial (no fake call, no phone glitch); TutorialController sets the attribute
+const TUTORIAL_ATTRIBUTE = "TutorialRunning"
+
 function HallucinationController:Eligible(): boolean
+	if Players.LocalPlayer:GetAttribute(TUTORIAL_ATTRIBUTE) == true then
+		return false
+	end
 	const vital = self.Dependencies.VitalController
 	const round = self.Dependencies.RoundController
 	if Vide.untrack(vital.Max) <= 0 or Vide.untrack(vital.LocalState) ~= "Active" then
@@ -186,7 +206,12 @@ function HallucinationController:Candidates(now: number, env: Context.Env): { Co
 	const sanity = Vide.untrack(self.Dependencies.VitalController.Sanity)
 	const out: { Content.Hallucination } = {}
 	for _, row in ROWS do
-		if sanity < row.MaxSanity and now >= (self.CooldownUntil[row.Key] or 0) and self:CanRun(row, env) then
+		if
+			not row.Scripted
+			and sanity < row.MaxSanity
+			and now >= (self.CooldownUntil[row.Key] or 0)
+			and self:CanRun(row, env)
+		then
 			table.insert(out, row)
 		end
 	end
@@ -204,7 +229,8 @@ function HallucinationController:ScareCandidates(
 	for _, row in ROWS do
 		if
 			row.FamilyD
-			and (#keys == 0 or table.find(keys, row.Key) ~= nil)
+			-- a Scripted row (the Night 1 opening) only when named
+			and (if #keys == 0 then not row.Scripted else table.find(keys, row.Key) ~= nil)
 			and (not cooled or now >= (self.CooldownUntil[row.Key] or 0))
 			and self:CanRun(row, env)
 		then

@@ -3,7 +3,7 @@
 --   traffic                         cars (route, distance/length, speed, stop), holds, reservations, density now
 --   traffic spawn [TR-n]            a car now on that route (or a random one): ignores timers, density and holds
 --   traffic clear                   removes every car
---   traffic hold <reason> on|off    TrafficService:Hold (anm_008, anm_010, cutscene, ambulance)
+--   traffic hold <reason> on|off    TrafficService:Hold (anm_008, anm_010, cutscene)
 --   traffic reserve <CW-n> [npc]    ReserveCrossing with a fake NpcId (default 0); expires after Crossing.MaxWait
 --   traffic release <CW-n> [npc]    ReleaseCrossing
 --   traffic hit                     knocks the caller as a valid car hit (Knock, SetKnocked, DropHeld, immunity)

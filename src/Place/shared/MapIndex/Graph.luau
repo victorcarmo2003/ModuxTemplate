@@ -13,7 +13,7 @@ export type Node = {
 export type Adjacency = { [string]: { string } }
 
 export type PathOptions = {
-	AvoidCrossings: boolean?, -- skip crosswalk edges (thief, MAP-01 §9.2)
+	AvoidCrossings: boolean?, -- skip crosswalk edges (MAP-01 §9.2)
 	-- queue slots Q1..Qn are never intermediate (customers outside the queue walk around it), and stepping through a
 	-- pickup slot PU-n costs PICKUP_PASS more (the lane behind the pickup line wins over walking along the slots, where
 	-- the other customers stand; restaurant patio 2026-10-18, PROVISIONAL)

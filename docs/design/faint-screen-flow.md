@@ -8,21 +8,21 @@ uma de cada vez**, e a tela **limpa** durante as contagens, com **só o produto 
 ## 1. As três telas
 
 > **DEC-319 (2026-10-20):** a vida extra do time está **estacionada** (`RunParams.Chances = 0`,
-> `Content.Revive.TeamLife = false`). Hoje, quando cai o último: causa, depois Revive all por 15 s, senão fim da run.
+> `Content.Revive.TeamLife = false`). Hoje, quando cai o último: causa, depois Revive all por 10 s, senão fim da run.
 > O ramo "com vida" abaixo fica guardado para quando a vida extra voltar (classe ou ação no mapa).
 
 | Tela | Quando | O que aparece | Tempo |
 |---|---|---|---|
 | 1. Causa | sempre, logo depois da queda | "WHAT GOT YOU", a causa e como passar dela (`Content.FaintTips`) | `Revive.CauseTime` = 3 s |
-| 2. Revive | caí e **ainda tem alguém de pé** | o número da contagem e o botão de revive ("Use Revive Kit (n)" ou "Revive · R$ 39"); nada mais | `Revive.DownWindow` = 15 s |
-| 3. Vida do time | caiu **o último** | com vida: o coração parte (1 → 0), **LAST CHANCE**, a noite recomeça. Sem vida: a contagem + **Revive all · R$ 99** para todos | com vida: só a tela 1, depois a noite perdida; sem vida: `Revive.ReviveAllWindow` = 15 s |
+| 2. Revive | caí e **ainda tem alguém de pé** | o número da contagem e o botão de revive ("Use Revive Kit (n)" ou "Revive · R$ 39"); nada mais | `Revive.DownWindow` = 10 s (DEC-327) |
+| 3. Vida do time | caiu **o último** | com vida: o coração parte (1 → 0), **LAST CHANCE**, a noite recomeça. Sem vida: a contagem + **Revive all · R$ 99** para todos | com vida: só a tela 1, depois a noite perdida; sem vida: `Revive.ReviveAllWindow` = 10 s (DEC-327) |
 
 - Quando caio e **não tem mais ninguém de pé**, a tela 2 não aparece: depois da causa vem direto a tela 3.
 - Se a contagem da tela 2 zera sem revive, o jogador vira **espectador até a próxima noite** (spectate normal, sem
   oferta). Se depois cair o último, a tela 3 vale para todos.
 - Com vida: a noite **recomeça do início** (como a noite perdida de hoje), gastando a vida (DEC-053, DEC-110).
 - Sem vida: **Revive all** levanta o time inteiro (quem está caído e quem já é espectador) e a noite **continua**.
-  Ninguém comprou em 15 s: fim da run ("Shift's over").
+  Ninguém comprou em 10 s: fim da run ("Shift's over").
 - Comprado tarde demais (a janela fechou), o Revive all vira **1 crédito de Revive Kit** para quem pagou.
 - O "Revive all" não aparece na loja, só na tela 3.
 
@@ -50,7 +50,7 @@ A causa vem do servidor (`VitalService.LastCause`, pacote `FaintCause`) e vira c
 | Peça | Arquivo |
 |---|---|
 | tempos | `Content.Revive` (CauseTime, DownWindow, ReviveAllWindow) |
-| Down vira espectador em 15 s; janela de quem cai por último; Revive all | `VitalService` (ExpireDowns, EvaluateWipe, ReviveAll) |
+| Down vira espectador em 10 s; janela de quem cai por último; Revive all | `VitalService` (ExpireDowns, EvaluateWipe, ReviveAll) |
 | produto `util_revive_all` (ProductId a criar no Creator Hub, 99 R$) | `Content.Shop`, `ShopUtilityService`, `ReviveKitService:Grant` |
 | telas 1, 2 e 3 (sem vida) | `ReviveKitController` (`Stage`: Cause, Countdown, Wait, ReviveAll) |
 | tela 3 (com vida e fim de run) | `NightLostController` + `NightLostScreen` + `LifeHeart` |

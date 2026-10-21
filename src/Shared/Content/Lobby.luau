@@ -59,6 +59,10 @@ export type Frame = {
 export type ZoneVfx = {
 	ColorTween: number, -- s of a colour change (squad platform state)
 	ActiveDistance: number, -- studs from the camera: farther zones are hidden and not animated
+	-- owner 2026-10-20 ("coloca aqueles efeitos de anel, de círculo, de quadrado que aparece nos pads"): true = every
+	-- zone keeps its full glow (neon frame, rising rings / squares, light) even with nobody on it, as before TASK-450;
+	-- false = the TASK-450 idle outline (glow only while someone stands in it)
+	IdleGlow: boolean,
 }
 
 -- Pad state keys (PadTag.State): Free / Configuring / Open / Closed / Starting.
@@ -123,6 +127,10 @@ export type Lobby = {
 	Squad: {
 		Poll: number, -- s between two server checks of the platforms
 		Countdown: number, -- s between Start and the teleport (the platform is green)
+		-- Pad room (owner request 2026-10-21, Provisional): stepping on a free pad starts this countdown at once
+		PadCountdown: number,
+		StartNow: number, -- s left after START NOW (shorter countdowns are kept)
+		JoinCutoff: number, -- s before the teleport after which nobody joins a starting pad room
 		DefaultMaxPlayers: number,
 		DefaultFriendsOnly: boolean,
 		Colors: { Free: Color3, Busy: Color3, Starting: Color3 },
@@ -132,6 +140,12 @@ export type Lobby = {
 		MinZoom: number,
 		MaxZoom: number,
 		StartZoom: number, -- distance pushed once when the lobby takes the camera (out of a first-person zoom)
+	},
+	-- Floor guide arrow (owner request 2026-10-20, Provisional; LobbyController/Guide.luau): each key is shown once per
+	-- account ("pad" = to the nearest squad pad; "classes" = to the Classes zone once the gems buy a class). Persisted
+	-- in the profile (LobbyGuides) and the Profile packet bitfield: append only, never rename.
+	Guide: {
+		Keys: { string },
 	},
 }
 
@@ -207,10 +221,11 @@ const lobby: Lobby = {
 		GhostSegments = 12,
 		Outset = 0.05,
 		Lift = 0.02,
-		Base = 0,
-		PulseAlpha = 0.35,
+		-- Realistic lighting style (owner 2026-10-20: the pad frames blew out): Base 0 -> 0.3, Ghost 0.1 -> 0.35
+		Base = 0.3,
+		PulseAlpha = 0.3,
 		PulsePeriod = 1.6,
-		Ghost = 0.1,
+		Ghost = 0.35,
 		Lighten = 0.15,
 		FadeIn = 0.12,
 		FadeOut = 0.55,
@@ -225,10 +240,14 @@ const lobby: Lobby = {
 	ZoneVfx = {
 		ColorTween = 0.3,
 		ActiveDistance = 110, -- v2 plaza diagonal ~150 (LOBBY.md §V2-14)
+		IdleGlow = true, -- Provisional (owner 2026-10-20)
 	},
 	Squad = {
 		Poll = 0.15,
 		Countdown = 5, -- FEAT-001 "contagem de 5 s"
+		PadCountdown = 30,
+		StartNow = 3,
+		JoinCutoff = 2,
 		DefaultMaxPlayers = 4, -- DEC-012
 		DefaultFriendsOnly = false,
 		-- legacy ring colours (no longer read by the lobby: Pad.Colors replaced them; no red, style guide §7.4)
@@ -272,6 +291,9 @@ const lobby: Lobby = {
 		MinZoom = 0.5,
 		MaxZoom = 30,
 		StartZoom = 12,
+	},
+	Guide = {
+		Keys = { "pad", "classes" },
 	},
 }
 

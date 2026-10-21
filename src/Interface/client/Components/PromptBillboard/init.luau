@@ -62,6 +62,8 @@ export type Props = {
 
 const PILL_HEIGHT = 40 -- face 36 + lip 4, desktop / gamepad (not tapped)
 const TOUCH_HEIGHT = 48 -- face 44 + lip 4 (>= Theme.MinTouch): the pill takes taps
+-- owner 2026-10-20 (phone): the tappable pill read too big; drawn at this scale (~39 px tall, text ~14 px)
+const TOUCH_SCALE = 0.8
 const LIP = Theme.Lip
 const CHIP_SIZE = 28
 const DOT_SIZE = 16
@@ -239,7 +241,7 @@ return function(props: Props): BillboardGui
 		return 1
 	end, 0.2, 1)
 	const pillSize = function(): number
-		return pillScale() * bump()
+		return pillScale() * bump() * (if tappable() then TOUCH_SCALE else 1)
 	end
 
 	const dotSize = spring(function()

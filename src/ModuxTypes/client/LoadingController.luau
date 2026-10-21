@@ -24,6 +24,7 @@ export type Public = {
 	StepMap: (self: Public) -> (),
 	BackgroundVoices: (self: Public) -> (),
 	Run: (self: Public) -> (),
+	PlayIntro: (self: Public) -> (),
 	SendReady: (self: Public) -> (),
 	Lift: (self: Public) -> (),
 }

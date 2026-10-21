@@ -222,6 +222,13 @@ function RunStateService:Admit(player: Player, class: string)
 	const userId = player.UserId
 	if not self:Seat(userId) then
 		warn(`[RunStateService] {player.Name} joined a full run ({MAX_PARTY}); not a member`)
+		-- DEC-320 (B-15): say it on screen instead of leaving the player in a silent limbo (dev roster, no launch); a
+		-- squad server sends outsiders back to the lobby (PartyRunService)
+		task.delay(3, function()
+			if player.Parent ~= nil and not self:IsMember(player) then
+				self:Notify(player, "run_full", MAX_PARTY)
+			end
+		end)
 		return
 	end
 
@@ -325,8 +332,9 @@ end
 
 -- Notices ----------------------------------------------------------------------------------------------------------
 
--- Toast to one player or to the whole audience (network.md §4.2). Works on any place role.
-function RunStateService:Notify(target: Target, key: string, value: number?)
+-- Toast to one player or to the whole audience (network.md §4.2). Works on any place role. by: the player who did it
+-- (DEC-320: the crew sees who bought), named by the other clients in front of the text.
+function RunStateService:Notify(target: Target, key: string, value: number?, by: Player?)
 	if Content.Notices.ByKey[key] == nil then
 		fail(`[RunStateService] Notify: {key} is not a key of Content.Notices`)
 		return
@@ -340,7 +348,11 @@ function RunStateService:Notify(target: Target, key: string, value: number?)
 	if amount ~= amount then
 		amount = 0
 	end
-	const packet = { Kind = key, Value = math.clamp(math.floor(amount), NOTICE_MIN, NOTICE_MAX) }
+	const packet = {
+		Kind = key,
+		Value = math.clamp(math.floor(amount), NOTICE_MIN, NOTICE_MAX),
+		By = if by ~= nil then by.UserId else nil,
+	}
 
 	if target == "all" then
 		self.Libs.Net.Notice:fireClient(net.Audience, packet)

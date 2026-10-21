@@ -5,11 +5,12 @@
 -- Trigger.Kind:
 --   DayPrep        Prep of Day = Trigger.Day (Day 1 tutorial and Day 2; with the run flow of 2026-10-12 every day from
 --                  Day 3 comes after a night, so the days 3+ are the call_day_after_<k> rows), or Prep of the first day
---                  after night Trigger.Night (call_day_after_<k>; Variant "quentin": the thief was caught the day
---                  before; Provisional, ui-text §11.3)
+--                  after night Trigger.Night (call_day_after_<k>; ui-text §11.3). Variant: optional alternative of
+--                  the same day (none in use since the thief left, DEC-313)
 --   DayInfinite    Prep of an endless day: one row of the pool at random, never the same twice in a row
 --   NightCall      Call phase of Night = Trigger.Night, first attempt
---   NightCoffee    Call phase of Night = Trigger.Night (Night 1), right after that night's own call (lower Priority); its
+--   NightCoffee    Night = Trigger.Night (Night 1), in its selling phase the first time a member's sanity falls to
+--                  Sanity.CoffeeCallAt (TASK-596, owner 2026-10-19; was: right after the night's own call); its
 --                  cue CoffeeHint starts the sanity-bar / coffee-machine emphasis (VitalService:StartCoffeeHint)
 --   NightRepeat    Call phase of a repeated night (Attempt > 0): exactly one row; its lines are followed by the
 --                  Short lines of that night's NightCall (LinesOf below)
@@ -64,7 +65,7 @@ export type Trigger = {
 	Day: number?,
 	Night: number?,
 	Action: string?, -- key of Actions (Hint)
-	Variant: string?, -- "quentin"
+	Variant: string?, -- alternative of the same day (none in use)
 }
 
 export type BossCall = {
@@ -90,12 +91,11 @@ export type TutorialRules = {
 export type Rules = {
 	LineTime: number, -- seconds per line (subtitle and voice)
 	AutoAnswer: number, -- seconds ringing before the call answers itself (not the Tutorial call)
+	ReadyWait: number, -- s of a Call phase the first ring waits for every active member's ClientReady (Provisional)
 	DayMaxLines: number,
 	NightMaxSeconds: number,
 	Tutorial: TutorialRules,
 }
-
-const QUENTIN = "You caught Quentin. Nice work."
 
 local function lines(...: string): { Line }
 	const out: { Line } = {}
@@ -115,8 +115,7 @@ local function day(key: string, dayIndex: number, variant: string?, body: { Line
 	}
 end
 
--- Prep of the first day after night k (night k is played on day k + 1, so this is Day k + 2). Variant "quentin" is the
--- same call with Walt's Quentin line inserted as the 2nd line (the thief was caught the day before)
+-- Prep of the first day after night k (night k is played on day k + 1, so this is Day k + 2)
 local function dayAfter(night: number, body: { Line }, variant: string?): BossCall
 	return {
 		Key = if variant then `call_day_after_{night}_{variant}` else `call_day_after_{night}`,
@@ -186,14 +185,12 @@ const base = Table.new({
 		"call_day_2",
 		2,
 		nil,
-		lines("Cheese is in. Folks love cheese.", "Watch your drawer. Quick hands.", "You work late tonight. I'll ring.")
+		lines("Cheese is in. Folks love cheese.", "You work late tonight. I'll ring.")
 	),
 	-- the day after night k (ui-text.md §11.3). Day 3 (after N1) carries the old "bacon" call and Day 4 (after N2) the
-	-- "potato sticks" one, each with its quentin variant (the old call_day_3/call_day_4, which could never ring any more).
+	-- "potato sticks" one (the old call_day_3/call_day_4, which could never ring any more).
 	dayAfter(1, lines("Morning! Told you nights were quiet.", "Bacon's in. Smell that?", "Grill's hot. Sell some dogs.")),
-	dayAfter(1, lines("Morning! You made it.", QUENTIN, "Bacon's in. Go sell some dogs."), "quentin"),
 	dayAfter(2, lines("Morning, Rookie. Sleep okay?", "Good. Don't think about it.", "Potato sticks today. Bigger grill, too.")),
-	dayAfter(2, lines("Morning, Rookie. Sleep okay?", QUENTIN, "Potato sticks and a bigger grill."), "quentin"),
 	dayAfter(3, lines("Bank clock's ticking fine. See?", "Nice and normal. Sell some dogs.")),
 	dayAfter(4, lines("One Mr. Pickett today, I hope.", "...That was a joke. Mostly.")),
 	dayAfter(5, lines("She liked you. The lady.", "Forget I said that.")),
@@ -210,9 +207,10 @@ const base = Table.new({
 	infinite(5, "Nice and normal. Just right."),
 	infinite(6, "Ketchup, mustard, smile. That's the job."),
 
-	-- Night 1 coffee (user request 2026-10-11, Provisional): the night starts at 50 sanity (Sanity.FirstNightStart) and Walt
-	-- sends the rookie to the coffee machine right after the rules call. Short, TTS-friendly ("..." for the pauses, no
-	-- numbers, no sausage). Line 1 starts the HUD emphasis (CoffeeHint). Not Once: a repeated Night 1 starts at 50 again.
+	-- Night 1 coffee (user request 2026-10-11, Provisional): the night starts at 60 sanity (Sanity.FirstNightStart) and Walt
+	-- sends the rookie to the coffee machine the first time it falls to 50 (Sanity.CoffeeCallAt; TASK-596, owner 2026-10-19:
+	-- time to digest the kitchen tutorial first). Short, TTS-friendly ("..." for the pauses, no numbers, no sausage). Line 1
+	-- starts the HUD emphasis (CoffeeHint). Not Once: a repeated Night 1 starts at 60 again.
 	{
 		Key = "call_night_1_coffee",
 		Lines = lines("You sound tired, Rookie...", "Have some coffee.", "It'll keep your head on straight."),
@@ -235,10 +233,12 @@ const base = Table.new({
 	),
 	nightCall(
 		2,
-		lines("Someone shaking all over?", "Shut the window. Keep working."),
-		lines("Shaking? Shut the window."),
+		-- TASK-591 (Q-399): the shaker is starving - serve him plain. New lines: no pre-generated voice until tools/voice
+		-- runs again (the call plays them as text meanwhile)
+		lines("Someone shaking all over?", "He's just starving. Serve him plain.", "Nothing on it."),
+		lines("Shaking? Plain hot dog."),
 		-- TASK-561: ANM-009 debuts tonight in the restaurant (back door opened by hand); Walt has a key and never knocks
-		{ Lines = lines("Someone shaking all over? Shut the window.", "Knocks on the back door?", "I've got a key. Don't open."), Short = lines("Shaking? Window. Knocks? Don't open.") }
+		{ Lines = lines("Someone shaking all over? Serve him plain, nothing on it.", "Knocks on the back door?", "I've got a key. Don't open."), Short = lines("Shaking? Plain. Knocks? Don't open.") }
 	),
 	nightCall(
 		3,
@@ -352,7 +352,7 @@ const base = Table.new({
 	hint("hint_bun_cut", "bun_cut", lines("Pop a frank in the bun.")),
 	hint("hint_board_add_sausage", "plate_add_sausage", lines("Hot dog's ready. Wait for orders.")),
 	-- TASK-284: the window lever opens the shop (key kept: BossCalls ids)
-	hint("hint_open_sign", "shutter_toggle", lines("We're open! Folks are lining up.", "Shut the window, shop's closed.")),
+	-- (hint_open_sign, the line when the window opens, left on owner request 2026-10-19: less talk, only what the player needs)
 	hint(
 		"hint_take_order",
 		"take_order",
@@ -364,13 +364,15 @@ const base = Table.new({
 		lines("Nice! Tips go in the jar.", "Low on stock? Grab a box in the pantry.")
 	),
 	hint("hint_restock", "restock", lines("That's how you restock. Easy.")),
-	hint("hint_discard", "discard", lines("Messed up? Toss it. No harm.")),
+	-- owner 2026-10-19: the first time a topping the order does not have goes on the hot dog (not on a discard)
+	hint("hint_discard", "topping_wrong", lines("Messed up? Toss it. No harm.")),
 	hint("hint_bench_buy_upgrade", "bench_buy_upgrade", lines("New gear's in the kitchen. Heh.")),
 } :: { BossCall })
 
 const rules: Rules = {
 	LineTime = 2.5, -- FEAT-018
 	AutoAnswer = 15, -- FEAT-018
+	ReadyWait = 20, -- Provisional: the loading screen can last up to 18 s
 	DayMaxLines = 7,
 	NightMaxSeconds = 45,
 	Tutorial = {

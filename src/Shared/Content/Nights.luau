@@ -111,13 +111,49 @@ const windows: Windows = {
 	Last = { 1740, 1800 }, -- 5:00 -> 6:00 AM
 }
 
+-- Owner 2026-10-19 (Provisional): the first nights let the player learn the kitchen before the fear. No regular anomaly
+-- starts before this game minute of these nights (the ones due earlier wait for it); the scripted ones are not held.
+-- Owner 2026-10-20 (Provisional, Q-415): the grace now holds only the anomalies that punish (regular events); the
+-- family D scares (no verb, no cost) play from 8 PM (ScaresFrom), and the presented premiere keeps its fixed time
+-- (PremiereAt), so Night 1 is never silent for its first minutes.
+const grace: { [number]: number } = {
+	[1] = 1380, -- Night 1: 11:00 PM
+	[2] = 1320, -- Night 2: 10:00 PM
+}
+
+-- Owner 2026-10-20 (Provisional, Q-415): game minute of the presented anomaly's debut (NewAnomaly) on these nights,
+-- instead of a drawn slot: right after the call presented it. Not held by the grace (the tutorial still holds it).
+const premiereAt: { [number]: number } = {
+	[1] = 1320, -- Night 1: 10:00 PM, anm_001_blank_folks
+}
+
+-- Owner 2026-10-20 (Provisional, Q-415): the scripted opening of these nights, a family D key (Content.Hallucinations,
+-- Scripted) played for everyone as the Night phase starts (first attempt only); no verb, no sanity cost. The drawn scares
+-- of the night start after Until (game minute) so they never land on top of it.
+export type Opening = { Key: string, Until: number }
+const opening: { [number]: Opening } = {
+	[1] = { Key = "night_opening", Until = 1250 }, -- ~45 s of Night 1 (540 s for 600 min)
+}
+
+-- Owner 2026-10-20 (Provisional, Q-415): game minute the family D scares window opens (was Windows.Shift[1], 9 PM)
+const scaresFrom = 1200 -- 8:00 PM
+
 const occurrences: Occurrences = {
 	Premiere = 3,
 	Recent = 2,
 	Old = 1,
 }
 
+-- DEC-320 (Q-413, Provisional): extra regular anomaly events of a night by the crew connected at its start (1..4 players):
+-- +1 with 3, +2 with 4 (more eyes make every anomaly easier)
+const crewEvents: { number } = { 0, 0, 1, 2 }
+
 return Table.with(base, {
 	Windows = Table.record(windows),
+	Grace = table.freeze(grace),
+	PremiereAt = table.freeze(premiereAt),
+	Opening = table.freeze(opening),
+	ScaresFrom = scaresFrom,
+	CrewEvents = table.freeze(crewEvents),
 	Occurrences = Table.record(occurrences),
 })

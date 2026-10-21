@@ -17,6 +17,9 @@
 	    shows exactly the off look this controller wrote: another system (LightController, an anomaly) that rewrote
 	    Material/Color meanwhile keeps its look.
 	  * One OnTick for every sign; a sign only costs work at its next scheduled step.
+	  * Dim (owner 2026-10-20, Realistic lighting style blew the neon out): every lit colour is scaled by Dim.Scale
+	    (sign tubes and the loose Neon parts under the Dim.Roots models of Workspace: stage edges, gems, lenses).
+	    A dimmed part carries the DimAttribute, so a re-tag or a second pass never scales it twice.
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -27,6 +30,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 
 const RULES = Content.Neon
+const DIM = RULES.Dim
 const TICK_RATE = 60 -- Hz: blinks are 40 ms long
 const BLACK = Color3.new(0, 0, 0)
 
@@ -68,6 +72,49 @@ local function isTubeName(name: string): boolean
 	return table.find(RULES.PartNames, name) ~= nil
 end
 
+local function scaled(color: Color3): Color3
+	return Color3.new(color.R * DIM.Scale, color.G * DIM.Scale, color.B * DIM.Scale)
+end
+
+-- Lit Neon part: scales its colour once (DimAttribute) and returns the dimmed lit colour.
+local function dim(part: BasePart): Color3
+	if part:GetAttribute(DIM.Attribute) ~= true then
+		part.Color = scaled(part.Color)
+		part:SetAttribute(DIM.Attribute, true)
+	end
+	return part.Color
+end
+
+local function inSign(part: Instance): boolean
+	local node = part.Parent
+	while node and node ~= Workspace do
+		if CollectionService:HasTag(node, RULES.Tag) then
+			return true
+		end
+		node = node.Parent
+	end
+	return false
+end
+
+-- Loose Neon part under a Dim root (not a sign tube: Track dims those).
+local function dimLoose(instance: Instance)
+	if
+		instance:IsA("BasePart")
+		and instance.Material == Enum.Material.Neon
+		and not overridden(instance)
+		and not inSign(instance)
+	then
+		dim(instance)
+	end
+end
+
+local function watchRoot(root: Instance)
+	for _, descendant in root:GetDescendants() do
+		dimLoose(descendant)
+	end
+	root.DescendantAdded:Connect(dimLoose)
+end
+
 -- Track one part of a sign (Neon parts, or the named tube parts found already off: lit colour from the Model).
 function NeonController:Track(sign: Sign, part: Instance)
 	if not part:IsA("BasePart") or sign.Known[part] then
@@ -75,13 +122,13 @@ function NeonController:Track(sign: Sign, part: Instance)
 	end
 	local lit: Color3
 	if part.Material == Enum.Material.Neon then
-		lit = part.Color
+		lit = dim(part)
 	elseif isTubeName(part.Name) then
 		const attribute = sign.Model:GetAttribute(RULES.ColorAttribute)
 		if typeof(attribute) ~= "Color3" then
 			return
 		end
-		lit = attribute
+		lit = scaled(attribute)
 	else
 		return
 	end
@@ -255,6 +302,19 @@ NeonController:OnInit(function(self)
 end)
 
 NeonController:OnStart(function(self)
+	if DIM.Scale < 1 then
+		for _, name in DIM.Roots do
+			const root = Workspace:FindFirstChild(name)
+			if root then
+				watchRoot(root)
+			end
+		end
+		Workspace.ChildAdded:Connect(function(child)
+			if table.find(DIM.Roots, child.Name) then
+				watchRoot(child)
+			end
+		end)
+	end
 	CollectionService:GetInstanceAddedSignal(RULES.Tag):Connect(function(instance)
 		self:Add(instance)
 	end)

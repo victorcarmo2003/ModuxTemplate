@@ -2,7 +2,7 @@
 -- Tutorial customer (user request 2026-10-11, Provisional): numbers and names shared by CustomerService (server, who
 -- spawns and judges it) and TutorialController (client, who guides the rookie through its order).
 -- One tutorial customer per server: TutorialService asks it once the rookie answered Walt's call (TutorialBegin).
--- No time limit (patience never runs out, no ring), never counts on the shift grade, never an anomaly or a thief;
+-- No time limit (patience never runs out, no ring), never counts on the shift grade, never an anomaly;
 -- the regular flow waits while it is at the counter. Its rig carries the attribute ATTRIBUTE = true.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
@@ -11,8 +11,9 @@ local Content = require(ReplicatedStorage.shared.Content)
 const RESTAURANT = true
 
 return table.freeze({
-	-- fixed order of the tutorial customer (Content.Ingredients topping keys; Walt's lines name it, Steps.luau)
-	Order = table.freeze({ "ketchup" }),
+	-- DEC-311 (owner 2026-10-19): two tutorial customers, one after the other. The first one wants a plain hot dog (fry, cut,
+	-- plate, serve), the second one ketchup and mustard (the same, then the condiment table). Content.Ingredients keys.
+	Orders = table.freeze({ table.freeze({}) :: { string }, table.freeze({ "ketchup", "mustard" }) }),
 	-- rig attribute (Model) of the tutorial customer, read by the client
 	Attribute = "TutorialCustomer",
 	-- s between two spawn tries while the counter is full or the NPC pool is busy
@@ -29,14 +30,14 @@ return table.freeze({
 	Shopping = false,
 	-- Day 1 upgrade lesson (owner request 2026-10-14, Provisional): when the first shift ends (the day Closing, 6 PM) the
 	-- clock stays held, Walt calls (BossCalls row Call, Trigger UpgradeLesson) and the rookie is guided to the Gear Stand to
-	-- buy the first level of Key (Storage). The Gear Stand is closed before that (Content.Mart.FirstShiftClosed). Short on
+	-- buy the first level of Key (Bun Box, UPG-035; was Storage before DEC-331). The Gear Stand is closed before that (Content.Mart.FirstShiftClosed). Short on
 	-- money when the call rings: Cash is topped up to Cash (EconomyService:TopUp, like the bun package), never below the
 	-- price. Over once any Gear Stand line is bought, the run leaves Day 1, or Content.Shift.TutorialHoldMax s of holding.
 	Upgrade = table.freeze({
 		-- 2026-10-17 cut (above): no call, no Closing hold, no Day 1 lesson steps. Back on in the restaurant only (TASK-393,
 		-- design/tutorial-restaurant.md §3): the Gear Stand step at the end of Day 1
 		Enabled = RESTAURANT,
-		Key = "cooler",
+		Key = "bun_box",
 		Call = "call_tutorial_upgrade",
 		Cash = 100,
 	}),

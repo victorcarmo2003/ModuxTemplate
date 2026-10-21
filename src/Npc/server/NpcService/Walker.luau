@@ -30,7 +30,8 @@
 export type Mover = { Model: Model, Root: BasePart, Humanoid: Humanoid }
 
 -- true = another rig is right ahead along `direction` (flat unit vector): wait
-export type Gate = (direction: Vector3) -> boolean
+-- `remaining`: studs to the waypoint; a rig past it is not in the way
+export type Gate = (direction: Vector3, remaining: number) -> boolean
 
 export type Crossing = {
 	At: { [number]: string }, -- index in `points` of the far curb of a crosswalk edge -> crosswalk key
@@ -87,7 +88,7 @@ type Item = { Position: Vector3, Index: number, Loose: boolean, Last: boolean }
 -- Near = a stall this close to the target counts as reached (Direct only)
 type Motion = { Loose: boolean, After: Vector3?, EaseIn: boolean, EaseOut: boolean, Base: number?, Near: number? }
 
-export type Options = { Ease: boolean } -- Ease false = the owner drives WalkSpeed (the thief)
+export type Options = { Ease: boolean } -- Ease false = the owner drives WalkSpeed
 
 type Turner = { Align: AlignOrientation, AutoRotate: boolean, Token: number }
 
@@ -574,7 +575,7 @@ local function step(
 			break
 		end
 		-- spacing gate: stop behind a rig right ahead (at most GATE_MAX s per waypoint)
-		if gate ~= nil and distance > ARRIVE and gated < GATE_MAX and gate(offset.Unit) then
+		if gate ~= nil and distance > ARRIVE and gated < GATE_MAX and gate(offset.Unit, distance) then
 			if not waiting then
 				waiting = true
 				mover.Humanoid:MoveTo(mover.Root.Position)

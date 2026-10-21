@@ -375,7 +375,7 @@ local function run(api: Api.Context, dev: Dev, caller: Player?): string
 						const now = workspace:GetServerTimeNow()
 						return (now - record.StartedAt) / record.Duration >= (window.FlipFrom + window.FlipTo) / 2
 					end, 20)
-					kitchen.Cook.Act(player, { Act = "Flip", Slot = slot, Score = 0 })
+					kitchen.Cook.Act(player, { Act = "Flip", Slot = slot, Score = 90 })
 				end
 				const used = if slot ~= 0 then slot else readySlot
 				local function isReady(): boolean

@@ -38,7 +38,8 @@
 --              Seen "Cameras" = invisible (no light, no shadow) unless this client looks through a security camera
 --              (Kit/Watch); nil/"All" = always seen. Value = 1: gone when it arrives (walks off). Held: a late joiner
 --              gets it where it should be.
---   Door       the hiding door: Target "Rattle" | "Push" | "Hold" | "Lock" (kept shut until the run ends); Point = door MapPoint; Duration
+--   Door       the hiding door: Target "Rattle" | "Push" | "Hold" | "Lock" (kept shut until the run ends) | "Bulge" (a heavy
+--              blow: the leaf swells and is shoved in, TASK-592); Point = door MapPoint; Duration
 --   Shadow     a shadow on the light under the door: Point = door MapPoint, To = MapPoint of the side it comes from / goes to
 --              (the steps), Target "Pass" (crosses, default) | "Arrive" (comes in from that side and stays in the middle) |
 --              "Leave" (the one standing there goes back out to that side), over Duration
@@ -54,98 +55,25 @@
 --   Silence    (TASK-493, the dramatic pause) music, ambience and the kitchen fade to Value -> To (volume scale 0..1)
 --              over Duration; the Sfx (steps, heart, breath, the hit) are untouched. 1 = back
 -- Every number PROVISIONAL (DEC-290) until the owner's Play. Mild (DEC-172): no blood, scares <= 1 s, no clipped scream.
+--
+-- TASK-586 (design/horror-cinematic.md §11): the types live in Types; a module in Scenes/ returns one Scene and replaces
+-- the scene below with the same Key (or adds it), so every anomaly's scene can be rewritten in its own file; with
+-- Extend = true it adds its steps to that scene instead (TASK-589).
 local Table = require(script.Parent.Table)
 local Restaurant = require(script.Parent.Restaurant)
+local Types = require(script.Types)
 
-export type Phase = "Signal" | "Active" | "Resolved" | "Failed"
-export type Who = "All" | "Caught" | "Safe"
-export type StepKind =
-	"Sound"
-	| "Music"
-	| "Lights"
-	| "Lightning"
-	| "Whispers"
-	| "Heartbeat"
-	| "Cinema"
-	| "Vignette"
-	| "Shake"
-	| "Fov"
-	| "Nudge"
-	| "Text"
-	| "Actor"
-	| "Door"
-	| "Shadow"
-	| "Roof"
-	| "HeadDown"
-	| "Grade"
-	| "Blur"
-	| "Silence"
+export type Phase = Types.Phase
+export type Who = Types.Who
+export type StepKind = Types.StepKind
+export type Where = Types.Where
+export type Seen = Types.Seen
+export type Step = Types.Step
+export type Scene = Types.Scene
+export type ShakeProfile = Types.ShakeProfile
+export type Stare = Types.Stare
+export type Rules = Types.Rules
 
-export type Step = {
-	At: number,
-	Phase: Phase,
-	Kind: StepKind,
-	Who: Who?,
-	Target: string?,
-	Value: number?,
-	To: (number | string)?,
-	Duration: number?,
-	Point: string?,
-	Burst: number?,
-	Text: string?,
-	Sound: string?, -- Actor / Roof: Content.Sounds key of its steps
-	Seen: ("All" | "Cameras")?, -- Actor: who sees it
-}
-
-export type Scene = {
-	Key: string, -- = Content.Anomalies key
-	Name: string, -- English, dev/log only
-	-- true = the client player (TASK-462) plays it in the real game; nil/false = only through `/dev scene <key>`
-	-- (kept off while an Effects/ module still does the same job, so no sound or light is doubled; TASK-467 turns the
-	-- blackout on)
-	Live: boolean?,
-	Steps: { Step }, -- any order; the player sorts by phase, then At
-}
-
-export type ShakeProfile = {
-	Amplitude: number, -- studs, camera space
-	Frequency: number, -- Hz
-	Duration: number, -- s
-}
-
--- Stare pressure, the look (TASK-482; DEC-294, DEC-295 Q-368 A; tech/stare-pressure.md). The timing (cone, Delay,
--- Release) is Content.Sanity.Stare, shared with the server drain; these are presentation only. Pressure 0..1 builds over
--- Build s once the stare passed Delay and falls back to 0 over Sanity.Stare.Release when the player looks away.
-export type Stare = {
-	Build: number, -- s from the start of the pressure to its peak
-	HeartFrom: number, -- BPM when the pressure starts
-	HeartTo: number, -- BPM at the peak
-	Vignette: number, -- screen edge darkness at the peak (<= Rules.MaxVignette)
-	Flicker: number, -- +- edge flicker at the peak ("glaucoma"), off with Motion.Reduced
-	HeadSpeed: number, -- degrees/s the head turns to follow the camera at the peak (slow = creepy)
-	HeadMax: number, -- degrees the head may turn past its own pose
-	-- degrees the head tilts sideways at the peak: a customer that already faces the camera (at the window) has nothing to
-	-- turn, so the tilt is what shows the stare moved it
-	HeadTilt: number,
-	FaceStretch: number, -- face shell scale share at the peak (taller and narrower)
-	FaceRoll: number, -- degrees of face tilt at the peak, swaying
-	WhisperFrom: number, -- whisper rate when the pressure starts (1 = Kit default)
-	WhisperTo: number, -- whisper rate at the peak
-	Words: { [string]: string }, -- anomaly key -> key of Words; missing = "stare"
-}
-
-export type Rules = {
-	Latency: number, -- s a one-shot may start late and still play
-	ReduceMotion: number, -- scale of Shake/Fov/Nudge when Motion.Reduced() (the game's existing reduced-motion setting)
-	MaxControlLock: number, -- s; no step may take the camera longer than this
-	MaxVignette: number,
-	MaxFov: number, -- degrees
-	MaxNudge: number, -- degrees
-	-- degrees; a suspense event's camera hijack (CameraController:HorrorPull, Content.Suspense.Rules.Hijack.Pull), not a scene step
-	MaxPull: number,
-	MaxBlur: number, -- TASK-493: BlurEffect Size at most
-	Shakes: { [string]: ShakeProfile },
-}
 
 -- ANM-020 blackout, the owner's reference scene (DEC-290, DEC-291; design/horror-cinematic.md §2). TASK-467: fitted to the
 -- restaurant timeline of Rules/ANM-020 (Signal = omen ~2.5 s; Active = the dark, RestaurantWindow 15 s to hold the
@@ -227,7 +155,7 @@ const blackout: Scene = {
 
 -- ANM-019 The roof walker, "don't look up" (TASK-484; DEC-294, DEC-295 / Q-367 A; design/horror-cinematic.md). Fitted to
 -- Rules/ANM-019: Signal = OmenFor 3 s (it lands on the roof), Active = WalkFor 16 s (the rule counts from 1 s: a look
--- above 35 degrees held 0.6 s), then Failed (somebody looked up: it drops in front of that player's window, the others
+-- above 35 degrees held 1.2 s, shown as a countdown by Effects/ANM-019, Q-396), then Failed (somebody looked up: it drops in front of that player's window, the others
 -- hear it leave) or Resolved (it reached the far end and went), LeaveFor 5 s each. The walk passes over every player's
 -- own head at ~7 s and stands there, silent, 2.5 s before it goes on. The caught player's drop and hit are cue-driven
 -- (Effects/ANM-019, on the jumpscare cue); the scene adds what everyone hears and feels.
@@ -515,7 +443,7 @@ const stalker: Scene = {
 }
 
 -- ANM-008 The long car (TASK-490; DEC-279 "to the drive-thru"; design/horror-cinematic.md §6.6). Fitted to Rules/ANM-008:
--- Signal = it rolls down the lane (5.6 s), floors it (1.8 s), brakes at the window (8.2 s) and waits 2.5 s; Active = the
+-- Signal = it rolls down the lane (5.6 s), floors it (1.8 s), brakes at the window (8.2 s) and waits 5 s; Active = the
 -- high beam (whoever is not behind a closed window pays); StayFor 6 s with the beam on; then Failed / Resolved as it
 -- backs out. The car, beam, horn and engine are Effects/ANM-008; the scene adds the words (close the window), the heart
 -- racing with the engine, the jolt of the brake and the silence before the beam.
@@ -533,7 +461,7 @@ const longCar: Scene = {
 		{ At = 8.2, Phase = "Signal", Kind = "Shake", Target = "Jolt" },
 		{ At = 8.4, Phase = "Signal", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
 		{ At = 8.6, Phase = "Signal", Kind = "Sound", Target = "breath_held" },
-		{ At = 8.6, Phase = "Signal", Kind = "Heartbeat", Value = 155, To = 165, Duration = 2 },
+		{ At = 8.6, Phase = "Signal", Kind = "Heartbeat", Value = 150, To = 170, Duration = 4.6 }, -- BeamDelay 5 (2026-10-19)
 		-- the high beam
 		{ At = 0, Phase = "Active", Kind = "Shake", Target = "Jolt" },
 		{ At = 0, Phase = "Active", Kind = "Fov", Value = -4, To = 0, Duration = 0.7 },
@@ -670,18 +598,21 @@ const knock: Scene = {
 		{ At = 19.3, Phase = "Active", Kind = "Sound", Target = "latch_hold", Point = "SCENE-DOOR" },
 		-- 19.8 s, the grace: the heart comes back slow, nothing else; it is still out there
 		{ At = 19.8, Phase = "Active", Kind = "Heartbeat", Value = 120, To = 90, Duration = 2.5 },
-		-- nobody opened (Resolved): one last soft knock, the steps go away, the room comes back, a breath out
-		{ At = 0, Phase = "Resolved", Kind = "Sound", Target = "door_knock", Point = "SCENE-DOOR-OUT", Value = 0.25 },
-		{ At = 0.8, Phase = "Resolved", Kind = "Sound", Target = "walker_step", Point = "SCENE-DOOR-OUT", To = "SCENE-STEPS-FAR", Duration = 4 },
-		{ At = 0.8, Phase = "Resolved", Kind = "Shadow", Target = "Leave", Point = "SCENE-DOOR", To = "SCENE-STEPS-FAR", Duration = 1.2 },
+		-- 22 s, it gives up (Rules/ANM-009 Window + DoorGrace): one last soft knock, the steps go away and its shadow
+		-- slides out of the gap, slow; still Active until LeaveFor (4 s) ends, so opening now still gets you (owner
+		-- 2026-10-19: the run used to end with the shadow mid-gap)
+		{ At = 22, Phase = "Active", Kind = "Sound", Target = "door_knock", Point = "SCENE-DOOR-OUT", Value = 0.25 },
+		{ At = 22.8, Phase = "Active", Kind = "Sound", Target = "walker_step", Point = "SCENE-DOOR-OUT", To = "SCENE-STEPS-FAR", Duration = 4 },
+		{ At = 22.8, Phase = "Active", Kind = "Shadow", Target = "Leave", Point = "SCENE-DOOR", To = "SCENE-STEPS-FAR", Duration = 3 },
+		-- nobody opened (Resolved, record kept Linger 4.5 s): the room comes back, a breath out
 		{ At = 0, Phase = "Resolved", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
 		{ At = 0, Phase = "Resolved", Kind = "Blur", Value = 0, To = 0, Duration = 0 },
-		{ At = 1, Phase = "Resolved", Kind = "Heartbeat", Value = 0, To = 0 },
-		{ At = 1.5, Phase = "Resolved", Kind = "Silence", Value = 0.05, To = 1, Duration = 3 },
-		{ At = 2, Phase = "Resolved", Kind = "Sound", Target = "breath_held", Value = 0.6 },
-		{ At = 2, Phase = "Resolved", Kind = "Grade", Value = 0.6, To = 0, Duration = 3 },
-		{ At = 2, Phase = "Resolved", Kind = "Vignette", Value = 0.5, To = 0, Duration = 3 },
-		{ At = 2.5, Phase = "Resolved", Kind = "Cinema", Value = 0, Duration = 1.2 },
+		{ At = 0.2, Phase = "Resolved", Kind = "Heartbeat", Value = 0, To = 0 },
+		{ At = 0.5, Phase = "Resolved", Kind = "Silence", Value = 0.05, To = 1, Duration = 3 },
+		{ At = 1, Phase = "Resolved", Kind = "Sound", Target = "breath_held", Value = 0.6 },
+		{ At = 1, Phase = "Resolved", Kind = "Grade", Value = 0.6, To = 0, Duration = 3 },
+		{ At = 1, Phase = "Resolved", Kind = "Vignette", Value = 0.5, To = 0, Duration = 3 },
+		{ At = 1.5, Phase = "Resolved", Kind = "Cinema", Value = 0, Duration = 1.2 },
 		-- someone opened it (Failed): the climax for who opened, the bang for the others
 		{ At = 0, Phase = "Failed", Kind = "Shadow", Target = "Leave", Point = "SCENE-DOOR", To = "SCENE-STEPS-FAR", Duration = 0.3 },
 		{ At = 0, Phase = "Failed", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
@@ -1115,7 +1046,7 @@ const rules: Rules = {
 	ReduceMotion = 0.25,
 	MaxControlLock = 2,
 	MaxVignette = 0.6,
-	MaxFov = 6,
+	MaxFov = 18, -- owner 2026-10-19: the forgotten customer's jumpscare zooms in hard (was 6; every scene asks <= 6)
 	MaxNudge = 3,
 	MaxPull = 30, -- TASK-481 (DEC-294), Provisional
 	MaxBlur = 18, -- TASK-493, Provisional (readable through it)
@@ -1123,6 +1054,8 @@ const rules: Rules = {
 		Jolt = { Amplitude = 0.12, Frequency = 18, Duration = 0.15 },
 		Step = { Amplitude = 0.03, Frequency = 10, Duration = 0.12 },
 		Door = { Amplitude = 0.08, Frequency = 22, Duration = 0.35 },
+		-- the forgotten customer's jumpscare (owner 2026-10-19: "treme ... coisa de 1-2 segundos"), Provisional
+		Scare = { Amplitude = 0.16, Frequency = 26, Duration = 0.9 },
 	},
 }
 
@@ -1148,6 +1081,44 @@ const stare: Stare = {
 const scenes: { Scene } = { blackout, roofWalker, crawler, turnedNeck, copies, stalker, longCar, hush, knock, redFog }
 for _, scene in oddScenes do
 	table.insert(scenes, scene)
+end
+
+-- TASK-586: Scenes/<key>.luau replace the scene of the same Key (or add one) and bring their own word lists
+const sceneFolder = script:FindFirstChild("Scenes")
+for _, child in if sceneFolder ~= nil then sceneFolder:GetChildren() else {} do
+	if not child:IsA("ModuleScript") then
+		continue
+	end
+	const scene = (require :: any)(child) :: Scene
+	local replaced = false
+	for index, existing in scenes do
+		if existing.Key == scene.Key then
+			if scene.Extend == true then
+				-- a layer on top: the original's steps, then these
+				const merged: { Step } = table.clone(existing.Steps)
+				for _, step in scene.Steps do
+					table.insert(merged, step)
+				end
+				const extended: Scene = table.clone(existing)
+				extended.Steps = merged
+				scenes[index] = extended
+			else
+				scenes[index] = scene
+			end
+			replaced = true
+			break
+		end
+	end
+	if not replaced then
+		table.insert(scenes, scene)
+	end
+	const own = scene.Words
+	if own ~= nil then
+		for key, list in own do
+			assert(words[key] == nil, `HorrorScenes: Words '{key}' of {child.Name} already exists`)
+			words[key] = list
+		end
+	end
 end
 
 return Table.with(Table.new(scenes), {

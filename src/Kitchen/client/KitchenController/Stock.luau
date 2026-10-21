@@ -2,6 +2,9 @@
 -- Stock visuals (TASK-029; FEAT-007, DEC-140, DEC-156; architecture.md §18.4, network.md §3.4).
 -- Reads only the Stock set (through Context.Stock); never decides anything. Per station:
 --   sausage_stock, bun_crate  `Fill` follows Amount/Capacity; "7/12" StockCounter pill above the prompts
+--   layered crate             (DEC-311) the parts named `Buns` of the station are layers, bottom first: as many show as the
+--                             stock fills (full = all, 2/3 = two of three, 1/3 = one, empty = none), so the whole-bun crate
+--                             reads its stock at a glance
 --   toppings (one per bowl)   `Fill_<Suf>` (food inside the bowl) follows Amount/Capacity;
 --                             `Label_<Suf>` gets a StockPlate (icon + "7/12");
 --                             `Lid_<Suf>` + `Lock_<Suf>` (padlock) shown only while Blocked (DEC-156)
@@ -50,6 +53,7 @@ const FILL_TWEEN = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirecti
 const FILL_MIN_RATIO = 0.12
 -- Counter pill this far above the station's prompt anchors (the prompt pill sits on the anchor).
 const COUNTER_RISE = 1.2
+const LAYER_NAME = "Buns" -- the stock layers of a crate (DEC-311)
 const COUNTER_MAX_DISTANCE = 40
 
 -- Placeholder swatch per ingredient until the icons exist (Q-152); palette of style guide §2.1.
@@ -658,6 +662,34 @@ local function mountBowl(station: Instance, ingredient: string, context: Context
 	end
 end
 
+-- Layers of a crate (DEC-311): the `Buns` parts, bottom first; ceil(Amount / Capacity * layers) of them show. No record yet = as
+-- authored (rule of doubt).
+local function bindLayers(station: Instance, read: () -> Context.StockRecord?)
+	const layers: { BasePart } = {}
+	for _, child in station:GetChildren() do
+		if child.Name == LAYER_NAME and child:IsA("BasePart") then
+			table.insert(layers, child)
+		end
+	end
+	if #layers == 0 then
+		return
+	end
+	table.sort(layers, function(a: BasePart, b: BasePart): boolean
+		return a.Position.Y < b.Position.Y
+	end)
+	Vide.effect(function()
+		const record = read()
+		if record == nil then
+			return
+		end
+		const share = if record.Capacity > 0 then math.clamp(record.Amount / record.Capacity, 0, 1) else 0
+		const shown = if record.Amount <= 0 then 0 else math.max(math.ceil(share * #layers - 1e-6), 1)
+		for index, layer in layers do
+			layer.LocalTransparencyModifier = if index <= shown then 0 else 1
+		end
+	end)
+end
+
 -- Cooler (sausage) and bun crate: one ingredient per station.
 local function mountSingle(station: Instance, ingredient: string, context: Context.Context)
 	local function read(): Context.StockRecord?
@@ -672,6 +704,7 @@ local function mountSingle(station: Instance, ingredient: string, context: Conte
 	if fillPart then
 		bindFill(fillPart, host, read, false)
 	end
+	bindLayers(station, read)
 
 	-- Above the station's own prompts (the cooler sits low in the cart body; its prompts are on the counter).
 	local sum, count = Vector3.zero, 0

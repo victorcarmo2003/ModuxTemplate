@@ -20,6 +20,8 @@ local Pads = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyContro
 local Signs = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Signs)
 local Rings = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Rings)
 local Extras = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Extras)
+local Guide = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Guide)
+local Halloween = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Halloween)
 local Stage = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Stage)
 local Text = require(StarterPlayer.StarterPlayerScripts.client.Lobby.LobbyController.Text)
 
@@ -27,16 +29,12 @@ export type Panel = "None" | "Classes" | "Shop" | "Codes" | "Squad" | "Platform"
 export type PartyRecord = {
 	Leader: number,
 	Members: { number },
-	Ready: { [number]: boolean },
 	State: "Forming" | "Configuring" | "Starting",
 	Platform: number,
 	Access: string, -- PartyRules.Access
 	MaxPlayers: number,
 	StartAt: number,
-}
-export type Draft = {
-	Access: string,
-	MaxPlayers: number,
+	Skip: { [number]: boolean }, -- members who skip the run's tutorial (pad bar)
 }
 export type Invite = {
 	PartyId: number,
@@ -50,13 +48,15 @@ export type Public = {
 	CameraBefore: string?,
 	Clock: Vide.Source<number>,
 	CodeFeedback: Vide.Source<CodeRedeem.Feedback>,
-	Draft: Vide.Source<Draft>,
-	DraftParty: number,
 	Entries: { ClassEntries.Entry },
 	Extras: Extras.Extras?,
 	Focus: Vide.Source<string>,
 	FovBefore: number,
 	Gui: ScreenGui?,
+	Guide: Guide.Guide?,
+	GuideKey: string,
+	GuideSent: { [string]: boolean },
+	Halloween: Halloween.Halloween?,
 	Hiding: boolean,
 	Invites: Vide.Source<{ Invite }>,
 	Online: Vide.Source<number>,
@@ -119,7 +119,6 @@ export type Public = {
 	Members: (self: Public) -> { SquadPanel.Member },
 	Candidates: (self: Public) -> { SquadPanel.Candidate },
 	IsLeader: (self: Public) -> boolean,
-	AllReady: (self: Public, party: PartyRecord) -> boolean,
 	Invite: (self: Public, userId: number) -> (),
 	Answer: (self: Public, accept: boolean) -> (),
 	CurrentInvite: (self: Public) -> InvitePopup.Invite?,
@@ -128,6 +127,8 @@ export type Public = {
 	Cancel: (self: Public) -> (),
 	CancelKey: (self: Public) -> string,
 	PlayShown: (self: Public) -> boolean,
+	PadBar: (self: Public) -> LobbyHud.PadBar?,
+	PadAction: (self: Public, action: LobbyHud.PadAction) -> (),
 	PlayButton: (self: Public) -> LobbyHud.PlayButton,
 	GearShown: (self: Public) -> boolean,
 	Play: (self: Public) -> (),
@@ -137,9 +138,6 @@ export type Public = {
 	PlatformParty: (self: Public, n: number) -> PartyRecord?,
 	SetupParty: (self: Public) -> PartyRecord?,
 	SetupMembers: (self: Public) -> { SquadSetup.Member },
-	Drafting: (self: Public) -> boolean,
-	CheckDraft: (self: Public, id: number, record: PartyRecord) -> (),
-	CreateRoom: (self: Public) -> (),
 	Countdown: (self: Public) -> number?,
 	Configure: (self: Public, access: string, maxPlayers: number) -> (),
 	PadMembers: (self: Public, n: number) -> number,
@@ -150,6 +148,11 @@ export type Public = {
 	PadFaces: (self: Public, n: number) -> { number },
 	PaintPlatforms: (self: Public) -> (),
 	OnPadCount: (self: Public, n: number, _from: number, _to: number) -> (),
+	CheapestClass: (self: Public) -> number?,
+	GuidePending: (self: Public, key: string) -> boolean,
+	GuideTarget: (self: Public) -> (string, LobbyZones.Zone?),
+	GuideDone: (self: Public, key: string) -> (),
+	CheckGuide: (self: Public) -> (),
 	OnZone: (self: Public, zone: LobbyZones.Zone, inside: boolean) -> (),
 	CheckZones: (self: Public) -> (),
 	RunZones: (self: Public) -> (),

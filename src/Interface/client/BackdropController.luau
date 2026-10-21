@@ -123,6 +123,7 @@ function BackdropController:Mount(playerGui: Instance)
 		ResetOnSpawn = false,
 		IgnoreGuiInset = true,
 		ScreenInsets = Enum.ScreenInsets.None,
+		ClipToDeviceSafeArea = false,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		DisplayOrder = DISPLAY_ORDER,
 		Enabled = false,

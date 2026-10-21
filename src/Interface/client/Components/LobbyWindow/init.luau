@@ -53,7 +53,7 @@ return function(props: Props): Frame
 	-- Real px size of the screen (this root fills it): a window drawn for a landscape phone shrinks to fit a narrow one.
 	const area = source(Vector2.zero)
 	const scale = function(): number
-		const base = if props.Scale then math.max(math.min(props.Scale(), UiScale.Current()), Theme.Scale.Min) else 1
+		const base = if props.Scale then math.max(math.min(props.Scale(), UiScale.Current()), UiScale.Floor()) else 1
 		return UiScale.Fit(base, area(), props.Size)
 	end
 	const bodyHeight = props.Size.Y - PAD * 2 - HEADER - GAP - PANEL_LIP

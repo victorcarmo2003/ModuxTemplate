@@ -216,7 +216,6 @@ const HEAD_NAMES: { [string]: boolean } = {
 	Face = true,
 	Cap = true,
 	Hat = true,
-	ThiefHat = true,
 }
 const HEAD_PREFIXES = { "Head_", "Face_", "Ears", "Cap" }
 

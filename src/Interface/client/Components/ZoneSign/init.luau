@@ -19,6 +19,7 @@ local Motion = require(script.Parent.Motion)
 local Icons = require(script.Parent.Icons)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonLabel = require(script.Parent.CartoonLabel)
+local WorldStroke = require(script.Parent.WorldStroke)
 local Icon = require(script.Parent.LobbyWindow.Icon)
 
 const create = Vide.create
@@ -45,6 +46,7 @@ export type Props = {
 }
 
 const WIDTH = 8 -- studs
+const STROKE_REFERENCE = 120 -- px of sign height where the kit outlines read right (WorldStroke)
 const HEIGHT = 9.8
 const MAX_TEXT = 72
 const DEFAULT_DISTANCE = 160
@@ -76,7 +78,7 @@ return function(props: Props): BillboardGui
 	icon.Position = UDim2.fromScale(0.5, 0.5)
 	icon.Size = UDim2.fromScale(0.72, 0.72)
 
-	return createRaw("BillboardGui")({
+	const billboard = createRaw("BillboardGui")({
 		Name = props.Name or "ZoneSign",
 		Adornee = props.Adornee,
 		Size = UDim2.fromScale(WIDTH, HEIGHT),
@@ -193,4 +195,7 @@ return function(props: Props): BillboardGui
 			}),
 		}),
 	}) :: BillboardGui
+	-- outlines follow the sign size on screen (far away they were a black blot, owner 2026-10-20)
+	cleanup(WorldStroke(billboard, STROKE_REFERENCE))
+	return billboard
 end

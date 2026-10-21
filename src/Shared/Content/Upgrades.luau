@@ -50,22 +50,42 @@ const grillTrailer: { Level } = {
 	{ Level = 3, Price = 150, Effects = { GrillSlots = 4, GrillTime = 4 }, Part = "Grill_L3" }, -- Q-163 a
 }
 
--- UPG-002 Storage (was "Cooler"; owner request 2026-10-14, Provisional): the FIRST upgrade of the run (the Day 1 upgrade
--- lesson, TutorialService). Level 1 + three purchases; each level raises every stock by the steps of
--- Ingredients.Capacity (buns +4: 12/16/20/24; ketchup and mustard +5: 15/20/25/30, the old level-1 30 at the top; the
--- other toppings the same shape). Prices $40 / $70 / $110 (Provisional, economy.md §2: was $50 / $120 for two levels).
--- The key stays "cooler" (record id, run snapshots "Upg"); the old level numbers 1..3 still load (rows 1..4 exist).
+-- UPG-002 Storage (key "cooler"): LEGACY, off the Gear Stand (DEC-331, Content.Mode.RetiredUpgrades). It was one upgrade that raised
+-- every stock; the capacity now comes from three smaller upgrades (UPG-035 Bun Box, UPG-036 Topping Rack, UPG-037 Coffee Shelf).
+-- The row stays so an old run snapshot ("Upg") still loads (the bought Storage level is simply not read by anything any more).
 const coolerTrailer: { Level } = {
 	{ Level = 1, Price = 0, Effects = { StockCapacityLevel = 1 }, Part = "Cooler_L1" },
 	{ Level = 2, Price = 40, Effects = { StockCapacityLevel = 2 }, Part = "Cooler_L2" },
 	{ Level = 3, Price = 70, Effects = { StockCapacityLevel = 3 }, Part = "Cooler_L3" },
-	-- the map has Cooler_L1..L3: level 4 reuses Cooler_L3 (same Part = same piece, UpgradeService:RefreshPiece)
 	{ Level = 4, Price = 110, Effects = { StockCapacityLevel = 4 }, Part = "Cooler_L3" },
-	-- TASK-324 (owner request 2026-10-15, Provisional): one more level so the anomaly run has more to buy
 	{ Level = 5, Price = 120, Effects = { StockCapacityLevel = 5 }, Part = "Cooler_L3" },
 }
 
--- UPG-013 Coffee Maker (TASK-324, owner request 2026-10-15, Provisional; anomaly mode only, B3): the factory machine
+-- UPG-035 Bun Box (DEC-331, Provisional; anomaly mode only, B2): the old Storage split. Capacity of buns and sausages
+-- (Ingredients[x].CapacityStat = BunCapacityLevel): 12 / 20 / 28. It reuses the Cooler_L1..L3 pieces of the trailer.
+const bunBoxTrailer: { Level } = {
+	{ Level = 1, Price = 0, Effects = { BunCapacityLevel = 1 }, Part = "Cooler_L1" },
+	{ Level = 2, Price = 50, Effects = { BunCapacityLevel = 2 }, Part = "Cooler_L2" },
+	{ Level = 3, Price = 110, Effects = { BunCapacityLevel = 3 }, Part = "Cooler_L3" },
+}
+
+-- UPG-036 Topping Rack (DEC-331, Provisional; anomaly mode only, B3): capacity of sauces and toppings
+-- (ToppingCapacityLevel). Pieces ToppingRack_L1..L3 (not on the map yet).
+const toppingRackTrailer: { Level } = {
+	{ Level = 1, Price = 0, Effects = { ToppingCapacityLevel = 1 }, Part = "ToppingRack_L1" },
+	{ Level = 2, Price = 50, Effects = { ToppingCapacityLevel = 2 }, Part = "ToppingRack_L2" },
+	{ Level = 3, Price = 110, Effects = { ToppingCapacityLevel = 3 }, Part = "ToppingRack_L3" },
+}
+
+-- UPG-037 Coffee Shelf (DEC-331, Provisional; anomaly mode only, B4): capacity of coffee (CoffeeCapacityLevel).
+-- Pieces CoffeeShelf_L1..L3 (not on the map yet).
+const coffeeShelfTrailer: { Level } = {
+	{ Level = 1, Price = 0, Effects = { CoffeeCapacityLevel = 1 }, Part = "CoffeeShelf_L1" },
+	{ Level = 2, Price = 40, Effects = { CoffeeCapacityLevel = 2 }, Part = "CoffeeShelf_L2" },
+	{ Level = 3, Price = 80, Effects = { CoffeeCapacityLevel = 3 }, Part = "CoffeeShelf_L3" },
+}
+
+-- UPG-013 Coffee Maker (TASK-324, owner request 2026-10-15, Provisional; RETIRED by DEC-331: Mode.RetiredUpgrades, B3): the factory machine
 -- (UPG-007) brews faster and a stronger cup. CoffeeBrewTime / CoffeeRestore are the base the class reads over
 -- (CoffeeMachine station passes them to ClassService:GetModifier): 6 s / +25 -> 5 s / +30 ($40) -> 4 s / +35 ($70).
 -- No piece on the trailer (Part names a Gear Stand miniature only; placeholder box until the art exists).
@@ -75,7 +95,7 @@ const coffeeMakerTrailer: { Level } = {
 	{ Level = 3, Price = 70, Effects = { CoffeeBrewTime = 4, CoffeeRestore = 35 }, Part = "CoffeeMaker_L3" },
 }
 
--- UPG-014 Breaker Box (TASK-324, owner request 2026-10-15, Provisional; anomaly mode only, B4): the breaker of the
+-- UPG-014 Breaker Box (TASK-324, owner request 2026-10-15, Provisional; anomaly mode only, B5 since DEC-331): the breaker of the
 -- blackout (ANM-020, family C) resets faster. BreakerHold = hold of the breaker_reset prompt (LightService sets
 -- PromptHold): 3 s (Actions.breaker_reset) -> 2 s ($30) -> 1 s ($60).
 const breakerBoxTrailer: { Level } = {
@@ -96,13 +116,9 @@ const counterTrailer: { Level } = {
 	{ Level = 5, Price = 150, Effects = { QueueSize = 5, PatienceBonus = 20 }, Part = "Counter_L3" },
 }
 
--- UPG-004 Cash Drawer Lock: thief opens in 8 s and steals 50% -> 16 s / 30% for $80 (DEC-046, DEC-050).
-const drawerLockTrailer: { Level } = {
-	{ Level = 0, Price = 0, Effects = { DrawerOpenTime = 8, StealPct = 50 }, Part = "" },
-	{ Level = 1, Price = 80, Effects = { DrawerOpenTime = 16, StealPct = 30 }, Part = "DrawerLock_L1" }, -- Q-163 a, c
-}
+-- UPG-004 Cash Drawer Lock: removed with the thief (DEC-313). The id is never reused.
 
--- UPG-005 Trailer Lights, trailer only, $100: day flow x1.1, night LightZone radius 18 studs (DEC-046, DEC-055).
+-- UPG-005 Trailer Lights (RETIRED by DEC-331: Mode.RetiredUpgrades), trailer only, $100: day flow x1.1, night LightZone radius 18 studs (DEC-046, DEC-055).
 const trailerLightsTrailer: { Level } = {
 	{ Level = 0, Price = 0, Effects = { LightRadius = 0, DayFlowBonus = 1 }, Part = "" },
 	{ Level = 1, Price = 100, Effects = { LightRadius = 18, DayFlowBonus = 1.1 }, Part = "TrailerLights_L1" },
@@ -153,7 +169,7 @@ return Table.new({
 	{
 		Key = "cooler",
 		Ref = "UPG-002",
-		Name = "Storage",
+		Name = "Storage", -- legacy, off sale (DEC-331)
 		Vehicles = { "trailer" },
 		StartLevel = 1,
 		Levels = { trailer = coolerTrailer },
@@ -178,22 +194,9 @@ return Table.new({
 		Cooldown = false, -- DEC-241: the Counter can be bought shift after shift
 	},
 	{
-		Key = "cash_drawer_lock",
-		Ref = "UPG-004",
-		Name = "Drawer Lock",
-		Vehicles = { "trailer" },
-		StartLevel = 0,
-		Levels = { trailer = drawerLockTrailer },
-		UnlockDay = 1,
-		SoldAt = "Bench",
-		BenchSpot = "B4",
-		PlaceSpots = {},
-		Scope = "Vehicle",
-	},
-	{
 		Key = "trailer_lights",
 		Ref = "UPG-005",
-		Name = "Patio Lights",
+		Name = "Trailer Lights",
 		Vehicles = { "trailer" }, -- FEAT-015, DEC-055
 		StartLevel = 0,
 		Levels = { trailer = trailerLightsTrailer },
@@ -203,7 +206,7 @@ return Table.new({
 		PlaceSpots = {},
 		Scope = "Vehicle",
 	},
-	-- Anomaly mode only (Content.Mode.AnomalyOnlyUpgrades, TASK-324): the pedestals of Counter (B3) and Drawer Lock (B4)
+	-- Anomaly mode only (Content.Mode.AnomalyOnlyUpgrades, TASK-324); coffee_maker is retired (DEC-331)
 	{
 		Key = "coffee_maker",
 		Ref = "UPG-013",
@@ -226,7 +229,7 @@ return Table.new({
 		Levels = { trailer = breakerBoxTrailer },
 		UnlockDay = 1,
 		SoldAt = "Bench",
-		BenchSpot = "B4",
+		BenchSpot = "B5",
 		PlaceSpots = {},
 		Scope = "Vehicle",
 	},
@@ -269,6 +272,46 @@ return Table.new({
 		SoldAt = "InPlace",
 		BenchSpot = "",
 		PlaceSpots = { "TBL-1", "TBL-2", "TBL-3", "TBL-4" },
+		Scope = "Vehicle",
+	},
+	-- DEC-331 (TASK-607): the capacity upgrades, at the END of the list so the network ids of the rows above do not move
+	{
+		Key = "bun_box",
+		Ref = "UPG-035",
+		Name = "Bun Box",
+		Vehicles = { "trailer" },
+		StartLevel = 1,
+		Levels = { trailer = bunBoxTrailer },
+		UnlockDay = 1,
+		SoldAt = "Bench",
+		BenchSpot = "B2",
+		PlaceSpots = {},
+		Scope = "Vehicle",
+	},
+	{
+		Key = "topping_rack",
+		Ref = "UPG-036",
+		Name = "Topping Rack",
+		Vehicles = { "trailer" },
+		StartLevel = 1,
+		Levels = { trailer = toppingRackTrailer },
+		UnlockDay = 1,
+		SoldAt = "Bench",
+		BenchSpot = "B3",
+		PlaceSpots = {},
+		Scope = "Vehicle",
+	},
+	{
+		Key = "coffee_shelf",
+		Ref = "UPG-037",
+		Name = "Coffee Shelf",
+		Vehicles = { "trailer" },
+		StartLevel = 1,
+		Levels = { trailer = coffeeShelfTrailer },
+		UnlockDay = 1,
+		SoldAt = "Bench",
+		BenchSpot = "B4",
+		PlaceSpots = {},
 		Scope = "Vehicle",
 	},
 } :: { Upgrade })

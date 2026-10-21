@@ -45,7 +45,7 @@ const Revive: Api.Module = function(ctx: Api.Context): { Api.Command }
 		{
 			Name = "revive",
 			Usage = "revive [player]",
-			Help = "brings a Down or Spectator player back Active (stand-in for the wave 4 ambulance / revive)",
+			Help = "brings a Down or Spectator player back Active (dev stand-in for a revive)",
 			Run = function(args: { string }, caller: Player?): string?
 				return vital:DevRevive(targetOf(args[1], caller))
 			end,

@@ -159,7 +159,7 @@ item; rota → nó), número fora de faixa, enum vazio, efeito de classe sobre `
 - toda classe tem `Species`, e essa espécie tem `Class` apontando de volta (1 ↔ 1);
 - `Upgrades[k].Levels[v]` existe para todo `v` em `Upgrades[k].Vehicles`; `Levels[v][1].Price = 0` para upgrades de
   nível inicial (Grill, Cooler, Counter);
-- `Ingredients[k].Capacity` tem uma entrada por nível de Cooler (`#Upgrades.cooler.Levels.cart`);
+- `Ingredients[k].Capacity` tem uma entrada por nível do upgrade dono de `CapacityStat` (3 níveis, DEC-331: `BunCapacityLevel` = Bun Box UPG-035, `ToppingCapacityLevel` = Topping Rack UPG-036, `CoffeeCapacityLevel` = Coffee Shelf UPG-037); o `Validate` acha o dono e confere a contagem;
 - `ItemRules.CategoryLimits` soma ≥ `HotbarSlots` não é erro (limites são por categoria; o total manda);
 - `Moods` contém `Neutral`; toda `Expression` de `Moods` existe na lista fechada de expressões (§3.16).
 
@@ -274,7 +274,8 @@ existem como chave (o enum `PhaseKeys` já sai completo, o `Net` não muda na on
 | `UnlockDay` | int (0 = depende de veículo) | 1 | DEC-071 |
 | `Vehicle` | chave de `Vehicles` ou `nil` | `nil` (Coffee: `trailer`) | DEC-049, DEC-055 |
 | `Weight` | number | 10 | DEC-071 |
-| `Capacity` | `{ int }` por nível de Cooler | 30 / 50 / 75 | DEC-049, `items.md` |
+| `Capacity` | `{ int }` por nível do upgrade de `CapacityStat` (3 níveis) | pão e salsicha 12 / 20 / 28; molhos 15 / 25 / 35; café 20 / 30 / 40 | DEC-331 (era DEC-049) |
+| `CapacityStat` | `Stat` | `BunCapacityLevel` (bun, sausage), `ToppingCapacityLevel` (molhos e toppings), `CoffeeCapacityLevel` (coffee) | DEC-331 |
 | `Station` | chave de `Stations` | `toppings` | MAP-01 §7.1, `architecture.md` §18.4 |
 | `Stack` | `"BeforeCords" \| "Cord" \| "InOrder"` | `Cord` | **DEC-142**: queijo sempre antes dos cordões (Ketchup, Mustard, Cream Cheese); o resto na ordem de montagem |
 | `Icon` | asset id (`rbxassetid://…`); `""` = placeholder | `""` até `Q-152` | **DEC-156** |
@@ -283,7 +284,7 @@ A cobertura no kit é `ReplicatedStorage.Assets.Items.Toppings/<chave>` (conven�
 (DEC-142) **não** fica aqui: é o atributo `TopHeight` no modelo do kit (medida da malha, TASK-007). `Stack` é a regra;
 `TopHeight` é a medida.
 
-| Key | Ref | Kind | OrderPrice | UnlockDay | Weight | Capacity (Cooler 1/2/3) | Station | Stack |
+| Key | Ref | Kind | OrderPrice | UnlockDay | Weight | Capacity (nível 1/2/3 do `CapacityStat`) | Station | Stack |
 |---|---|---|---|---|---|---|---|---|
 | `bun` | ITM-001 | Base | — | 1 | — | 12 / 20 / 30 | `bun_crate` | — |
 | `sausage` | ITM-002 | Base | — | 1 | — | 12 / 20 / 30 | `sausage_stock` | — |
@@ -387,13 +388,19 @@ Chaves alinhadas ao binding da TASK-002 (`architecture.md` §18.4, §18.14 item 
 | `BenchSpot` | posição na bancada (`B1`..`B5`) | `B1` |
 
 - `Effects` é mapa `{ [Stat]: valor absoluto do nível }` sobre a lista fechada de `Stat` (§3.10): `GrillSlots`,
-  `GrillTime`, `StockCapacityLevel`, `QueueSize`, `PatienceBonus`, `DrawerOpenTime`, `StealPct`, `LightRadius`,
+  `GrillTime`, `StockCapacityLevel` (legado), `BunCapacityLevel`, `ToppingCapacityLevel`, `CoffeeCapacityLevel`, `QueueSize`, `PatienceBonus`, `DrawerOpenTime`, `StealPct`, `LightRadius`,
   `DayFlowBonus`.
 - **Por veículo (DEC-184):** o estado da run guarda `Levels[vehicle][upgrade]`; o trailer nasce com `StartLevel` em
   tudo; comprar na bancada sobe o nível **do veículo atual**. Preços do trailer = preços do carrinho e Cash Drawer Lock
   recomprado no trailer: **Provisório** até `Q-163` (a, c); mudar é só número na linha `trailer`.
-- Linhas: `grill` (UPG-001), `cooler` (UPG-002), `counter` (UPG-003), `cash_drawer_lock` (UPG-004), `trailer_lights`
-  (UPG-005, só trailer, "Trailer only" na bancada antes). Coffee Machine (UPG-007) vem com o trailer, sem linha de compra.
+- Linhas: `grill` (UPG-001), `cooler` (UPG-002), `counter` (UPG-003), `trailer_lights` (UPG-005, só trailer), `coffee_maker`
+  (UPG-013), `breaker_box` (UPG-014, B5) e, no fim da lista (ids de rede não mudam), `bun_box` / `topping_rack` /
+  `coffee_shelf` (UPG-035..037, DEC-331, B2 / B3 / B4, 3 níveis cada). Coffee Machine (UPG-007) vem com o trailer, sem linha de compra.
+- **`Content.Mode` (DEC-331):** `DayOnlyUpgrades`, `AnomalyOnlyUpgrades` e `RetiredUpgrades` (`cooler`, `coffee_maker`,
+  `trailer_lights`: fora de venda em qualquer modo, a linha fica para os snapshots antigos). `IsOff(key)` = aposentado, ou
+  de dia no modo anomalia, ou de anomalia no modo dia. Um upgrade desligado lê `Mode.Fixed[stat]` (`QueueSize` 2,
+  `CoffeeBrewTime` 6, `CoffeeRestore` 25, `StockCapacityLevel` 1, `LightRadius` 0, `DayFlowBonus` 1). `Validate`: dois
+  upgrades só dividem a mesma `BenchSpot` se nunca estiverem à venda no mesmo modo; as chaves aposentadas existem.
 - `Part`: nome da peça visível no modelo do veículo (DEC-052); grill = rolos por nível (DEC-201). Nomes com o
   art-director/level-designer (binding TASK-002).
 
@@ -476,7 +483,8 @@ Lista fechada de `Stat`:
 |---|---|---|
 | `WalkSpeed` | `CharacterService` (Humanoid) | Coelho, Gato, Coruja (dia), Urso (com 3 pacotes) |
 | `GrillTime`, `GrillSlots` | `Kitchen` | Gato, Grill |
-| `StockCapacityLevel` | `Kitchen` | Cooler |
+| `StockCapacityLevel` | — | Cooler/Storage aposentado (DEC-331); `Mode.Fixed` = 1 |
+| `BunCapacityLevel`, `ToppingCapacityLevel`, `CoffeeCapacityLevel` | `Kitchen` (`GetCapacity` lê `Ingredients[k].CapacityStat`) | Bun Box, Topping Rack, Coffee Shelf (DEC-331) |
 | `QueueSize`, `PatienceBonus` | `Customer` | Counter |
 | `PackageLimit` | `Item` | Urso |
 | `TipAmount`, `TipWindow` | `Economy`/`Customer` | Raposa, Leão |
@@ -589,6 +597,8 @@ Robux e crédito são **só para o próprio caído** (DEC-116). Não há campo p
 DEC).
 
 ### 3.13 Ambulance (FEAT-034, DEC-114, DEC-122; IDs do `MAP-01.md` §5.5)
+
+> **Descartado (DEC-314, 2026-10-20):** a ambulância e os médicos não serão feitos; o corpo fica no chão até o reviver ou o fim da noite (`Revive.BodyFallback`). Texto abaixo sobre ambulância é histórico.
 
 | Campo | Valor inicial |
 |---|---|
@@ -957,6 +967,8 @@ Campos novos: `DarkPhases = { "Call", "Prep", "Night", "NightEnd" }`, `SeeAngle 
 
 ### 6.6 Thief (completa a §3.16; DEC-050, DEC-182)
 
+> **Removido (DEC-313, 2026-10-20):** o ladrão saiu do jogo e do código (`src/Thief`, `Content.Thief`, `Net.Thief`, UPG-004, notices `thief_*`, ligações "quentin"). Texto abaixo é histórico.
+
 | Campo | Valor inicial |
 |---|---|
 | `ChanceByDay` | `{ [1] = 0, [2] = 0.5, Default = 0.7 }` |
@@ -982,6 +994,18 @@ Campos novos: `DarkPhases = { "Call", "Prep", "Night", "NightEnd" }`, `SeeAngle 
 `BossCallRules`: `LineTime = 2.5`, `AutoAnswer = 15`, `DayMaxLines = 7`, `NightMaxSeconds = 45`. Hints:
 `Trigger.Action` = chave de `Actions` cuja 1ª execução na run dispara a dica (via `InteractionService.Performed`).
 `Validate`: cada noite tem `NightCall`; existe exatamente um `NightRepeat`; nenhuma linha passa do teto de tempo.
+
+`BossCallRules.ReadyWait = 20` (TASK-584, Provisório): segundos da fase `Call` em que o 1º toque espera o `ClientReady` de
+todo membro ativo (o cliente ainda está na tela de carregamento). `Validate`: linhas da Noite 1 + café + `ReadyWait` +
+`AutoAnswer` cabem no teto da fase `Call` (`Shift`, hoje 120 s).
+
+### 6.7b ShopWindow (janela de serviço = loja; TASK-284, TASK-585)
+
+`LeaveMood`, `LeaveResult`, `Anomalies` (ver cabeçalho do arquivo) e, para a janela fechada por um jogador (Provisório,
+2026-10-19): `ShutGrace = 1.5` (s fechada sem parar antes de a fila reagir; reabrir antes cancela), `ComplainTime = 2.2` (s do
+balão antes de o cliente sair), `LeaveJitter = 0.4` (s extras aleatórios por cliente), `ShutLines` (12 falas curtas originais
+em inglês, ≤ 28 caracteres; `CustomerComplain.Line` é o índice). Fechamento automático (anomalia) segue imediato.
+`Validate`: `ShutGrace` 0..30, `ComplainTime` 0,5..10, `LeaveJitter` 0..5, `ShutLines` não vazio, ≤ 64, cada uma 1..28 caracteres.
 
 ### 6.8 Vehicles, Items, RunParams, Flow, Stations, Revive (campos novos)
 

@@ -32,6 +32,7 @@
 	Public reads: `Count` (Vide source, live occurrences), `RecordOf(id)`, `Occurrences(key?)`.
 ]]
 local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Workspace = game:GetService("Workspace")
@@ -337,7 +338,14 @@ function AnomalyController:OnCue(raw: any)
 		self:WarnOnce(`cue:{row.Key}:{cueRow.Key}`, `cue "{cueRow.Key}" is not listed for {row.Key}`)
 		return
 	end
-	Scene.Cue(row.Key, cueRow.Key, raw.Entity)
+	-- DEC-320 (B-13): a personal cue for another player whose UserId shares our low 16 bits is not ours: move Entity
+	-- off our own value so no effect (nor the scene) takes it for this client
+	local entity: number = raw.Entity
+	const localId = Players.LocalPlayer.UserId
+	if raw.User ~= nil and raw.User ~= localId and entity == localId % 65536 then
+		entity = if entity == 65535 then 1 else entity + 1
+	end
+	Scene.Cue(row.Key, cueRow.Key, entity, raw.User)
 	const module = self.Effects[row.Ref]
 	const handler = if module then module.Cue else nil
 	if handler == nil then
@@ -349,7 +357,8 @@ function AnomalyController:OnCue(raw: any)
 		Ref = row.Ref,
 		Cue = cueRow.Key,
 		Row = cueRow,
-		Entity = raw.Entity,
+		Entity = entity,
+		User = raw.User,
 		Seed = raw.Seed,
 		Rng = Random.new(raw.Seed),
 		At = Workspace:GetServerTimeNow(),

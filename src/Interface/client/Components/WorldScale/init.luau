@@ -87,4 +87,15 @@ function WorldScale.Track(gui: BillboardGui, width: number, height: number)
 	end)
 end
 
+-- New design size of a tracked gui (a card that grows or shrinks with its content); applied on the next frame.
+function WorldScale.Resize(gui: BillboardGui, width: number, height: number)
+	const entry = entries[gui]
+	if entry == nil then
+		return
+	end
+	entry.Width = width
+	entry.Height = height
+	entry.Last = -1
+end
+
 return table.freeze(WorldScale)

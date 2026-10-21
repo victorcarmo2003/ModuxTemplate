@@ -14,7 +14,11 @@
 	  Caught   OutsideStage = "Caught" (the client shows the face), Rules.Faint s later VitalService:Fall; the stage
 	           clears after Rules.Linger s.
 	Down / Spectator / not Active = cleared. Never in the lobby.
+	Safe = inside the vehicle, a Content.Restaurant.SafeBoxes box, or (owner 2026-10-20) the Gear Stand region while the
+	stand is OPEN (GearStandService:IsOpen): the stand's bounding box grown by Rules.GearMargin studs on every side
+	(flat), found from the pedestals (Content.Mart.Tags.Pedestal) inside the GEAR_STAND model. Closed = the street again.
 ]]
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -45,6 +49,8 @@ const RULES = {
 	Catch = 3.5, -- studs (flat)
 	Faint = 0.7, -- s from the face to the faint
 	Linger = 3,
+	GearMargin = 10, -- studs around the Gear Stand that count as safe while it is open (owner 2026-10-20)
+	GearHeight = 8, -- studs above / below the stand's box still inside the region
 }
 const TICK_RATE = 8 -- Hz
 const NIGHT_PHASE = "Night"
@@ -87,7 +93,15 @@ local function ground(at: Vector3, fromY: number, p: RaycastParams): Vector3
 end
 
 const OutsideService = Modux.Service("OutsideService", {
-	Require = { "PlaceService", "RoundService", "RunStateService", "VehicleService", "VitalService", "AnomalyService" },
+	Require = {
+		"PlaceService",
+		"RoundService",
+		"RunStateService",
+		"VehicleService",
+		"VitalService",
+		"AnomalyService",
+		"GearStandService",
+	},
 	Priority = 545,
 })
 
@@ -95,6 +109,41 @@ function OutsideService:Setup()
 	self.Enabled = false :: boolean
 	self.Tracks = {} :: { [Player]: Track }
 	self.LastTick = 0 :: number
+	self.Stand = nil :: Model? -- the GEAR_STAND model (parent of the pedestals), found on demand
+end
+
+-- The Gear Stand model: the Model that holds the tagged pedestals (bind_map01 moves them inside GEAR_STAND)
+function OutsideService:GearStand(): Model?
+	const cached = self.Stand
+	if cached ~= nil and cached:IsDescendantOf(workspace) then
+		return cached
+	end
+	self.Stand = nil
+	for _, pedestal in CollectionService:GetTagged(Content.Mart.Tags.Pedestal) do
+		const stand = if pedestal:IsDescendantOf(workspace) then pedestal.Parent else nil
+		if stand ~= nil and stand:IsA("Model") and stand ~= workspace then
+			self.Stand = stand
+			return stand
+		end
+	end
+	return nil
+end
+
+-- In the Gear Stand region while the stand is open (flat margin around its box, a few studs of height)
+function OutsideService:AtOpenStand(position: Vector3): boolean
+	if not self.Dependencies.GearStandService:IsOpen() then
+		return false
+	end
+	const stand = self:GearStand()
+	if stand == nil then
+		return false
+	end
+	const box, size = stand:GetBoundingBox()
+	const p = box:PointToObjectSpace(position)
+	const half = size / 2
+	return math.abs(p.X) <= half.X + RULES.GearMargin
+		and math.abs(p.Z) <= half.Z + RULES.GearMargin
+		and math.abs(p.Y) <= half.Y + RULES.GearHeight
 end
 
 function OutsideService:SetStage(player: Player, track: Track, stage: Stage, t: number)
@@ -144,7 +193,8 @@ function OutsideService:SpawnFor(root: BasePart): Vector3
 	return ground(best, root.Position.Y, p)
 end
 
--- inside the vehicle interior (LZ-1) or in one of Content.Restaurant.SafeBoxes (the pantry / stock room)
+-- inside the vehicle interior (LZ-1), in one of Content.Restaurant.SafeBoxes (the pantry / stock room) or at the open
+-- Gear Stand
 function OutsideService:IsSafe(player: Player, root: BasePart): boolean
 	if self.Dependencies.VehicleService:IsInside(player) then
 		return true
@@ -155,7 +205,7 @@ function OutsideService:IsSafe(player: Player, root: BasePart): boolean
 			return true
 		end
 	end
-	return false
+	return self:AtOpenStand(p)
 end
 
 function OutsideService:Step(dt: number)

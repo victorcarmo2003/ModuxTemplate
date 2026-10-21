@@ -8,7 +8,8 @@
 -- group, a radius or the zone list changes. By day every position is lit (FEAT-020 "de dia nada é escuro").
 --
 -- Switch (Prompt_Switch -> switch_light, tap): party state, cooldown = largest Cooldown of the Switch groups (0.5 s),
--- only on the current vehicle's switch, no effect during the Hush; turns itself on at every night ShiftStarted.
+-- only on the current vehicle's switch, no effect during the trailer's Hush (the restaurant's postsOnly Hush keeps it:
+-- turning the shop dark is the answer there, TASK-592); turns itself on at every night ShiftStarted.
 -- Trailer Lights (Kind Upgrade): switch + trailer_lights level >= 1, radius = UpgradeService LightRadius effect.
 -- Hush (ANM-010, AnomalyService only): BeginHush(startedAt, holdUntil) puts the posts out from startedAt (record
 -- At = startedAt, the client goes post by post by Order x Step); the trailer zones go dark when the last post is out
@@ -547,8 +548,11 @@ end
 -- Interaction -------------------------------------------------------------------------------------------------------
 
 function LightService:CanToggle(anchor: Instance): boolean
-	if self.Hush ~= nil or self.Blackout ~= nil then
-		return false -- FEAT-020: no effect during the Hush; ANM-020: no power, only the breaker
+	const hush = self.Hush
+	if (hush ~= nil and not hush.PostsOnly) or self.Blackout ~= nil then
+		-- FEAT-020: no effect during the trailer's Hush (TASK-592: the restaurant's postsOnly Hush keeps the switch, it is
+		-- the answer); ANM-020: no power, only the breaker
+		return false
 	end
 	if os.clock() - self.LastToggle < COOLDOWN then
 		return false

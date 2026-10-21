@@ -1,6 +1,7 @@
 --!strict
 -- Ingredients (content-data.md §3.3). Owner: game-designer (+ art-director on Icon).
 -- Stock record id = IndexOf[key]. ToppingKeys (Sauce + Topping) is the Customers.Order bitfield.
+local Stats = require(script.Parent.Stats)
 local Table = require(script.Parent.Table)
 
 export type Kind = "Base" | "Sauce" | "Topping" | "Supply"
@@ -16,7 +17,8 @@ export type Ingredient = {
 	UnlockDay: number, -- 0 = depends on Vehicle
 	Vehicle: string?, -- key of Vehicles, or nil (any vehicle)
 	Weight: number, -- order draw weight (DEC-071); 0 when not an order topping
-	Capacity: { number }, -- one entry per Storage level (Upgrades.cooler, 5 levels; level 5 TASK-324)
+	Capacity: { number }, -- one entry per level of the upgrade that owns CapacityStat (3 levels, DEC-331)
+	CapacityStat: Stats.Stat, -- Stat that picks the Capacity entry: Bun/Topping/CoffeeCapacityLevel (UPG-035..037)
 	Station: string, -- key of Stations
 	Stack: Stack?, -- only Sauce/Topping
 	Icon: string, -- rbxassetid; "" = placeholder until Q-152 (DEC-156)
@@ -31,7 +33,8 @@ const base = Table.new({
 		OrderPrice = 0,
 		UnlockDay = 1,
 		Weight = 0,
-		Capacity = { 12, 16, 20, 24, 28 }, -- +4 per Storage level (owner request 2026-10-14, Provisional)
+		Capacity = { 12, 20, 28 }, -- Bun Box levels (DEC-331, Provisional)
+		CapacityStat = "BunCapacityLevel",
 		Station = "bun_crate",
 		Icon = "",
 	},
@@ -43,7 +46,8 @@ const base = Table.new({
 		OrderPrice = 0,
 		UnlockDay = 1,
 		Weight = 0,
-		Capacity = { 12, 16, 20, 24, 28 }, -- follows the buns (one sausage per bun; Provisional)
+		Capacity = { 12, 20, 28 }, -- follows the buns (one sausage per bun; Provisional)
+		CapacityStat = "BunCapacityLevel",
 		Station = "sausage_stock",
 		Icon = "",
 	},
@@ -55,7 +59,8 @@ const base = Table.new({
 		OrderPrice = 1,
 		UnlockDay = 1,
 		Weight = 10,
-		Capacity = { 15, 20, 25, 30, 35 }, -- 15 +5 per level: three purchases reach the old 30 (owner request 2026-10-14)
+		Capacity = { 15, 25, 35 }, -- Topping Rack levels (DEC-331, Provisional)
+		CapacityStat = "ToppingCapacityLevel",
 		Station = "toppings",
 		Stack = "Cord",
 		Icon = "",
@@ -68,7 +73,8 @@ const base = Table.new({
 		OrderPrice = 1,
 		UnlockDay = 1,
 		Weight = 10,
-		Capacity = { 15, 20, 25, 30, 35 }, -- same as ketchup
+		Capacity = { 15, 25, 35 }, -- same as ketchup
+		CapacityStat = "ToppingCapacityLevel",
 		Station = "toppings",
 		Stack = "Cord",
 		Icon = "",
@@ -81,7 +87,8 @@ const base = Table.new({
 		OrderPrice = 2,
 		UnlockDay = 3, -- owner 2026-10-18: Night 2 (runs start at night: Night k = Day k + 1)
 		Weight = 7,
-		Capacity = { 5, 6, 7, 8, 9 }, -- same rule for every topping: about half at level 1, the old level-1 cap at level 4 (Provisional)
+		Capacity = { 5, 7, 9 }, -- about half at level 1, the same top as before (Provisional)
+		CapacityStat = "ToppingCapacityLevel",
 		Station = "toppings",
 		Stack = "BeforeCords",
 		Icon = "",
@@ -94,7 +101,8 @@ const base = Table.new({
 		OrderPrice = 3,
 		UnlockDay = 5, -- owner 2026-10-18: Night 4 (runs start at night: Night k = Day k + 1)
 		Weight = 6,
-		Capacity = { 5, 6, 7, 8, 9 }, -- same rule (Provisional)
+		Capacity = { 5, 7, 9 }, -- same rule (Provisional)
+		CapacityStat = "ToppingCapacityLevel",
 		Station = "toppings",
 		Stack = "InOrder",
 		Icon = "",
@@ -107,7 +115,8 @@ const base = Table.new({
 		OrderPrice = 2,
 		UnlockDay = 7, -- owner 2026-10-18: Night 6 (runs start at night: Night k = Day k + 1)
 		Weight = 6,
-		Capacity = { 6, 9, 12, 15, 18 }, -- same rule (Provisional)
+		Capacity = { 6, 12, 18 }, -- same rule (Provisional)
+		CapacityStat = "ToppingCapacityLevel",
 		Station = "toppings",
 		Stack = "InOrder",
 		Icon = "",
@@ -120,7 +129,8 @@ const base = Table.new({
 		OrderPrice = 2,
 		UnlockDay = 9, -- owner 2026-10-18: Night 8 (runs start at night: Night k = Day k + 1)
 		Weight = 5,
-		Capacity = { 6, 8, 10, 12, 14 }, -- same rule (Provisional; Q-062)
+		Capacity = { 6, 10, 14 }, -- same rule (Provisional; Q-062)
+		CapacityStat = "ToppingCapacityLevel",
 		Station = "toppings",
 		Stack = "Cord",
 		Icon = "",
@@ -134,7 +144,8 @@ const base = Table.new({
 		UnlockDay = 0,
 		Vehicle = "trailer",
 		Weight = 0,
-		Capacity = { 20, 20, 20, 20, 20 }, -- Storage does not change coffee
+		Capacity = { 20, 30, 40 }, -- Coffee Shelf levels (DEC-331, Provisional)
+		CapacityStat = "CoffeeCapacityLevel",
 		Station = "coffee_machine",
 		Icon = "",
 	},

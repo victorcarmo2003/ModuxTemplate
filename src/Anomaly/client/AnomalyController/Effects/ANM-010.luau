@@ -21,6 +21,11 @@
 	    "Stay inside the Mart". Gone when the record leaves Active.
 	Cue `jumpscare` (TASK-334): Entity = UserId % 65536 of a player caught outside; only that client shows the face.
 	Cue `hush_fog` (flavor of the error, DEC-195): a bank of fog drifts through the current vehicle for a few seconds.
+	Head (TASK-592, owner 2026-10-19; PROVISIONAL Q-398): record Anchor from Anomalies/ANM-010. 1 = the window is open: a
+	huge dark head on a long neck slides in through the service window (HEAD_POINT, its LookVector points inside), slow,
+	and turns to look at this client's camera, red neon eyes on you (owner 2026-10-19, glowing); 3 = it pulls back out, fast; 2 = the window was shut:
+	two heavy bumps on the shutter. Local only (Parts until the art-director's sheet). The lights-on jumpscare is the
+	server's (cue jumpscare). The drive-thru window has no MapPoint yet (DT-WIN unbound): the service window stands in.
 
 	PROVISIONAL (frontend-coder, TASK-118): fog look, density and rates below until AST-067 (`T_Fog` 256²) and the
 	art-director's AST-084 values; built-in particle texture as placeholder. "City sounds fade" is not done: no
@@ -63,6 +68,28 @@ const BANNER_INK = Color3.fromHex("#2B2233")
 const BANNER_MUSTARD = Color3.fromHex("#F6C12B")
 const BANNER_CREAM = Color3.fromHex("#FFF1D6")
 const ENTITY_MOD = 65536
+
+-- The head through the window (TASK-592; PROVISIONAL)
+-- outside the service window at eye height. Its LookVector is NOT trusted (owner 2026-10-19: the bound point looks at the
+-- street, so the head slid from the shop out): "inward" = from the point towards the middle of the current vehicle
+const HEAD_POINT = "SCENE-WINDOW-EYES"
+const HEAD_IN = 1 -- record Anchor (Anomalies/ANM-010)
+const HEAD_GLASS = 2
+const HEAD_OUT = 3
+const HEAD_SIZE = 3.4 -- studs: far bigger than any customer's
+const HEAD_COLOR = Color3.fromHex("#07060B") -- the Silhouette's black
+-- owner 2026-10-19: red neon eyes (were white), each with a small red glow on the shop
+const HEAD_EYE = Color3.fromHex("#FF1A1A")
+const EYE_GLOW_RANGE = 7 -- studs
+const EYE_GLOW_BRIGHTNESS = 3
+const HEAD_OUTSIDE = 10 -- studs outside the point where it starts (out on the street, clear of the window)
+const HEAD_DEPTH = 2.4 -- studs inside the point where it stops
+const HEAD_DROP = 0.4 -- studs under the point (eye height -> head centre)
+const HEAD_ENTER = 2.4 -- s to slide in
+const HEAD_LEAVE = 0.6 -- s to pull out
+const HEAD_TURN = 1.8 -- 1/s: how fast it turns to the camera
+const HEAD_TILT = math.rad(14) -- the slow sideways tilt while it looks
+const NECK_LENGTH = 9 -- studs of neck behind the head, going out and up
 
 const FOG_IN = 4 -- seconds
 const FOG_OUT = 5
@@ -250,6 +277,27 @@ local function vehicleModel(ctx: Effect.Context): Instance?
 	return VehicleRoot.Find(Vide.untrack(ctx.Round.Vehicle))
 end
 
+-- Middle of the current vehicle (Model bounding box, or the box of a Folder's parts), nil without one
+local function vehicleCentre(ctx: Effect.Context): Vector3?
+	const vehicle = vehicleModel(ctx)
+	if vehicle == nil then
+		return nil
+	end
+	if vehicle:IsA("Model") then
+		return vehicle:GetBoundingBox().Position
+	end
+	local low: Vector3? = nil
+	local high: Vector3? = nil
+	for _, item in vehicle:GetDescendants() do
+		if item:IsA("BasePart") then
+			const p = item.Position
+			low = if low then low:Min(p) else p
+			high = if high then high:Max(p) else p
+		end
+	end
+	return if low and high then (low + high) / 2 else nil
+end
+
 -- Error flavor: a bank of fog drifts through the vehicle (one shot)
 local function seep(ctx: Effect.Context, cue: Effect.Cue)
 	const vehicle = vehicleModel(ctx)
@@ -363,6 +411,169 @@ local function runWarning(ctx: Effect.Context, occ: Effect.Occurrence): () -> ()
 	end
 end
 
+-- The head ----------------------------------------------------------------------------------------------------
+
+local function headPart(model: Model, name: string, shape: Enum.PartType, size: Vector3, color: Color3): BasePart
+	const part = Instance.new("Part")
+	part.Name = name
+	part.Shape = shape
+	part.Size = size
+	part.Color = color
+	part.Material = if color == HEAD_EYE then Enum.Material.Neon else Enum.Material.SmoothPlastic
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.CastShadow = false
+	if color == HEAD_EYE then
+		const glow = Instance.new("PointLight")
+		glow.Color = HEAD_EYE
+		glow.Range = EYE_GLOW_RANGE
+		glow.Brightness = EYE_GLOW_BRIGHTNESS
+		glow.Shadows = false
+		glow.Parent = part
+	end
+	part.Parent = model
+	return part
+end
+
+-- Head pivot at its centre facing -Z; the neck goes back (+Z) and up from it
+local function buildHead(): (Model, { BasePart }, { CFrame })
+	const model = Instance.new("Model")
+	model.Name = "HushHead"
+	const parts: { BasePart } = {}
+	const offsets: { CFrame } = {}
+	local function add(part: BasePart, offset: CFrame)
+		table.insert(parts, part)
+		table.insert(offsets, offset)
+	end
+	add(headPart(model, "Head", Enum.PartType.Ball, Vector3.one * HEAD_SIZE, HEAD_COLOR), CFrame.identity)
+	add(
+		headPart(model, "Jaw", Enum.PartType.Ball, Vector3.new(HEAD_SIZE * 0.8, HEAD_SIZE * 0.55, HEAD_SIZE * 0.9), HEAD_COLOR),
+		CFrame.new(0, -HEAD_SIZE * 0.35, -0.2)
+	)
+	for _, side in { -0.62, 0.62 } do
+		add(headPart(model, "Eye", Enum.PartType.Ball, Vector3.new(0.7, 0.85, 0.35), HEAD_EYE), CFrame.new(side, 0.35, -HEAD_SIZE * 0.47))
+	end
+	add(
+		headPart(model, "Neck", Enum.PartType.Block, Vector3.new(1.6, 1.6, NECK_LENGTH), HEAD_COLOR),
+		CFrame.Angles(math.rad(-28), 0, 0) * CFrame.new(0, 0, NECK_LENGTH / 2 + HEAD_SIZE * 0.3)
+	)
+	return model, parts, offsets
+end
+
+local function mountHead(ctx: Effect.Context, occ: Effect.Occurrence)
+	local model: Model? = nil
+	local parts: { BasePart } = {}
+	local offsets: { CFrame } = {}
+	local from = Vector3.zero -- outside
+	local to = Vector3.zero -- inside
+	local inward = Vector3.zAxis
+	local look = CFrame.identity -- current facing (rotation only)
+	local stage = "None" -- None | Enter | Look | Leave
+	local stageAt = 0
+	local last = Vide.untrack(occ.Record).Anchor
+	const started = os.clock()
+
+	local function remove()
+		if model ~= nil then
+			model:Destroy()
+			model = nil
+		end
+		stage = "None"
+	end
+
+	local function show(at: number)
+		const point = ctx.Point(HEAD_POINT)
+		if point == nil then
+			return
+		end
+		-- towards the inside of the vehicle; the point's LookVector only when there is no vehicle
+		const middle = vehicleCentre(ctx)
+		const flat = if middle then (middle - point.Position) * Vector3.new(1, 0, 1) else point.LookVector * Vector3.new(1, 0, 1)
+		inward = if flat.Magnitude > 1e-3 then flat.Unit else Vector3.zAxis
+		const centre = point.Position - Vector3.new(0, HEAD_DROP, 0)
+		from = centre - inward * HEAD_OUTSIDE
+		to = centre + inward * HEAD_DEPTH
+		look = CFrame.lookAt(Vector3.zero, inward).Rotation
+		const built, list, offs = buildHead()
+		built.Parent = ctx.Folder()
+		model, parts, offsets = built, list, offs
+		stage = "Enter"
+		stageAt = at
+	end
+
+	const connection = RunService.RenderStepped:Connect(function(dt: number)
+		const record = Vide.untrack(occ.Record)
+		const anchor = record.Anchor
+		const now = os.clock()
+		if anchor ~= last then
+			last = anchor
+			const point = ctx.Point(HEAD_POINT)
+			const at = if point ~= nil then point.Position else nil
+			if anchor == HEAD_IN and model == nil then
+				show(now)
+				ctx.Audio:Play("door_creak", at, { Volume = 0.9, Speed = 0.55 })
+			elseif anchor == HEAD_OUT and model ~= nil then
+				stage = "Leave"
+				stageAt = now
+			elseif anchor == HEAD_GLASS then
+				-- the window was shut: two heavy bumps on the shutter
+				ctx.Audio:Play("window_slam", at, { Volume = 1.2, Speed = 0.8 })
+				task.delay(0.9, function()
+					ctx.Audio:Play("window_slam", at, { Volume = 1.4, Speed = 0.7 })
+				end)
+			end
+		elseif anchor == HEAD_IN and model == nil and stage == "None" and record.Phase == "Active" then
+			-- a late joiner: it is already in
+			show(now - HEAD_ENTER)
+		end
+		if record.Phase ~= "Active" and (stage == "Enter" or stage == "Look") then
+			stage = "Leave"
+			stageAt = now
+		end
+		if model == nil then
+			return
+		end
+		-- position along the slide
+		local k = 1
+		if stage == "Enter" then
+			const t = math.clamp((now - stageAt) / HEAD_ENTER, 0, 1)
+			k = t * t * (3 - 2 * t)
+			if t >= 1 then
+				stage = "Look"
+			end
+		elseif stage == "Leave" then
+			const t = math.clamp((now - stageAt) / HEAD_LEAVE, 0, 1)
+			if t >= 1 then
+				remove()
+				return
+			end
+			k = 1 - t * t
+		end
+		const centre = from:Lerp(to, k)
+		-- once in, it turns to look at the camera, slowly
+		local goal = CFrame.lookAt(Vector3.zero, inward).Rotation
+		const camera = workspace.CurrentCamera
+		if stage == "Look" and camera ~= nil then
+			const toward = camera.CFrame.Position - centre
+			if toward.Magnitude > 1e-3 then
+				goal = CFrame.lookAt(Vector3.zero, toward.Unit).Rotation
+			end
+		end
+		look = look:Lerp(goal, math.min(1, dt * HEAD_TURN))
+		const tilt = if stage == "Look" then HEAD_TILT * math.sin((now - started) * 0.9) else 0
+		const pivot = CFrame.new(centre) * look * CFrame.Angles(0, 0, tilt)
+		for index, part in parts do
+			part.CFrame = pivot * offsets[index]
+		end
+	end)
+	Vide.cleanup(function()
+		connection:Disconnect()
+		remove()
+	end)
+end
+
 return {
 	Ref = "ANM-010",
 	Mount = function(ctx: Effect.Context, occ: Effect.Occurrence)
@@ -375,6 +586,7 @@ return {
 			table.insert(emitters, e)
 		end
 		box.Parent = ctx.Folder()
+		mountHead(ctx, occ) -- TASK-592
 
 		const record = Vide.untrack(occ.Record)
 		const state: FogState = {

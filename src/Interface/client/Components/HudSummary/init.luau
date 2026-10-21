@@ -32,7 +32,6 @@ export type Report = {
 	Completed: number,
 	Sales: number, -- paid straight into the shared money (2026-10-13)
 	Tips: number, -- piled in the tip jar
-	Stolen: number,
 	Grade: Grade,
 	Bonus: number,
 	Deposited: number, -- "Banked"
@@ -158,15 +157,12 @@ local function note(order: number, text: string): TextLabel
 	})
 end
 
--- FEAT-014 lines, in order. "Stolen" only when something was stolen; gems only when the shift credited any.
+-- FEAT-014 lines, in order. Gems only when the shift credited any.
 local function rows(report: Report): { Instance }
 	const list: { Instance } = {}
 	table.insert(list, row(1, "Ui/friends", "Customers", `{report.Completed} / {report.Arrived}`))
 	table.insert(list, row(2, "Ui/cash", "Sales", Money(report.Sales)))
 	table.insert(list, row(3, "Hud/coin", "Tips", Money(report.Tips)))
-	if report.Stolen > 0 then
-		table.insert(list, row(4, "", "Stolen", Money(-report.Stolen)))
-	end
 	table.insert(list, row(5, "Ui/sparkle", "Grade bonus", "+" .. Money(report.Bonus)))
 	table.insert(list, row(6, "Hud/coin", "Banked", Money(report.Deposited), Theme.Tone.Mustard))
 	if report.Gems > 0 then

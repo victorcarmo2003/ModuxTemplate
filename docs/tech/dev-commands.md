@@ -47,6 +47,7 @@ Anomalia = key, `ANM-###`, número (o do ANM) ou parte do nome (`blackout`, `kno
 | `street cars\|walkers\|thief ...` | rua: carros, pedestres, ladrão |
 | `debug audio\|interact\|movement\|drop\|light ...` | leituras de debug |
 | `smoke [status]` | smoke do loop do restaurante |
+| `track [list\|stop\|here\|<key>]` | câmera de captura do trailer (TASK-C1, `marketing/trailer-blackout-60s.md` §7): sem args = o que toca no caller (ou a lista); `list` = `key — nome (duração s, n keys)`; `<key>` = toca a track de `src/Dev/shared/CameraTracks.luau` na câmera do caller (atributos `DevCameraTrack`/`DevCameraTrackAt` do Player, lidos por `Dev/client/DevCameraController`; `HideUi` esconde a UI, menos cena de horror e prompts); `stop` = câmera e UI de volta; `here` = a câmera atual do caller como linha de `Key` pronta para colar (packet `DevCameraHere`, 2 Hz) |
 
 ## 3. Renomeados, fundidos e removidos
 

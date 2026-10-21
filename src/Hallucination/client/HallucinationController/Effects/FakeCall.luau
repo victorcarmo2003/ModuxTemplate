@@ -1,10 +1,14 @@
 --!strict
 -- fake_call (< 60; script.md §8, ui-text.md §12.4, sound-list.md §5.12): the vehicle's wall phone rings (the real
--- SFX-080 on purpose, lamp blinking like a real call) and then the strip shows only "Walt: ..." -- no "Answer", no
--- prompt, not a call (FEAT-018). Only while no real call is up; a real call arriving cancels it at once.
+-- SFX-080 on purpose, lamp blinking like a real call) and then Walt says ONE line -- no "Answer", no prompt, not a
+-- call (FEAT-018). Only while no real call is up; a real call arriving cancels it at once.
+-- Owner 2026-10-19: never the empty "Walt: ..." again - every ring ends in a line of Content.Hallucinations.WaltLines
+-- (a hint, or a piece of the lore), voiced through BossController:Speak when the voice exists. TASK-601: the line is
+-- the night's next unheard one (Lines.Next "Walt"), so the lore comes in order.
 local CollectionService = game:GetService("CollectionService")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Context = require(script.Parent.Parent.Context)
+local Lines = require(script.Parent.Parent.Lines)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 
 const PHONE_IDS: { [string]: boolean } = { ["TRL-PHONE"] = true }
@@ -14,10 +18,9 @@ const LAMP_SUFFIX = "_Lamp"
 const RING_KEY = "phone_ring"
 const GLITCH_KEY = "phone_glitch" -- the "line" of the fake call: glitched phone noise (user request 2026-10-10)
 const SPEAKER = "Walt"
-const TEXT = "..." -- ui-text.md §12.4 "Walt: ..."
 const RING_TIME = 3.5 -- s: about two rings
 const PAUSE = 0.4
-const LINE_TIME = 2.5 -- BossCallRules.LineTime
+const LINE_TIME = 3.2 -- s the line stays (a real sentence now)
 const BLINK_HZ = 2
 const STEP = 0.1
 const HEAR_RANGE = 45 -- studs from the phone: farther away the ring would not be noticed
@@ -121,8 +124,22 @@ const FakeCall: Context.Effect = {
 		if not run:Wait(PAUSE) or not env.CallIdle() then
 			return
 		end
-		env.Subtitle(SPEAKER, TEXT)
-		env.Sound(GLITCH_KEY, host)
+		const picked = Lines.Next("Walt", env.Night(), env.Random)
+		if picked == nil then
+			return
+		end
+		const line = picked.Text
+		env.Subtitle(SPEAKER, line)
+		env.Sound(GLITCH_KEY, host, { Volume = 0.4 })
+		pcall(function()
+			const client = script:FindFirstAncestor("client")
+			const feature = if client then client:FindFirstChild("Boss") else nil
+			const module = if feature then feature:FindFirstChild("BossController") else nil
+			if module ~= nil and module:IsA("ModuleScript") then
+				const boss: any = (require :: any)(module)
+				boss:Speak(line)
+			end
+		end)
 		const shown = os.clock()
 		while os.clock() - shown < LINE_TIME do
 			if not env.CallIdle() or not run:Wait(STEP) then

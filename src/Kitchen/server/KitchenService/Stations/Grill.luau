@@ -5,8 +5,10 @@
 --   grill_place   (sausage_stock, tap "Grill")  1 sausage from stock -> lowest free slot of the grill of the touched anchor (its
 --                 own grill, the grill that contains the stock Model, else the nearest one; one grill = lowest free slot of the
 --                 vehicle); Duration = Effect GrillTime (8/6/4 s, UPG-001; DEC-305) x Modifier GrillTime of who placed it
---   Tick 10 Hz    Working -> Ready at StartedAt + Duration, flipped or not. Never burns (DEC-298): a Ready sausage waits on the
---                 grill for as long as it takes.
+--   Tick 10 Hz    Working -> Ready at StartedAt + Duration once flipped. Never burns (DEC-298): a Ready sausage waits on the
+--                 grill for as long as it takes. DEC-311: an unflipped sausage stops at Restaurant.Grill.HoldAt of its cook time
+--                 (the record does not change: clients draw it held while Flip is empty) until it is flipped; the flip moves
+--                 StartedAt so it resumes from HoldAt.
 --   grill_flip    (optional, tap "Flip") once, only while Working. Server clock minus the tap latency (<= 0.3 s): inside
 --                 Restaurant.Grill.FlipFrom..FlipTo of the Duration it stamps the bonus; the flip score is Grade.Score grill_flip
 --                 of the distance to the middle of that window (kitchen-focus.md §3). The cook schedule never moves.
@@ -457,7 +459,9 @@ const collect: StationApi.Action = {
 -- Flips the sausage of `slot` on THIS grill once, only while Working (a Ready one is done cooking). Inside
 -- Restaurant.Grill.FlipFrom..FlipTo of the Duration (server clock, `latency` = the tap's way to the server, clamped) it stamps
 -- the bonus. The cook schedule never moves. Returns (score, nil) or (nil, reason): "Empty" | "Flipped" | "Ready".
-local function flipOn(ctx: Context, grill: Station, slot: number, latency: number?): (number?, string?)
+-- `given` = the score of the flip mini-game of the cooking focus (0..100, DEC-311; the bonus is a Good or better); nil = the old
+-- timed flip of the world prompt (server clock against the window)
+local function flipOn(ctx: Context, grill: Station, slot: number, latency: number?, given: number?): (number?, string?)
 	const record = grill.Records[slot]
 	if record == nil or record.State == "Empty" then
 		return nil, "Empty"
@@ -471,11 +475,25 @@ local function flipOn(ctx: Context, grill: Station, slot: number, latency: numbe
 	const seen = ctx.Now() - math.clamp(latency or 0, 0, LATENCY_MAX)
 	const window = Content.Restaurant.Grill
 	const fraction = if record.Duration > 0 then (seen - record.StartedAt) / record.Duration else -1
-	const bonus = fraction >= window.FlipFrom and fraction <= window.FlipTo
-	const score = flipScore(fraction)
+	local score, bonus
+	if given ~= nil then
+		-- the mini-game opens at the hold: an earlier flip is refused
+		if fraction < window.HoldAt - 0.02 then
+			return nil, "Early"
+		end
+		score = math.clamp(math.floor(given), 0, 100)
+		bonus = score >= Content.Prep.Grades.Bands.Good
+	else
+		score = flipScore(fraction)
+		bonus = fraction >= window.FlipFrom and fraction <= window.FlipTo
+	end
 	flippedOf(grill)[slot] = score
 	bonusOf(grill)[slot] = bonus
 	record.Flip = score + 1
+	-- held at HoldAt (DEC-311): it resumes from there
+	if fraction >= window.HoldAt then
+		record.StartedAt = ctx.Now() - record.Duration * window.HoldAt
+	end
 	ctx.Publish(grill)
 	refreshFlip(ctx, grill)
 	return score, nil
@@ -538,8 +556,8 @@ function Grill.PlaceAt(ctx: Context, grill: Station, stock: Station, player: Pla
 end
 
 -- Cooking focus: flips the sausage of `slot` (only while it cooks, once). Returns its flip score, nil = refused.
-function Grill.FlipAt(ctx: Context, grill: Station, slot: number, latency: number?): number?
-	const score = flipOn(ctx, grill, slot, latency)
+function Grill.FlipAt(ctx: Context, grill: Station, slot: number, latency: number?, given: number?): number?
+	const score = flipOn(ctx, grill, slot, latency, given)
 	return score
 end
 
@@ -592,8 +610,9 @@ function Grill.Tick(ctx: Context, station: Station, now: number)
 	end
 	local changed = sync(ctx, station)
 	for _, record in station.Records do
-		-- no pause, flipped or not; never burns (DEC-298)
-		if record.State == "Working" and now >= record.StartedAt + record.Duration then
+		-- never burns (DEC-298); unflipped, it waits at HoldAt (DEC-311: the record is not touched, the client draws it held)
+		const flipped = (record.Flip or 0) > 0
+		if record.State == "Working" and flipped and now >= record.StartedAt + record.Duration then
 			record.State = "Ready"
 			changed = true
 		end

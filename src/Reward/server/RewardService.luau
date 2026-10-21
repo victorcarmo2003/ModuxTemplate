@@ -11,6 +11,9 @@
 --   EconomyService:AddReportStep        day credits at the start of Summary; fills ShiftReport.Gems / AfkLocked
 --   RoundService.NightResolved("Won")   night credit and, on the last night, the finale (before the Finale phase)
 --   RoundService:AddRunReportStep       RunReport.Gems = RunRewards.Gems of this run (T59)
+-- Event badges (DEC-315, design/badges.md): Unlock(player, key) once per account. Listened here: ProfileService.Loaded
+-- (welcome), NightResolved (first_night, halfway, kept_light), CustomerService.Acted (first_hotdog, not_today),
+-- KitchenService.Emitted "grill_flip" (golden_flip). TutorialService calls Unlock (tutorial_done).
 -- NightResolved and AddRunReportStep come with TASK-054: until then they are looked up at runtime (warn once) and
 -- the run ends with Gems = 0 (§19.0 rule 4). PENDING when TASK-054 lands: drop the RoundHooks cast.
 -- Who gets paid: connected members with a loaded profile, in any life state (DEC-104). A connected player whose
@@ -25,6 +28,7 @@ local Atomic = require(ReplicatedStorage.shared.Types.Atomic)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Ledger = require(ServerScriptService.server.Economy.EconomyService.Ledger)
 local Template = require(ServerScriptService.server.Profile.ProfileService.Template)
+local Grade = require(ReplicatedStorage.shared.Prep.Grade)
 local Modux = require(ServerScriptService.server.Modux)
 local MetricsLog = require(ServerScriptService.server.Metrics.MetricsService.Log)
 
@@ -84,13 +88,25 @@ local function awardBadge(userId: number, badgeId: number): boolean
 end
 
 const RewardService = Modux.Service("RewardService", {
-	Require = { "PlaceService", "ProfileService", "RoundService", "RunStateService", "EconomyService" },
+	Require = {
+		"PlaceService",
+		"ProfileService",
+		"RoundService",
+		"RunStateService",
+		"EconomyService",
+		"CustomerService",
+		"KitchenService",
+		"InteractionService",
+	},
 	Priority = 550,
 })
 
 function RewardService:Setup()
 	-- Gems credited to each player in the current shift (UserId), for ShiftReport.Gems; zeroed at ShiftStarted
 	self.ShiftGems = {} :: { [number]: number }
+	-- DEC-320 (Q-411): UserIds who did at least one work action this shift (Content.RunParams.AntiAfkWork); zeroed at
+	-- ShiftStarted. A present player outside it gets no gems for the shift
+	self.Worked = {} :: { [number]: boolean }
 	-- Events waiting for a profile that is still loading (data.md §1.3)
 	self.Pending = {} :: { [Player]: { Pending } }
 	-- Badges with a retry loop running (UserId:key)
@@ -166,6 +182,11 @@ function RewardService:Credit(player: Player, profile: Profile, key: string, gem
 end
 
 -- Runs `pay` for every connected member with a loaded profile; one still loading gets it on Loaded (LOAD_WAIT).
+-- DEC-320 (Q-411): this player did a kitchen / service action this shift (anti-AFK per player)
+function RewardService:HasWorked(player: Player): boolean
+	return self.Worked[player.UserId] == true
+end
+
 function RewardService:ForPresent(pay: (player: Player, profile: Profile) -> ())
 	const profiles = self.Dependencies.ProfileService
 	for _, player in Players:GetPlayers() do
@@ -211,6 +232,9 @@ end
 function RewardService:CheckAchievements(player: Player, profile: Profile): number
 	local gained = 0
 	for _, achievement in Content.Achievements.List do
+		if achievement.Counter == nil then
+			continue -- event achievement (Unlock)
+		end
 		const counter = (profile :: any)[achievement.Counter] :: (() -> any)?
 		if counter == nil then
 			fail(`[RewardService] achievement {achievement.Key}: {achievement.Counter} is not a profile field`)
@@ -231,6 +255,51 @@ function RewardService:CheckAchievements(player: Player, profile: Profile): numb
 	end
 	self:AwardPending(player, profile)
 	return gained
+end
+
+-- Event achievement (Counter nil, design/badges.md): unlocked once per account, no gems; the badge goes out with retry.
+-- Returns true when this call unlocked it. A player without a loaded profile (or not in Players) is skipped.
+function RewardService:Unlock(player: Player, key: string): boolean
+	const achievement = Content.Achievements.ByKey[key]
+	if achievement == nil then
+		fail(`[RewardService] Unlock: unknown achievement {key}`)
+		return false
+	end
+	if player.Parent ~= Players then
+		return false
+	end
+	const profile = self.Dependencies.ProfileService:Get(player)
+	if profile == nil or profile.Achievements()[key] ~= nil then
+		return false
+	end
+	const unlocked = table.clone(profile.Achievements())
+	unlocked[key] = os.time()
+	profile.Achievements(unlocked)
+	self.Dependencies.ProfileService:RequestSave(player)
+	if self.Dependencies.PlaceService:Is("Run") then
+		self.Dependencies.RunStateService:Notify(player, "achievement", Content.Achievements.IndexOf[key])
+	end
+	self:AwardPending(player, profile)
+	return true
+end
+
+-- Night badges: Night 1, Night 5 and the last night won (NightResolved "Won")
+function RewardService:NightBadges(night: number)
+	local key: string? = nil
+	if night >= Content.RunParams.Nights then
+		key = "kept_light"
+	elseif night == 1 then
+		key = "first_night"
+	elseif night == 5 then
+		key = "halfway"
+	end
+	if key == nil then
+		return
+	end
+	const badge = key
+	self:ForPresent(function(player: Player)
+		self:Unlock(player, badge)
+	end)
 end
 
 -- Unlocked achievements whose badge is not confirmed yet (BadgesAwarded). Each runs in its own thread with backoff;
@@ -286,6 +355,11 @@ function RewardService:ReportStep(info: ShiftInfo, report: ShiftReport)
 
 		self:ForPresent(function(player: Player, profile: Profile)
 			local gained = 0
+			-- DEC-320 (Q-411): the crew minimum AND this player's own work
+			if not self:HasWorked(player) then
+				self.Dependencies.RunStateService:Notify(player, "afk_no_gems_you")
+				return
+			end
 			if afkOk then
 				gained += self:Credit(player, profile, `D{day}:day`, rewards.DayShift)
 			end
@@ -326,6 +400,18 @@ function RewardService:NightWon(info: ShiftInfo)
 	end
 	const last = night >= Content.RunParams.Nights
 	self:ForPresent(function(player: Player, profile: Profile)
+		-- DEC-320 (Q-411): no work this night = no night gems (the finale still pays: it is the run's, not the shift's)
+		if not self:HasWorked(player) then
+			self.Dependencies.RunStateService:Notify(player, "afk_no_gems_you")
+			if last then
+				self:Toast(player, self:Credit(player, profile, "finale", rewards.Finale, function(p: Profile)
+					const stats = table.clone(p.Stats())
+					stats.RunsFinished += 1
+					p.Stats(stats)
+				end))
+			end
+			return
+		end
 		local gained = self:Credit(
 			player,
 			profile,
@@ -418,6 +504,7 @@ RewardService:OnInit(function(self)
 	profiles.Loaded:Connect(function(player, profile)
 		self:FlushPending(player, profile)
 		self:AwardPending(player, profile)
+		self:Unlock(player, "welcome")
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		self.Pending[player] = nil
@@ -435,6 +522,17 @@ RewardService:OnInit(function(self)
 	const round = self.Dependencies.RoundService
 	round.ShiftStarted:Connect(function()
 		self.ShiftGems = {}
+		self.Worked = {}
+	end)
+	-- DEC-320 (Q-411): a work action (prompt or cooking gesture) marks the player as working this shift
+	const work: { [string]: boolean } = {}
+	for _, key in Content.RunParams.AntiAfkWork do
+		work[key] = true
+	end
+	self.Dependencies.InteractionService.Performed:Connect(function(player, action)
+		if work[action] then
+			self.Worked[player.UserId] = true
+		end
 	end)
 
 	const hooks = (round :: any) :: RoundHooks
@@ -442,6 +540,7 @@ RewardService:OnInit(function(self)
 		hooks.NightResolved:Connect(function(info, result)
 			if result == "Won" then
 				self:NightWon(info)
+				self:NightBadges(info.Night)
 			end
 		end)
 	else
@@ -454,6 +553,30 @@ RewardService:OnInit(function(self)
 			end
 		end)
 	end
+	-- event badges (DEC-315)
+	const customers = self.Dependencies.CustomerService
+	customers.Acted:Connect(function(id, action, player, result)
+		if player == nil then
+			return
+		end
+		if action == "serve" and (result == "Perfect" or result == "Complete") then
+			self:Unlock(player, "first_hotdog")
+		elseif action == "refuse" then
+			const customer = customers.Customers[id]
+			if customer ~= nil and customer.Variant ~= nil then
+				self:Unlock(player, "not_today")
+			end
+		end
+	end)
+	self.Dependencies.KitchenService.Emitted:Connect(function(name, player, data)
+		if name ~= "grill_flip" or player == nil or data == nil or type(data.Score) ~= "number" then
+			return
+		end
+		if Grade.Band(Content.Prep, data.Score) == "Perfect" then
+			self:Unlock(player, "golden_flip")
+		end
+	end)
+
 	if hooks.AddRunReportStep ~= nil then
 		hooks.AddRunReportStep(round, STEP, function(player, report)
 			report.Gems = self:RunGems(player)

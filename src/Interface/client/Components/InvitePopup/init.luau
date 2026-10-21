@@ -49,7 +49,7 @@ return function(props: Props): Frame
 	end)
 	const pop = Motion.Pop(shown)
 	const scale = function(): number
-		return (if props.Scale then math.max(math.min(props.Scale(), UiScale.Current()), Theme.Scale.Min) else 1) * pop()
+		return (if props.Scale then math.max(math.min(props.Scale(), UiScale.Current()), UiScale.Floor()) else 1) * pop()
 	end
 
 	return create("Frame")({

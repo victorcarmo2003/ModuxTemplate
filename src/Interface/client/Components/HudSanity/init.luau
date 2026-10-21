@@ -6,7 +6,7 @@
 -- Never red, no heart, no skull.
 -- Sizes (px at UI scale 1): Compact (phone) portrait 34, bar 110 x 10, number 11 px (owner's number; smaller than the
 -- 14 px rule on purpose, it only repeats the bar); desktop portrait 44, bar 180 x 14, number 15 px.
--- Reveal (Content.HudReveal): `Revealed` scales it in (0.25 s, Motion.Reveal); `Intro` = true makes a Mustard ring pulse
+-- Reveal (Content.HudReveal): `Revealed` pops it in (Motion.RevealPop); `Intro` = true makes a Mustard ring pulse
 -- around it, once, the first time it is shown and revealed (night 1 presentation).
 -- Portrait until AST-086 (TASK-093): the class icon of the AST-071 sheet (`Class/class_<x>`, Day head render) on the
 -- species fur colour; species letter when the icon is missing. The band shows as the ring colour (Day warm, Mid
@@ -213,8 +213,8 @@ return function(props: Props): Frame
 	end
 	const fill = spring(ratio, 0.25, 1)
 
-	-- Progressive reveal: 0 -> 1 in Theme.Motion.Reveal s (instant with reduced motion)
-	const reveal = Motion.Reveal(function()
+	-- Progressive reveal: pops in (Motion.RevealPop; instant with reduced motion)
+	const reveal = Motion.RevealPop(function()
 		return props.Revealed == nil or props.Revealed()
 	end)
 

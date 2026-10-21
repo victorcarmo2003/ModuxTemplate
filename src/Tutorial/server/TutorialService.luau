@@ -51,6 +51,8 @@ const HOT_DOG = "hot_dog"
 const PACKAGE = Content.Packages.ByKey[TutorialRules.Package]
 const BUN = if PACKAGE then PACKAGE.Ingredient else "bun"
 
+const SKIP_ATTRIBUTE = "TutorialSkipped" -- on the Player: skipped on the lobby pad (TutorialController reads it)
+
 const TutorialService = Modux.Service(
 	"TutorialService",
 	{
@@ -65,6 +67,8 @@ const TutorialService = Modux.Service(
 			"AnomalyService",
 			"VitalService",
 			"RewardService",
+			"RunStateService",
+			"RoleService",
 		},
 		Priority = 500,
 	}
@@ -85,6 +89,12 @@ function TutorialService:Setup()
 	-- os.clock() when the current hold began (0 = not holding); HoldExpired = the safety timeout ran out (latched)
 	self.HoldSince = 0 :: number
 	self.HoldExpired = false :: boolean
+	-- Co-op wait (DEC-320, Q-412): seconds this run the clock was held while a crewmate who is done waited
+	-- (Content.Shift.TutorialWaitMax for the whole run, never restarted by a rookie who joins later); os.clock() of the
+	-- last count; UserIds already told "Waiting for the rookie" in the current wait
+	self.WaitUsed = 0 :: number
+	self.WaitAt = 0 :: number
+	self.WaitTold = {} :: { [number]: boolean }
 	-- Day 1 upgrade lesson: UserId -> answered the tutorial call this run; lesson over (latched); the call / cash went
 	-- out; os.clock() the Closing hold began (0 = not holding)
 	self.Rookies = {} :: { [number]: boolean }
@@ -223,11 +233,12 @@ end
 
 -- Upgrade lesson ------------------------------------------------------------------------------------------------
 
--- Any Gear Stand line above its start level on the current vehicle (the first upgrade was bought)
+-- Any Gear Stand line above its start level on the current vehicle (the first upgrade was bought); retired / off lines
+-- (Content.Mode.IsOff, DEC-331) do not count: an old run can still hold a level of one of them
 function TutorialService:BoughtGear(): boolean
 	const upgrades = self.Dependencies.UpgradeService
 	for _, upgrade in Content.Upgrades.List do
-		const level = if upgrade.SoldAt == "Bench" then upgrades:GetLevel(upgrade.Key) else nil
+		const level = if upgrade.SoldAt == "Bench" and not Content.Mode.IsOff(upgrade.Key) then upgrades:GetLevel(upgrade.Key) else nil
 		if level ~= nil and level > upgrade.StartLevel then
 			return true
 		end
@@ -350,7 +361,41 @@ function TutorialService:ShouldHold(): boolean
 		warn(`[TutorialService] Day 1 held {Content.Shift.TutorialHoldMax} s: released (safety timeout)`)
 		return false
 	end
+	if not self:CountWait(t) then
+		self.HoldExpired = true
+		self.HoldSince = 0
+		warn(`[TutorialService] crew waited {Content.Shift.TutorialWaitMax} s for a rookie this run: released (DEC-320)`)
+		return false
+	end
 	return true
+end
+
+-- Co-op wait (DEC-320, Q-412): while the clock is held and someone in the server is already done with the tutorial,
+-- the time counts against one budget per run (Content.Shift.TutorialWaitMax); those players get "Waiting for the
+-- rookie" once per wait. False = the budget is spent (the hold lets go). Called from ShouldHold only.
+function TutorialService:CountWait(t: number): boolean
+	const waiting: { Player } = {}
+	for _, player in Players:GetPlayers() do
+		if not self:IsPending(player) then
+			table.insert(waiting, player)
+		end
+	end
+	if #waiting == 0 then
+		self.WaitAt = 0
+		table.clear(self.WaitTold)
+		return true
+	end
+	if self.WaitAt > 0 then
+		self.WaitUsed += math.min(t - self.WaitAt, 1)
+	end
+	self.WaitAt = t
+	for _, player in waiting do
+		if not self.WaitTold[player.UserId] then
+			self.WaitTold[player.UserId] = true
+			self.Dependencies.RunStateService:Notify(player, "tutorial_wait")
+		end
+	end
+	return self.WaitUsed < Content.Shift.TutorialWaitMax
 end
 
 -- Dev hooks ---------------------------------------------------------------------------------------------------------
@@ -383,6 +428,9 @@ function TutorialService:DevReset(player: Player)
 	self.Seeded = false
 	self.HoldSince = 0
 	self.HoldExpired = false
+	self.WaitUsed = 0
+	self.WaitAt = 0
+	table.clear(self.WaitTold)
 	self.Rookies[player.UserId] = true
 	self.LessonOver = false
 	self.LessonRung = false
@@ -428,6 +476,21 @@ TutorialService:OnInit(function(self)
 	self.Dependencies.VitalService:SetHold(function(): boolean
 		return self:AnyPending()
 	end)
+	-- Skip tutorial on the lobby pad (owner request 2026-10-21, Provisional): the launch lists who skips; closed for the
+	-- run as a skip, and the attribute tells the client not to start it
+	const launch = self.Dependencies.RoleService:GetLaunch()
+	if launch ~= nil and #launch.SkipTutorial > 0 then
+		local function skip(player: Player)
+			if table.find(launch.SkipTutorial, player.UserId) then
+				player:SetAttribute(SKIP_ATTRIBUTE, true)
+				self:Complete(player, "skip")
+			end
+		end
+		Players.PlayerAdded:Connect(skip)
+		for _, player in Players:GetPlayers() do
+			skip(player)
+		end
+	end
 	Players.PlayerRemoving:Connect(function(player: Player)
 		-- a player who comes back starts over (the client lost its session state too)
 		self.Closed[player.UserId] = nil

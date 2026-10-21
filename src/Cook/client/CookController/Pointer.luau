@@ -101,7 +101,7 @@ function Pointer.new(): Pointer
 	table.insert(
 		connections,
 		UserInputService.InputEnded:Connect(function(input: InputObject)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 and self.Device == "Mouse" then
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
 				dispatch("Up", point(input), "Mouse")
 			elseif input.UserInputType == Enum.UserInputType.Touch and input == touch then
 				touch = nil

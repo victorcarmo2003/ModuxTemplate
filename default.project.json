@@ -61,6 +61,12 @@
 						"optional": "src/Cutscene/shared"
 					}
 				},
+				"Dev": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Dev/shared"
+					}
+				},
 				"DriveThru": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -502,12 +508,6 @@
 						"optional": "src/Tablet/server"
 					}
 				},
-				"Thief": {
-					"$ignoreUnknownInstances": false,
-					"$path": {
-						"optional": "src/Thief/server"
-					}
-				},
 				"Traffic": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -638,6 +638,12 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Delivery/client"
+						}
+					},
+					"Dev": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Dev/client"
 						}
 					},
 					"Door": {
@@ -871,12 +877,6 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Tablet/client"
-						}
-					},
-					"Thief": {
-						"$ignoreUnknownInstances": false,
-						"$path": {
-							"optional": "src/Thief/client"
 						}
 					},
 					"Traffic": {

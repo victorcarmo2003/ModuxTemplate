@@ -32,6 +32,7 @@ export type Public = {
 	Published: { [number]: number },
 	Stations: { [number]: StationApi.Station },
 	StockChanged: SignalLib.Signal<string, number>,
+	ToppingAdded: SignalLib.Signal<Player, Tool, string>,
 	Wanted: { [Instance]: Wanted },
 	Warned: { [string]: boolean },
 	WasBlocked: { [string]: boolean },

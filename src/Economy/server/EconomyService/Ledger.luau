@@ -7,10 +7,10 @@ local Content = require(ReplicatedStorage.shared.Content)
 
 export type Grade = "A" | "B" | "C" | "D"
 export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused" | "Slow"
--- Where shift money comes from: order price, tip, thief caught (+$5 "Nice catch!", FEAT-013: money, not a customer).
--- Sale and Catch go straight to Cash (DEC-238, EconomyService:AddSale); Tip goes to the tip jar (DEC-239, AddTip)
-export type SaleKind = "Sale" | "Catch"
-export type DrawerKind = "Sale" | "Tip" | "Catch"
+-- Where shift money comes from: order price and tip. Sale goes straight to Cash (DEC-238, EconomyService:AddSale); Tip
+-- goes to the tip jar (DEC-239, AddTip)
+export type SaleKind = "Sale"
+export type DrawerKind = "Sale" | "Tip"
 
 -- Shift counters (architecture.md §2.3 "ledger do turno"; data.md §2.2: zeroed every shift, never in the snapshot)
 export type Ledger = {
@@ -19,8 +19,6 @@ export type Ledger = {
 	Completed: number, -- Perfect + Complete (= satisfied, DEC-051); anti-AFK base (DEC-083)
 	Sales: number, -- $ from orders
 	Tips: number, -- $ from tips (DEC-072)
-	Catches: number, -- $ from caught thieves (FEAT-013)
-	Stolen: number, -- $ taken by the thief (EconomyService:Steal)
 	Collected: number, -- $ of tips moved from the jar to Cash during the shift ("Collect Tips", DEC-239); informative
 }
 
@@ -33,7 +31,6 @@ export type Report = {
 	Completed: number,
 	Drawer: number,
 	Tips: number,
-	Stolen: number,
 	Grade: Grade,
 	Bonus: number,
 	Deposited: number,
@@ -45,7 +42,7 @@ export type Report = {
 export type Settlement = {
 	Grade: Grade,
 	BonusPct: number,
-	Take: number, -- the day take: Sales + Tips + Catches - Stolen (the base of the bonus, DEC-051)
+	Take: number, -- the day take: Sales + Tips (the base of the bonus, DEC-051)
 	Bonus: number,
 	Deposited: number, -- Take + Bonus (the report line; Cash already holds the sales and the collected tips)
 }
@@ -53,7 +50,7 @@ export type Settlement = {
 const Ledger = {}
 
 function Ledger.new(): Ledger
-	return { Arrived = 0, Served = 0, Completed = 0, Sales = 0, Tips = 0, Catches = 0, Stolen = 0, Collected = 0 }
+	return { Arrived = 0, Served = 0, Completed = 0, Sales = 0, Tips = 0, Collected = 0 }
 end
 
 -- Counts one customer outcome. Left/Refused/Wrong only matter through Arrived (they are not satisfied).
@@ -69,10 +66,8 @@ end
 function Ledger.credit(ledger: Ledger, kind: DrawerKind, amount: number)
 	if kind == "Sale" then
 		ledger.Sales += amount
-	elseif kind == "Tip" then
-		ledger.Tips += amount
 	else
-		ledger.Catches += amount
+		ledger.Tips += amount
 	end
 end
 
@@ -94,7 +89,7 @@ function Ledger.grade(arrived: number, completed: number): Grade
 	return "D"
 end
 
--- Bonus = floor(day take x %) (FEAT-014); the day take = Sales + Tips + Catches - Stolen, the same number the old drawer
+-- Bonus = floor(day take x %) (FEAT-014); the day take = Sales + Tips, the same number the old drawer
 -- gave (DEC-238, DEC-239: sales go to Cash and tips to the jar, but the grade bonus does not depend on where or when the
 -- crew collected). bossPoints = party BossBonusPP (Shift Lead, +5, not stacking); FEAT-014 table: it adds to A/B/C and
 -- never to D (D stays 0% and triggers the boss line). Pure: the caller adds the tips left in the jar to Cash.
@@ -104,7 +99,7 @@ function Ledger.settle(ledger: Ledger, bossPoints: number): Settlement
 	if grade ~= "D" then
 		pct += math.max(bossPoints, 0)
 	end
-	const take = math.max(ledger.Sales + ledger.Tips + ledger.Catches - ledger.Stolen, 0)
+	const take = math.max(ledger.Sales + ledger.Tips, 0)
 	const bonus = math.floor(take * pct / 100)
 	return { Grade = grade, BonusPct = pct, Take = take, Bonus = bonus, Deposited = take + bonus }
 end

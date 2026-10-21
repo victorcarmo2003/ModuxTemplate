@@ -105,7 +105,6 @@ return UILabs.CreateVideStory({
 				Completed = 7,
 				Sales = 72,
 				Tips = 12,
-				Stolen = 0,
 				Grade = "B",
 				Bonus = 8,
 				Deposited = 92,

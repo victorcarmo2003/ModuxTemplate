@@ -431,7 +431,8 @@ function TabletController:DropBalloons(spot: Spot)
 	end
 end
 
--- Sounds of the running talks: dialog_blip on each new line (everyone, at the tablet), ticket_pop per item (me)
+-- Sounds of the running talks: dialog_blip on each new line (everyone, at the tablet), the customer's murmur (order_take) on each
+-- of its lines from the first one (owner 2026-10-19: it murmured only once the talk was over), ticket_pop per item (me)
 function TabletController:Cue(spot: Spot, now: number)
 	const record = Vide.untrack(spot.Record)
 	const talk = spot.Talk
@@ -448,6 +449,9 @@ function TabletController:Cue(spot: Spot, now: number)
 	const at = spot.Rig or self:Anchor(spot)
 	if at ~= nil then
 		audio:Play("dialog_blip", at)
+		if step.Speaker == "Customer" then
+			audio:Play("order_take", at)
+		end
 	end
 	if isMine(record) and step.Reveal > spot.LastReveal then
 		spot.LastReveal = step.Reveal

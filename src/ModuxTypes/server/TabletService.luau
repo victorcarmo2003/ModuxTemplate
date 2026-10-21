@@ -28,7 +28,7 @@ export type Public = {
 	PickupHasRoom: (self: Public) -> boolean,
 	TalkTime: (self: Public, k1: number, k2: number?) -> number,
 	Head: (self: Public, tablet: Tablet) -> number?,
-	IsFull: (self: Public, npc: number?) -> boolean,
+	IsFull: (self: Public, npc: number?, drive: boolean?) -> boolean,
 	Check: (self: Public, player: Player, tablet: Tablet) -> (boolean, string?),
 	Start: (self: Public, player: Player, tablet: Tablet) -> boolean,
 	Reset: (self: Public, tablet: Tablet) -> (),

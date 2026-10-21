@@ -585,6 +585,7 @@ function VitalController:Mount(playerGui: Instance)
 			ResetOnSpawn = false,
 			IgnoreGuiInset = true,
 			ScreenInsets = Enum.ScreenInsets.None,
+			ClipToDeviceSafeArea = false,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			DisplayOrder = 0, -- under the HUD (1)
 

@@ -17,6 +17,12 @@
 	  * the creature is gone Hijack.Linger s later.
 	Unseen by the end of Rules.Life: it simply vanishes. Motion.Reduced(): the camera API scales itself
 	(HorrorScenes.Rules.ReduceMotion) and Screen.Pulse is skipped; no pull/zoom beyond that.
+
+	The forgotten customer (owner 2026-10-19; Content.Suspense.Rules.Forgotten): every NOTICE_STEP s, each customer of the
+	queue (Phase Queue, CustomerController) nobody has noticed yet is tested with the same glance (head on screen, in range,
+	clear line). The first glance sends CustomerNoticed (the server tells everyone: no scare for them later). If At of its
+	queue patience was already gone, the glance is a small scare: a short pull to its head, a light zoom, a sting, a pulse.
+	Not during the tutorial (TutorialRunning) nor from a cooking focus (CookStation).
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -24,6 +30,7 @@ local RunService = game:GetService("RunService")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Workspace = game:GetService("Workspace")
 local Content = require(ReplicatedStorage.shared.Content)
+local Vide = require(ReplicatedStorage.Packages.Vide)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local Sight = require(ReplicatedStorage.shared.Anomaly.Sight)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
@@ -51,15 +58,20 @@ const HISS_KEY = "suspense_hiss"
 const GROUND_UP = 6
 const GROUND_DOWN = 20
 const ZOOM_HOLD = 0.5 -- s the zoom stays in after the pull before it eases back
+const FORGOTTEN = RULES.Forgotten
+const NOTICE_STEP = 0.2 -- s between two passes of the forgotten-customer glance
 
 const SuspenseController = Modux.Controller("SuspenseController", {
-	Require = { "CameraController", "AudioController" },
+	Require = { "CameraController", "AudioController", "CustomerController" },
 	Priority = 550,
 })
 
 function SuspenseController:Setup()
 	self.Show = nil :: Show?
 	self.Folder = nil :: Folder?
+	-- NpcId -> true: noticed by this client or by anyone (CustomerNoticed); dropped when the customer goes
+	self.Noticed = {} :: { [number]: boolean }
+	self.NoticeAt = 0 :: number
 end
 
 function SuspenseController:FolderOf(): Folder
@@ -115,6 +127,91 @@ function SuspenseController:Clear()
 		show.Connection:Disconnect()
 	end
 	show.Model:Destroy()
+end
+
+-- A point on screen (inside `margin` of the edges), within `range` and in clear line from the camera, in first person
+function SuspenseController:InSight(point: Vector3, range: number, margin: number, ignore: { Instance }): boolean
+	const camera = Workspace.CurrentCamera
+	if camera == nil or self.Dependencies.CameraController.Mode() ~= "FirstPerson" then
+		return false
+	end
+	const origin = camera.CFrame.Position
+	const offset = point - origin
+	if offset.Magnitude > range then
+		return false
+	end
+	const screen, visible = camera:WorldToViewportPoint(point)
+	if not visible or screen.Z <= 0 then
+		return false
+	end
+	const size = camera.ViewportSize
+	if
+		screen.X < size.X * margin
+		or screen.X > size.X * (1 - margin)
+		or screen.Y < size.Y * margin
+		or screen.Y > size.Y * (1 - margin)
+	then
+		return false
+	end
+	return Sight.Clear(origin, offset, exclude(ignore))
+end
+
+-- The forgotten customer: the first glance at each queue customer; a late one scares (Content.Suspense.Rules.Forgotten)
+function SuspenseController:StepNoticed()
+	const now = os.clock()
+	if now < self.NoticeAt then
+		return
+	end
+	self.NoticeAt = now + NOTICE_STEP
+	const customers = self.Dependencies.CustomerController
+	const player = Players.LocalPlayer
+	const blind = player:GetAttribute("TutorialRunning") == true or player:GetAttribute("CookStation") ~= nil
+	for id in self.Noticed do
+		if customers.Entries[id] == nil then
+			self.Noticed[id] = nil
+		end
+	end
+	if blind then
+		return
+	end
+	const serverNow = Workspace:GetServerTimeNow()
+	for id, entry in customers.Entries do
+		if self.Noticed[id] then
+			continue
+		end
+		const record = Vide.untrack(entry.Record)
+		const model = customers.Models[id]
+		if record == false or model == nil or record.Phase ~= "Queue" or record.State == "Leaving" then
+			continue
+		end
+		const head = model:FindFirstChild("Head")
+		const point = if head ~= nil and head:IsA("BasePart") then head.Position else model:GetPivot().Position
+		const gone = if record.PatienceSpan > 0 and record.PatienceEndsAt > 0
+			then 1 - (record.PatienceEndsAt - serverNow) / record.PatienceSpan
+			else 0
+		if not self:InSight(point, FORGOTTEN.Range, FORGOTTEN.ScreenMargin, { model }) then
+			continue
+		end
+		self.Noticed[id] = true
+		self.Libs.Net.CustomerNoticed:fireServer({ Npc = id })
+		if gone >= FORGOTTEN.At then
+			self:Startle(point)
+		end
+	end
+end
+
+-- The jumpscare of a forgotten customer (1-2 s): the look pulled onto its head, a hard zoom held and eased back, a shake,
+-- a sub drop and a sting, a pulse and the edges closing
+function SuspenseController:Startle(point: Vector3)
+	const camera = self.Dependencies.CameraController
+	camera:HorrorPull(point, FORGOTTEN.Pull, FORGOTTEN.Duration)
+	camera:HorrorFov(FORGOTTEN.Fov, 0, FORGOTTEN.Hold)
+	camera:HorrorShake(FORGOTTEN.Shake)
+	const audio = self.Dependencies.AudioController
+	audio:Play(DROP_KEY, nil, { Scare = true })
+	audio:Play(FORGOTTEN.Sound, point, { Scare = true })
+	Screen.Pulse(FORGOTTEN.Pulse)
+	Screen.SetVignette(FORGOTTEN.Vignette, 0, FORGOTTEN.VignetteFor, CHANNEL)
 end
 
 -- Head on screen (inside the margin), in range and in clear line from the camera, in first person.
@@ -221,11 +318,18 @@ SuspenseController:OnInit(function(self)
 	self.Libs.Net.Suspense:onClient(function(data)
 		self:Begin(data)
 	end)
+	-- someone caught a queue customer first: no forgotten-customer scare for it here
+	self.Libs.Net.CustomerNoticed:onClient(function(data)
+		self.Noticed[data.Npc] = true
+	end)
 end)
 
 SuspenseController:OnStart(function(self)
 	Players.LocalPlayer.CharacterAdded:Connect(function()
 		self:Reset()
+	end)
+	RunService.Heartbeat:Connect(function()
+		self:StepNoticed()
 	end)
 end)
 

@@ -14,8 +14,11 @@
 --   any slot busy      SFX-021 `grill_sizzle` loop on the grill (volume by busy slots) + smoke, Rate 3 per busy slot
 -- Wave 3 (TASK-110): a slot with `Altered` >= 1 shows SausageWrong (AST-061) whatever the bar says (no ready burst).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Content = require(ReplicatedStorage.shared.Content)
 local Context = require(script.Parent.Context)
+local FlipMeter = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.FlipMeter)
 local Fx = require(script.Parent.Fx)
 local Slots = require(script.Parent.Slots)
 
@@ -31,6 +34,8 @@ const KIND = "grill"
 const SAUSAGE_HEIGHT = 0.24 -- AST-002 (build_items.luau)
 const OVERLAY_SCALE = 1.012 -- the grilled model over the raw one: no z-fight
 const FADE_FROM = 0.1 -- cooking share at which the grilled colour starts to show (Provisional, S1)
+-- DEC-311: an unflipped sausage waits at this share until its flip (the server holds it without touching the record)
+const HOLD_AT = Content.Restaurant.Grill.HoldAt
 
 local function spotPosition(spot: Slots.Spot): Vector3
 	return (spot.Host.CFrame * spot.Offset).Position
@@ -38,13 +43,21 @@ end
 
 local function mountSlot(
 	station: Instance,
+	stationId: () -> number?,
 	spot: Slots.Spot,
 	read: Slots.Reader,
 	clock: () -> number,
 	audio: Context.Audio
 )
+	-- TASK-594 (owner 2026-10-19: the bar ran to full before the flip, then dropped back to half): unflipped, the bar stops at
+	-- HoldAt like the server; the flip moves StartedAt so it goes on from there
 	local function progress(): number
-		return Slots.Progress(read, clock)
+		const value = Slots.Progress(read, clock)
+		const record = read()
+		if record ~= nil and record.State == "Working" and record.Flip == 0 then
+			return math.min(value, HOLD_AT)
+		end
+		return value
 	end
 
 	-- state transitions (nil = no record seen yet: the first one is silent)
@@ -150,7 +163,11 @@ local function mountSlot(
 	Slots.Bar(spot, SAUSAGE_HEIGHT, progress, function()
 		const record = read()
 		return record ~= nil and record.State ~= "Empty"
-	end)
+	end, true, function(): boolean
+		-- the focused cook mode says which sausage is being flipped (the same record id as the Stations set)
+		const id = stationId()
+		return id ~= nil and FlipMeter.State.Active() == id * 100 + spot.Slot
+	end, FlipMeter.State.Marker)
 end
 
 -- Sizzle loop + smoke for the whole grill, from the number of busy slots.
@@ -220,7 +237,7 @@ function Grill.Mount(station: Instance, context: Context.Context)
 		return Slots.AnyWorking(readers)
 	end)
 	for slot, spot in spots do
-		mountSlot(station, spot, readers[slot], clock, context.Audio)
+		mountSlot(station, stationId, spot, readers[slot], clock, context.Audio)
 	end
 	mountGrill(station, spots, readers, context.Audio)
 end

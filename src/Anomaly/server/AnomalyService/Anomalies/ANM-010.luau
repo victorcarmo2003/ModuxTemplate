@@ -5,7 +5,7 @@
 -- (Lights set: At = start, post Order k out at k x Step); the fog is the client (Effects/ANM-010).
 --
 --   Start    LightService:BeginHush(start, holdUntil) (posts out from now; trailer LightZones dark from the corner
---            post until the posts come back; the switch has no effect meanwhile) + TrafficService:Hold("anm_010"),
+--            post until the posts come back; the switch has no effect meanwhile in the trailer) + TrafficService:Hold("anm_010"),
 --            Phase Active, Step 0.
 --   Step     number of posts already out (Order x Step of the juniper_posts group), published while they go out.
 --   Corner   the corner post goes out (largest Order x Step, the same moment LightService darkens the trailer; Params
@@ -23,6 +23,13 @@
 -- TASK-490 (restaurant, design/anomalies-v3-restaurant.md, Provisional): no Mart. The posts go out one by one as before
 -- but the shop keeps its light and its switch (LightService:BeginHush postsOnly); safe = the shop light switched OFF at
 -- the corner post and kept off until the posts come back (on again for OutGrace s = every watched player fails).
+-- TASK-592 (owner 2026-10-19, PROVISIONAL Q-398): (a) the shop switch works during the Hush (LightService CanToggle
+-- only refuses a full Hush; here it is postsOnly) and the rule reads it (safe = IsSwitchOn false); (b) the window no
+-- longer slams shut by itself (Content.ShopWindow anm_010_hush = None); (c) the head: at HeadAt s, with the service
+-- window open, it pushes its head in through it and looks (record Anchor HEAD_IN) for HeadFor s, then pulls out
+-- (HEAD_OUT; also when someone shuts the window on it). The shop lit at that moment, or switched on while the head is in,
+-- = every active player fails at once (jumpscare + faint, no OutGrace). Window shut at HeadAt = it bumps the shutter
+-- (HEAD_GLASS), nothing else.
 -- TASK-334 (owner 2026-10-15, Provisional): the owner died "with a lot of doors opening and closing": those were the
 -- Mart's automatic doors (DoorController AutoDoor, proximity) swinging while he stood in the doorway, half in and half
 -- out of the safe zone, so a 5 Hz tick caught him "outside" during the hold. Now: (a) a watched player fails only after
@@ -54,10 +61,17 @@ const DEFAULT_POINT = "SS"
 const DEFAULT_RADIUS = 10
 const DEFAULT_OUT_GRACE = 2
 const DEFAULT_SCARE_FAINT = 0.7
+const DEFAULT_HEAD_AT = 25.5
+const DEFAULT_HEAD_FOR = 6
+-- record Anchor of the head (Effects/ANM-010; TASK-592)
+const HEAD_IN = 1
+const HEAD_GLASS = 2
+const HEAD_OUT = 3
 const SCARE_CUE = "jumpscare"
 const ENTITY_MOD = 65536 -- AnomalyCue.Entity is 0..65535
 
 type Stage = "Going" | "Holding"
+type Head = "Waiting" | "In" | "Done"
 
 type State = {
 	Stage: Stage,
@@ -82,6 +96,11 @@ type State = {
 	Flavoured: boolean,
 	Held: boolean,
 	LastTick: number,
+	-- TASK-592: the head through the window
+	Head: Head,
+	HeadAt: number,
+	HeadFor: number,
+	HeadUntil: number,
 }
 
 -- The occurrence that began the current Hush (only it ends it) and live traffic Holds of this module
@@ -258,7 +277,7 @@ local function fail(ctx: Api.Context, occ: Api.Occurrence, state: State, players
 	end
 	state.AnyFailed = true
 	for _, player in list do
-		ctx.Cue(occ, SCARE_CUE, player.UserId % ENTITY_MOD)
+		ctx.Cue(occ, SCARE_CUE, player.UserId % ENTITY_MOD, player.UserId)
 	end
 	task.delay(state.ScareFaint, function()
 		for _, player in list do
@@ -270,6 +289,34 @@ local function fail(ctx: Api.Context, occ: Api.Occurrence, state: State, players
 	if not state.Flavoured then
 		state.Flavoured = true
 		ctx.Cue(occ, "hush_fog", 0)
+	end
+end
+
+-- TASK-592: the head through the window. The shop lit while it looks in = everyone active fails at once.
+local function head(ctx: Api.Context, occ: Api.Occurrence, state: State, now: number)
+	if state.Head == "Waiting" then
+		if now < state.HeadAt then
+			return
+		end
+		if ctx.Vehicle.IsShutterClosed() then
+			state.Head = "Done"
+			ctx.Publish(occ, { Anchor = HEAD_GLASS })
+			return
+		end
+		state.Head = "In"
+		state.HeadUntil = now + state.HeadFor
+		ctx.Publish(occ, { Anchor = HEAD_IN })
+	end
+	if state.Head ~= "In" then
+		return
+	end
+	if now >= state.HeadUntil or ctx.Vehicle.IsShutterClosed() then
+		state.Head = "Done"
+		ctx.Publish(occ, { Anchor = HEAD_OUT })
+		return
+	end
+	if ctx.Light.IsSwitchOn() then
+		fail(ctx, occ, state, ctx.Active())
 	end
 end
 
@@ -320,6 +367,10 @@ const Hush: Api.Module = {
 			Flavoured = false,
 			Held = false,
 			LastTick = occ.StartedAt,
+			Head = "Waiting",
+			HeadAt = occ.StartedAt + param(rule, "HeadAt", DEFAULT_HEAD_AT),
+			HeadFor = param(rule, "HeadFor", DEFAULT_HEAD_FOR),
+			HeadUntil = 0,
 		}
 		occ.State = state
 		if delay == nil then
@@ -348,6 +399,8 @@ const Hush: Api.Module = {
 		if target ~= nil and state.Range > 0 then
 			ctx.SeenTick(occ, target, state.Range, dt)
 		end
+
+		head(ctx, occ, state, now)
 
 		if state.Stage == "Going" then
 			if now >= state.DarkAt then

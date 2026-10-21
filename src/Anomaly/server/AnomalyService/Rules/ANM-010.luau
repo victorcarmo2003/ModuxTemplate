@@ -33,6 +33,12 @@ const rule: Api.Rule = {
 		SafeZones = { "LZ-4", "LZ-5" },
 		-- studs added on every side of each safe LightZone (the gap between LZ-4 and LZ-5 at the door)
 		ZoneMargin = 4,
+		-- TASK-592 (owner 2026-10-19, PROVISIONAL Q-398): s after the start the Hush pushes its head in through the
+		-- service window when it is open (it stopped at the glass at ~25 s, scene), and s it stays in, looking. The shop
+		-- lit while the head is in = the error at once for every active player (no OutGrace). Window shut = it only
+		-- bumps the shutter.
+		HeadAt = 25.5,
+		HeadFor = 6,
 	},
 }
 

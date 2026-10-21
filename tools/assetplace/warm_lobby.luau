@@ -33,11 +33,12 @@ local CREAM_LIGHT = Color3.fromHex("FFE7C2")
 local log: { string } = {}
 
 -- id, expected world position, light class, target colour (nil = keep hue), brightness, range, angle (spot, nil = keep)
+-- 2026-10-20 Realistic lighting style: L-KEY 4.5 -> 2.8, L-FILL 2.2 -> 1.6, L-HQ 2.0 -> 1.5 (class stage rig blew out)
 local PLAN = {
-	{ "L-KEY", Vector3.new(-9.2, 8.0, -578.6), "SpotLight", CREAM_LIGHT, 4.5, 20, nil },
-	{ "L-FILL", Vector3.new(9.2, 6.6, -578.6), "SpotLight", WARM, 2.2, 18, nil },
+	{ "L-KEY", Vector3.new(-9.2, 8.0, -578.6), "SpotLight", CREAM_LIGHT, 2.8, 20, nil },
+	{ "L-FILL", Vector3.new(9.2, 6.6, -578.6), "SpotLight", WARM, 1.6, 18, nil },
 	{ "L-RIM", Vector3.new(0, 6.8, -572.0), "SpotLight", nil, 1.5, 9, nil }, -- teal accent kept
-	{ "L-HQ", Vector3.new(0, 10.5, -567.5), "PointLight", Color3.fromRGB(255, 200, 120), 2.0, 26, nil },
+	{ "L-HQ", Vector3.new(0, 10.5, -567.5), "PointLight", Color3.fromRGB(255, 200, 120), 1.5, 26, nil },
 	{ "L-SHOP", Vector3.new(-36.5, 8.0, -620), "PointLight", WARM, 1.9, 22, nil },
 	{ "L-CODES", Vector3.new(-10, 7.0, -653.6), "SpotLight", WARM, 2.2, 12, nil },
 	{ "L-TRUCK", Vector3.new(-36, 7.0, -579.0), "PointLight", WARM, 1.9, 22, nil },

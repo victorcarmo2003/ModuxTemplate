@@ -393,9 +393,15 @@ Onde ficam (tabela ou HUD) é do architect; hoje nenhuma tabela da onda 2 tem es
 | Momento | Texto |
 |---|---|
 | HUD | "Night {n}" · relógio "7:00 PM" parado na `Call`, depois "8:00 PM" → "6:00 AM" |
-| Banner no início da noite | grande "Night {n}" · pequeno "Stay open till 6:00 AM." |
-| Banner na noite repetida | grande "Night {n}" · pequeno "Same night. Same rules." (nunca fala de chances, DEC-053) |
+| Título no início do dia (TASK-595, Provisório) | grande "DAY {n}" · pequeno "Doors open at 8:00 AM." |
+| Título no início da noite | grande "NIGHT {n}" · pequeno "Stay open till 6:00 AM." |
+| Título na noite repetida | grande "NIGHT {n}" · pequeno "Same night. Same rules." (nunca fala de chances, DEC-053) |
 | 6:00 AM (`NightEnd`) | "6:00 AM" · "You made it!" |
+| Abertura da loja no tutorial (TASK-595, Provisório) | grande "WE'RE OPEN" · pequeno "Your first customer is on the way." |
+
+Desde a TASK-595 (Play do dono 2026-10-19) os títulos de troca de turno e a abertura da loja do tutorial usam o título
+grande do apagão (`HorrorCaption`, via `Interface/Announce`), não o banner do HUD; o banner fica só para o "Resuming".
+O título é escrito em maiúsculas e espaçado pelo componente. Textos Provisórios até revisão do narrative-writer.
 | Todos de volta na noite repetida | "Everyone's back on shift!" (§6) |
 
 ### 12.3 Queda, janela e espectador (onda 2: sem ambulância nem reviver; ondas 2–3)

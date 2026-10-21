@@ -30,7 +30,7 @@ export type Options = {
 	-- Crew cap. Default: on for the crew uniform (Outfits.Use = "Crew"), off for civil outfits. Ears-up species
 	-- wear the cap with ear holes (Assets.Crew.CapEarsUp).
 	Cap: boolean?,
-	-- Hat that replaces the cap, by name in Assets.Crew.Hats ("ThiefHat" for Quick Quentin, DEC-159). Not raised.
+	-- Hat that replaces the cap, by name in Assets.Crew.Hats (none in use since DEC-313). Not raised.
 	Hat: string?,
 	-- Class skin (Content.Skins key; owner request 2026-10-17): written as attribute Skin (Dress swaps the outfit sheet),
 	-- its Fur replaces the species fur, its Accessories / Hat are added. Only on a crew outfit (Outfits.Use = "Crew");

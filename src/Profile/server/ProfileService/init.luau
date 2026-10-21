@@ -192,7 +192,22 @@ function ProfileService:Replicate(player: Player)
 		Classes = self:OwnedClasses(profile),
 		Selected = self:SelectedClass(profile),
 		TutorialDone = profile.TutorialDone() == true,
+		Guides = self:LobbyGuides(profile),
 	})
+end
+
+-- Lobby floor guides already shown. The pad guide counts as done for anyone who already started a run.
+function ProfileService:LobbyGuides(profile: Profile): { [string]: boolean }
+	const saved = profile.LobbyGuides()
+	const out: { [string]: boolean } = {}
+	for _, key in Content.Lobby.Guide.Keys do
+		out[key] = type(saved) == "table" and saved[key] ~= nil
+	end
+	const stats = profile.Stats()
+	if type(stats) == "table" and (stats.RunsStarted or 0) > 0 then
+		out.pad = true
+	end
+	return out
 end
 
 -- Runs Migrations[v] while the data is behind the Template version (data.md §1.5). Reconcile runs before this.

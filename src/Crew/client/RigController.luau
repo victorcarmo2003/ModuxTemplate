@@ -12,7 +12,7 @@
 	    neutral face. The local sanity band no longer dresses NPCs (Provisional, 2026-10-14): the mood holds in the
 	    low band too;
 	  - Night on an NPC only comes from an anomaly variant with an animal rig (NIGHT_VARIANTS: blank, raincoat),
-	    always Night even with high sanity, except reserved outfits (Quick Quentin, DEC-159). The player's own
+	    always Night even with high sanity, except reserved outfits (none in use). The player's own
 	    character is Night in the low band through the server (VitalService -> CharacterService:SetLookPack ->
 	    LookPack attribute, crew branch above); nothing to do on this client.
 	Local-only rigs (Opal, previews) are built with `Tag = false` and dressed by their owner with CrewRig.Dress.
@@ -276,9 +276,6 @@ function RigController:Resolve(model: Model): (Pack, string?, boolean)
 	if fixed ~= nil and hasExpression(fixed) then
 		-- Blank head / atlas only together with the empty face (otherwise the ordinary look, never a bald face).
 		return shown, fixed, variant == BLANK and not reserved
-	end
-	if override == nil and outfit == "thief" then
-		return shown, "Thief", false -- Quick Quentin's own face (T_Expr_Thief, NPC-007)
 	end
 	return shown, override or NEUTRAL_FACE, false
 end

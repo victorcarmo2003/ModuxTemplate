@@ -16,6 +16,7 @@ local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonLabel = require(script.Parent.CartoonLabel)
+local UiScale = require(script.Parent.UiScale)
 local Zones = require(script.Parent.Parent.Zones)
 
 const create = Vide.create
@@ -48,6 +49,7 @@ const BADGE = 34 -- round badge (not touchable)
 -- Clear of the native hotbar (DEC-040) on the bottom centre
 const BOTTOM_GAP = 84
 const SLIDE = 24
+const PHONE = 0.75 -- owner 2026-10-20: the strip covered the pickup prompt on a phone
 -- Speaker name on the Cream strip: the Ketchup lip (dark red-orange), contrast > 5:1 on Cream
 const SPEAKER_COLOR = Theme.Tone.Ketchup.Lip
 
@@ -121,7 +123,7 @@ return function(props: Props): Frame
 		createRaw("UISizeConstraint")({ MinSize = Vector2.new(MIN_WIDTH, 0), MaxSize = Vector2.new(MAX_WIDTH, 10000) }),
 		createRaw("UIScale")({
 			Scale = function()
-				return (if props.Scale then props.Scale() else 1) * scale()
+				return (if props.Scale then props.Scale() else 1) * UiScale.Compact(PHONE) * scale()
 			end,
 		}),
 

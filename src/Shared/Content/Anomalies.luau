@@ -116,6 +116,11 @@ const cues = Table.new({
 	{ Key = "blackout_warn", Kind = "Visual", Duration = 0 },
 	-- ANM-021 the red fog (owner 2026-10-18): the fog reaches the glass and starts beating on it
 	{ Key = "fog_bang", Kind = "Both", Duration = 0 },
+	-- TASK-591 (owner 2026-10-19). Entity = actor NpcId. The starer reached the window: every camera is dragged to it,
+	-- slowly, then a flash blackout with a thud
+	{ Key = "stare_front", Kind = "Both", Duration = 0 },
+	-- ANM-022 the head banger: one blow of its head on the shut window (thud, camera shake, the shutter jumps)
+	{ Key = "head_bang", Kind = "Both", Duration = 0 },
 } :: { Cue })
 
 local function anomaly(
@@ -272,6 +277,15 @@ const redFog = anomaly(5, "anm_021_red_fog", "The red fog", "World", 0, "Party",
 redFog.Ref = "ANM-021"
 redFog.Family = "C"
 
+-- TASK-591: the window drags every camera to the starer when it reaches it (cue stare_front)
+const starer = odd(8, 16, "anm_016_starer", "The starer")
+starer.Cues = { "jumpscare", "stare_front" }
+
+-- TASK-591 (owner 2026-10-19, Provisional Q-399): a family A customer the window does NOT send away - only the shop's
+-- lights going out do; with the window shut it beats its head on it (cue head_bang). Silent debut on Night 8.
+const headBanger = odd(8, 22, "anm_022_head_banger", "The head banger")
+headBanger.Cues = { "jumpscare", "head_bang" }
+
 const rows: { Anomaly } = {
 	-- ViewRange: 60 default, 80 N6, 300 N7 (FEAT-019); 100 N3/N8 and 200 N10 Provisional (C-01 ~73 studs,
 	-- AN-12 ~63, Juniper posts 82-135 from the counter; MAP-01 §6, §10.3)
@@ -287,11 +301,12 @@ const rows: { Anomaly } = {
 	whiteEyes,
 	odd(6, 14, "anm_014_big_head", "The big head"),
 	odd(7, 15, "anm_015_floater", "The floater"),
-	odd(8, 16, "anm_016_starer", "The starer"),
+	starer,
 	monster(7, 17, "anm_017_crawler", "The crawler"),
 	roofWalker,
 	blackout,
 	redFog,
+	headBanger,
 }
 
 const base = Table.new(rows)

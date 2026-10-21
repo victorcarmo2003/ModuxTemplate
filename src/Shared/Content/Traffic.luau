@@ -17,7 +17,7 @@
 -- (Resume, NightEnd, NightLost, Summary at night, Finale, RunEnd). Night rows spawn only DayNight routes.
 -- DEC-198 (Provisional numbers): <= 1 car in the Calm (7-9 PM), 0 after 9 PM. Juniper South (CW-1) uses its own
 -- per-direction interval (Crossing.JuniperSouthInterval) inside the cap.
--- Hold reasons (TrafficService:Hold): no car spawns while any is on (anm_008, anm_010, cutscene, ambulance).
+-- Hold reasons (TrafficService:Hold): no car spawns while any is on (anm_008, anm_010, cutscene).
 -- Looks: index = (shape - 1) x #Paints + paint; kit Assets.Vehicles (TASK-099). Never black and long (ANM-008).
 local Table = require(script.Parent.Table)
 
@@ -90,7 +90,7 @@ export type Traffic = {
 	Crosswalks: Table.Table<Crosswalk>,
 	Conflicts: Table.Table<Conflict>,
 	Density: { Density },
-	MaxCars: number, -- absolute cap (the ambulance takes one vehicle slot)
+	MaxCars: number, -- absolute cap
 	ConflictGap: number,
 	SpeedStraight: number,
 	SpeedCrossing: number,
@@ -104,7 +104,6 @@ export type Traffic = {
 	ImpulseUp: number,
 	ImmuneTime: number,
 	HitsNpcs: boolean,
-	AmbulanceHits: boolean,
 	Crossing: Crossing,
 }
 
@@ -197,7 +196,7 @@ const traffic: Traffic = {
 		Shapes = { "Sedan", "Hatch", "Van", "Pickup" }, -- TASK-099 kit Cars/<Shape>
 		Paints = { "Peach", "Butter", "Lilac", "MintGray", "TealLight" }, -- Cars/<Shape>/Paints/<Paint>
 	},
-	HoldReasons = { "anm_008", "anm_010", "cutscene", "ambulance" },
+	HoldReasons = { "anm_008", "anm_010", "cutscene" },
 	HitMinSpeed = 6, -- studs/s (FEAT-033)
 	HitTolerance = 8, -- studs, server validation (architecture.md §8.2)
 	KnockTime = 2.5, -- Q-122 a
@@ -206,7 +205,6 @@ const traffic: Traffic = {
 	ImpulseUp = 15,
 	ImmuneTime = 5, -- Q-122 d
 	HitsNpcs = false, -- DEC-133
-	AmbulanceHits = false,
 	Crossing = {
 		PareStop = 1, -- DEC-133
 		ReserveRadius = 15, -- DEC-133

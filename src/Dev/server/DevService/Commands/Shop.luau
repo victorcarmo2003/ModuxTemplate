@@ -5,7 +5,7 @@
 --   shop code <text>                  redeems a code for the caller
 --   shop reward endless <n> [player] | forget [player] | status [player]   gem rewards
 --   shop market [reset]               Gear Stand pedestals and cooldowns; reset = every line back on sale
---   shop gear [open | close | state]  Gear Stand hours
+--   shop gear [open | hold | close | state]  Gear Stand hours
 local Api = require(script.Parent.Parent.Api)
 local Kit = require(script.Parent.Parent.Kit)
 
@@ -15,7 +15,7 @@ const Shop: Api.Module = function(ctx: Api.Context): { Api.Command }
 	return {
 		Kit.group(
 			"shop",
-			"shop receipt <key> [id] | code <text> | reward ... | market [reset] | gear [open|close]",
+			"shop receipt <key> [id] | code <text> | reward ... | market [reset] | gear [open|hold|close]",
 			"fake receipt, redeem a code, gem rewards, Gear Stand stock and hours",
 			{
 				receipt = Kit.forward(shop.receipt),

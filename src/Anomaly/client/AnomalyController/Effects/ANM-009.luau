@@ -37,6 +37,14 @@
 	within OUTSIDE_RANGE of the door (from the street it is right there). door_crack: the leaf is really open (the
 	player opened it), so no swing; the napkins and the wind blow in from SCENE-DOOR-OUT through SCENE-DOOR. The
 	silence, the handle, the latch and the hit are the scene's (Content.HorrorScenes anm_009_knock).
+
+	Lock (TASK-592, owner 2026-10-19; PROVISIONAL Q-398): the answer is to run and lock the back door. Three series now:
+	1 far and soft, 2 closer with Walt's voice, 3 the heavy one (three slow loud blows, the wrong voice typed out; the
+	scene bulges the door on each blow). Record Anchor = 1 (someone locked it): the bolt is heard at the door, once.
+	Near the door while Active ("pressure", the stare's look, Stare.luau): within NEAR_FAR studs of SCENE-DOOR the heart
+	beats faster the closer you are (NEAR_HEART BPM), the colour drains (a ColorCorrection of our own, KnockDrain) and the
+	edges close in with a slow flicker ("glaucoma", Kit/Screen channel "knock"; no flicker with Motion.Reduced). Gone as
+	the record leaves Active.
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -45,11 +53,15 @@ local RunService = game:GetService("RunService")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
+local Lighting = game:GetService("Lighting")
+local SoundService = game:GetService("SoundService")
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
+local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Motion)
 local UiScale = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.UiScale)
 local Haptics = require(StarterPlayer.StarterPlayerScripts.client.Input.Haptics)
 local Effect = require(script.Parent.Parent.Effect)
 local Jumpscare = require(script.Parent.Kit.Jumpscare)
+local Screen = require(script.Parent.Kit.Screen)
 local Watch = require(script.Parent.Kit.Watch)
 local VehicleRoot = require(ReplicatedStorage.shared.Vehicle.VehicleRoot)
 
@@ -72,12 +84,25 @@ const OUTSIDE_RANGE = 40 -- studs: a local player outside this near DOOR-B sees 
 -- Restaurant series (TASK-561; PROVISIONAL): volume scale, gaps between knocks (s; uneven = wrong), playback speed,
 -- line (nil = no voice); Typed = the line comes word by word with this pause (s) between words
 type Series = { Volume: number, Gaps: { number }, Speed: number, Line: string?, Typed: number? }
+-- TASK-592: three series; the third is the heavy one, its gaps = Rules/ANM-009 HeavyGap (the scene's Bulge beats)
 const SERIES: { Series } = {
-	{ Volume = 0.3, Gaps = { 0.75, 0.75 }, Speed = 0.92 },
-	{ Volume = 0.75, Gaps = { 0.38, 0.38, 0.38 }, Speed = 1 },
-	{ Volume = 1, Gaps = { 0.42, 0.42 }, Speed = 1, Line = "Rookie? It's me. It's Walt. Open up." },
-	{ Volume = 1.1, Gaps = { 0.9, 0.25, 1.4 }, Speed = 0.78, Line = "Rookie. Open. The. Door.", Typed = 0.55 },
+	{ Volume = 0.35, Gaps = { 0.75, 0.75 }, Speed = 0.92 },
+	{ Volume = 0.85, Gaps = { 0.4, 0.4 }, Speed = 1, Line = "Rookie? It's me. It's Walt. Open up." },
+	{ Volume = 2, Gaps = { 1.2, 1.2 }, Speed = 0.62, Line = "Rookie. Open. The. Door.", Typed = 0.55 },
 }
+
+-- Near the door (TASK-592; PROVISIONAL): the stare's pressure by distance to SCENE-DOOR
+const NEAR_FAR = 22 -- studs: the pressure starts here
+const NEAR_CLOSE = 4 -- studs: full pressure
+const NEAR_RISE = 1.5 -- 1/s: how fast the pressure follows the distance
+const NEAR_HEART = { 72, 165 } -- BPM at the edge and at the door
+const NEAR_VIGNETTE = 0.55
+const NEAR_FLICKER = 0.12
+const NEAR_FLICKER_SPEED = 5
+const NEAR_SATURATION = -0.85 -- the colour drained at full pressure
+const NEAR_CONTRAST = 0.15
+const NEAR_CHANNEL = "knock" -- Kit/Screen vignette channel
+const LOCKED_ANCHOR = 1 -- Anomalies/ANM-009 publishes it when the door is locked
 
 -- Door swing (state Ajar)
 const AJAR_ANGLE = math.rad(10)
@@ -106,6 +131,10 @@ const KNOCKER_DROP = 7.45 -- studs from the door glass (AN-05) down to the groun
 const KNOCKER_BODY = Color3.fromHex("#1E1A2B")
 const KNOCKER_EYE = Color3.fromHex("#F4F1E8")
 const KNOCKER_CAP = Color3.fromHex("#3A4A6B") -- Walt's cap, faded
+-- TASK-588 (design/horror-cinematic.md §11.2): on the cameras whoever knocks is NOT Walt - the cap is his, the body is
+-- far too tall (the head clears the door frame) and too thin, the knocking arm too long
+const KNOCKER_TALL = 1.45 -- vertical stretch of the silhouette
+const KNOCKER_THIN = 0.8 -- horizontal squeeze of the body
 const KNOCK_SWAY = math.rad(6)
 const ENTITY_MOD = 65536
 
@@ -646,17 +675,18 @@ local function knockerPose(ctx: Effect.Context): CFrame?
 	return if (look - feet).Magnitude > 1e-3 then CFrame.lookAt(feet, look) else CFrame.new(feet)
 end
 
--- Tall silhouette, pivot at the feet, facing -Z (the door)
+-- Tall silhouette (taller than Walt, TASK-588), pivot at the feet, facing -Z (the door)
 local function buildKnocker(pose: CFrame): Model
 	const model = Instance.new("Model")
 	model.Name = "Knocker"
-	knockerPart(model, "Body", Enum.PartType.Block, Vector3.new(2, 4.6, 1.1), pose * CFrame.new(0, 2.3, 0), KNOCKER_BODY)
-	knockerPart(model, "Head", Enum.PartType.Ball, Vector3.new(1.8, 1.8, 1.8), pose * CFrame.new(0, 5.4, 0), KNOCKER_BODY)
-	knockerPart(model, "Cap", Enum.PartType.Cylinder, Vector3.new(0.5, 1.9, 1.9), pose * CFrame.new(0, 6.3, 0) * CFrame.Angles(0, 0, math.rad(90)), KNOCKER_CAP)
+	const tall, thin = KNOCKER_TALL, KNOCKER_THIN
+	knockerPart(model, "Body", Enum.PartType.Block, Vector3.new(2 * thin, 4.6 * tall, 1.1), pose * CFrame.new(0, 2.3 * tall, 0), KNOCKER_BODY)
+	knockerPart(model, "Head", Enum.PartType.Ball, Vector3.new(1.8, 1.8, 1.8), pose * CFrame.new(0, 4.6 * tall + 0.8, 0), KNOCKER_BODY)
+	knockerPart(model, "Cap", Enum.PartType.Cylinder, Vector3.new(0.5, 1.9, 1.9), pose * CFrame.new(0, 4.6 * tall + 1.7, 0) * CFrame.Angles(0, 0, math.rad(90)), KNOCKER_CAP)
 	for _, side in { -0.42, 0.42 } do
-		knockerPart(model, "Eye", Enum.PartType.Ball, Vector3.new(0.5, 0.62, 0.3), pose * CFrame.new(side, 5.55, -0.82), KNOCKER_EYE)
+		knockerPart(model, "Eye", Enum.PartType.Ball, Vector3.new(0.5, 0.62, 0.3), pose * CFrame.new(side, 4.6 * tall + 0.95, -0.82), KNOCKER_EYE)
 	end
-	knockerPart(model, "Arm", Enum.PartType.Block, Vector3.new(0.5, 2.6, 0.5), pose * CFrame.new(0.9, 4.1, -0.9) * CFrame.Angles(math.rad(70), 0, 0), KNOCKER_BODY)
+	knockerPart(model, "Arm", Enum.PartType.Block, Vector3.new(0.5, 2.6 * tall, 0.5), pose * CFrame.new(0.9 * thin + 0.2, 4.1 * tall, -0.9 * tall) * CFrame.Angles(math.rad(70), 0, 0), KNOCKER_BODY)
 	model.PrimaryPart = model:FindFirstChild("Body") :: BasePart
 	return model
 end
@@ -673,6 +703,92 @@ local function outsideNear(ctx: Effect.Context): boolean
 	const out = outside.Position - inside.Position
 	const from = root.Position - inside.Position
 	return from:Dot(out) > out:Dot(out) * 0.5 and (root.Position - outside.Position).Magnitude <= OUTSIDE_RANGE
+end
+
+-- Near the door ------------------------------------------------------------------------------------------------
+
+local function mountPressure(ctx: Effect.Context, occ: Effect.Occurrence)
+	local pressure = 0
+	local heartOn = true
+	local bolted = Vide.untrack(occ.Record).Anchor == LOCKED_ANCHOR -- a late joiner does not hear the bolt
+	const drain = Instance.new("ColorCorrectionEffect")
+	drain.Name = "KnockDrain"
+	drain.Enabled = false
+	drain.Parent = Lighting
+	-- single beats while the pressure is up (the scene's heartbeat sound, as Stare.luau)
+	task.spawn(function()
+		const row = Content.Sounds.ByKey.heartbeat
+		if row == nil or row.Id == "" then
+			return
+		end
+		const found = SoundService:FindFirstChild("Sfx", true)
+		const group: SoundGroup? = if found ~= nil and found:IsA("SoundGroup") then found else nil
+		while heartOn do
+			const p = pressure
+			if p <= 0.02 then
+				task.wait(0.2)
+				continue
+			end
+			const beat = Instance.new("Sound")
+			beat.Name = "Knock_Heartbeat"
+			beat.SoundId = row.Id
+			beat.Volume = row.Volume * (0.4 + 0.7 * p)
+			beat.PlaybackSpeed = 0.95 + 0.25 * p
+			beat.SoundGroup = group
+			beat.Parent = SoundService
+			beat:Play()
+			task.delay(2, function()
+				beat:Destroy()
+			end)
+			task.wait(60 / (NEAR_HEART[1] + (NEAR_HEART[2] - NEAR_HEART[1]) * p))
+		end
+	end)
+	local last = os.clock()
+	const connection = RunService.RenderStepped:Connect(function()
+		const now = os.clock()
+		const dt = math.min(now - last, 0.1)
+		last = now
+		const record = Vide.untrack(occ.Record)
+		if record.Anchor == LOCKED_ANCHOR and not bolted then
+			bolted = true
+			const inside = ctx.Point(DOOR_IN_POINT)
+			ctx.Audio:Play("latch_hold", if inside then inside.Position else nil, { Volume = 1.2 })
+		end
+		local goal = 0
+		const point = ctx.Point(DOOR_IN_POINT)
+		const character = Players.LocalPlayer.Character
+		const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+		if record.Phase == "Active" and point ~= nil and root ~= nil and root:IsA("BasePart") then
+			const distance = (root.Position - point.Position).Magnitude
+			goal = math.clamp((NEAR_FAR - distance) / (NEAR_FAR - NEAR_CLOSE), 0, 1)
+		end
+		const was = pressure
+		pressure += (goal - pressure) * math.min(1, dt * NEAR_RISE * 2)
+		if pressure < 0.01 and goal == 0 then
+			pressure = 0
+		end
+		if pressure <= 0 then
+			if was > 0 then
+				Screen.ClearVignette(NEAR_CHANNEL)
+				drain.Enabled = false
+			end
+			return
+		end
+		local edge = NEAR_VIGNETTE * pressure
+		if not Motion.Reduced() then
+			edge += NEAR_FLICKER * pressure * math.noise(now * NEAR_FLICKER_SPEED, 0.5)
+		end
+		Screen.SetVignette(edge, edge, 0, NEAR_CHANNEL)
+		drain.Enabled = true
+		drain.Saturation = NEAR_SATURATION * pressure
+		drain.Contrast = NEAR_CONTRAST * pressure
+	end)
+	Vide.cleanup(function()
+		heartOn = false
+		connection:Disconnect()
+		Screen.ClearVignette(NEAR_CHANNEL)
+		drain:Destroy()
+	end)
 end
 
 local function mountKnocker(ctx: Effect.Context, occ: Effect.Occurrence)
@@ -720,7 +836,10 @@ end
 
 return {
 	Ref = "ANM-009",
-	Mount = mountKnocker,
+	Mount = function(ctx: Effect.Context, occ: Effect.Occurrence)
+		mountKnocker(ctx, occ)
+		mountPressure(ctx, occ) -- TASK-592
+	end,
 	Cue = function(ctx: Effect.Context, cue: Effect.Cue)
 		if cue.Cue == "knock" then
 			knock(ctx, cue)

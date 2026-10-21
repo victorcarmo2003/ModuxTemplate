@@ -3,7 +3,7 @@
 --   tips                      jar, Cash and the shift ledger (same as `tips state`)
 --   tips add <n>              puts n in the tip jar (needs the shop taking entries: a selling phase or the day Closing)
 --   tips collect              the jar goes to Cash and the coins play (same as the "Collect Tips" prompt)
---   economy ledger            pure test of Ledger.settle (day take = Sales + Tips + Catches - Stolen, bonus, deposit);
+--   economy ledger            pure test of Ledger.settle (day take = Sales + Tips, bonus, deposit);
 --                             prints one line per case and ends with "N/N ok"
 local ServerScriptService = game:GetService("ServerScriptService")
 local Api = require(script.Parent.Parent.Api)
@@ -38,8 +38,6 @@ type Case = {
 	Completed: number,
 	Sales: number,
 	Tips: number,
-	Catches: number,
-	Stolen: number,
 	Boss: number,
 	Grade: Ledger.Grade,
 	Take: number,
@@ -48,14 +46,12 @@ type Case = {
 }
 
 const CASES: { Case } = {
-	{ Name = "A: all satisfied", Arrived = 10, Completed = 10, Sales = 50, Tips = 10, Catches = 5, Stolen = 0, Boss = 0, Grade = "A", Take = 65, Bonus = 13, Deposited = 78 },
-	{ Name = "B: 8 of 10", Arrived = 10, Completed = 8, Sales = 100, Tips = 0, Catches = 0, Stolen = 0, Boss = 0, Grade = "B", Take = 100, Bonus = 10, Deposited = 110 },
-	{ Name = "C: 5 of 10 (no bonus)", Arrived = 10, Completed = 5, Sales = 40, Tips = 4, Catches = 0, Stolen = 0, Boss = 0, Grade = "C", Take = 44, Bonus = 0, Deposited = 44 },
-	{ Name = "D: 4 of 10 (no bonus, boss does not help)", Arrived = 10, Completed = 4, Sales = 60, Tips = 0, Catches = 0, Stolen = 0, Boss = 5, Grade = "D", Take = 60, Bonus = 0, Deposited = 60 },
-	{ Name = "stolen leaves the base", Arrived = 10, Completed = 10, Sales = 50, Tips = 20, Catches = 0, Stolen = 10, Boss = 0, Grade = "A", Take = 60, Bonus = 12, Deposited = 72 },
-	{ Name = "boss points add to B", Arrived = 4, Completed = 3, Sales = 40, Tips = 0, Catches = 0, Stolen = 0, Boss = 5, Grade = "B", Take = 40, Bonus = 6, Deposited = 46 },
-	{ Name = "nobody came: C, zero", Arrived = 0, Completed = 0, Sales = 0, Tips = 0, Catches = 0, Stolen = 0, Boss = 0, Grade = "C", Take = 0, Bonus = 0, Deposited = 0 },
-	{ Name = "stolen above the take clamps at 0", Arrived = 2, Completed = 2, Sales = 0, Tips = 5, Catches = 0, Stolen = 9, Boss = 0, Grade = "A", Take = 0, Bonus = 0, Deposited = 0 },
+	{ Name = "A: all satisfied", Arrived = 10, Completed = 10, Sales = 55, Tips = 10, Boss = 0, Grade = "A", Take = 65, Bonus = 13, Deposited = 78 },
+	{ Name = "B: 8 of 10", Arrived = 10, Completed = 8, Sales = 100, Tips = 0, Boss = 0, Grade = "B", Take = 100, Bonus = 10, Deposited = 110 },
+	{ Name = "C: 5 of 10 (no bonus)", Arrived = 10, Completed = 5, Sales = 40, Tips = 4, Boss = 0, Grade = "C", Take = 44, Bonus = 0, Deposited = 44 },
+	{ Name = "D: 4 of 10 (no bonus, boss does not help)", Arrived = 10, Completed = 4, Sales = 60, Tips = 0, Boss = 5, Grade = "D", Take = 60, Bonus = 0, Deposited = 60 },
+	{ Name = "boss points add to B", Arrived = 4, Completed = 3, Sales = 40, Tips = 0, Boss = 5, Grade = "B", Take = 40, Bonus = 6, Deposited = 46 },
+	{ Name = "nobody came: C, zero", Arrived = 0, Completed = 0, Sales = 0, Tips = 0, Boss = 0, Grade = "C", Take = 0, Bonus = 0, Deposited = 0 },
 }
 
 local function runCase(case: Case): (boolean, string)
@@ -65,8 +61,6 @@ local function runCase(case: Case): (boolean, string)
 	ledger.Served = case.Completed
 	ledger.Sales = case.Sales
 	ledger.Tips = case.Tips
-	ledger.Catches = case.Catches
-	ledger.Stolen = case.Stolen
 	const settlement = Ledger.settle(ledger, case.Boss)
 	const ok = settlement.Grade == case.Grade
 		and settlement.Take == case.Take
@@ -86,7 +80,7 @@ const Tips: Api.Module = function(ctx: Api.Context): { Api.Command }
 	const function state(): string
 		const ledger = economy:GetLedger()
 		return `Cash ${economy:GetCash()}, tip jar ${economy:GetDrawer()}, entries {if economy:IsDrawerOpen() then "open" else "closed"}; `
-			.. `ledger sales ${ledger.Sales} tips ${ledger.Tips} catches ${ledger.Catches} stolen ${ledger.Stolen} collected ${ledger.Collected}`
+			.. `ledger sales ${ledger.Sales} tips ${ledger.Tips} collected ${ledger.Collected}`
 	end
 
 	return {

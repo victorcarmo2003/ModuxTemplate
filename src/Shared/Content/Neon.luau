@@ -24,6 +24,9 @@ export type Neon = {
 	Sound: string, -- key of Content.Sounds played at the sign when a burst starts
 	SoundVolume: number, -- multiplier over the row Volume
 	SoundRange: number, -- studs: the sound only plays within this distance of the camera
+	-- Realistic lighting style blows Neon out (owner 2026-10-20): lit colours scaled by Scale (1 = untouched), on
+	-- sign tubes and on loose Neon parts under the Workspace children named in Roots. Attribute marks a dimmed part.
+	Dim: { Scale: number, Roots: { string }, Attribute: string },
 }
 
 const neon: Neon = {
@@ -44,6 +47,7 @@ const neon: Neon = {
 	Sound = "neon_click", -- SFX-133
 	SoundVolume = 0.35,
 	SoundRange = 60,
+	Dim = { Scale = 0.75, Roots = { "LOBBY_Assets" }, Attribute = "NeonDimmed" },
 }
 
 return table.freeze(neon)

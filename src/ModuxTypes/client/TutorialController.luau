@@ -9,7 +9,7 @@ local Call = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.Tutorial
 local Steps = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Steps)
 local Trail = require(StarterPlayer.StarterPlayerScripts.client.Tutorial.TutorialController.Trail)
 
-type GuestRecord = { State: string, Order: { [string]: boolean } }
+type GuestRecord = { State: string, Order: { [string]: boolean }, Drive: number? }
 type Held = { Item: string, Toppings: { [string]: boolean } }
 type Kitchen = {
 	GrillWorking: boolean,
@@ -22,6 +22,7 @@ type Kitchen = {
 export type Public = {
 	Answered: boolean,
 	AskedAt: number,
+	AtDrive: Vide.Source<boolean>,
 	Beacon: Beacon.Beacon,
 	Call: Call.Call,
 	CashRevealed: Vide.Source<boolean>,
@@ -34,7 +35,9 @@ export type Public = {
 	DevHandlers: { [string]: (text: string) -> () },
 	DevNoted: boolean,
 	Edge: EdgePointer.EdgePointer,
+	EndReason: string,
 	Finished: Vide.Source<boolean>,
+	Flags: { [string]: boolean },
 	Folder: Folder?,
 	Forced: string?,
 	GreetPinned: boolean,
@@ -49,6 +52,7 @@ export type Public = {
 	LessonNear: boolean,
 	LessonOn: boolean,
 	LessonSkipped: boolean,
+	LobbySkip: Vide.Source<boolean>,
 	Markers: { [Attachment]: BasePart },
 	Mounted: boolean,
 	PastDay1: Vide.Source<boolean>,
@@ -61,6 +65,7 @@ export type Public = {
 	Revived: Vide.Source<boolean>,
 	Rookie: boolean,
 	Running: Vide.Source<boolean>,
+	Sales: number,
 	Scale: Vide.Source<number>,
 	Sent: boolean,
 	ShopFrom: number,
@@ -70,6 +75,8 @@ export type Public = {
 	StepAt: number,
 	StepKey: Vide.Source<string>,
 	Target: Vide.Source<Instance | false>,
+	Tasks: Vide.Source<{ { Text: string, Done: boolean, Icon: string? } }>,
+	TasksOn: Vide.Source<boolean>,
 	Trail: Trail.Trail,
 	TrailInside: boolean,
 	TrailKey: string,
@@ -82,6 +89,7 @@ export type Public = {
 	WaitStarted: number,
 	Setup: (self: Public) -> (),
 	FirstRun: (self: Public) -> boolean,
+	PastFirstShift: (self: Public) -> boolean,
 	Step: (self: Public) -> Steps.Step?,
 	PanelText: (self: Public) -> string,
 	StepLabel: (self: Public) -> string,
@@ -107,7 +115,10 @@ export type Public = {
 	DecidePhone: (self: Public) -> (string?, Instance?),
 	Decide: (self: Public) -> (string, Instance?, string),
 	DecideLive: (self: Public) -> (string, Instance?, string),
+	WindowShut: (self: Public) -> boolean,
 	DecideRestaurant: (self: Public, guestId: number, guest: GuestRecord, rig: Model?) -> (string, Instance?, string),
+	TaskList: (self: Public) -> { { Text: string, Done: boolean, Icon: string? } },
+	TrackTasks: (self: Public) -> (),
 	CookAnchor: (self: Public, station: string) -> Instance?,
 	GrillState: (self: Public) -> { Ready: boolean, FlipNow: boolean, Working: boolean },
 	CanRestock: (self: Public) -> boolean,
@@ -115,6 +126,7 @@ export type Public = {
 	Restocked: (self: Public) -> boolean,
 	StationRestock: (self: Public, ingredient: string) -> Instance?,
 	DecideRestock: (self: Public) -> (string, Instance?, string),
+	SausageBay: (self: Public) -> Instance?,
 	BeginRestock: (self: Public) -> (),
 	KitchenAnchor: (self: Public, action: string, enabled: boolean) -> Instance?,
 	WorkMarker: (self: Public, anchor: Attachment) -> BasePart,
@@ -131,6 +143,7 @@ export type Public = {
 	TickIdle: (self: Public, step: Steps.Step, target: Instance?) -> (),
 	OnSale: (self: Public, npc: number, result: string) -> (),
 	TickTalk: (self: Public) -> (),
+	ShiftTalk: (self: Public) -> (),
 	NextTalk: (self: Public) -> (),
 	Skip: (self: Public) -> (),
 	Finish: (self: Public, reason: string) -> (),

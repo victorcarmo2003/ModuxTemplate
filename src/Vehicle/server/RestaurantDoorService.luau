@@ -9,9 +9,14 @@
 -- and closes it. While open the server copy of the leaf does not collide (customers and players walk through).
 -- Lock (anomalies): SetLocked(reason, on) - while any reason holds, the door closes at once, the prompt reads "Locked"
 -- and pressing it does nothing but fire Tried. Several reasons stack (as TrailerDoorService:SetLocked).
--- Signals: Opened(player, mapId), Closed(player?, mapId), Tried(player, mapId) (pressed while locked). Readers: the
--- anomalies that test "do not open the back door" (ANM-009 in the restaurant).
--- API: IsOpen(mapId?), SetOpen(mapId, open, player?), SetLocked(reason, on), IsLocked(), DoorPosition(mapId?).
+-- Lock by hand (TASK-592, owner 2026-10-19 "correr e trancar a porta"; PROVISIONAL, Q-404): SetLockable(reason, on) - while
+-- any reason holds and the door is not locked yet, the prompt reads "Lock Door" with a LOCK_HOLD s hold; finishing it
+-- shuts the door (if open) and locks it (reason PLAYER_LOCK, fires LockedBy). The lock lasts until the last lockable
+-- reason is released (or the shift ends): the anomaly that asked for it decides when the door opens again.
+-- Signals: Opened(player, mapId), Closed(player?, mapId), Tried(player, mapId) (pressed while locked), LockedBy(player,
+-- mapId) (locked it by hand). Readers: the anomalies of the back door (ANM-009 in the restaurant).
+-- API: IsOpen(mapId?), SetOpen(mapId, open, player?), SetLocked(reason, on), IsLocked(), SetLockable(reason, on),
+-- IsLockedByHand(), DoorPosition(mapId?).
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -34,6 +39,9 @@ const ACTION = "door_toggle"
 const OPEN_TEXT = "Open Door"
 const CLOSE_TEXT = "Close Door"
 const LOCKED_TEXT = "Locked"
+const LOCK_TEXT = "Lock Door"
+const LOCK_HOLD = 1 -- s to turn the bolt (TASK-592; PROVISIONAL, Q-404)
+const PLAYER_LOCK = "hand" -- Locks reason of a door locked by a player
 const HANDLE_Y = 3.6 -- studs above the leaf bottom
 
 const RestaurantDoorService = Modux.Service("RestaurantDoorService", {
@@ -46,9 +54,11 @@ function RestaurantDoorService:Setup()
 	self.Doors = {} :: { [string]: Door }
 	self.AnchorDoor = {} :: { [Instance]: string }
 	self.Locks = {} :: { [string]: boolean }
+	self.Lockable = {} :: { [string]: boolean }
 	self.Opened = self.Libs.Signal.new() :: SignalLib.Signal<Player, string>
 	self.Closed = self.Libs.Signal.new() :: SignalLib.Signal<Player?, string>
 	self.Tried = self.Libs.Signal.new() :: SignalLib.Signal<Player, string>
+	self.LockedBy = self.Libs.Signal.new() :: SignalLib.Signal<Player, string>
 end
 
 -- Reads ---------------------------------------------------------------------------------------------------------------
@@ -76,6 +86,11 @@ function RestaurantDoorService:IsLocked(): boolean
 	return next(self.Locks) ~= nil
 end
 
+-- TASK-592: a player locked it by hand (and the lock still holds)
+function RestaurantDoorService:IsLockedByHand(): boolean
+	return self.Locks[PLAYER_LOCK] == true
+end
+
 function RestaurantDoorService:DoorPosition(mapId: string?): Vector3?
 	const door = self:Door(mapId)
 	if door == nil or door.Leaves[1] == nil then
@@ -88,9 +103,12 @@ end
 
 function RestaurantDoorService:Refresh(door: Door)
 	const locked = self:IsLocked()
-	const text = if locked then LOCKED_TEXT elseif door.Open then CLOSE_TEXT else OPEN_TEXT
+	const lockable = not locked and next(self.Lockable) ~= nil
+	const text = if locked then LOCKED_TEXT elseif lockable then LOCK_TEXT elseif door.Open then CLOSE_TEXT else OPEN_TEXT
+	const interaction = self.Dependencies.InteractionService
 	for _, anchor in door.Anchors do
-		self.Dependencies.InteractionService:SetPrompt(anchor, true, text)
+		interaction:SetPrompt(anchor, true, text)
+		interaction:SetPromptHold(anchor, if lockable then LOCK_HOLD else nil)
 	end
 end
 
@@ -133,6 +151,31 @@ function RestaurantDoorService:SetLocked(reason: string, on: boolean)
 		end
 		self:Refresh(door)
 	end
+end
+
+-- TASK-592: while any reason holds, the prompt locks the door instead of opening it. Releasing the last reason also
+-- undoes a lock made by hand.
+function RestaurantDoorService:SetLockable(reason: string, on: boolean)
+	if on then
+		self.Lockable[reason] = true
+	else
+		self.Lockable[reason] = nil
+		if next(self.Lockable) == nil then
+			self.Locks[PLAYER_LOCK] = nil
+		end
+	end
+	for _, door in self.Doors do
+		self:Refresh(door)
+	end
+end
+
+function RestaurantDoorService:LockByHand(player: Player, mapId: string)
+	self.Locks[PLAYER_LOCK] = true
+	for id, door in self.Doors do
+		self:SetOpen(id, false, nil)
+		self:Refresh(door)
+	end
+	self.LockedBy:Fire(player, mapId)
 end
 
 -- Binding -------------------------------------------------------------------------------------------------------------
@@ -215,6 +258,10 @@ RestaurantDoorService:OnInit(function(self)
 				self.Tried:Fire(player, mapId)
 				return
 			end
+			if next(self.Lockable) ~= nil then
+				self:LockByHand(player, mapId)
+				return
+			end
 			self:SetOpen(mapId, not door.Open, player)
 		end,
 	})
@@ -233,6 +280,7 @@ RestaurantDoorService:OnStart(function(self)
 	-- every shift starts with the door shut and unlocked
 	self.Dependencies.RoundService.ShiftStarted:Connect(function(_info)
 		table.clear(self.Locks)
+		table.clear(self.Lockable)
 		for mapId in self.Doors do
 			self:SetOpen(mapId, false, nil)
 		end

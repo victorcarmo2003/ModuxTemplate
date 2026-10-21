@@ -17,6 +17,8 @@ function ProfileController:Setup()
 	self.Ready = Vide.source(false) :: Vide.Source<boolean>
 	-- first-hot-dog tutorial done or skipped (TutorialController reads it once Ready)
 	self.TutorialDone = Vide.source(false) :: Vide.Source<boolean>
+	-- lobby floor guides already shown (Content.Lobby.Guide.Keys; LobbyController reads it)
+	self.Guides = Vide.source({}) :: Vide.Source<{ [string]: boolean }>
 end
 
 function ProfileController:Owns(class: string): boolean
@@ -31,6 +33,7 @@ ProfileController:OnInit(function(self)
 		self.Classes(table.freeze(data.Classes))
 		self.Selected(data.Selected)
 		self.TutorialDone(data.TutorialDone)
+		self.Guides(table.freeze(data.Guides))
 		self.Ready(true)
 	end)
 end)

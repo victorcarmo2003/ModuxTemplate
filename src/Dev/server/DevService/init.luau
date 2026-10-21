@@ -21,6 +21,8 @@ const CHAT_COMMAND = "DevCommand"
 const ALIAS = "/dev"
 const PREFIX = "[Dev]"
 const HELP = "help"
+const CAMERA_POS_ATTRIBUTE = "DevCameraPos" -- Commands/Track.luau reads both
+const CAMERA_LOOK_ATTRIBUTE = "DevCameraLook"
 
 -- Booted instance in dev mode (nil in the Command Bar copy and when dev mode is off)
 local live: any = nil
@@ -204,6 +206,13 @@ DevService:OnInit(function(self)
 		if not ok then
 			warn(`{PREFIX} DevTool {data.Tool}: {err}`)
 		end
+	end)
+
+	-- trailer capture camera (TASK-C1): the client's camera at 2 Hz, kept on the Player for `track here`
+	-- (Commands/Track.luau). Player attributes are server-written, so the client cannot store them itself.
+	self.Libs.Net.DevCameraHere:onServer(function(data, player: Player)
+		player:SetAttribute(CAMERA_POS_ATTRIBUTE, data.Pos)
+		player:SetAttribute(CAMERA_LOOK_ATTRIBUTE, data.Look)
 	end)
 end)
 

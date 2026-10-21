@@ -410,8 +410,16 @@ local function raincoatLady(ctx: Context): Actor?
 	}
 end
 
-local function flyerPart(): Part
-	const flyer = part("Flyer", Vector3.new(1.4, 1.9, 0.05), CREAM, nil)
+-- TASK-601: the old flyers behind the new one (offset studs on the post, roll degrees, paper and ink gone yellow)
+const OLD_FLYERS: { { Offset: Vector2, Roll: number, Paper: Color3, Ink: Color3 } } = {
+	{ Offset = Vector2.new(-0.35, 0.25), Roll = -7, Paper = Color3.fromHex("#E9D7A6"), Ink = Color3.fromHex("#5A4A3A") },
+	{ Offset = Vector2.new(0.4, -0.15), Roll = 9, Paper = Color3.fromHex("#D9C285"), Ink = Color3.fromHex("#6A5840") },
+	{ Offset = Vector2.new(-0.15, -0.45), Roll = 4, Paper = Color3.fromHex("#C9AC6C"), Ink = Color3.fromHex("#6E5C42") },
+	{ Offset = Vector2.new(0.25, 0.5), Roll = -12, Paper = Color3.fromHex("#B89A5C"), Ink = Color3.fromHex("#705E44") },
+}
+
+local function flyerPart(paper: Color3?, ink: Color3?): Part
+	const flyer = part("Flyer", Vector3.new(1.4, 1.9, 0.05), paper or CREAM, nil)
 	const gui = Instance.new("SurfaceGui")
 	gui.Face = Enum.NormalId.Front
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
@@ -432,7 +440,7 @@ local function flyerPart(): Part
 		label.FontFace = Font.fromEnum(Enum.Font.FredokaOne)
 		label.TextSize = line.Size
 		label.TextWrapped = true
-		label.TextColor3 = INK
+		label.TextColor3 = ink or INK
 		label.Text = line.Text
 		label.Parent = gui
 	end
@@ -451,6 +459,16 @@ local function flyer(ctx: Context): Actor?
 	const sheet = flyerPart()
 	sheet.Parent = ctx.Folder
 	const half = sheet.Size.Y / 2
+	-- TASK-601 (owner 2026-10-19, Q-401 A; story/walt-calls-lore.md §5): behind the new flyer, the same flyer again and
+	-- again, older and yellower, stapled one over the other - Walt has been hiring for a long time. No line, no rule.
+	const old: { Part } = {}
+	for index, look in OLD_FLYERS do
+		const stale = flyerPart(look.Paper, look.Ink)
+		stale.Name = `OldFlyer{index}`
+		stale.CFrame = hang * CFrame.new(look.Offset.X, look.Offset.Y, 0.03 * index) * CFrame.Angles(0, 0, math.rad(look.Roll))
+		stale.Parent = ctx.Folder
+		table.insert(old, stale)
+	end
 
 	return {
 		Model = nil,
@@ -460,6 +478,9 @@ local function flyer(ctx: Context): Actor?
 		end,
 		Destroy = function()
 			sheet:Destroy()
+			for _, stale in old do
+				stale:Destroy()
+			end
 		end,
 	}
 end

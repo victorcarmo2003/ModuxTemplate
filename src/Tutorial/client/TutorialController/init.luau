@@ -155,6 +155,11 @@ const IDLE = 12 -- s without progress on a step with Remind before it turns urge
 const PROGRESS = 2 -- studs closer to the target that count as progress (walking to it resets IDLE)
 const TALK_MIN = 1.5 -- s a talk step stays at least while Walt is on the line
 const TALK_TIME = 7 -- s of a talk step without the call
+-- s a talk step may last at most while Walt is on the line (owner 2026-10-20: "o tutorial ficou travado com close no
+-- relógio"): his lines wait up to Call HOLD s each for a voice still in the load queue, so 3-4 lines of the closing talk kept
+-- the dark spotlight on the clock for most of a minute. Past this the step moves on; what he still has to say goes on
+-- as subtitles under the goodbye
+const TALK_MAX = 14
 const STEP_SOUND = "prompt_done"
 const SKIP_BIND = "TutorialSkip"
 -- Owner request 2026-10-14 (Provisional): no Skip (Q / D-pad / button) and no top tutorial panel: Walt explains every step on the
@@ -238,7 +243,7 @@ type TabletRecord = { State: string, Npc: number }
 -- Stations set record fields read here (network.md §3.5)
 type SlotRecord = { Kind: string, State: string, Count: number }
 -- Customers set record fields read here (network.md §3.6)
-type GuestRecord = { State: string, Order: { [string]: boolean } }
+type GuestRecord = { State: string, Order: { [string]: boolean }, Drive: number? }
 type Held = { Item: string, Toppings: { [string]: boolean } }
 type Kitchen = {
 	GrillWorking: boolean,
@@ -268,12 +273,16 @@ function TutorialController:Setup()
 	-- the run went past Day 1 (latched) / the dev reset brought the tutorial back in this run
 	self.PastDay1 = Vide.source(false) :: Vide.Source<boolean>
 	self.Revived = Vide.source(false) :: Vide.Source<boolean>
+	-- Skip tutorial picked on the lobby pad (Player attribute TutorialSkipped, TutorialService)
+	self.LobbySkip = Vide.source(Players.LocalPlayer:GetAttribute("TutorialSkipped") == true) :: Vide.Source<boolean>
 	self.Running = Vide.source(false) :: Vide.Source<boolean>
 	self.CashRevealed = Vide.source(false) :: Vide.Source<boolean>
 	self.ClockRevealed = Vide.source(false) :: Vide.Source<boolean>
 	self.StepKey = Vide.source("") :: Vide.Source<string>
 	-- topping name of the "toppings" step
 	self.Item = Vide.source("") :: Vide.Source<string>
+	-- the tutorial customer is a drive-thru car (owner 2026-10-20: the 2nd one): steps with a DriveHint show it
+	self.AtDrive = Vide.source(false) :: Vide.Source<boolean>
 	-- false = none (a Source of an optional type is ambiguous to call under the new solver)
 	self.Target = Vide.source(false :: Instance | false) :: Vide.Source<Instance | false>
 	self.Spot = Vide.source(false :: GuiObject | false) :: Vide.Source<GuiObject | false>
@@ -379,6 +388,9 @@ function TutorialController:FirstRun(): boolean
 	if self.Finished() then
 		return false
 	end
+	if self.LobbySkip() and not self.Revived() then
+		return false
+	end
 	if self.Revived() then
 		return true
 	end
@@ -421,6 +433,9 @@ function TutorialController:PanelHint(): string
 	const step = self:Step()
 	if step == nil then
 		return ""
+	end
+	if step.DriveHint and self.AtDrive() then
+		return step.DriveHint
 	end
 	if self.Urgent() and step.Remind then
 		return step.Remind
@@ -1039,6 +1054,17 @@ function TutorialController:DecideRestaurant(guestId: number, guest: GuestRecord
 	local function onGuest(anchor: Instance): boolean
 		return npcIdOf(anchor) == guestId
 	end
+	-- owner 2026-10-20 (Provisional): the 2nd tutorial customer is a car at the drive-thru; its prompt is on the car
+	const drive = (guest.Drive or 0) > 0
+	if Vide.untrack(self.AtDrive) ~= drive then
+		self.AtDrive(drive)
+	end
+	if drive and guest.State ~= "Ordering" and guest.State ~= "Waiting" then
+		return "r_tablet", rig, "" -- still driving up to the window
+	end
+	if drive and guest.State == "Ordering" then
+		return "r_tablet", self:Anchor("take_order", false, onGuest) or rig, ""
+	end
 	if guest.State == "Ordering" then
 		for _, raw in Restaurant.Tablets:entries() do
 			const record = raw :: TabletRecord
@@ -1066,6 +1092,9 @@ function TutorialController:DecideRestaurant(guestId: number, guest: GuestRecord
 				const focused = Players.LocalPlayer:GetAttribute(COOK_FOCUS) == "Toppings"
 				return "r_toppings", if focused then nil else self:CookAnchor("Toppings"), if row then row.Name else key
 			end
+		end
+		if drive then
+			return "r_pickup", self:Anchor("serve", false, onGuest) or rig, ""
 		end
 		return "r_pickup", self:Anchor(PICKUP_SERVE, false) or self:Anchor("serve", false, onGuest) or rig, ""
 	end
@@ -1491,6 +1520,14 @@ function TutorialController:PromptAllowed(anchor: Instance): boolean
 	if table.find(Steps.AlwaysActions, action) ~= nil then
 		return true
 	end
+	-- the drive-thru tutorial car: "Take Order" / "Serve" on its driver are never held back by the step the panel is on
+	-- (owner 2026-10-20: ~10 s at the window with no prompt while the step still waited); the server checks the state
+	if action == "take_order" or action == "serve" then
+		const rig = anchor:FindFirstAncestorWhichIsA("Model")
+		if rig ~= nil and rig:GetAttribute("DriveThru") == true and rig:GetAttribute(TutorialRules.Attribute) == true then
+			return true
+		end
+	end
 	const key = Vide.untrack(self.StepKey)
 	const step = Steps.ByKey[key]
 	if step == nil then
@@ -1499,7 +1536,13 @@ function TutorialController:PromptAllowed(anchor: Instance): boolean
 	-- the restaurant steps (owner 2026-10-19: "esconder os prompts e introduzir por etapas"): only the step's own prompt, and
 	-- only on the thing the arrow points at (one plate, one station)
 	if step.Restaurant or key == "open" or key == "wait_customer" then
-		if step.Action ~= action then
+		-- the drive-thru tutorial car takes its order and its food on the driver ("Take Order" / "Serve" on the rig, not the
+		-- tablet nor the pickup counter): r_tablet and r_pickup let those prompts through too (owner 2026-10-20: "não tem
+		-- proximityprompt para atender ele", "não consigo entregar o alimento")
+		const atDrive = Vide.untrack(self.AtDrive)
+		const driveOrder = atDrive
+			and ((key == "r_tablet" and action == "take_order") or (key == "r_pickup" and action == "serve"))
+		if step.Action ~= action and not driveOrder then
 			return false
 		end
 		const target = Vide.untrack(self.Target)
@@ -1664,6 +1707,9 @@ end
 -- NUDGE repeat of their Say lines.
 function TutorialController:TickIdle(step: Steps.Step, target: Instance?)
 	const now = os.clock()
+	if step.DriveHint and Vide.untrack(self.AtDrive) then
+		return -- the voiced reminders talk about the tablet / the pickup: none at the drive-thru
+	end
 	const remind = step.Remind
 	if remind == nil then
 		if step.Say and not self.Call.Busy() and now - self.StepAt > NUDGE and self:Voiced() then
@@ -1753,7 +1799,9 @@ end
 -- Talk step: over once Walt said it (at least TALK_MIN s), or after TALK_TIME s without the call
 function TutorialController:TickTalk()
 	const elapsed = os.clock() - self.StepAt
-	const over = if self:Voiced() then elapsed >= TALK_MIN and not self.Call.Busy() else elapsed >= TALK_TIME
+	const over = if self:Voiced()
+		then (elapsed >= TALK_MIN and not self.Call.Busy()) or elapsed >= TALK_MAX
+		else elapsed >= TALK_TIME
 	if over then
 		self:NextTalk()
 	end
@@ -1869,7 +1917,12 @@ function TutorialController:Finish(reason: string)
 			for _, text in Steps.Goodbye do
 				table.insert(lines, text)
 			end
-			self.Call.Replace(lines)
+			if Vide.untrack(self.StepKey) == SHIFT_STEP then
+				-- the closing talk may end on TALK_MAX with "the shift ends at six" still queued: the goodbye goes after it
+				self.Call.Queue(lines)
+			else
+				self.Call.Replace(lines)
+			end
 		elseif reason == "skip" then
 			self.Call.Cut()
 			self.Call.Queue(Steps.SkipGoodbye)
@@ -2013,7 +2066,7 @@ function TutorialController:BoughtGear(): boolean?
 	local known = false
 	for id, record in self.Libs.Net.Upgrades:entries() do
 		const upgrade = Content.Upgrades.List[id]
-		if upgrade == nil or upgrade.SoldAt ~= "Bench" then
+		if upgrade == nil or upgrade.SoldAt ~= "Bench" or Content.Mode.IsOff(upgrade.Key) then -- off / retired lines (DEC-331) never count
 			continue
 		end
 		known = true
@@ -2820,6 +2873,9 @@ TutorialController:OnStart(function(self)
 		self:Mount(Players.LocalPlayer:WaitForChild("PlayerGui"))
 	end)
 	self:BindDebug()
+	Players.LocalPlayer:GetAttributeChangedSignal("TutorialSkipped"):Connect(function()
+		self.LobbySkip(Players.LocalPlayer:GetAttribute("TutorialSkipped") == true)
+	end)
 	RunService.Heartbeat:Connect(function()
 		-- the Beacon only moves while something is marked (ClearGuidance unmarks it when the tutorial stops)
 		self.Beacon.Step()

@@ -318,7 +318,7 @@ function MapIndex.NearestNode(position: Vector3, skip: ((id: string) -> boolean)
 	return best
 end
 
--- Node ids from `from` to `to` (both included), or nil. AvoidCrossings for the thief (MAP-01 §9.2); AvoidQueue
+-- Node ids from `from` to `to` (both included), or nil. AvoidCrossings skips crosswalks (MAP-01 §9.2); AvoidQueue
 -- keeps queue slots from being intermediate steps (check_map01 route warning).
 function MapIndex.Path(from: string, to: string, options: PathOptions?): { string }?
 	const current = get()

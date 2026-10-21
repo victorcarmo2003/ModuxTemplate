@@ -25,6 +25,7 @@ local Theme = require(script.Parent.Theme)
 local Motion = require(script.Parent.Motion)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonLabel = require(script.Parent.CartoonLabel)
+local WorldStroke = require(script.Parent.WorldStroke)
 
 const create = Vide.create
 const source = Vide.source
@@ -60,6 +61,7 @@ export type Props = {
 }
 
 const WIDTH = 7 -- studs
+const STROKE_REFERENCE = 120 -- px of sign height where the kit outlines read right (WorldStroke)
 const HEIGHT = 7.2
 const MAX_TEXT = 64
 const DEFAULT_DISTANCE = 140
@@ -147,7 +149,7 @@ return function(props: Props): BillboardGui
 		return bump() * (1 + 0.06 * beat())
 	end
 
-	return createRaw("BillboardGui")({
+	const billboard = createRaw("BillboardGui")({
 		Name = props.Name or "PadTag",
 		Adornee = props.Adornee,
 		Size = UDim2.fromScale(WIDTH, HEIGHT),
@@ -292,4 +294,7 @@ return function(props: Props): BillboardGui
 			}),
 		}),
 	}) :: BillboardGui
+	-- outlines follow the sign size on screen (far away they were a black blot, owner 2026-10-20)
+	cleanup(WorldStroke(billboard, STROKE_REFERENCE))
+	return billboard
 end

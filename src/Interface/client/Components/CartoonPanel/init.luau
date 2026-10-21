@@ -94,6 +94,9 @@ local function padding(value: Padding?): Instance
 end
 
 const PROBE = 100
+-- Under this UI scale a measure is skipped: in a pop-in / pop-out the text keeps its minimum size while the scale
+-- nears 0, so content / scale blew the panel up to the screen width (owner 2026-10-20, the lobby gem pill on a phone).
+const MIN_MEASURE_SCALE = 0.25
 
 -- Content size: the face area on the axes the body does not size by itself, auto (0) on the axes it does.
 local function contentSize(autoX: boolean, autoY: boolean, lip: number): UDim2
@@ -191,7 +194,7 @@ return function(props: Props): Frame
 	if autoX or autoY then
 		local function measure()
 			const scale = probe.AbsoluteSize.X / PROBE
-			if scale > 0 then
+			if scale >= MIN_MEASURE_SCALE then
 				measured(contentFrame.AbsoluteSize / scale)
 			end
 		end

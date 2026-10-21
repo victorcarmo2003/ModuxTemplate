@@ -39,7 +39,6 @@ const base = Table.new({
 	civil("f"),
 	civil("g"),
 	civil("h"),
-	{ Key = "thief", Ref = "AST-056", Arms = "Civil", Packs = { "Day" }, Use = "Reserved", ReservedFor = "NPC-007" },
 } :: { Outfit })
 
 const looks: Looks = {
@@ -55,7 +54,6 @@ const looks: Looks = {
 		"Exhausted",
 		"Stressed",
 		"Normal_Night",
-		"Thief", -- NPC-007 only
 	},
 	NpcNeverUses = {
 		Expressions = { "Fainted" }, -- Provisional (DEC-187)

@@ -154,6 +154,7 @@ Tabelas que geram os enums: `content-data.md`. Dados persistidos: `data.md`.
 | `Interact` | packet c → s | **1** | §4.1 |
 | `Notice` | packet s → c/grupo | **1** | §4.2 |
 | `Sale` | packet s → grupo | **1** | §4.3 |
+| `CustomerComplain` | packet s → grupo | **1** | §4.3a |
 | `ShiftReport` | packet s → grupo | **1** | §4.4 |
 | `ClassAction` | packet c → s | **1** | §4.6 |
 | `Round` (packet antigo) | packet | legado | **mantido** na onda 1, sem uso novo; removido na onda 2 |
@@ -348,6 +349,7 @@ Interact = Lync.packet(Lync.struct({
 Notice = Lync.packet(Lync.struct({
 	Kind = Lync.enum(Content.Notices.Keys),
 	Value = Lync.int(-1000000, 1000000),        -- parâmetro do texto ({value}); índice de tabela quando o texto cita item/upgrade
+	By = Lync.optional(Lync.f64()),             -- DEC-320: UserId de quem fez (o client põe o nome do colega na frente)
 }))
 ```
 
@@ -373,6 +375,23 @@ Sale = Lync.packet(Lync.struct({
 | Dispara | `CustomerService` (validação de "Serve", desistência, "Refuse") |
 | Lê | `CustomerController` (balão feliz/neutro/reclamação), `EconomyController` ("+$N" flutuante na gaveta) |
 | Frequência | por venda (≤ 1/s) |
+
+### 4.3a `CustomerComplain` (s → grupo)
+
+Janela de serviço fechada por um jogador (TASK-585, Provisório): o cliente reclama sobre a cabeça antes de ir embora.
+
+```lua
+CustomerComplain = Lync.packet(Lync.struct({
+	Npc = Lync.int(1, 65535),                   -- NpcId
+	Line = Lync.int(1, 64),                     -- índice em Content.ShopWindow.ShutLines
+}))
+```
+
+| | |
+|---|---|
+| Dispara | `CustomerService:ComplainLineAway` (janela fechada por `ShutGrace` s) |
+| Lê | `CustomerController`: balão `Complaint` com o texto + som/clipe de `Reactions.Feedback("Slow")`; o `Sale Refused` que vem `ComplainTime` s depois não troca o balão |
+| Frequência | evento (um por cliente da fila, por fechamento) |
 | `Perfect` | Completo **com** gorjeta (dentro da janela, DEC-072). `Wrong` → o HotDog volta à mão de quem serviu (Tool, sem rede) |
 | Por que packet | é apresentação de um instante; o estado (gaveta) já está em `Economy` |
 
@@ -412,7 +431,12 @@ Profile = Lync.packet(Lync.struct({
 	Classes = Lync.bitfield(Content.Classes.Keys), -- desbloqueadas
 	Selected = Lync.enum(Content.Classes.Keys),
 	TutorialDone = Lync.bool(), -- legado (Q-193): ninguém lê; o tutorial roda no dia 1 de toda run
+	Guides = Lync.bitfield(Content.Lobby.Guide.Keys), -- setas de chão do lobby já mostradas (Provisório, 2026-10-20)
 }))
+
+-- c -> s, Provisório (pedido do dono 2026-10-20). Responder: LobbyService. A seta de chão `Key` ("pad" | "classes")
+-- chegou ao alvo: grava em LobbyGuides e não aparece mais. Cosmético, idempotente; o servidor confia no client.
+LobbyGuideDone = Lync.packet(Lync.enum(Content.Lobby.Guide.Keys))
 
 -- c -> s, Provisório (2026-10-11). Responder: TutorialService. Fecha o tutorial desta run para o jogador, só na
 -- memória do servidor (nada é salvo; idempotente; Q-193). O servidor confia no client (nada de dinheiro, item ou stat depende disso).
@@ -601,7 +625,7 @@ Parties = Lync.replicate(Lync.struct({ ... })),    -- lobby; plataformas física
 | `Revive` | c → s | `{ Target: f64, Method: enum({"Robux","Item","Credit"}) }` | `ReviveService` | Robux/crédito só para si (DEC-116) |
 | `SkipVote` | c → s | `Lync.empty()` | `CutsceneService` | DEC-194 |
 | `BossCall` | s → grupo | `{ Call: enum(Content.BossCalls.Keys), Short: bool }` | `BossController` | não pulável (DEC-194 b, Provisório) |
-| `AnomalyCue` | s → jogador/grupo | `{ Anomaly, Cue, Entity: int(0,65535), Seed: int(0,65535) }` | `AnomalyController` | |
+| `AnomalyCue` | s → jogador/grupo | `{ Anomaly, Cue, Entity: int(0,65535), Seed: int(0,65535), User: f64? }` (`User` = UserId do cue pessoal, DEC-320) | `AnomalyController` | |
 | `LifeEvent` | s → grupo | `{ UserId: f64, Event: enum({"Down","Revived","Spectating","Hit","Wipe","WipeCleared"}) }` | Camera, Hud, Ambulance | |
 | `PartyAction` | c → s | `{ Action: enum({"Leave","Ready","Unready","Start"}), Party: int(0,255) }` | `PartyService` | entrar = pisar na plataforma (DEC-179), sem `Join` |
 | `Reconnect` / `ReconnectReply` | s → c / c → s | como na v3 | `SessionService` | |
@@ -856,6 +880,8 @@ Call = Lync.replicate(Lync.struct({          -- registro 1
 
 ### 13.4 `Thief` (onda 2)
 
+> **Removido (DEC-313, 2026-10-20):** o ladrão saiu do jogo e do código (`src/Thief`, `Content.Thief`, `Net.Thief`, UPG-004, notices `thief_*`, ligações "quentin"). Texto abaixo é histórico.
+
 ```lua
 Thief = Lync.replicate(Lync.struct({         -- registro 1
 	State = Lync.enum({ "None", "Lurking", "Approaching", "Opening", "Fleeing" }),
@@ -991,6 +1017,8 @@ ReconnectReply = Lync.packet(Lync.struct({ Accept = Lync.bool() })), -- c → s
 ```
 
 ### 13.9 Ambulância, reviver, bancada (onda 4)
+
+> **Descartado (DEC-314, 2026-10-20):** a ambulância e os médicos não serão feitos; o corpo fica no chão até o reviver ou o fim da noite (`Revive.BodyFallback`). Texto abaixo sobre ambulância é histórico.
 
 `Ambulance`, `Revive` e `Bench` com o schema da §6.2 (sem mudança). `Profile` ganha
 `ReviveCredits = Lync.int(0, 99)` (§4.5).
@@ -1300,7 +1328,10 @@ Durante `Starting` (contagem de `Rules.Countdown` = 5 s do Start de squad ou do 
 **CANCEL** (mostarda escura, tecla X / X do gamepad; na janela `SquadSetup` há um botão Cancel).
 
 ```lua
-PartyCancel = Lync.packet(Lync.empty()), -- c -> s
+PartyCancel = Lync.packet(Lync.empty()), -- c -> s (pad rooms: no-op, DEC-347)
+-- DEC-347 (2026-10-21, Provisório): barra do pad. StartNow / FriendsOnly = líder; SkipTutorial = cada membro. Party ganha
+-- Skip = Lync.map(f64, bool, 0, 4); TeleportData ganha SkipTutorial = { UserId } (TutorialService fecha o tutorial dele)
+PartyPad = Lync.packet(Lync.struct({ Action = Lync.enum({ "StartNow", "SkipTutorial", "FriendsOnly" }), On = Lync.bool() }))
 ```
 
 Servidor (`PartyService:HandleCancel`): rate e papel comuns (§16); sem squad = `NotInParty`; não líder = `NotLeader`;

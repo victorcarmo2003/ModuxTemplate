@@ -313,7 +313,9 @@ function AnimController:Step(binding: Binding, camera: Camera?, now: number)
 	const last = binding.LastPosition
 	const elapsed = now - binding.LastAt
 	local sample = 0
-	if last ~= nil and elapsed > 0 then
+	-- a drive-thru driver (DriveThruController seats it and moves it with its car): never walks (owner 2026-10-20)
+	const driving = model:GetAttribute("DriveThru") == true
+	if last ~= nil and elapsed > 0 and not driving then
 		const moved = Vector3.new(position.X - last.X, 0, position.Z - last.Z).Magnitude
 		if moved < TELEPORT then
 			sample = moved / elapsed

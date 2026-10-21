@@ -18,6 +18,9 @@ export type View = {
 	HopAt: number, -- os.clock() of the last horn (hop)
 	Seat: CFrame, -- the driver's root, from the car pivot
 	Rig: Model?, -- the customer's rig on that seat (nil = not found yet)
+	-- rest C0 of the joints this client bent on Rig (sitting pose, head turn), put back on release (owner 2026-10-20)
+	Rest: { [Motor6D]: CFrame },
+	Look: number, -- current head turn (rad) towards the local camera
 }
 export type Move = { From: number, To: number, Start: number, Duration: number, Accel: boolean }
 
@@ -29,6 +32,7 @@ export type Public = {
 	Patience: { [number]: Patience },
 	Records: { [number]: CarRecord },
 	Views: { [number]: View },
+	Window: Vector3?,
 	Setup: (self: Public) -> (),
 	Container: (self: Public) -> Folder,
 	OnRecord: (self: Public, spot: number, record: CarRecord?) -> (),
@@ -37,7 +41,10 @@ export type Public = {
 	Horn: (self: Public, car: View, sound: string) -> (),
 	CheckHorn: (self: Public, car: View, t: number) -> (),
 	Step: (self: Public) -> (),
+	AlignWindow: (self: Public, car: View, pose: CFrame) -> CFrame,
+	Release: (self: Public, car: View) -> (),
 	SeatDriver: (self: Public, car: View, pose: CFrame) -> (),
+	LookAtCamera: (self: Public, car: View, rig: Model) -> (),
 	FindRigs: (self: Public) -> (),
 	Rebuild: (self: Public) -> (),
 }

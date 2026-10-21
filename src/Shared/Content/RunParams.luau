@@ -19,6 +19,8 @@ export type RunParams = {
 	EndlessRequiresNoTrailer: boolean, -- UNUSED, same reason
 	AntiAfkMinCompleted: number,
 	AntiAfkAppliesToGradeA: boolean,
+	-- DEC-320 (Q-411): Content.Actions keys that count as work for the per-player anti-AFK (one is enough per shift)
+	AntiAfkWork: { string },
 	BindingWave: number, -- which MapIndex Required.Wave<n> PlaceService validates; also gates Actions[a].Wave
 }
 
@@ -43,6 +45,32 @@ const params: RunParams = {
 	EndlessFromDay = 6, -- UNUSED: endless days are gone with the new flow (Q-207), RunState.Endless stays false
 	EndlessRequiresNoTrailer = true, -- UNUSED
 	AntiAfkMinCompleted = 3, -- DEC-083
+	-- DEC-320 (Q-411, Provisional list): kitchen and service actions; doors, lights, phone, cameras and shopping do not count
+	AntiAfkWork = {
+		"cook_focus",
+		"grill_place",
+		"grill_collect",
+		"grill_flip",
+		"bun_cut",
+		"plate_take",
+		"plate_add_bun",
+		"plate_add_sausage",
+		"topping_add",
+		"tablet_take",
+		"take_order",
+		"serve",
+		"pickup_serve",
+		"drive_serve",
+		"serve_table",
+		"refuse",
+		"restock",
+		"take_box",
+		"collect_tips",
+		"brew_coffee",
+		"give_coffee",
+		"breaker_reset",
+		"revive_mate",
+	},
 	AntiAfkAppliesToGradeA = true, -- DEC-083 (secretary reading, to confirm)
 	BindingWave = 3, -- 1 -> 2 -> 3 per wave (content-data.md §6.8; architecture.md §19.22)
 }

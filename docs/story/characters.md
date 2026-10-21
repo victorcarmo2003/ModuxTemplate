@@ -78,6 +78,8 @@ Aparência pensada para R6: leitura por **silhueta, cor, chapéu e acessório**,
 
 ## CHR-004 — Quick Quentin (o ladrão do dia)
 
+> **Removido (DEC-313, 2026-10-20):** o ladrão saiu do jogo e do código (`src/Thief`, `Content.Thief`, `Net.Thief`, UPG-004, notices `thief_*`, ligações "quentin"). Texto abaixo é histórico.
+
 - **Papel**: o ladrão de DEC-018/DEC-050. Só de dia, a partir do dia 2. Espreita visível, mexe na gaveta se ninguém está na zona do carrinho, foge com saco de moedas. Sem contato, sem briga.
 - **Motivação**: guloso por moedas, não é malvado. Rouba e sai na ponta dos pés.
 - **Personalidade**: cômico, exagerado, "vilão de desenho". Assobia fingindo que não está ali.
@@ -122,6 +124,8 @@ Aparência pensada para R6: leitura por **silhueta, cor, chapéu e acessório**,
 - **Nomes que o chefe usa** (texto de jogo): "the blank folks" (ANM-001), "the wrong food" (ANM-002), "the stopped clock" (ANM-003), "the copies" (ANM-004), "the Raincoat Lady" (ANM-005), "the wavers" (ANM-006), "the Walker" (ANM-007), "the long car" (ANM-008), "the knock" (ANM-009), "the Hush" (ANM-010).
 
 ## CHR-008 — Bellmoor Rescue crew (médicos da ambulância)
+
+> **Descartado (DEC-314, 2026-10-20):** a ambulância e os médicos não serão feitos; o corpo fica no chão até o reviver ou o fim da noite (`Revive.BodyFallback`). Texto abaixo sobre ambulância é histórico.
 
 - **Papel**: dois médicos que chegam de ambulância quando um jogador desmaia por sanidade 0, **descem** e o levam na maca carregada à mão (DEC-091, DEC-114). Não são anomalia, não são ameaça: são **resgate**. No reviver, a ambulância volta e **ninguém desce** (DEC-091).
 - **Motivação**: turno da noite, como o jogador. Já conhecem a esquina.

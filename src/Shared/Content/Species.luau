@@ -1,6 +1,6 @@
 --!strict
 -- Animal species (content-data.md §3.10a; DEC-158, DEC-159, DEC-186, DEC-188, DEC-192, DEC-214).
--- TASK-009: 18 species. 8 have a class (6 playable in the MVP: PlayableKeys); raccoon is Quick Quentin only.
+-- TASK-009: 18 species. 8 have a class (6 playable in the MVP: PlayableKeys); raccoon is reserved (no NPC since DEC-313).
 -- DEC-188 a: every species may be a customer (civil outfit, never the crew uniform), except the raccoon.
 -- Wave 1 draws customers only from CustomerTypes.Species; where playable species and the pig appear as
 -- customers is Q-165 (Provisional: pedestrians only, wave 2). Pig as a normal customer: DEC-192 confirmed by DEC-214.
@@ -58,7 +58,7 @@ const base = Table.new({
 		Asset = "Raccoon",
 		Customer = false,
 		Pedestrian = false,
-		ReservedFor = "NPC-007", -- Quick Quentin only (DEC-159, DEC-186)
+		ReservedFor = "NPC-007", -- was Quick Quentin (DEC-186); the thief left (DEC-313), the raccoon stays off customers
 	},
 } :: { Species })
 

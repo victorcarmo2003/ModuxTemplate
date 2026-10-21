@@ -10,6 +10,9 @@
 -- SAME insets as the target's ScreenGui (the HUD: ScreenInsets = DeviceSafeInsets), so both
 -- frames share one origin whatever the top bar / safe area of the device; the dim bands overscan OVERSCAN px past the
 -- frame on every side, so the top bar and the notch areas are dimmed too.
+-- Intro (owner 2026-10-19, the Back button of the cooking focus): when `Intro()` is true the spotlight plays a short close-up
+-- each time it comes on (or its target changes): INTRO_DIM s of nothing, then the dim fades in, INTRO_WAIT s later the ring
+-- starts as big as the screen and closes onto the target in INTRO_CLOSE s (ease out), then pulses as usual.
 -- Pure: only props.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -33,6 +36,8 @@ export type Props = {
 	-- Dim transparency when fully shown. Default 0.45.
 	Dim: number?,
 	Name: string?,
+	-- true = play the close-up intro (see the header) for the current target. nil / false = dim and ring at once.
+	Intro: (() -> boolean)?,
 }
 
 type Hole = { Position: Vector2, Size: Vector2 }
@@ -41,11 +46,27 @@ const PULSE_SPEED = 4 -- rad/s
 const PULSE = 0.04
 const RADIUS = UDim.new(0, 18)
 const OVERSCAN = 2000 -- px the dim bands reach past the frame (top bar, notch, any inset)
+const INTRO_DIM = 0.5 -- s before the dim comes in
+const INTRO_WAIT = 0.5 -- s of dim before the ring starts closing
+const INTRO_CLOSE = 1 -- s the ring takes from the screen's edge to the target
+const INTRO_INSET = 24 -- px the ring's first frame sits inside the screen edge
 
 return function(props: Props): Frame
 	const pad = props.Padding or 10
 	const dim = props.Dim or 0.45
-	const pop = Motion.Pop(props.Shown)
+	const intro = props.Intro
+	-- the intro's dim delay is over (always true without an intro)
+	const armed = source(intro == nil)
+	-- the ring's close-up: < 0 = not started (hidden), 0..1 = closing, 1 = on the target
+	const closeT = source(1)
+	local introSince: number? = nil
+	local introTarget: GuiObject? = nil
+	local function introOn(): boolean
+		return intro ~= nil and intro()
+	end
+	const pop = Motion.Pop(function(): boolean
+		return props.Shown() and (not introOn() or armed())
+	end)
 	const hole = source({ Position = Vector2.zero, Size = Vector2.zero } :: Hole)
 	const pulse = source(1)
 	const screen = source(Vector2.zero)
@@ -62,6 +83,33 @@ return function(props: Props): Frame
 	})
 
 	const connection = RunService.RenderStepped:Connect(function()
+		-- the intro clock runs while hidden too: it is what lets the dim in
+		if intro ~= nil then
+			const on = untrack(props.Shown) and untrack(intro)
+			const target = untrack(props.Target)
+			if not on then
+				introSince = nil
+				if untrack(armed) then
+					armed(false)
+				end
+				if untrack(closeT) ~= 1 then
+					closeT(1)
+				end
+			else
+				if introSince == nil or target ~= introTarget then
+					introSince = os.clock()
+					introTarget = target
+				end
+				const t = os.clock() - (introSince :: number)
+				if untrack(armed) ~= (t >= INTRO_DIM) then
+					armed(t >= INTRO_DIM)
+				end
+				const close = math.min((t - INTRO_DIM - INTRO_WAIT) / INTRO_CLOSE, 1)
+				if untrack(closeT) ~= close then
+					closeT(close)
+				end
+			end
+		end
 		if untrack(pop) <= 0.01 then
 			return
 		end
@@ -124,6 +172,20 @@ return function(props: Props): Frame
 		return screen()
 	end
 
+	-- Centre and size of the ring: the hole, or on the way there from the screen's edge (intro, ease out cubic)
+	local function ringBox(): (Vector2, Vector2)
+		const h = hole()
+		const centre = h.Position + h.Size / 2
+		const t = math.clamp(closeT(), 0, 1)
+		if t >= 1 or not introOn() then
+			return centre, h.Size
+		end
+		const eased = 1 - (1 - t) ^ 3
+		const size = full()
+		const fromSize = Vector2.new(math.max(size.X - INTRO_INSET * 2, h.Size.X), math.max(size.Y - INTRO_INSET * 2, h.Size.Y))
+		return (size / 2):Lerp(centre, eased), fromSize:Lerp(h.Size, eased)
+	end
+
 	const children: { Instance } = {
 		-- Without a target the top band covers everything.
 		band("Top", function()
@@ -159,21 +221,22 @@ return function(props: Props): Frame
 			return Vector2.new(left, h.Position.Y), Vector2.new(size.X - left + OVERSCAN, h.Size.Y)
 		end),
 
-		-- Ring over the hole
+		-- Ring over the hole (during the intro it closes in from the screen's edge)
 		create("Frame")({
 			Name = "Ring",
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = function()
-				const h = hole()
-				const centre = h.Position + h.Size / 2
+				const centre, _ = ringBox()
 				return UDim2.fromOffset(centre.X, centre.Y)
 			end,
 			Size = function()
-				const h = hole()
-				return UDim2.fromOffset(h.Size.X, h.Size.Y)
+				const _, size = ringBox()
+				return UDim2.fromOffset(size.X, size.Y)
 			end,
 			BackgroundTransparency = 1,
-			Visible = hasHole,
+			Visible = function(): boolean
+				return hasHole() and (not introOn() or closeT() >= 0)
+			end,
 			create("UICorner")({ CornerRadius = RADIUS }),
 			createRaw("UIScale")({ Scale = pulse }),
 			createRaw("UIStroke")({

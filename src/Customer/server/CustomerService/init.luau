@@ -69,7 +69,7 @@
 -- Tutorial customer (user request 2026-10-11, Provisional; shared.Tutorial.Rules): RequestTutorial() (TutorialService,
 -- when a rookie answered Walt's call) spawns one customer in a day Prep/Open as soon as the counter and the NPC pool
 -- have room. Its rig carries the attribute Rules.Attribute = true (the client guides the rookie through it). It orders
--- Rules.Order, never runs out of patience (no ring: PatienceEndsAt 0 on the wire), never counts on the shift ledger
+-- Rules.Orders (in turn), never runs out of patience (no ring: PatienceEndsAt 0 on the wire), never counts on the shift ledger
 -- (no CountArrival / CountResult), gets no anomaly rule (no AddServeRule, no Acted, never copied by a mirror), cannot
 -- be refused and never sits. "Take Order" works on it even in Prep (the drawer is closed there); "Serve" still needs
 -- the drawer open (the rookie opens the shop first). The regular flow waits while it is at the counter.
@@ -175,13 +175,22 @@ export type Customer = {
 	CarryLook: { Toppings: string?, Sauce: string?, Altered: boolean, Dish: boolean }?,
 	-- Drive-thru (TASK-574): lane spot 1..Drive.Lanes of its car (1 = at the window), 0 = a walking customer
 	Drive: number,
+	-- Pickup arc (owner 2026-10-20): reached the arc once (later moves go straight), and the counter slot it walks to for its
+	-- plate (1..PickupArc.Slots, 0 = not collecting; Display = its plate on the counter)
+	Arc: boolean,
+	CounterSlot: number,
+	Display: Model?,
 }
 
 -- DriveThruService hooks (SetDriver, TASK-574). Try(party): one spawn attempt may become a car; the NpcId when a car
 -- spawned (it called Create with its lane spot), nil = an ordinary attempt. Left(id): a drive customer started leaving (its car drives
 -- off; DriveThruService removes the record). Neither may yield.
+-- `counter` = customers at / walking to the counter now (Occupants), for the counter / drive-thru balance (owner 2026-10-20).
+-- TryTutorial(): the tutorial customer as a car (owner 2026-10-20: the 2nd tutorial customer comes to the drive-thru), any
+-- night, no share draw; the NpcId, nil = no room on the lane / in the pool (CustomerService tries again later).
 export type Driver = {
-	Try: (party: number) -> number?,
+	Try: (party: number, counter: number) -> number?,
+	TryTutorial: () -> number?,
 	Left: (id: number) -> (),
 }
 
@@ -231,7 +240,7 @@ export type Wire = {
 export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused" | "Slow"
 
 -- Customer-anomaly variant (= NpcService.Variant; rig attribute "Variant", read by the client)
-export type Variant = "blank" | "mirror" | "raincoat" | "shake" | "neck" | "eyes" | "bighead" | "float" | "stare"
+export type Variant = "blank" | "mirror" | "raincoat" | "shake" | "neck" | "eyes" | "bighead" | "float" | "stare" | "banger"
 
 -- SpawnActor request (architecture.md §19.13 Context.Spawn). Look fields force the draw (must be valid for the type);
 -- CopyOf (mirror only) copies the type, species and outfit of a live, non-actor customer that is not leaving.
@@ -258,6 +267,8 @@ const SEED_DOMAIN = "customers"
 const ORDER_SEED_DOMAIN = "orders" -- own stream: order draws never shift the spawn draws
 const ACTOR_SEED_DOMAIN = "actors" -- own stream: anomaly actors never shift the customer draws
 const MIRROR = "mirror"
+-- TASK-591: actor variants whose ticket is a plain hot dog, no topping (ANM-011 the shaker: serve him plain)
+const PLAIN_VARIANTS: { [string]: boolean } = { shake = true }
 const SALE_MAX = 1000 -- Sale.Amount wire range
 const TAKE_ORDER = "take_order"
 const SERVE = "serve"
@@ -279,7 +290,8 @@ const NEUTRAL = "Neutral" -- arrival mood (Content.Moods)
 -- Mood ladder, best first (Q-219 B: Messy = one band down; Content.Moods has no order of its own yet)
 const MOOD_LADDER = { HAPPY, NEUTRAL, ANNOYED, COMPLAINING }
 -- day phases where the tutorial customer may spawn (the tutorial runs in Prep and Open)
-const TUTORIAL_PHASES: { [string]: boolean } = { Prep = true, Open = true }
+-- Night too (DEC-311): the run starts at night (Shift.RunStartsAtNight), and the tutorial is the first night's shop
+const TUTORIAL_PHASES: { [string]: boolean } = { Prep = true, Open = true, Night = true }
 -- Restaurant (TASK-380)
 const PICKUP_SERVE = "pickup_serve" -- Content.Actions key (PICKUP Prompt_Serve)
 const PICKUP_FULL = "pickup_full" -- Content.Notices key
@@ -349,6 +361,11 @@ const CustomerService = Modux.Service("CustomerService", {
 function CustomerService:Setup()
 	self.Enabled = false :: boolean
 	self.Customers = {} :: { [number]: Customer }
+	-- ShutGrace wait of the player-closed window (the line), the WaitShutGrace wait (customers whose order was taken), and the
+	-- last ShutLines index shown (no repeat in a row)
+	self.ShutThread = nil :: thread?
+	self.WaitShutThread = nil :: thread?
+	self.LastComplaint = 0 :: number
 	self.Line = Queue.new() :: Queue.Queue
 	-- Reseeded at every ShiftStarted
 	self.Rng = Random.new() :: Random
@@ -366,6 +383,13 @@ function CustomerService:Setup()
 	self.NextSpawnAt = 0 :: number
 	-- night pacing (owner 2026-10-18): the counter freed, the next customer waits until CounterFreeAt (Flow.CounterGap)
 	self.CounterFreeAt = 0 :: number
+	-- server time until which nobody new arrives after the window reopened (Flow.ReopenPause, owner 2026-10-20)
+	self.ReopenUntil = 0 :: number
+	-- Pickup arc (owner 2026-10-20): the counter copy of the hot dog being handed over (ServeAtPickup -> LeaveServed), the
+	-- counter slots in use (slot -> customer id) and the folder of the counter plates
+	self.PendingDisplay = nil :: Model?
+	self.CounterSlots = {} :: { [number]: number }
+	self.DisplayFolder = nil :: Folder?
 	self.CounterWasFull = false :: boolean
 	-- restaurant nights: customers since the last quiet stretch (Restaurant.Flow.LullEvery)
 	self.LullCount = 0 :: number
@@ -404,6 +428,8 @@ function CustomerService:Setup()
 	self.DevNoArrivals = false :: boolean
 	-- Tutorial customer asked (RequestTutorial) and not spawned yet; server time of the next try
 	self.TutorialWanted = false :: boolean
+	-- tutorial customers served in this server (DEC-311: the next one gets TutorialRules.Orders[served + 1])
+	self.TutorialServed = 0 :: number
 	self.TutorialTryAt = 0 :: number
 	-- look draws of the tutorial customer: never shifts the seeded customer draws
 	self.TutorialRng = Random.new() :: Random
@@ -508,10 +534,12 @@ function CustomerService:IsCounterEmpty(): boolean
 end
 
 -- Active queue slots now (Counter level, UPG-003). Read live: a Counter bought mid-shift opens Q4 at once.
--- At night Flow.NightQueueSize (TASK-287): one NPC at the counter, customer or anomaly actor, never two.
+-- At night Flow.NightQueueByParty (DEC-320, Q-413; was Flow.NightQueueSize = 1, TASK-287): one NPC at the counter
+-- for 1-2 players, two with 3+ (party locked when the selling phase started).
 function CustomerService:QueueSize(): number
 	if self:IsNightShift() then
-		return Queue.size(Content.Flow.NightQueueSize)
+		const byParty = Content.Flow.NightQueueByParty
+		return Queue.size(byParty[math.clamp(self.Party, 1, #byParty)] or Content.Flow.NightQueueSize)
 	end
 	return Queue.size(self.Dependencies.UpgradeService:GetEffect("QueueSize"))
 end
@@ -589,8 +617,12 @@ function CustomerService:MaxCustomers(): number
 	if not self:IsNightShift() then
 		return flow.MaxCustomersDay
 	end
+	-- DEC-320 (Q-413): the night cap follows the crew size, Restaurant.Flow.MaxCustomers (5 / 7 / 9 / 9), party locked
+	-- when the selling phase started; a night row may only lower it
+	const byParty = Content.Restaurant.Flow.MaxCustomers
+	const cap = byParty[math.clamp(self.Party, 1, #byParty)] or flow.MaxCustomersNight
 	const row = self:NightRow()
-	return if row ~= nil then math.min(row.Customers.Max, flow.MaxCustomersNight) else flow.MaxCustomersNight
+	return if row ~= nil and row.Customers.Max < flow.MaxCustomersNight then math.min(row.Customers.Max, cap) else cap
 end
 
 -- Run members connected to this server, 1..#PartyMult (DEC-185: connected players).
@@ -611,8 +643,11 @@ end
 function CustomerService:MeanInterval(): number?
 	const round = self.Dependencies.RoundService
 	const flow = Content.Flow
-	const party = flow.PartyMult[math.clamp(self.Party, 1, #flow.PartyMult)]
+	local party = flow.PartyMult[math.clamp(self.Party, 1, #flow.PartyMult)]
 	if self:IsNightShift() then
+		-- DEC-320 (Q-413): the restaurant's own crew multiplier at night (1 / 1.8 / 2.5 / 3.1)
+		const restaurantMult = Content.Restaurant.Flow.PartyMult
+		party = restaurantMult[math.clamp(self.Party, 1, #restaurantMult)] or party
 		const row = self:NightRow()
 		if row == nil then
 			self:WarnOnce("night", `no Nights row for night {round:Info().Night}: using Flow.NightInterval`)
@@ -740,7 +775,9 @@ function CustomerService:JoinDrive(id: number)
 	customer.State = "Queued"
 	customer.JoinedAt = now()
 	self:Publish(customer, false)
-	self.Dependencies.EconomyService:CountArrival()
+	if not customer.Tutorial then
+		self.Dependencies.EconomyService:CountArrival()
+	end
 	self.Joined:Fire(id)
 end
 
@@ -763,17 +800,31 @@ function CustomerService:FrontDrive(id: number): boolean
 	if customer == nil or ticket == nil or customer.Drive ~= 1 or customer.State ~= "Queued" then
 		return false
 	end
-	const drive = Content.Restaurant.Drive
-	const bonus = math.max(self.Dependencies.UpgradeService:GetEffect("PatienceBonus"), 0)
-	ticket.QueueSpan = drive.OrderPatience + bonus
-	ticket.OrderSpan = drive.PrepBase + drive.PrepPerK * ticket.K + bonus
-	Orders.BeginQueue(ticket, now())
-	customer.State = "Ordering"
-	return self:Update(id, {
-		PatienceEndsAt = ticket.PatienceEndsAt,
-		Phase = "Queue",
-		PatienceSpan = Orders.WireSpan(ticket),
-	})
+	local written = true
+	if customer.Tutorial then
+		-- the tutorial car never runs out of patience (no clock on the wire)
+		customer.State = "Ordering"
+		self:Publish(customer, false)
+	else
+		const drive = Content.Restaurant.Drive
+		const bonus = math.max(self.Dependencies.UpgradeService:GetEffect("PatienceBonus"), 0)
+		ticket.QueueSpan = drive.OrderPatience + bonus
+		ticket.OrderSpan = drive.PrepBase + drive.PrepPerK * ticket.K + bonus
+		Orders.BeginQueue(ticket, now())
+		customer.State = "Ordering"
+		written = self:Update(id, {
+			PatienceEndsAt = ticket.PatienceEndsAt,
+			Phase = "Queue",
+			PatienceSpan = Orders.WireSpan(ticket),
+		})
+	end
+	-- owner 2026-10-20 (Provisional): the order is taken on the car itself ("Take Order" on the driver's rig), no tablet
+	const customerAnchor = self.Dependencies.NpcService:Anchors(id)
+	if customerAnchor ~= nil then
+		customerAnchor:SetAttribute("PromptAction", TAKE_ORDER)
+	end
+	self:SetPrompts(id, true)
+	return written
 end
 
 -- The customer in the car at the window (lane spot 1, not leaving), or nil.
@@ -872,14 +923,27 @@ end
 function CustomerService:RefreshPickup()
 	const points = self:PickupPoints()
 	const format = Content.Restaurant.Binding.PickupPoint
+	const arc = self:IsArcMode()
 	for spot, id in self.PickupLine.Order do
 		const customer = self.Customers[id]
-		if customer == nil or customer.Pickup == spot then
+		if customer == nil or customer.Pickup == spot or customer.CounterSlot > 0 then
 			continue
 		end
 		customer.Pickup = spot
 		self:Publish(customer, false)
-		if points > 0 then
+		if arc and points > 0 then
+			-- owner 2026-10-20: to PU-1 by the graph once, then straight to its place on the arc
+			if customer.Arc then
+				self:WalkArc(customer)
+			else
+				self:Walk(customer, Pickup.point(1, format), true, function(ok: boolean)
+					if ok then
+						customer.Arc = true
+						self:WalkArc(customer)
+					end
+				end)
+			end
+		elseif points > 0 then
 			-- AvoidQueue: the walk from Q1 never steps through the tablet queue slots
 			self:Walk(customer, Pickup.point(math.min(spot, points), format), true, function() end)
 		end
@@ -983,7 +1047,7 @@ function CustomerService:Attempt(): (Outcome, number?)
 	-- a car does not need a counter slot, only room in the customer and NPC caps
 	const driver = self.Driver
 	if driver ~= nil and self:Count() < self:MaxCustomers() and npc:Count() < npc:Capacity() then
-		const ok, driven = pcall(driver.Try, self.Party)
+		const ok, driven = pcall(driver.Try, self.Party, self:Occupants())
 		if not ok then
 			self:WarnOnce("driver", `drive-thru spawn failed: {driven}`)
 		elseif driven ~= nil then
@@ -1113,6 +1177,9 @@ function CustomerService:Create(id: number, variant: Variant?, leader: number?, 
 		CarryModel = nil,
 		CarryLook = nil,
 		Drive = drive or 0,
+		Arc = false,
+		CounterSlot = 0,
+		Display = nil,
 	}
 	if customer.Tutorial then
 		-- before the first replication of the record: the client knows it is the tutorial customer from the start
@@ -1218,8 +1285,10 @@ end
 
 function CustomerService:SetPrompts(id: number, enabled: boolean)
 	const customer = self.Customers[id]
-	if customer ~= nil and customer.Drive > 0 then
-		enabled = false -- TASK-574: the driver's rig is hidden; the drive-thru is served at DT-PC / DT-WIN
+	if customer ~= nil and customer.Drive > 1 then
+		-- owner 2026-10-20 (Provisional): no DT-PC tablet nor DT-WIN any more; the car AT THE WINDOW (spot 1) carries the
+		-- prompt itself ("Take Order", then "Serve" on the driver's rig). The cars behind it have none.
+		enabled = false
 	end
 	const customerAnchor = self.Dependencies.NpcService:Anchors(id)
 	if customerAnchor ~= nil then
@@ -1404,6 +1473,7 @@ function CustomerService:Forget(id: number): boolean
 		model:SetAttribute(TutorialRules.Attribute, nil)
 		customer.Model = nil
 	end
+	self:ClearCollect(customer)
 	const carried = customer.CarryModel
 	if carried ~= nil then
 		-- the rig goes back to the pool empty-handed (TASK-380)
@@ -1440,6 +1510,7 @@ end
 -- Every customer away now (shift end): they walk off instead of vanishing. Partners go with their leader; diners
 -- are SeatingService's (it stands them up on the phase change).
 function CustomerService:SendAllAway()
+	self:CancelShutWait()
 	const ids: { number } = {}
 	for id, customer in self.Customers do
 		if customer.State ~= "Leaving" and customer.Leader == nil then
@@ -1452,17 +1523,16 @@ function CustomerService:SendAllAway()
 	end
 end
 
--- The service window shut (TASK-284, owner request 2026-10-14; Content.ShopWindow, Provisional Q-270): everyone in line,
--- ordering or waiting for food walks off angry (ShopWindow.LeaveMood). Each pending hot dog is settled as
--- ShopWindow.LeaveResult (Refused: $0, same ledger and stats as a refusal; Acted "refuse" with the player who closed,
--- nil = automatic). Still walking to the line (no ticket yet): leaves angry, no outcome. Stay: the tutorial customer,
--- anomaly actors (their module decides) and diners whose food came.
-function CustomerService:SendLineAway(player: Player?)
-	const rules = Content.ShopWindow
-	const result = rules.LeaveResult :: SaleResult
+-- Customers a closing window sends away (sorted ids): not leaving, not a partner, not an actor, not the tutorial one, and
+-- not a diner whose food already came (a ticket with nothing pending). `waiting` (owner 2026-10-20, Provisional): true =
+-- only the ones whose order was taken (State Waiting), false = only the line (not ordered yet), nil = both.
+function CustomerService:LineAwayIds(waiting: boolean?): { number }
 	const ids: { number } = {}
 	for id, customer in self.Customers do
 		if customer.State == "Leaving" or customer.Leader ~= nil or customer.Variant ~= nil or customer.Tutorial then
+			continue
+		end
+		if waiting ~= nil and (customer.State == "Waiting") ~= waiting then
 			continue
 		end
 		const ticket = self.Tickets[id]
@@ -1472,7 +1542,103 @@ function CustomerService:SendLineAway(player: Player?)
 		table.insert(ids, id)
 	end
 	table.sort(ids)
-	for _, id in ids do
+	return ids
+end
+
+-- The service window shut by a player (Content.ShopWindow.ShutGrace): the line complains first and leaves after.
+-- The window stayed shut ShutGrace s; each customer shows a short line over its head (CustomerComplain), is Complaining
+-- with the prompts off and its patience frozen, and walks off ComplainTime (+ jitter) s later exactly as SendLineAway
+-- does (reopening in between does not call it back).
+function CustomerService:ComplainLineAway(player: Player?, waiting: boolean?)
+	const rules = Content.ShopWindow
+	const result = rules.LeaveResult :: SaleResult
+	const lines = #rules.ShutLines
+	const net = self.Dependencies.NetService
+	for _, id in self:LineAwayIds(waiting) do
+		const customer = self.Customers[id]
+		if customer == nil or customer.State == "Leaving" then
+			continue
+		end
+		self:PausePatience(id, true)
+		self:SetPrompts(id, false)
+		self:Update(id, { Mood = rules.LeaveMood })
+		-- never the same line twice in a row
+		-- (math.random: the shift Rng stream stays deterministic for spawns and orders)
+		local line = math.random(1, lines)
+		if lines > 1 and line == self.LastComplaint then
+			line = line % lines + 1
+		end
+		self.LastComplaint = line
+		if net:IsRunning() then
+			self.Libs.Net.CustomerComplain:fireClient(net.Audience, { Npc = id, Line = line })
+		end
+		task.delay(rules.ComplainTime + math.random() * rules.LeaveJitter, function()
+			-- gone, or a new customer on the id, or it left by itself meanwhile
+			if self.Customers[id] ~= customer or customer.State == "Leaving" then
+				return
+			end
+			const ticket = self.Tickets[id]
+			if ticket ~= nil then
+				self:SettlePending(customer, ticket, result)
+				self.Acted:Fire(id, REFUSE, player, result)
+			end
+			self:Leave(id, rules.LeaveMood)
+		end)
+	end
+end
+
+-- The window must stay shut ShutGrace s before the line reacts; a reopening cancels it. Owner 2026-10-20 (Provisional): only
+-- the line (not ordered yet) goes then; the customers whose order was taken keep waiting and go only if the window stays
+-- shut WaitShutGrace s (twice the line's time to leave), complaining the same way. An anomaly that slams it clears the line
+-- at once and starts the same WaitShutGrace wait for the others.
+function CustomerService:OnShutter(closed: boolean, player: Player?)
+	self:CancelShutWait()
+	if not closed then
+		-- owner 2026-10-20 (Provisional): a pause of arrivals after reopening, so the crew catches up before a new wave
+		self.ReopenUntil = now() + Content.Flow.ReopenPause
+		return
+	end
+	const rules = Content.ShopWindow
+	if player == nil then
+		-- automatic (an anomaly slammed it): the line at once
+		self:SendLineAway(nil, false)
+	else
+		self.ShutThread = task.delay(rules.ShutGrace, function()
+			self.ShutThread = nil
+			if self.Dependencies.VehicleService:IsShutterClosed() then
+				self:ComplainLineAway(player, false)
+			end
+		end)
+	end
+	self.WaitShutThread = task.delay(rules.WaitShutGrace, function()
+		self.WaitShutThread = nil
+		if self.Dependencies.VehicleService:IsShutterClosed() then
+			self:ComplainLineAway(player, true)
+		end
+	end)
+end
+
+-- Stops the pending ShutGrace / WaitShutGrace waits (reopened, new shift, shift end)
+function CustomerService:CancelShutWait()
+	if self.ShutThread ~= nil then
+		task.cancel(self.ShutThread)
+		self.ShutThread = nil
+	end
+	if self.WaitShutThread ~= nil then
+		task.cancel(self.WaitShutThread)
+		self.WaitShutThread = nil
+	end
+end
+
+-- The service window shut (TASK-284, owner request 2026-10-14; Content.ShopWindow, Provisional Q-270): everyone in line,
+-- ordering or waiting for food walks off angry (ShopWindow.LeaveMood). Each pending hot dog is settled as
+-- ShopWindow.LeaveResult (Refused: $0, same ledger and stats as a refusal; Acted "refuse" with the player who closed,
+-- nil = automatic). Still walking to the line (no ticket yet): leaves angry, no outcome. Stay: the tutorial customer,
+-- anomaly actors (their module decides) and diners whose food came.
+function CustomerService:SendLineAway(player: Player?, waiting: boolean?)
+	const rules = Content.ShopWindow
+	const result = rules.LeaveResult :: SaleResult
+	for _, id in self:LineAwayIds(waiting) do
 		const customer = self.Customers[id]
 		if customer == nil or customer.State == "Leaving" then
 			continue
@@ -1488,6 +1654,7 @@ end
 
 -- Every customer gone at once (new shift, snapshot restore: the shift starts empty, data.md).
 function CustomerService:RemoveAll()
+	self:CancelShutWait()
 	const ids: { number } = {}
 	for id in self.Customers do
 		table.insert(ids, id)
@@ -1576,8 +1743,10 @@ function CustomerService:OpenTicket(id: number)
 		return
 	end
 	if customer.Tutorial then
-		-- fixed order, patience that never runs out (no draw: the seeded order stream stays the same)
-		const ticket = Orders.Ticket({ table.clone(TutorialRules.Order) }, now(), 0, 0, nil)
+		-- fixed order (the next of TutorialRules.Orders, DEC-311), patience that never runs out (no draw: the seeded order stream
+		-- stays the same)
+		const orders = TutorialRules.Orders
+		const ticket = Orders.Ticket({ table.clone(orders[math.clamp(self.TutorialServed + 1, 1, #orders)]) }, now(), 0, 0, nil)
 		ticket.PatienceEndsAt = math.huge
 		self.Tickets[id] = ticket
 		return
@@ -1597,6 +1766,10 @@ function CustomerService:OpenTicket(id: number)
 			lines = { table.clone(forced[1]), table.clone(forced[2]) }
 		end
 		pairBonus = Content.Flow.Groups.PatienceBonus
+	end
+	if customer.Variant ~= nil and PLAIN_VARIANTS[customer.Variant] then
+		-- TASK-591 (ANM-011): the shaker only wants a plain hot dog; the draw above still ran (stream unchanged)
+		lines = { {} }
 	end
 	const arrivedAt = if customer.JoinedAt > 0 then customer.JoinedAt else now()
 	const typeRow = Content.CustomerTypes.ByKey[npc.CustomerType]
@@ -1994,7 +2167,15 @@ function CustomerService:ServeAtPickup(player: Player, target: number?): (SaleRe
 	then
 		return nil, nil
 	end
-	return self:ServeCustomer(player, id, customer, ticket, served), id
+	-- Pickup arc (owner 2026-10-20): a copy of the plate goes on the counter if the sale lets the customer take it (LeaveServed)
+	self.PendingDisplay = if self:IsArcMode() and customer.Drive == 0 then self:MakeDisplay(served) else nil
+	const result = self:ServeCustomer(player, id, customer, ticket, served)
+	const unused = self.PendingDisplay
+	self.PendingDisplay = nil
+	if unused ~= nil then
+		unused:Destroy()
+	end
+	return result, id
 end
 
 -- Leader NpcId of the plate's order on a hot dog Tool (attribute Ticket, PlateService), nil = none / unknown customer.
@@ -2205,6 +2386,14 @@ function CustomerService:SellLine(
 	self:Settle(self:LineOwner(customer, index), result, amount)
 	if not customer.Tutorial then
 		self.Acted:Fire(id, SERVE, player, result)
+	else
+		-- DEC-311: the next tutorial customer (if any) comes with the next order
+		self.TutorialServed += 1
+		if self.TutorialServed < #TutorialRules.Orders then
+			-- not RequestTutorial: this one is still around (it walks off with the plate); StepTutorial spawns the next
+			self.TutorialWanted = true
+			self.TutorialTryAt = 0
+		end
 	end
 	return result
 end
@@ -2297,6 +2486,10 @@ end
 -- walks it PU-n -> table, it eats and Dismiss sends it out); else, or with no table, takeaway: it walks out carrying the
 -- plate (Rules.TakeawayWhenNoTable; false = it leaves without the plate in hand). Actors and the tutorial customer never sit.
 function CustomerService:LeaveServed(customer: Customer, mood: string?)
+	if self:IsArcMode() and customer.Drive == 0 and customer.CounterSlot == 0 then
+		self:Collect(customer, mood)
+		return
+	end
 	const sits = Content.Seating.SitAt == SERVED_SEAT_MODE
 		and customer.Variant == nil
 		and not customer.Tutorial
@@ -2323,6 +2516,189 @@ function CustomerService:SetCarrying(customer: Customer)
 		model:SetAttribute(CARRY_LOOK.Dish, if look and look.Dish then true else nil)
 		model:SetAttribute(CARRYING, true)
 		customer.CarryModel = model
+	end
+end
+
+-- Pickup arc (owner 2026-10-20, Provisional; Content.Restaurant.PickupArc) ---------------------------------------------
+-- The customers whose order was taken wait on an arc outside the PICKUP counter instead of the PU-2..n line. "Hand Over"
+-- still decides the sale at once (same verdict, pay and tip); a good one puts a copy of the plate on a counter slot, the
+-- customer walks from the arc to that slot, takes it (Carrying) and goes on as LeaveServed did (table or takeaway).
+
+function CustomerService:IsArcMode(): boolean
+	return Content.Restaurant.PickupArc.Enabled and self:IsPickupMode()
+end
+
+-- PU-1 (in front of the counter), the outward direction (counter -> street) and the counter axis (towards +X / +Z)
+function CustomerService:ArcFrame(): (Vector3?, Vector3, Vector3)
+	const point = MapIndex.FindPoint(Pickup.point(1, Content.Restaurant.Binding.PickupPoint))
+	if point == nil then
+		return nil, Vector3.zAxis, Vector3.xAxis
+	end
+	const base = point.Position
+	local outward = Vector3.zAxis
+	for _, model in CollectionService:GetTagged(Content.Restaurant.Binding.PickupTag) do
+		if model:IsA("Model") and model:IsDescendantOf(workspace) then
+			const flat = (base - model:GetPivot().Position) * Vector3.new(1, 0, 1)
+			if flat.Magnitude > 0.1 then
+				outward = flat.Unit
+			end
+			break
+		end
+	end
+	local along = outward:Cross(Vector3.yAxis)
+	if along.X + along.Z < 0 then
+		along = -along
+	end
+	return base, outward, along
+end
+
+-- World position of arc spot `spot` among PickupSize() spots
+function CustomerService:ArcSpot(spot: number): Vector3?
+	const rules = Content.Restaurant.PickupArc
+	const base, outward, along = self:ArcFrame()
+	if base == nil then
+		return nil
+	end
+	const count = math.max(self:PickupSize(), 1)
+	const t = if count > 1 then (math.clamp(spot, 1, count) - 1) / (count - 1) else 0.5
+	const angle = math.rad(-rules.Spread + 2 * rules.Spread * t)
+	const centre = base + along * rules.Shift
+	return centre + (outward * math.cos(angle) + along * math.sin(angle)) * rules.Radius
+end
+
+-- Straight to its arc spot, then faces the counter
+function CustomerService:WalkArc(customer: Customer)
+	const target = self:ArcSpot(customer.Pickup)
+	if target == nil then
+		return
+	end
+	customer.Move += 1
+	const order = customer.Move
+	const npc = self.Dependencies.NpcService
+	task.spawn(function()
+		npc:WalkToPosition(customer.Id, target, 10)
+		if self.Customers[customer.Id] == customer and customer.Move == order then
+			const base = self:ArcFrame()
+			if base ~= nil then
+				npc:Face(customer.Id, base - target)
+			end
+		end
+	end)
+end
+
+-- Counter slot `slot`: where the plate stands (on the counter top) and where the customer stands to take it
+function CustomerService:CounterSpot(slot: number): (Vector3?, Vector3?)
+	const rules = Content.Restaurant.PickupArc
+	const base, _, along = self:ArcFrame()
+	if base == nil then
+		return nil, nil
+	end
+	const offset = along * ((slot - (rules.Slots + 1) / 2) * rules.Gap)
+	local plate: Vector3? = nil
+	for _, model in CollectionService:GetTagged(Content.Restaurant.Binding.PickupTag) do
+		if model:IsA("Model") and model:IsDescendantOf(workspace) then
+			const pivot = model:GetPivot().Position + offset
+			const params = RaycastParams.new()
+			params.FilterType = Enum.RaycastFilterType.Include
+			params.FilterDescendantsInstances = { model }
+			const hit = workspace:Raycast(pivot + Vector3.new(0, 6, 0), Vector3.new(0, -12, 0), params)
+			plate = if hit then hit.Position + Vector3.new(0, 0.15, 0) else pivot
+			break
+		end
+	end
+	return plate, base + offset
+end
+
+-- A still copy of the hot dog Tool for the counter (no physics, no queries, no scripts); nil = nothing to copy
+function CustomerService:MakeDisplay(tool: Tool): Model?
+	const handle = tool:FindFirstChild("Handle")
+	if handle == nil or not handle:IsA("BasePart") then
+		return nil
+	end
+	const copy = tool:Clone()
+	const model = Instance.new("Model")
+	model.Name = "PickupPlate"
+	for _, child in copy:GetChildren() do
+		child.Parent = model
+	end
+	copy:Destroy()
+	for _, item in model:GetDescendants() do
+		if item:IsA("BasePart") then
+			item.Anchored = true
+			item.CanCollide = false
+			item.CanQuery = false
+			item.CanTouch = false
+		elseif item:IsA("LuaSourceContainer") then
+			item:Destroy()
+		end
+	end
+	const primary = model:FindFirstChild("Handle")
+	if primary ~= nil and primary:IsA("BasePart") then
+		model.PrimaryPart = primary
+	end
+	return model
+end
+
+-- Served at the pickup in arc mode: the plate on a counter slot, the walk arc -> counter, then LeaveServed goes on
+function CustomerService:Collect(customer: Customer, mood: string?)
+	const rules = Content.Restaurant.PickupArc
+	local slot = 1
+	for index = 1, rules.Slots do
+		if self.CounterSlots[index] == nil then
+			slot = index
+			break
+		end
+	end
+	self.CounterSlots[slot] = customer.Id
+	customer.CounterSlot = slot
+	const plateAt, standAt = self:CounterSpot(slot)
+	const display = self.PendingDisplay
+	self.PendingDisplay = nil
+	if display ~= nil and plateAt ~= nil then
+		local folder = self.DisplayFolder
+		if folder == nil or folder.Parent == nil then
+			const made = Instance.new("Folder")
+			made.Name = "PickupPlates"
+			made.Parent = workspace
+			folder = made
+			self.DisplayFolder = made
+		end
+		display:PivotTo(CFrame.new(plateAt :: Vector3))
+		display.Parent = folder
+		customer.Display = display
+	elseif display ~= nil then
+		display:Destroy()
+	end
+	customer.Move += 1
+	const order = customer.Move
+	const npc = self.Dependencies.NpcService
+	task.spawn(function()
+		if standAt ~= nil then
+			npc:WalkToPosition(customer.Id, standAt, rules.CollectTimeout)
+		end
+		if self.Customers[customer.Id] ~= customer or customer.State == "Leaving" or customer.Move ~= order then
+			self:ClearCollect(customer)
+			return
+		end
+		if plateAt ~= nil and standAt ~= nil then
+			npc:Face(customer.Id, (plateAt :: Vector3) - (standAt :: Vector3))
+		end
+		self:ClearCollect(customer)
+		self:LeaveServed(customer, mood)
+	end)
+end
+
+-- The counter plate and slot of a collecting customer go (taken, sent away, removed). CounterSlot stays > 0 so LeaveServed
+-- does not collect twice; the record goes with it.
+function CustomerService:ClearCollect(customer: Customer)
+	const display = customer.Display
+	customer.Display = nil
+	if display ~= nil then
+		display:Destroy()
+	end
+	const slot = customer.CounterSlot
+	if slot > 0 and self.CounterSlots[slot] == customer.Id then
+		self.CounterSlots[slot] = nil
 	end
 end
 
@@ -2400,8 +2776,13 @@ function CustomerService:RegisterOrders()
 	const interaction = self.Dependencies.InteractionService
 	interaction:RegisterAction(TAKE_ORDER, {
 		Validate = function(player: Player, anchor: Instance): boolean
-			-- TAB-1 in the map (TASK-380): the order is taken at the tablet only (TabletService -> TakeOrderFor)
-			return not self:IsTabletMode() and self:CanAct(player, anchor, "Ordering")
+			-- TAB-1 in the map (TASK-380): the order is taken at the tablet only (TabletService -> TakeOrderFor); a drive-thru
+			-- car at the window takes it on its own prompt (owner 2026-10-20)
+			if not self:CanAct(player, anchor, "Ordering") then
+				return false
+			end
+			const _, customer = self:TicketAt(anchor)
+			return not self:IsTabletMode() or (customer ~= nil and customer.Drive == 1)
 		end,
 		Run = function(player: Player, anchor: Instance)
 			self:TakeOrder(player, anchor)
@@ -2529,7 +2910,7 @@ function CustomerService:Step()
 		-- the leaving customer walks out of the shop area first (CounterLeave), then the random gap counts
 		self.CounterFreeAt = t + Content.Flow.CounterLeave + gap[1] + self.Rng:NextNumber() * (gap[2] - gap[1])
 	end
-	const resting = night and (t < self.CounterFreeAt or self.Dependencies.NpcService:IsTension())
+	const resting = (night and (t < self.CounterFreeAt or self.Dependencies.NpcService:IsTension())) or t < self.ReopenUntil
 	if
 		self.NextSpawnAt > 0
 		and t >= self.NextSpawnAt
@@ -2667,10 +3048,23 @@ function CustomerService:StepTutorial(t: number)
 	end
 	self.TutorialTryAt = t + TutorialRules.Retry
 	const round = self.Dependencies.RoundService
-	if not round:IsStarted() or self:IsNightShift() or not TUTORIAL_PHASES[round:GetPhase()] then
+	-- the night too (DEC-311: the run starts at night); TUTORIAL_PHASES says when
+	if not round:IsStarted() or not TUTORIAL_PHASES[round:GetPhase()] then
 		return
 	end
 	const npc = self.Dependencies.NpcService
+	-- owner 2026-10-20 (Provisional): from the 2nd tutorial customer on, a car at the drive-thru (the counter one when the
+	-- map has no drive-thru)
+	const driver = self.Driver
+	if self.TutorialServed >= 1 and driver ~= nil then
+		const ok, driven = pcall(driver.TryTutorial)
+		if not ok then
+			self:WarnOnce("driver_tutorial", `drive-thru tutorial spawn failed: {driven}`)
+		elseif driven ~= nil then
+			self.TutorialWanted = false
+		end
+		return
+	end
 	if Queue.isFull(self:Occupants(), self:QueueSize()) or npc:Count() >= npc:Capacity() then
 		return
 	end
@@ -2785,9 +3179,7 @@ CustomerService:OnInit(function(self)
 	end)
 	-- The window is the shop (TASK-284): closing it sends the line away. VehicleService (620) made the signal in its OnInit
 	self.Dependencies.VehicleService.ShutterChanged:Connect(function(closed: boolean, player: Player?)
-		if closed then
-			self:SendLineAway(player)
-		end
+		self:OnShutter(closed, player)
 	end)
 	-- Someone else despawned one of ours (dev parade, anomaly in wave 2): drop the record
 	self.Dependencies.NpcService.Despawned:Connect(function(id: number)

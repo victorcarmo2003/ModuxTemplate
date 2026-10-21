@@ -513,6 +513,7 @@ function VehicleController:MountFade(playerGui: Instance)
 			ResetOnSpawn = false,
 			IgnoreGuiInset = true,
 			ScreenInsets = Enum.ScreenInsets.None,
+			ClipToDeviceSafeArea = false,
 			DisplayOrder = FADE_ORDER,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 

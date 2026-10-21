@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 
+export type Slot = { Index: number, Part: BasePart, Anchor: Attachment, Npc: number, Line: number }
 export type Entry = {
 	Id: number,
 	Player: Player,
@@ -27,6 +28,7 @@ export type Public = {
 	NoticeAt: { [Player]: { [string]: number } },
 	Plates: { [number]: Entry },
 	Sent: { [number]: Wire },
+	Slots: { [number]: Slot },
 	Setup: (self: Public) -> (),
 	AliveCount: (self: Public) -> number,
 	HasRoomFor: (self: Public, _npc: number?) -> boolean,
@@ -42,7 +44,10 @@ export type Public = {
 	Bind: (self: Public, entry: Entry) -> boolean,
 	Follow: (self: Public, player: Player) -> (),
 	ValidateTake: (self: Public, player: Player) -> boolean,
-	Take: (self: Public, player: Player) -> Entry?,
+	Take: (self: Public, player: Player, anchor: Instance?) -> Entry?,
+	SlotOf: (self: Public, instance: Instance) -> Slot?,
+	BindSlots: (self: Public) -> (),
+	RefreshSlots: (self: Public) -> (),
 	OnTicket: (self: Public, _npc: number) -> (),
 	Release: (self: Public, npc: number) -> number,
 	Clear: (self: Public) -> (),

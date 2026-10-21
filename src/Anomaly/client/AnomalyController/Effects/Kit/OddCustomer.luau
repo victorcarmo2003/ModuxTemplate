@@ -50,8 +50,10 @@ const SLAM_KICK_ANGLE = math.rad(2.2)
 const SLAM_KICK_TIME = 0.25
 const STARE_MAX = math.rad(110)
 const STARE_TURN = 10 -- 1/s, how fast the head catches the camera
+const BANGER_PITCH = 28 -- degrees the head hangs forward (TASK-591, Provisional)
+const BANGER_SWAY = 4 -- degrees of slow side sway
 
-export type Variant = "shake" | "neck" | "eyes" | "bighead" | "float" | "stare"
+export type Variant = "shake" | "neck" | "eyes" | "bighead" | "float" | "stare" | "banger"
 
 const OddCustomer = {}
 
@@ -204,6 +206,24 @@ local function stare(model: Model): Actor.Undo
 	end
 end
 
+-- TASK-591 (ANM-022 the head banger): the head hangs forward, low, as if leaning on the glass, swaying a little
+local function banger(model: Model): Actor.Undo
+	const motor = joint(model, "Torso", "Neck")
+	if motor == nil then
+		return function() end
+	end
+	const base = motor.C0
+	const started = os.clock()
+	const connection = RunService.RenderStepped:Connect(function()
+		const sway = math.sin((os.clock() - started) * 1.3) * math.rad(BANGER_SWAY)
+		motor.C0 = base * CFrame.Angles(math.rad(BANGER_PITCH), 0, sway)
+	end)
+	return function()
+		connection:Disconnect()
+		motor.C0 = base
+	end
+end
+
 local function firstSound(keys: { string }): string?
 	for _, key in keys do
 		const row = Content.Sounds.ByKey[key]
@@ -271,6 +291,8 @@ function OddCustomer.Effect(ref: string, variant: Variant): Effect.Module
 					return float(model)
 				elseif variant == "stare" then
 					return stare(model)
+				elseif variant == "banger" then
+					return banger(model)
 				end
 				-- eyes: the face is the sign; the idle is held still like the blank folks
 				return Actor.HoldStill(ctx, model)

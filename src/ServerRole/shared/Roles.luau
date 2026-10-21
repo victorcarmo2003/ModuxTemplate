@@ -28,6 +28,8 @@ export type Launch = {
 	PartyId: number,
 	Members: { number }, -- UserIds in party order (leader first)
 	Leader: number,
+	-- members who chose Skip tutorial on the lobby pad (owner request 2026-10-21); TutorialService closes theirs
+	SkipTutorial: { number },
 }
 
 const ATTRIBUTE = "ServerRole" -- on ReplicatedStorage, written by the server, read by every client
@@ -72,11 +74,20 @@ local function parseLaunch(data: any): Launch?
 	if type(data.PartyId) == "number" and data.PartyId == data.PartyId then
 		partyId = data.PartyId :: number
 	end
+	const skip: { number } = {}
+	if type(data.SkipTutorial) == "table" then
+		for _, userId in data.SkipTutorial do
+			if table.find(members, userId) and not table.find(skip, userId) then
+				table.insert(skip, userId)
+			end
+		end
+	end
 	const launch: Launch = {
 		Role = role,
 		PartyId = partyId,
 		Members = table.freeze(members),
 		Leader = leader,
+		SkipTutorial = table.freeze(skip),
 	}
 	table.freeze(launch :: any)
 	return launch

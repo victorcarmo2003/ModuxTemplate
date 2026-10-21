@@ -5,9 +5,10 @@
 --   Omen    Start: Phase Signal. It lands on the roof (the scene: the thud, dust, lamps swaying). OmenFor s, no rule yet.
 --   Walk    Phase Active for WalkFor s: the heavy steps cross the roof from one end to the other. From LookFrom s on,
 --           every tick (5 Hz) each Active player's Gaze pitch (ctx.Pitch) is read: above LookPitch for LookGrace s in a
---           row = caught (a shorter glance resets). No fresh Gaze (third person, cameras, lag) never counts.
+--           row = caught (a shorter glance resets). No fresh Gaze (third person, cameras, lag) never counts. The client
+--           shows its own look as a countdown at once (Effects/ANM-019, Q-396): the stain above opens its eyes.
 --   Caught  the first tick with someone caught: the walk ends there. Every player caught on that tick gets the cue
---           "jumpscare" (Entity = UserId % 65536: only that client sees it drop in front of the window and the hit) and
+--           "jumpscare" (Entity = UserId % 65536: only that client sees it drop from the ceiling into its face) and
 --           pays -Sanity.RuleBroken (ctx.Fail). Phase Failed (the others hear it leave). LeaveFor s later, Finish.
 --   Safe    WalkFor s with nobody caught: Phase Resolved (the steps reach the far end and go), LeaveFor s later, Finish.
 -- No actor, no HideZone, no faint by itself (only a sanity at 0 falls, VitalService). Works in the trailer and in the
@@ -21,8 +22,8 @@ const ENTITY_MOD = 65536 -- AnomalyCue.Entity range
 const DEFAULT_OMEN = 3
 const DEFAULT_WALK = 16
 const DEFAULT_LOOK_FROM = 1
-const DEFAULT_PITCH = 35
-const DEFAULT_GRACE = 0.6
+const DEFAULT_PITCH = 22 -- TASK-593 (was 35)
+const DEFAULT_GRACE = 1.2
 const DEFAULT_LEAVE = 5
 
 type Stage = "Omen" | "Walk" | "Over"
@@ -57,7 +58,7 @@ local function over(ctx: Api.Context, occ: Api.Occurrence, state: State, now: nu
 	end
 	ctx.Publish(occ, { Phase = "Failed" })
 	for _, player in caught do
-		ctx.Cue(occ, SCARE_CUE, player.UserId % ENTITY_MOD)
+		ctx.Cue(occ, SCARE_CUE, player.UserId % ENTITY_MOD, player.UserId)
 	end
 	ctx.Fail(occ, caught)
 end

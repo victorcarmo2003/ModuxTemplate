@@ -655,6 +655,8 @@ Validação **[DEC-072]**:
 
 ### FEAT-013 — Ladrão
 
+> **Removido (DEC-313, 2026-10-20):** o ladrão saiu do jogo e do código (`src/Thief`, `Content.Thief`, `Net.Thief`, UPG-004, notices `thief_*`, ligações "quentin"). Texto abaixo é histórico.
+
 - Status: Rascunho · Pilares: GERENCIAR, OBSERVAR · Origem: **[DEC-018, DEC-050, DEC-023]**
 - Resumo: o ladrão é **Quick Quentin** (CHR-004); comportamento completo em NPC-007 (`npcs.md`). Números **[DEC-050]**: só de dia; chance dia 1 0% · dia 2 50% · dia 3+ 70%; 1 por dia; aparece entre 9:00 AM e 3:00 PM; espreita ≤ 120 s; gatilho = nenhum jogador a ≤ 14 studs do veículo por 3 s; ~4 s até a gaveta; abre em 8 s (16 s com UPG-004); rouba floor(50%) (30% com UPG-004); nada se gaveta < $5; impedir = entrar na zona durante a abertura → foge, party +$5 ("Nice catch!"), creditado na gaveta.
 - Proposta adicional: jogador "presente" na zona precisa estar **conectado e de pé** (desconectado não conta).
@@ -1451,6 +1453,8 @@ Sem semáforo, o padrão aprendível (OBSERVAR) é o ritmo do trânsito e o PARE
   - Com 4 carros de dia, o orçamento de performance do architect é respeitado (medir em aparelho disponível, DEC-090).
 
 ### FEAT-034 — Desmaio, ambulância e reviver
+
+> **Descartado (DEC-314, 2026-10-20):** a ambulância e os médicos não serão feitos; o corpo fica no chão até o reviver ou o fim da noite (`Revive.BodyFallback`). Texto abaixo sobre ambulância é histórico.
 
 - Status: Rascunho · Pilares: SOBREVIVER · Origem: **[DEC-043, DEC-091, DEC-092, DEC-093, DEC-094, DEC-100, DEC-102, DEC-108, DEC-023, DEC-114, DEC-115, DEC-116, DEC-117, DEC-118, DEC-129, DEC-216]**; seguem como proposta: tempos e paradas, sanidade ao voltar, uso do item por colega (**Q-120 f**); preço em Robux adiado (**Q-098**)
 - Resumo: sanidade 0 → o jogador **desmaia** e cai → a **ambulância** (NPC-023) chega, os **médicos descem e levam o corpo** (NPC-024) **[DEC-114]** → o jogador assiste (FEAT-025) e pode ser **revivido** por **Robux** (developer product, **só para si** **[DEC-116]**) ou pelo **Rescue Whistle** (ITM-021) → a ambulância volta, para em frente ao trailer, ele aparece ao lado e ela vai embora, **sem ninguém descer** **[DEC-091, DEC-114]**. Sem reviver até as 6:00 AM: espectador permanente **[DEC-093, DEC-115]**. Resgate, nunca ferimento **[DEC-023]**. Só existe à noite (sanidade só à noite, DEC-056).

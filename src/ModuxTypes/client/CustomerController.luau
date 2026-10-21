@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local OrderBubble = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.OrderBubble)
+local Reactions = require(StarterPlayer.StarterPlayerScripts.client.Customer.CustomerController.Reactions)
 
 export type Record = {
 	State: string,
@@ -47,6 +48,7 @@ type Tracked = {
 type Done = { Row: number, Toppings: { OrderBubble.Topping } }
 
 export type Public = {
+	Complained: { [number]: number },
 	Entries: { [number]: Entry },
 	Focus: Vide.Source<number>,
 	Gui: Instance?,
@@ -73,7 +75,7 @@ export type Public = {
 	Fill: (self: Public) -> (),
 	Sync: (self: Public, id: number) -> (),
 	Mount: (self: Public, entry: Entry, model: Model) -> (),
-	React: (self: Public, id: number, result: string) -> (),
+	React: (self: Public, id: number, result: string, kindOverride: Reactions.Kind?, textOverride: string?) -> (),
 	ClearReaction: (self: Public, model: Model) -> (),
 	Cue: (self: Public, id: number, key: string) -> (),
 	Feedback: (self: Public, id: number, result: string) -> (),

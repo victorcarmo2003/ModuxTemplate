@@ -7,6 +7,9 @@ export type Stat =
 	| "GrillTime"
 	| "GrillSlots"
 	| "StockCapacityLevel"
+	| "BunCapacityLevel" -- UPG-035 Bun Box: level of the buns and sausages capacity (DEC-331)
+	| "ToppingCapacityLevel" -- UPG-036 Topping Rack: sauces and toppings (DEC-331)
+	| "CoffeeCapacityLevel" -- UPG-037 Coffee Shelf: coffee (DEC-331)
 	| "QueueSize"
 	| "PatienceBonus"
 	| "PackageLimit"
@@ -18,8 +21,6 @@ export type Stat =
 	| "CoffeeRestore"
 	| "SeeAnomalyLoss"
 	| "BossBonusPP"
-	| "DrawerOpenTime"
-	| "StealPct"
 	| "LightRadius"
 	| "DayFlowBonus"
 	| "TableCount" -- UPG-008 Patio Tables: tables bought on the Pad (FEAT-037)
@@ -32,6 +33,9 @@ const LIST: { Stat } = {
 	"GrillTime",
 	"GrillSlots",
 	"StockCapacityLevel",
+	"BunCapacityLevel",
+	"ToppingCapacityLevel",
+	"CoffeeCapacityLevel",
 	"QueueSize",
 	"PatienceBonus",
 	"PackageLimit",
@@ -43,8 +47,6 @@ const LIST: { Stat } = {
 	"CoffeeRestore",
 	"SeeAnomalyLoss",
 	"BossBonusPP",
-	"DrawerOpenTime",
-	"StealPct",
 	"LightRadius",
 	"DayFlowBonus",
 	"TableCount",

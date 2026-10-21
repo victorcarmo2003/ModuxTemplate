@@ -8,15 +8,15 @@ export type Party = {
 	Id: number,
 	Leader: number,
 	Members: { number }, -- party order, leader first after any change of leader
-	Ready: { [number]: boolean },
 	State: State,
 	Platform: number, -- 1..8 = owns LOBBY-SQUAD-n; 0 = invite squad
-	Access: string, -- PartyRules.Access: "Setup" (private, being set up) | "Open" | "Friends" | "Invite" | "Closed"
+	Access: string, -- PartyRules.Access: "Open" | "Friends" | "Invite" | "Closed"
 	MaxPlayers: number, -- 1..Rules.MaxSize, never below #Members when set
 	StartAt: number, -- workspace:GetServerTimeNow() of the teleport; 0 = no countdown
 	Launched: boolean, -- countdown over: reserve / teleport running
 	Solo: boolean, -- quick play "Solo": disbanded instead of going back to the idle state
 	Token: number, -- bumped by every Begin and Cancel: a countdown thread only fires for the token it was born with
+	Skip: { [number]: boolean }, -- members who skip the run's tutorial (pad bar)
 }
 type Invite = { From: number, ExpiresAt: number }
 type Flight = { Options: TeleportOptions, Tries: number, PartyId: number }
@@ -51,17 +51,18 @@ export type Public = {
 	Create: (self: Public, leader: number, platform: number, access: string) -> Party?,
 	Disband: (self: Public, party: Party) -> (),
 	RemoveMember: (self: Public, userId: number, kicked: boolean) -> (),
-	Join: (self: Public, party: Party, userId: number, ready: boolean) -> (),
+	Join: (self: Public, party: Party, userId: number) -> (),
 	Leave: (self: Public, userId: number) -> (),
 	HandleCreate: (self: Public, player: Player) -> (),
 	HandleInvite: (self: Public, player: Player, target: number) -> (),
 	HandleRespond: (self: Public, player: Player, partyId: number, accept: boolean) -> (),
 	HandleLeave: (self: Public, player: Player) -> (),
 	HandleKick: (self: Public, player: Player, target: number) -> (),
-	HandleReady: (self: Public, player: Player, ready: boolean) -> (),
 	HandleConfigure: (self: Public, player: Player, requested: string, maxPlayers: number) -> (),
 	HandleStart: (self: Public, player: Player) -> (),
-	Begin: (self: Public, party: Party) -> (),
+	Begin: (self: Public, party: Party, seconds: number, notify: boolean) -> (),
+	StartNow: (self: Public, party: Party) -> (),
+	HandlePad: (self: Public, player: Player, action: string, on: boolean) -> (),
 	HandleCancel: (self: Public, player: Player) -> (),
 	HandleQuickPlay: (self: Public, player: Player, mode: string) -> (),
 	LaunchData: (self: Public, party: Party) -> { [string]: any },

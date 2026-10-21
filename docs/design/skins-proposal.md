@@ -43,8 +43,8 @@ Cachorro (todo mundo tem) é a porta de entrada a 99. Referência do gênero: sk
 
 - **Só Robux.** Developer Product por skin (§3). Nenhum caminho por gemas, códigos ou conquistas no lote 1.
 - **Limitada** = `Limited = true` + `EndsAt` (os.time UTC). Até lá está à venda; depois **some da fileira para quem
-  não tem** e quem tem fica com ela para sempre. Data Provisória: **2026-11-03 00:00 UTC** (domingo 2/11 à noite nas
-  Américas: o fim de semana depois do Halloween conta). `Q-301`.
+  não tem** e quem tem fica com ela para sempre. Data (DEC-316): **até o fim de 2026-11-05 em Brasília**
+  = `EndsAt` 2026-11-06 03:00 UTC. Responde `Q-301`.
 - A tela mostra o selo **LIMITED** no círculo e uma faixa no topo: "Halloween Skins · Limited · Nd left".
 - **Equipar por classe:** cada classe guarda a skin equipada (ou nenhuma = uniforme da crew). Trocar de classe não
   perde a skin da outra.

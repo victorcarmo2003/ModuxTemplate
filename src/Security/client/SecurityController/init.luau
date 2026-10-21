@@ -462,7 +462,9 @@ function SecurityController:Mount()
 			ResetOnSpawn = false,
 			IgnoreGuiInset = true,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-			DisplayOrder = 20,
+			-- owner 2026-10-20: over the anomaly scenes' black bars (Scene/Kits Cinema, 40) so the buttons are never covered;
+			-- under the whispers (45) and the jumpscare (50)
+			DisplayOrder = 41,
 			SecurityFeed({
 				Cams = cams,
 				Cam = self.Cam,

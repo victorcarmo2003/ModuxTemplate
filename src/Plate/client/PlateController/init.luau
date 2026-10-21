@@ -12,6 +12,8 @@
 	  - Condiment pans: only the pans of the held plate's order that are not on it yet light up (a Highlight on the Pan_* Model
 	    whose attribute Topping is that key; kitchen-world.md §1 #9).
 	  - "#n" tag over the plate a crewmate holds (TicketHud.TagHands).
+	  - Plate slots of the front counter (SlotCards, DEC-311): a slot with no ticket line hides its plate; one with a line
+	    shows it under the order card (PlateOrderCard: #n, the layered hot dog, the patience).
 	  - Prompts: plugs the plate probe into PromptController/Rules (Take Plate with free hands, Add Bun / Add Sausage only
 	    for what the plate lacks, Hand Over only with a hot dog, its ticket customer at the pickup).
 	Listeners in OnInit (before Lync.start); the HUD is built in OnStart.
@@ -26,6 +28,7 @@ local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
 local Rules = require(StarterPlayer.StarterPlayerScripts.client.Interaction.PromptController.Rules)
 local HandFood = require(script.HandFood)
+local SlotCards = require(script.SlotCards)
 local TicketHud = require(script.TicketHud)
 
 const MAX_TOPPINGS = Content.OrderRules.MaxToppings
@@ -35,10 +38,13 @@ const HUD_FALLBACK = UDim2.fromOffset(8, 96)
 const PAN_ATTRIBUTE = "Topping" -- PRODUCTION/Pan_* (kitchen-world.md §5)
 const PAN_LIGHT = "PlateOrderLight"
 const PAN_COLOR = Theme.Color.Mustard
+const TICKET_CARD_ATTRIBUTE = "TicketCard" -- LocalPlayer: the plate card is on the HUD (HudController hides HudOrder)
 
 -- What the HUD and the prompts read of the Customers set
 type Customer = {
 	State: string,
+	PatienceEndsAt: number,
+	PatienceSpan: number,
 	Number: number?,
 	Order: { [string]: boolean },
 	Order2: { [string]: boolean }?,
@@ -58,6 +64,8 @@ function PlateController:Setup()
 	self.Hand = nil :: TicketHud.Tracker?
 	self.Scale = Vide.source(1) :: Vide.Source<number>
 	self.HudPosition = Vide.source(HUD_FALLBACK) :: Vide.Source<UDim2>
+	-- server time, ticked with OnTick (the slot cards' patience bars)
+	self.Clock = Vide.source(0) :: Vide.Source<number>
 	self.HudGui = nil :: ScreenGui?
 	-- Pan_* Models by topping key (rescanned when one goes away) and the lit ones
 	self.Pans = {} :: { [string]: Instance }
@@ -88,6 +96,8 @@ function PlateController:WriteCustomer(id: number, record: any?)
 	else
 		map[id] = {
 			State = record.State,
+			PatienceEndsAt = record.PatienceEndsAt,
+			PatienceSpan = record.PatienceSpan,
 			Number = record.Number,
 			Order = table.clone(record.Order),
 			Order2 = if record.Order2 then table.clone(record.Order2) else nil,
@@ -202,6 +212,18 @@ function PlateController:HudCard(): TicketHud.CardProps
 			end
 			return math.max(hand.Hands() - 1, 0)
 		end,
+		Patience = function(): number
+			const current = self:Current()
+			if current == nil or current.Ticket == 0 then
+				return -1
+			end
+			const customer = self.Customers()[current.Ticket]
+			if customer == nil or customer.PatienceSpan <= 0 or customer.PatienceEndsAt <= 0 then
+				return -1
+			end
+			return math.clamp((customer.PatienceEndsAt - self.Clock()) / customer.PatienceSpan, 0, 1)
+		end,
+		WarnAt = Content.Moods.Rules.AnnoyedAt,
 		Position = function()
 			return self.HudPosition()
 		end,
@@ -333,6 +355,12 @@ function PlateController:Watch(gui: Instance)
 	end)
 	self.HudGui = screen
 	screen.Parent = gui
+	-- one order card on the HUD (owner 2026-10-19): while the plate card shows, HudController hides its HudOrder
+	Vide.root(function()
+		Vide.effect(function()
+			Players.LocalPlayer:SetAttribute(TICKET_CARD_ATTRIBUTE, self:Current() ~= nil)
+		end)
+	end)
 
 	-- "#n" over the plate a crewmate holds
 	const tags = Instance.new("Folder")
@@ -344,6 +372,25 @@ function PlateController:Watch(gui: Instance)
 		end)
 	end)
 	HandFood.Watch()
+	SlotCards.Watch({
+		Number = function(npc: number): number?
+			return self:TicketNumber(npc)
+		end,
+		Order = function(npc: number, line: number): { string }?
+			return self:OrderOf(npc, line)
+		end,
+		Drive = function(npc: number): boolean
+			const customer = self.Customers()[npc]
+			return customer ~= nil and customer.Drive ~= nil
+		end,
+		Patience = function(npc: number): number?
+			const customer = self.Customers()[npc]
+			if customer == nil or customer.PatienceSpan <= 0 or customer.PatienceEndsAt <= 0 then
+				return nil
+			end
+			return math.clamp((customer.PatienceEndsAt - self.Clock()) / customer.PatienceSpan, 0, 1)
+		end,
+	})
 end
 
 PlateController:OnInit(function(self)
@@ -395,6 +442,7 @@ PlateController:OnTick(function(self)
 	end
 	self:PlaceHud()
 	self:LightPans()
+	self.Clock(Workspace:GetServerTimeNow())
 end, STEP_RATE)
 
 return PlateController

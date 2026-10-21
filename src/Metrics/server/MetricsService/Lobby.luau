@@ -7,6 +7,8 @@
 --                      5 start (the countdown ended: the run begins)
 --   lobby_zone_enter   first entry in each zone of the visit {zone, t = s since join}
 --   lobby_dwell        on leave, s spent per zone (value) {zone}; "street" = no zone: hot / cold spots
+--   Zone:lobby.<zone>  each zone change, street included, and the zone at entry {t = s since join} (hot zones card); the
+--                      entry zone goes out on the first poll with a HumanoidRootPart after the join delay
 --   lobby_leave        on leave {played, seconds, moved, zones}; played = false is "left the lobby without playing"
 --   lobby_start        the countdown ended {mode = solo | squad, size, seconds = s since join, first = first of the visit}
 --   funnel "squad"     (session = the squad) 1 created -> 2 room (left "Setup") -> 3 joined (a 2nd player:
@@ -74,6 +76,7 @@ type Visit = {
 	Seen: { [string]: boolean },
 	InZone: { [string]: boolean }, -- LobbyZones key -> inside (hysteresis)
 	Started: boolean,
+	ZoneLogged: boolean, -- Zone:lobby.<zone> of the first position already sent
 }
 
 type Panel = { Name: string, Session: string, At: number, Step: number }
@@ -94,6 +97,12 @@ local function zoneName(zone: LobbyZones.Zone): string
 		return "pad"
 	end
 	return ZONE_NAME[zone.Key] or string.lower(zone.Key)
+end
+
+-- Hot zones card (RoMetrics "Zone:<name>", owner 2026-10-21): every zone the player is in, street included, so the last
+-- one before leaving is where they left the game
+local function logZone(player: Player, name: string, t: number)
+	Log.player(player, `Zone:lobby.{name}`, nil, { t = math.floor(t) })
 end
 
 const Lobby = {}
@@ -150,6 +159,7 @@ function Lobby.Join(self: Lobby, player: Player)
 		Seen = {},
 		InZone = {},
 		Started = false,
+		ZoneLogged = false,
 	}
 	const visit = self.Visits[player]
 	visit.Steps[1] = true
@@ -167,6 +177,8 @@ function Lobby.SetZone(self: Lobby, player: Player, visit: Visit, name: string, 
 	visit.Dwell[visit.Zone] = (visit.Dwell[visit.Zone] or 0) + (now - visit.ZoneSince)
 	visit.Zone = name
 	visit.ZoneSince = now
+	visit.ZoneLogged = true
+	logZone(player, name, now - visit.JoinedAt)
 	if name == STREET then
 		return
 	end
@@ -213,6 +225,11 @@ function Lobby.Poll(self: Lobby)
 			end
 		end
 		self:SetZone(player, visit, inside or STREET, now)
+		if not visit.ZoneLogged then
+			-- the zone at entry: the first read with a character after the join delay (not "street" before it loads)
+			visit.ZoneLogged = true
+			logZone(player, visit.Zone, now - visit.JoinedAt)
+		end
 	end
 end
 

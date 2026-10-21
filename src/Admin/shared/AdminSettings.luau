@@ -6,7 +6,7 @@
 local RunService = game:GetService("RunService")
 
 const AdminSettings = {
-	AdminUserIds = {} :: { number },
+	AdminUserIds = {216675619, 9203551752} :: { number },
 	ToggleKey = Enum.KeyCode.F2,
 }
 

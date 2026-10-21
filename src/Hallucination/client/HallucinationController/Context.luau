@@ -25,11 +25,15 @@ export type Env = {
 	Vehicle: () -> Instance?,
 	-- No real boss call is ringing or talking (BossController.State == "Idle").
 	CallIdle: () -> boolean,
+	-- TASK-601: the night of the run (RoundController.Night; 0 = not in a night yet)
+	Night: () -> number,
 	-- Kitchen slot state ("Empty" | "Working" | "Ready"), nil = no record.
 	SlotState: (recordId: number) -> string?,
 	-- Local subtitle strip (CallSubtitle) and whisper line; "" hides.
 	Subtitle: (speaker: string, text: string) -> (),
 	Whisper: (text: string) -> (),
+	-- Camera shake of CameraController:HorrorShake (profile of HorrorScenes Rules.Shakes; owner 2026-10-20, Q-415).
+	Shake: (profile: string, scale: number?) -> (),
 }
 
 export type Run = {

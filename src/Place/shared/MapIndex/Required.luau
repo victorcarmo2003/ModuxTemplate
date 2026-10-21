@@ -234,7 +234,7 @@ end
 -- Wave 1: the vehicle and its kitchen (§18.4-§18.7; the trailer since 2026-10-12).
 const wave1 = base(1)
 
--- Wave 2 (§19.22): trailer kitchen with coffee machine, phone, light switch, light zones, street lights, night/revive/spectate/swap points, thief lurks.
+-- Wave 2 (§19.22): trailer kitchen with coffee machine, phone, light switch, light zones, street lights, night/revive/spectate/swap points.
 -- Street bins (Prompt_Discard, DEC-200) are not counted: how many is open (Q-166).
 const wave2 = base(2)
 wave2.Tags = concat(WAVE1_TAGS, { "LightZone", "StreetLight" })
@@ -252,12 +252,8 @@ wave2.Points = concat(WAVE1_POINTS, {
 	"SPEC-P",
 	"SPEC-M",
 	"DROP-T",
-	"L1",
-	"L2",
-	"L3",
-	"ST-R",
 })
-wave2.Nodes = concat(WAVE1_NODES, { "ST-R", "L1", "L2", "L3" })
+wave2.Nodes = concat(WAVE1_NODES, {})
 const trailerKitchen = kitchen("trailer")
 trailerKitchen.coffee_machine = { Actions = { brew_coffee = 1, restock = 1 } } -- FEAT-021
 wave2.Vehicles = {
@@ -271,13 +267,7 @@ wave2.Tagged = {
 		Ids = { "NL-01", "NL-02", "NL-03", "NL-04", "P-01" }, -- Walker / Hush posts (MAP-01 §5.6, 2026-10-10)
 	},
 }
--- thief routes from the street spawn to each lurk (MAP-01 §9.2; AvoidCrossings is the thief's own query)
-const THIEF_ROUTES: { Route } = {
-	{ From = "ST-R", To = "L1", Name = "ROUTE-THIEF-L1" },
-	{ From = "ST-R", To = "L2", Name = "ROUTE-THIEF-L2" },
-	{ From = "ST-R", To = "L3", Name = "ROUTE-THIEF-L3" },
-}
-wave2.Routes = concat(WAVE1_ROUTES, THIEF_ROUTES)
+wave2.Routes = concat(WAVE1_ROUTES, {})
 
 -- Wave 3 (§19.22, §8; MAP-01 §5.4-§5.6, §9.5, §10.3, §11; TASK-097). Names that are game data come from Content:
 -- cutscene marks and targets (Cutscenes), route paths, stop lines and boxes (Traffic), sidewalk nodes (WalkPaths,

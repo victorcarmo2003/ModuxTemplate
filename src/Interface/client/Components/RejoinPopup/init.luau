@@ -42,6 +42,7 @@ export type Props = {
 }
 
 const WIDTH = 300
+const PHONE = 0.72 -- owner 2026-10-20: the card read too big on a phone
 const HEIGHT = 136
 const BADGE = 48
 const BUTTON = 44
@@ -81,7 +82,9 @@ return function(props: Props): Frame
 	end)
 	const pop = Motion.Pop(shown)
 	const scale = function(): number
-		return (if props.Scale then math.max(math.min(props.Scale(), UiScale.Current()), Theme.Scale.Min) else 1) * pop()
+		return (if props.Scale then math.max(math.min(props.Scale(), UiScale.Current()), UiScale.Floor()) else 1)
+			* UiScale.Compact(PHONE)
+			* pop()
 	end
 	const icon = function(): string
 		return if last().IsNight then "Hud/moon" else "Hud/sun"
@@ -142,6 +145,9 @@ return function(props: Props): Frame
 					Position = UDim2.fromOffset(BADGE + 10, 0),
 					Box = UDim2.new(1, -(BADGE + 10), 0, 26),
 					TextSize = 17,
+					-- shrinks to fit the card ("Resume your shift - 12:34 left" ran past the edge, owner 2026-10-20)
+					Scaled = true,
+					MaxTextSize = 17,
 					XAlignment = Enum.TextXAlignment.Left,
 					Color = Theme.Color.Dark,
 					Stroke = 0,
@@ -154,6 +160,9 @@ return function(props: Props): Frame
 					Position = UDim2.fromOffset(BADGE + 10, 26),
 					Box = UDim2.new(1, -(BADGE + 10), 0, 22),
 					TextSize = 15,
+					-- shrinks to fit the card ("Resume your shift - 12:34 left" ran past the edge, owner 2026-10-20)
+					Scaled = true,
+					MaxTextSize = 15,
 					XAlignment = Enum.TextXAlignment.Left,
 					Color = Theme.Color.Dark,
 					Stroke = 0,

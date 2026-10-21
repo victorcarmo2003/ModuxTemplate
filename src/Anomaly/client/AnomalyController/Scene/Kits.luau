@@ -6,7 +6,8 @@
 	  Vignette             Effects/Kit/Screen.SetVignette, one channel per scene (TASK-464); cleared at the end
 	  Whispers             Effects/Kit/Whispers.Ramp (the HIDE words, few then en masse; TASK-464). Value = To = 0 stops
 	  Door                 the door leaf nearest the step's MapPoint shakes locally: Rattle (handle tried, fast jitter),
-	                       Push (forced against the frame), Hold (one hard jolt, the latch holds). Back to its pose after.
+	                       Push (forced against the frame), Hold (one hard jolt, the latch holds), Bulge (TASK-592: one
+	                       heavy blow, the leaf swells a little and is shoved in, then settles). Back to its pose after.
 	                       Lock: the AutoDoor of that leaf stays shut (attribute DoorHeld, DoorController) until the run ends
 	  Shadow               a dark band on the light under that door (DOOR-GAP-B, TASK-465), dimming it: Pass crosses it,
 	                       Arrive comes in from the side of the step's To MapPoint (the steps) and stays, Leave goes back out
@@ -41,6 +42,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Effect = require(script.Parent.Parent.Effect)
 local Screen = require(script.Parent.Parent.Effects.Kit.Screen)
 local Watch = require(script.Parent.Parent.Effects.Kit.Watch)
+local Seen = require(script.Parent.Seen)
 local Whispers = require(script.Parent.Parent.Effects.Kit.Whispers)
 local Steps = require(script.Parent.Steps)
 
@@ -53,12 +55,19 @@ export type Camera = {
 	HorrorShake: (self: any, profile: string, scale: number?) -> (),
 	HorrorFov: (self: any, delta: number, back: number?, duration: number) -> (),
 	HorrorNudge: (self: any, target: Vector3, degrees: number, duration: number) -> (),
+	-- TASK-591: the suspense hijack, up to Rules.MaxPull degrees (Effects/ANM-016 drags every view to the starer)
+	HorrorPull: (self: any, target: Vector3, degrees: number, duration: number) -> (),
 	HorrorClear: (self: any) -> (),
 }
 
 const DOOR_SEARCH = 7 -- studs from the MapPoint to the door leaf (an open swing leaf sits ~5 away)
 const GAP_SEARCH = 3 -- studs from the MapPoint to the light under the door
 const GAP_MAP_ID = "DOOR-GAP-B"
+-- Door Bulge (TASK-592; PROVISIONAL): share of the step spent on the hit, studs shoved in, swell of thickness / face
+const BULGE_HIT = 0.12
+const BULGE_PUSH = 0.22
+const BULGE_THICK = 0.9
+const BULGE_FACE = 0.035
 const AUTO_DOOR_TAG = "AutoDoor"
 const HELD_ATTRIBUTE = "DoorHeld" -- DoorController keeps a held door shut
 const SHADOW_COLOR = Color3.fromRGB(8, 8, 14)
@@ -163,6 +172,23 @@ end
 
 -- Door ------------------------------------------------------------------------------------------------------------------
 
+-- TASK-592 Bulge: how swollen the leaf is over the step (fast hit, slow settle)
+local function bulgeAmount(k: number): number
+	if k < BULGE_HIT then
+		return k / BULGE_HIT
+	end
+	return math.exp(-(k - BULGE_HIT) * 5)
+end
+
+-- The leaf's size swollen by `amount`: the thinnest axis (the thickness) grows the most, the face a little
+local function bulgeSize(size: Vector3, amount: number): Vector3
+	const thin = math.min(size.X, size.Y, size.Z)
+	local function grow(axis: number): number
+		return axis * (1 + amount * (if axis == thin then BULGE_THICK else BULGE_FACE))
+	end
+	return Vector3.new(grow(size.X), grow(size.Y), grow(size.Z))
+end
+
 -- Offsets in the leaf's own space for each move, as a function of k = 0..1 over the step
 local function doorOffset(kind: string, k: number): CFrame
 	const fade = 1 - k
@@ -174,6 +200,9 @@ local function doorOffset(kind: string, k: number): CFrame
 		-- forced against the frame: two pushes inwards
 		const push = math.max(0, math.sin(k * math.pi * 2)) * 0.09
 		return CFrame.new(0, 0, push)
+	elseif kind == "Bulge" then
+		-- TASK-592: a heavy blow from outside, shoved in hard, then a slow settle with a small tremble
+		return CFrame.new(0, 0, bulgeAmount(k) * BULGE_PUSH) * CFrame.Angles(math.rad(math.sin(k * 50) * 0.4 * fade), 0, 0)
 	end
 	-- Hold: one hard jolt, the latch holds
 	return CFrame.new(0, 0, math.exp(-k * 8) * 0.06 * math.sin(k * 40))
@@ -211,6 +240,8 @@ const door: Handler = function(ctx, state, step, _late)
 		previous()
 	end
 	const rest = leaf.CFrame
+	const size = leaf.Size
+	const bulge = kind == "Bulge"
 	const duration = math.max(step.Duration or 0.6, 0.1)
 	const started = os.clock()
 	local connection: RBXScriptConnection? = nil
@@ -221,6 +252,7 @@ const door: Handler = function(ctx, state, step, _late)
 		end
 		if leaf.Parent ~= nil then
 			leaf.CFrame = rest
+			leaf.Size = size
 		end
 		state.Undo[tag] = nil
 	end
@@ -229,6 +261,9 @@ const door: Handler = function(ctx, state, step, _late)
 		if k >= 1 or leaf.Parent == nil then
 			stop()
 			return
+		end
+		if bulge then
+			leaf.Size = bulgeSize(size, bulgeAmount(k))
 		end
 		leaf.CFrame = rest * doorOffset(kind, k)
 	end)
@@ -285,7 +320,10 @@ const shadow: Handler = function(ctx, state, step, _late)
 		if band == nil then
 			return
 		end
-		TweenService:Create(band.Part, TweenInfo.new(duration, Enum.EasingStyle.Sine, Enum.EasingDirection.In), { CFrame = outside }):Play()
+		-- well past the gap and fading out on the way, so nothing of it is left in view when it ends (owner 2026-10-19)
+		const gone = centre + long * length * 1.4
+		TweenService:Create(band.Part, TweenInfo.new(duration, Enum.EasingStyle.Sine, Enum.EasingDirection.In), { CFrame = gone }):Play()
+		TweenService:Create(band.Part, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Transparency = 1 }):Play()
 		if band.Light ~= nil then
 			TweenService:Create(band.Light, TweenInfo.new(duration), { Brightness = band.Brightness }):Play()
 		end
@@ -502,10 +540,11 @@ local function spawnWalker(ctx: Effect.Context, tag: string, name: string, seen:
 		Watch = nil,
 	}
 	-- hidden before it enters the world, so it never flashes in first person
-	if seen == "Cameras" then
-		showWalker(walker, Watch.Watching())
-		walker.Watch = Watch.Changed(function(watching)
-			showWalker(walker, watching)
+	-- TASK-589: "Cameras" = only on the feed, "Eyes" = only in first person (Scene/Seen)
+	if Seen.Layered(seen) then
+		showWalker(walker, Seen.Visible(seen))
+		walker.Watch = Watch.Changed(function()
+			showWalker(walker, Seen.Visible(seen))
 		end)
 	else
 		showWalker(walker, true)
@@ -587,17 +626,28 @@ end
 
 -- Heartbeat -------------------------------------------------------------------------------------------------------------
 
--- One run's heartbeat loop: a beat every 60/BPM s, BPM from Value to To over Duration (owner 2026-10-18)
+-- One run's heartbeat loop: a beat every 60/BPM s, BPM from Value to To over Duration (owner 2026-10-18).
+-- Owner 2026-10-19 ("toca excessivamente ... continua tocando por um tempo ... um fadeout ... cortar uns 80%"):
+--   * a calming ramp (To < Value: the escape, the crawler gone, the safe ones after a catch) plays only CALM_SHARE of its
+--     Duration and fades out over it, quieter beat after beat, then stops by itself;
+--   * a stop step (Value 0) with a Duration fades the running heart out over it instead of cutting it;
+--   * a held rate (past Duration, waiting for a stop step) gives up after HOLD_MAX s with a short fade, so a stop step that
+--     never runs (a Where filter, a phase skipped) cannot leave the heart beating.
+const CALM_SHARE = 0.2
+const HOLD_MAX = 10
+const HOLD_FADE = 1
+
 const heartbeat: Handler = function(_ctx, state, step, late)
-	const running = state.Undo.heartbeat
-	if running ~= nil then
-		state.Undo.heartbeat = nil
-		running()
-	end
 	const from = step.Value or 0
 	const to = if type(step.To) == "number" then step.To else from
+	const running = (state.Undo :: any).heartbeat :: ((fade: number?) -> ())?
+	if running ~= nil then
+		state.Undo.heartbeat = nil
+		-- a stop step with a Duration fades the heart that runs
+		running(if from <= 0 and to <= 0 then step.Duration else nil)
+	end
 	if from <= 0 and to <= 0 then
-		return -- stop step: a sudden silence
+		return -- stop step: a sudden silence (or the fade above)
 	end
 	const row = Content.Sounds.ByKey.heartbeat
 	if row == nil or row.Id == "" then
@@ -605,22 +655,46 @@ const heartbeat: Handler = function(_ctx, state, step, late)
 	end
 	const found = SoundService:FindFirstChild("Sfx", true)
 	const group: SoundGroup? = if found ~= nil and found:IsA("SoundGroup") then found else nil
-	const duration = math.max((step.Duration or 0) - late, 0.1)
+	const calming = to < from
+	const fullDuration = math.max((step.Duration or 0) - late, 0.1)
+	const duration = if calming then math.max(fullDuration * CALM_SHARE, 0.1) else fullDuration
 	const startedAt = os.clock()
 	local alive = true
-	state.Undo.heartbeat = function()
-		alive = false
-	end
+	local fadeFrom: number? = if calming then startedAt else nil
+	local fadeFor = duration
+	state.Undo.heartbeat = function(fade: number?)
+		if fade ~= nil and fade > 0 and alive then
+			fadeFrom = os.clock()
+			fadeFor = fade
+		else
+			alive = false
+		end
+	end :: any
 	task.spawn(function()
 		while alive do
-			const t = math.clamp((os.clock() - startedAt) / duration, 0, 1)
-			-- past Duration it holds the last rate until a stop step or the end of the run
+			const now = os.clock()
+			const t = math.clamp((now - startedAt) / duration, 0, 1)
+			-- past Duration it holds the last rate until a stop step, the end of the run or HOLD_MAX
+			if fadeFrom == nil and now - startedAt > duration + HOLD_MAX then
+				fadeFrom = now
+				fadeFor = HOLD_FADE
+			end
+			local gain = 1
+			const fading = fadeFrom
+			if fading ~= nil then
+				gain = 1 - (now - fading) / fadeFor
+				if gain <= 0 then
+					alive = false
+					break
+				end
+			end
 			const bpm = math.max(from + (to - from) * t, 20)
 			const beat = Instance.new("Sound")
 			beat.Name = "HorrorScene_Heartbeat"
 			beat.SoundId = row.Id
-			beat.Volume = row.Volume * (0.55 + 0.65 * t)
-			beat.PlaybackSpeed = 0.95 + 0.2 * t
+			-- a rising heart gets louder; a calming one never does
+			beat.Volume = row.Volume * (if calming then 1 else 0.55 + 0.65 * t) * gain
+			beat.PlaybackSpeed = 0.95 + 0.2 * (if calming then 1 - t else t)
 			beat.SoundGroup = group
 			beat.Parent = SoundService
 			beat:Play()
@@ -761,6 +835,8 @@ const cinemaStep: Handler = function(_ctx, state, step, late)
 		gui.Name = CINEMA_NAME
 		gui.ResetOnSpawn = false
 		gui.IgnoreGuiInset = true
+		gui.ScreenInsets = Enum.ScreenInsets.None
+		gui.ClipToDeviceSafeArea = false
 		gui.DisplayOrder = 40 -- under the whispers (45) and the jumpscare
 		gui.Parent = playerGui
 		const created: Cinema = { Gui = gui, Top = bar("Top", gui, 0), Bottom = bar("Bottom", gui, 1), Saved = {} }
@@ -803,6 +879,11 @@ const DUST_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 const DUST_COLOR = Color3.fromRGB(140, 123, 102)
 const GRIT_COLOR = Color3.fromRGB(84, 72, 60)
 const DUST_LIFE = 3 -- s a dust / step carrier part lives
+-- TASK-593 (owner Play 2026-10-19: the steps went on long after it left): the roof_step clip is longer than one step,
+-- so each step's sound is cut after ROOF_STEP_RING s (a short fade) and the live ones are cut at once when the walk
+-- stops (a Thud, Kits.RoofStop, the end of the run). Provisional.
+const ROOF_STEP_RING = 0.9 -- s one step sounds
+const ROOF_STEP_FADE = 0.25 -- s of its fade out
 
 type Lamp = {
 	Parts: { BasePart },
@@ -819,6 +900,7 @@ type RoofRun = {
 	Lamps: { Lamp }?,
 	Sway: RBXScriptConnection?,
 	Walk: number, -- token of the walk playing (a new one stops the old)
+	Voices: { Sound }, -- TASK-593: the step sounds still ringing (cut when the walk stops)
 }
 
 local cameraRef: Camera? = nil
@@ -886,6 +968,17 @@ local function restoreLamps(run: RoofRun)
 	end
 end
 
+-- TASK-593: stops the walk playing and cuts every step still ringing (the lamps keep swinging down on their own)
+local function roofHush(run: RoofRun)
+	run.Walk += 1
+	for _, voice in run.Voices do
+		if voice.Parent ~= nil then
+			voice:Stop()
+		end
+	end
+	table.clear(run.Voices)
+end
+
 -- The run's walk line (built on its first Roof step; undone with the run)
 local function roofRun(state: State): RoofRun
 	const existing = roofRuns[state]
@@ -908,10 +1001,11 @@ local function roofRun(state: State): RoofRun
 		Lamps = nil,
 		Sway = nil,
 		Walk = 0,
+		Voices = {},
 	}
 	roofRuns[state] = run
 	state.Undo.roof = function()
-		run.Walk += 1
+		roofHush(run)
 		restoreLamps(run)
 		roofRuns[state] = nil
 	end
@@ -1048,7 +1142,27 @@ local function roofStep(
 	const eye = if view ~= nil then view.CFrame.Position else at
 	const ceiling = ceilingAt(ctx, Vector3.new(at.X, eye.Y, at.Z))
 	const part = carrierAt(ctx, "HorrorScene_RoofStep", Vector3.new(at.X, ceiling + ROOF_ABOVE, at.Z), Vector3.one * 0.2)
-	ctx.Audio:Play(sound, part, { Volume = volume, Speed = if heavy then 0.6 else 0.72 + state.Rng:NextNumber(0, 0.1) })
+	const voice = ctx.Audio:Play(sound, part, { Volume = volume, Speed = if heavy then 0.6 else 0.72 + state.Rng:NextNumber(0, 0.1) })
+	if voice ~= nil then
+		-- TASK-593: one step is one step, never the whole clip (the landing rings twice as long)
+		table.insert(run.Voices, voice)
+		const ring = if heavy then ROOF_STEP_RING * 2 else ROOF_STEP_RING
+		task.delay(ring, function()
+			const index = table.find(run.Voices, voice)
+			if index == nil then
+				return -- already cut by roofHush
+			end
+			table.remove(run.Voices, index)
+			if voice.Parent ~= nil and voice.IsPlaying then
+				TweenService:Create(voice, TweenInfo.new(ROOF_STEP_FADE), { Volume = 0 }):Play()
+				task.delay(ROOF_STEP_FADE, function()
+					if voice.Parent ~= nil then
+						voice:Stop()
+					end
+				end)
+			end
+		end)
+	end
 	if heavy then
 		ctx.Audio:Play(ROOF_LAND_KEY, part, { Volume = volume })
 	end
@@ -1082,12 +1196,14 @@ local function roofPoint(run: RoofRun, fraction: number): Vector3
 end
 
 -- Target "Walk" (steady heavy steps from Value to To, fractions of the line, over Duration), "Leave" (from where it is
--- to To, fading out) or "Thud" (one landing at Value; nil = where it is). Sound = step key (roof_step)
+-- to To, fading out) or "Thud" (one landing at Value; nil = where it is). Sound = step key (roof_step). TASK-593: a
+-- Thud ends the walk playing (it jumped) and cuts its ringing steps; a new Walk / Leave stops the one before.
 const roofStepHandler: Handler = function(ctx, state, step, late)
 	const run = roofRun(state)
 	const target = step.Target or "Walk"
 	const sound = step.Sound or ROOF_STEP_KEY
 	if target == "Thud" then
+		roofHush(run)
 		const at = step.Value or run.At
 		run.At = at
 		roofStep(ctx, state, run, roofPoint(run, at), sound, 1.3, true)
@@ -1099,7 +1215,7 @@ const roofStepHandler: Handler = function(ctx, state, step, late)
 	const duration = math.max((step.Duration or 4) - late, 0.2)
 	const count = math.max(2, math.round(math.abs(to - from) * ROOF_HALF * 2 / ROOF_STRIDE))
 	const side = (run.To - run.From).Unit:Cross(Vector3.yAxis)
-	run.Walk += 1
+	run.Walk += 1 -- the walk before stops; its last steps ring out (ROOF_STEP_RING)
 	const token = run.Walk
 	task.spawn(function()
 		for index = 1, count do
@@ -1328,6 +1444,11 @@ const silence: Handler = function(_ctx, state, step, late)
 	state.Undo.silence = restoreSilence
 end
 
+-- A piece of Scene/Kit (TASK-586)
+export type KitPiece = {
+	Register: (handle: (kind: Content.HorrorStepKind, handler: Handler) -> (), camera: Camera?) -> (),
+}
+
 const Kits = {}
 
 -- Called once by AnomalyController after Scene.Start (needs CameraController).
@@ -1350,11 +1471,37 @@ function Kits.Register(handle: (kind: Content.HorrorStepKind, handler: Handler) 
 	handle("Grade", grade)
 	handle("Blur", blur)
 	handle("Silence", silence)
+	-- TASK-586: one module per new piece in Scene/Kit (Pose, Prop, Glass, Glare, Silhouette, Lantern...), each returning
+	-- { Register = function(handle, camera) }, so the pieces are written in parallel without sharing this file
+	const folder = script.Parent:FindFirstChild("Kit")
+	for _, child in if folder ~= nil then folder:GetChildren() else {} do
+		if child:IsA("ModuleScript") then
+			const piece = (require :: any)(child) :: KitPiece
+			piece.Register(handle, camera)
+		end
+	end
 end
 
 -- The camera kit given to Register (Effects/ANM-019 punches the view of the caught player with it); nil before
 function Kits.Camera(): Camera?
 	return cameraRef
+end
+
+-- Where the roof walk is now (the flat point of its last step, at the walk's height), or nil when no Roof run is live.
+-- Effects/ANM-019 hangs the stain, the prints and the drips under it.
+function Kits.RoofAt(): Vector3?
+	for _, run in roofRuns do
+		return roofPoint(run, run.At)
+	end
+	return nil
+end
+
+-- TASK-593: the walk is over (Effects/ANM-019 when the record leaves Signal / Active): every Roof run stops stepping
+-- and its ringing steps are cut. A later Thud / Leave step of the scene still plays (the jump off, the run away).
+function Kits.RoofStop()
+	for _, run in roofRuns do
+		roofHush(run)
+	end
 end
 
 return table.freeze(Kits)

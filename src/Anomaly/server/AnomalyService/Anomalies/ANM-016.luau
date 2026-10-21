@@ -8,4 +8,7 @@ local Kit = require(script.Parent.Kit.CustomerActor)
 return Kit.Module({
 	Ref = "ANM-016",
 	Scare = true,
+	-- TASK-591 (owner 2026-10-19): when it reaches the window every camera is dragged to it, then a flash blackout
+	-- (Effects/ANM-016)
+	CounterCue = "stare_front",
 })

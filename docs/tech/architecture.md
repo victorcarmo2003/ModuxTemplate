@@ -152,7 +152,7 @@ Papel do place: atributo `Workspace.PlaceRole` (`"Lobby"`/`"Run"`). No Studio, R
 |---|---|---|---|
 | Avatar | R6 forçado (Game Settings → Avatar) | R6 forçado | DEC-089, DEC-097 — **emendado por DEC-146**: jogador sem avatar próprio, personagem da crew (ver nota abaixo) |
 | `StarterPlayer.CameraMode` | `LockFirstPerson` | `LockFirstPerson` | DEC-039, DEC-097 |
-| `Players.CharacterAutoLoads` | true | **false** (spawn controlado: atrasado, revive, retomada, spectate) | DEC-091, DEC-098 |
+| `Players.CharacterAutoLoads` | true | **false** (spawn controlado: atrasado, revive, retomada, spectate) | DEC-091, DEC-098  Hoje a place tem `true` (uma place só, DEC v4.3): o `CharacterService` troca qualquer personagem que não seja da crew, então o efeito é o mesmo (auditoria multiplayer 2026-10-20) |
 | `StreamingEnabled` | true | true, `StreamingMinRadius` 256, `StreamingTargetRadius` 512; gameplay `Persistent` (§12.4, `Q-087`) | |
 | Grupos de colisão | `Players` não colide com `Players` | idem + `Npc` não colide com `Players`/`Npc` | `Q-086` |
 | Developer product "Revive" | criado no Creator Hub (id em `Content.Products`) | mesmo | DEC-092 |
@@ -502,6 +502,8 @@ de 10 s. Não há transição Spectator → Reviving.
 - Recibo que chega depois de a janela fechar ou de a noite ser perdida vira crédito no perfil (DEC-117, §10.2).
 
 ### 6.3 Ambulância (sequência, não NPC)
+
+> **Descartado (DEC-314, 2026-10-20):** a ambulância e os médicos não serão feitos; o corpo fica no chão até o reviver ou o fim da noite (`Revive.BodyFallback`). Texto abaixo sobre ambulância é histórico.
 
 - Ambulância e médicos **não são NPCs do servidor**: atores roteirizados renderizados no client a partir do set
   `Ambulance` (registro único: viagem, fase, `StartedAt`, parada, corpos). Não contam no teto de 12 NPCs. A
@@ -1815,6 +1817,8 @@ variação), `Life.luau` (puro: transições §6.1). Estado por **`UserId`** (so
 
 ### 19.10 Ladrão (`ThiefService`; FEAT-013; DEC-050, 182)
 
+> **Removido (DEC-313, 2026-10-20):** o ladrão saiu do jogo e do código (`src/Thief`, `Content.Thief`, `Net.Thief`, UPG-004, notices `thief_*`, ligações "quentin"). Texto abaixo é histórico.
+
 | Item | Contrato |
 |---|---|
 | Sorteio | `ShiftStarted` de dia: `Random(seed, Day, "thief")` contra `Thief.ChanceByDay`; hora na janela `Thief.WindowClock` (9 AM–3 PM); 1 por dia |
@@ -2015,6 +2019,8 @@ Passantes (DEC-183; T46, Provisório até `Q-162` a):
 | Teto | fora dos 12 Humanoids (como carros e Opal); se o usuário decidir que contam (`Q-162` a), o mesmo set serve com teto de 12 somado |
 
 ### 19.18 Ambulância, reviver, monetização e oferta S1 (onda 4; FEAT-034, 035; §6, §10)
+
+> **Descartado (DEC-314, 2026-10-20):** a ambulância e os médicos não serão feitos; o corpo fica no chão até o reviver ou o fim da noite (`Revive.BodyFallback`). Texto abaixo sobre ambulância é histórico.
 
 §6 e §10 valem. Integração com o que a onda 2 deixa pronto:
 

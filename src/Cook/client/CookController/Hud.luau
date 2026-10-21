@@ -17,14 +17,23 @@ export type Props = {
 	Grade: () -> string | false, -- band of the last gesture, false = none shown
 	Scale: () -> number,
 	OnBack: () -> (),
+	-- the tutorial asks the player to step back (DEC-311): the Back button turns Mustard and pulses; os.clock() drives the pulse
+	BackHint: (() -> number?)?,
+	-- the live bar of the gesture in progress (owner 2026-10-19: like the old prep's progress), 0..1; nil = hidden
+	Progress: (() -> number?)?,
 }
+
+const BAR = Vector2.new(280, 22) -- px of the progress bar at UI scale 1
 
 const TONE: { [string]: Color3 } = {
 	Perfect = Theme.Color.Mustard,
+	Nice = Theme.Color.Green,
 	Good = Theme.Color.Teal,
 	Messy = Theme.Color.Slate,
 }
-const LABELS = (Content.Prep.Grades.Labels :: any) :: { [string]: string }
+-- the plate bands' labels plus the gesture-only "Nice" (DEC-311: Perfect / Nice / Good)
+const LABELS: { [string]: string } = table.clone((Content.Prep.Grades.Labels :: any) :: { [string]: string })
+LABELS.Nice = "Nice!"
 
 const Hud = {}
 
@@ -45,7 +54,9 @@ function Hud.Screen(props: Props): (ScreenGui, Frame)
 		IgnoreGuiInset = false,
 		ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-		DisplayOrder = 4,
+		-- owner 2026-10-19: over the anomaly scenes' black bars (Scene/Kits Cinema, 40) so Back is never covered while
+		-- cooking; still under the whispers (45) and the jumpscare
+		DisplayOrder = 41,
 
 		create("TextLabel")({
 			Name = "Hint",
@@ -81,7 +92,9 @@ function Hud.Screen(props: Props): (ScreenGui, Frame)
 				const scale = props.Scale()
 				return UDim2.fromOffset(math.floor(96 * scale), math.floor(Theme.MinTouch * scale))
 			end,
-			BackgroundColor3 = Theme.Color.Cream,
+			BackgroundColor3 = function(): Color3
+				return if props.BackHint ~= nil and props.BackHint() ~= nil then Theme.Color.Mustard else Theme.Color.Cream
+			end,
 			AutoButtonColor = true,
 			FontFace = Theme.Font.Title,
 			Text = "Back",
@@ -94,6 +107,12 @@ function Hud.Screen(props: Props): (ScreenGui, Frame)
 			end,
 			create("UICorner")({ CornerRadius = Theme.Radius.Card }),
 			createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+			createRaw("UIScale")({
+				Scale = function(): number
+					const clock = if props.BackHint ~= nil then props.BackHint() else nil
+					return if clock ~= nil then 1 + 0.12 * (0.5 + 0.5 * math.sin(clock * 6)) else 1
+				end,
+			}),
 		}),
 
 		create("TextLabel")({
@@ -120,6 +139,41 @@ function Hud.Screen(props: Props): (ScreenGui, Frame)
 			Visible = function()
 				return props.Grade() ~= false
 			end,
+		}),
+
+		-- the gesture's progress, over the hint line: Mustard filling, Green once full
+		create("Frame")({
+			Name = "Progress",
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = function(): UDim2
+				return UDim2.new(0.5, 0, 1, -math.floor(64 * props.Scale()))
+			end,
+			Size = function(): UDim2
+				const scale = props.Scale()
+				return UDim2.fromOffset(math.floor(BAR.X * scale), math.floor(BAR.Y * scale))
+			end,
+			BackgroundColor3 = Theme.Color.Ink,
+			BackgroundTransparency = 0.15,
+			BorderSizePixel = 0,
+			Visible = function(): boolean
+				return props.Progress ~= nil and props.Progress() ~= nil
+			end,
+			create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
+			createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = 3 }),
+			create("Frame")({
+				Name = "Fill",
+				Position = UDim2.fromOffset(3, 3),
+				Size = function(): UDim2
+					const value = if props.Progress ~= nil then props.Progress() or 0 else 0
+					return UDim2.new(math.clamp(value, 0, 1), -6, 1, -6)
+				end,
+				BackgroundColor3 = function(): Color3
+					const value = if props.Progress ~= nil then props.Progress() or 0 else 0
+					return if value >= 0.999 then Theme.Color.Green else Theme.Color.Mustard
+				end,
+				BorderSizePixel = 0,
+				create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
+			}),
 		}),
 
 		dot,

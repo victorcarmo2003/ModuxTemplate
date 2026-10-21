@@ -136,6 +136,7 @@ Revisão D3 rev. 2 (2026-10-12, Provisório): **≤ 6 palavras por fala, ≤ 3 f
 | comprar | "Grab buns at the bakery." · "Eight buns. That'll do." · "Bakery shelf. Hold Buy Buns." |
 | voltar | "Bring them to the trailer." · "Back to the trailer." |
 | reabastecer | "Hold Restock on the bun crate." · "Stocked up!" · "Hold Restock at the bun crate." |
+| fim do turno (TASK-598, Provisório; tela preta com o relógio em destaque) | "One more thing." "Your shift ends at six." "Keep an eye on the clock." |
 | despedida | "That's the job. You got this." "Call me if..." · pulou: "Alright. You know the drill." "Call me if you need me." |
 
 Dicas depois da ação (`hint_*`, uma vez): "Bar full? Grab it." · "Now slice a bun." · "Pop a frank in the bun." · "Hot dog's ready. Wait for orders." · "We're open! Folks are lining up." · "See the bubble? That's the order." + "Nothing extra." · "Nice! Cash goes in the drawer." + "Low on stock? Try the Mart." + "Look both ways." · "Careful crossing. Get hit, drop it." (DEC-103) + "Gear's on the back wall." + "Sometimes there's something special." (DEC-106) · "That's how you restock. Easy." · "Messed up? Toss it. No harm." · "New gear's on the trailer. Heh."
@@ -397,6 +398,8 @@ Ideias de texto e situação para art/áudio. Sem gore, sem grito, sem jumpscare
 Alucinação nunca dispara erro de regra nem conta como anomalia vista.
 
 ## 9. Queda: desmaio, ambulância, reviver, spectate (DEC-091 a DEC-094, DEC-100, DEC-111, DEC-113 a DEC-116, DEC-129)
+
+> **Descartado (DEC-314, 2026-10-20):** a ambulância e os médicos não serão feitos; o corpo fica no chão até o reviver ou o fim da noite (`Revive.BodyFallback`). Texto abaixo sobre ambulância é histórico.
 
 Substitui a antiga proposta "Had enough" → banco (Q-055, não escolhida). Decidido: sanidade 0 → desmaio, o avatar cai → os médicos descem e levam o avatar (DEC-114) → reviver por **Robux** (só para si, DEC-116) ou pelo **Rescue Whistle** do Mart, até **6:00 AM** da noite da queda (DEC-115), no máximo **2 revives por jogador por noite** (DEC-129) → senão **spectate**, até o fim da run **ou** até a party perder uma noite e ela ser repetida (DEC-111, DEC-113). Tempos de tela são sugestões; textos de tela em `ui-text.md` §7.
 Tom: **cuidado e resgate**. Nada de "died", "body", grito ou câmera tremendo.

@@ -224,7 +224,7 @@ local function scare(ctx: Api.Context, occ: Api.Occurrence, state: State, player
 		state.Failed = true
 		ctx.Publish(occ, { Phase = "Failed" })
 	end
-	ctx.Cue(occ, SCARE_CUE, Hide.EntityOf(player))
+	ctx.Cue(occ, SCARE_CUE, Hide.EntityOf(player), player.UserId)
 	task.delay(state.ScareFaint, function()
 		if player.Parent ~= nil then
 			vital():Fall(player)

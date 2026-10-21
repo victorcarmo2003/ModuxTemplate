@@ -688,7 +688,11 @@ end
 -- crossfade with a cue that is fading out)
 function AudioController:PlayShiftTrack(isNight: boolean, fadeIn: number?)
 	const kind = if isNight then "Night" else "Day"
-	const pool = if isNight then RULES.ShiftMusic.Night else RULES.ShiftMusic.Day
+	-- owner 2026-10-19 (Provisional): Night 1 has its own pool, low, chained track after track until the night ends
+	const round = self.Dependencies.RoundController
+	const firstNight = isNight and Vide.untrack(round.Night) == 1
+	const pool = if firstNight then RULES.ShiftMusic.FirstNight elseif isNight then RULES.ShiftMusic.Night else RULES.ShiftMusic.Day
+	const scale = if firstNight then RULES.ShiftMusic.FirstNightVolume else 1
 	const key = Cues.PickTrack(pool, self.LastShiftTrack[kind], self.Rng)
 	if key == nil then
 		return
@@ -706,17 +710,23 @@ function AudioController:PlayShiftTrack(isNight: boolean, fadeIn: number?)
 	sound.SoundGroup = self.Groups.Music
 	sound.Looped = false
 	const rise = fadeIn or 0
-	sound.Volume = if rise > 0 then 0 else row.Volume
+	const volume = row.Volume * scale
+	sound.Volume = if rise > 0 then 0 else volume
 	sound.Parent = self.Screen
 	if rise > 0 then
-		TweenService:Create(sound, TweenInfo.new(rise), { Volume = row.Volume }):Play()
+		TweenService:Create(sound, TweenInfo.new(rise), { Volume = volume }):Play()
 	end
 	sound.Ended:Once(function()
-		if self.ShiftTrack == sound then
+		const current = self.ShiftTrack == sound
+		if current then
 			self.ShiftTrack = nil
 			self.ShiftMusic("")
 		end
 		sound:Destroy()
+		-- Night 1: the next track while the same night lasts and nothing else owns the music
+		if current and firstNight and Vide.untrack(round.IsNight) and Vide.untrack(round.Night) == 1 and not self:MusicBusy() then
+			self:PlayShiftTrack(true, SHIFT_FADE)
+		end
 	end)
 	self.ShiftTrack = sound
 	self.ShiftMusic(key)

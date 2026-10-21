@@ -73,6 +73,8 @@ export type Cue = {
 	Cue: string, -- Content.AnomalyCues key
 	Row: Content.AnomalyCue, -- Kind, Duration
 	Entity: number, -- NpcId or anchor index; 0 = none (meaning is per cue)
+	-- full UserId of the player a personal cue is for (AnomalyCue.User, DEC-320); nil = not personal
+	User: number?,
 	Seed: number,
 	Rng: Random, -- Random.new(Seed): same on every client
 	At: number, -- server time on arrival

@@ -55,7 +55,7 @@ O **monstro** atravessa a rua, encosta na janela, olha para dentro e vai embora 
 | ANM-007 (reuso) | The Walker (figura alta) | anda do fim da rua até a janela |
 | ANM-017 | Rastejador | vem de quatro pelo chão, rápido |
 | ANM-018 | O Sorriso | rosto enorme que aparece na janela de serviço |
-| ANM-019 | Sombra no teto | passos no teto do trailer, depois desce pela frente. **TASK-484 (Q-367 A, DEC-295): saiu do módulo `Hide`, virou "não olhe para cima"** — quem olha para cima enquanto ela anda paga sanidade e ela cai na frente da janela dele (`design/horror-cinematic.md` §6.1) |
+| ANM-019 | Sombra no teto | passos no teto do trailer, depois desce pela frente. **TASK-484 (Q-367 A, DEC-295): saiu do módulo `Hide`, virou "não olhe para cima"** — quem olha para cima enquanto ela anda paga sanidade e ela cai do teto na cara dele (`design/horror-cinematic.md` §6.1). **Q-396 (Provisório):** mancha, pegadas de sangue e gotas no teto enquanto anda; olhar = olhos abrem na mancha + contagem de 1,2 s (borrão, vermelho, coração) que dá para desviar |
 
 Implementação: **um único módulo `Hide`** (aviso → janela de tempo → checa zona → monstro passa). Cada monstro = modelo + caminho (`Path` de 2–4 pontos) + animação simples. Esconderijo = `Part` com `HideZone`.
 

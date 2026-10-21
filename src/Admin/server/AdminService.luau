@@ -10,6 +10,7 @@
 --   showcase               opens the dev showcase panel (ShowcaseService; same gate: Studio dev mode + allowed admin).
 --   anomaly <id> trigger|resolve|wrong|stop   forces / resolves / fails / stops one anomaly (ANM-###, key or night n).
 --   scare <id>             plays a hallucination (key) or a sting ("sting:<sound key>") on your client.
+--   gear open|close|state  forces the Gear Stand open (held: no scheduled close) or closed (DevService: gear hold|close).
 --   tp, content            native and safe in production (no DevService needed).
 --   giftclass <player|userId> <class>, giftgems <player|userId> <amount>   gifts through GiftService (TASK-352; owner
 --                          request 2026-10-16, Provisional): a ProfileStore message, so it works in production and for
@@ -431,6 +432,22 @@ function AdminService:Register()
 				return fail(`amount must be a whole number from 1 to {AdminArguments.MaxGiftGems}`)
 			end
 			self:CommandGift(target, "Gems", "", value)
+		end,
+	})
+
+	-- gear open|close|state (owner 2026-10-20): test the upgrade shop and its safe region outside; open = held open
+	conch.register("gear", {
+		permissions = { PERMISSION },
+		description = "Gear Stand: open (held, no auto close) | close | state (DevService: gear)",
+		arguments = function()
+			return AdminArguments.GearAction("action", "open | close | state")
+		end,
+		callback = function(action: string)
+			const verb = string.lower(action or "state")
+			if verb ~= "open" and verb ~= "close" and verb ~= "state" then
+				return fail("action must be open, close or state")
+			end
+			self:RunDev("gear", { if verb == "open" then "hold" else verb })
 		end,
 	})
 

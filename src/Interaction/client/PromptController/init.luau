@@ -29,8 +29,8 @@
 	Interaction menu (user request 2026-10-12, compact pass same day): order and selection in `Menu`, drawn by
 	Interface/Components/InteractionMenu. Priority tier then distance, stable (new rows are inserted, listed rows never
 	reshuffle), a row that leaves reach stays 1.5 s dimmed. The selected row is the target: E / X / a tap / hold act on it.
-	  Touch          ONE action circle above the jump button (one or more candidates) running the selected action, a hold
-	                 fills a ring on it; with 2+ options they fan out in an arc up/left of it (max 4). No CAS touch buttons: the circle and the fan are the only touch input.
+	  Touch          no menu (owner 2026-10-20: the action circle over the jump button is gone): the target's world pill
+	                 takes the tap / hold, the other candidates show the dot. No CAS touch buttons.
 	  Desktop/pad    two or more candidates -> a compact column right of the crosshair; wheel or Up/Down moves, 1..4 pick and
 	                 press directly, gamepad D-pad up/down.
 	One candidate on desktop = the pill as before. Billboards show the dot while the menu is up. Same Interact packet,
@@ -80,6 +80,7 @@ const TICK_RATE = 10
 const MAX_SCREEN_DISTANCE_FRACTION = 0.35
 const SIGHT_STEPS = 8 -- see-through / small parts skipped before giving up (counts as visible)
 const SIGHT_SEE_THROUGH = 0.9 -- a part at least this transparent never blocks a prompt
+const DRIVE_CARS = "DriveThruCars" -- DriveThruController's folder of local car models
 const SIGHT_MIN_SIZE = 2.5 -- studs: a part whose largest side is under this (tablet, cups, bottles) never blocks a prompt
 const HYSTERESIS_MARGIN_FRACTION = 0.05
 const BIND_NAME = "Interact"
@@ -191,9 +192,21 @@ end
 -- the anchor's own Model (the appliance / panel it belongs to), on the character, on a see-through part (Transparency
 -- >= SIGHT_SEE_THROUGH, invisible zones and markers) or on a small prop (largest side < SIGHT_MIN_SIZE: the counter
 -- tablet hid the customer's prompt, owner 2026-10-18) does not block; anything else solid between them does.
+-- Player characters never block either (owner 2026-10-20: a mate standing in front must not hide the prompt); walls still do.
 function PromptController:InSight(anchor: Instance, position: Vector3, from: Vector3, character: Model): boolean
 	const own = anchor:FindFirstAncestorWhichIsA("Model")
 	const ignore: { Instance } = { character }
+	for _, player in Players:GetPlayers() do
+		const other = player.Character
+		if other ~= nil and other ~= character then
+			table.insert(ignore, other)
+		end
+	end
+	-- the drive-thru cars (local models): the driver's prompt is seen through its own car (owner 2026-10-20)
+	const cars = workspace:FindFirstChild(DRIVE_CARS)
+	if cars ~= nil then
+		table.insert(ignore, cars)
+	end
 	if own ~= nil then
 		table.insert(ignore, own)
 	elseif anchor:IsA("BasePart") then
@@ -969,11 +982,13 @@ function PromptController:Tick()
 		end
 	end
 	Menu.Update(menu, inView, os.clock(), self.Holding ~= nil, margin)
-	-- Enter with two live rows (desktop / gamepad) or one (touch: the action circle is the only button); stay while that
-	-- many rows remain (one may be in grace) so the list does not collapse under the selection.
+	-- Enter with two live rows (desktop / gamepad); stay while that many rows remain (one may be in grace) so the list does
+	-- not collapse under the selection. Touch never opens it (owner 2026-10-20: drop the action circle over the jump
+	-- button): the world pill of the target takes the tap, the others show the dot.
 	const touch = device == "Touch"
-	const minRows = if touch then 1 else 2
-	const showMenu = Menu.CurrentCount(menu) >= minRows or (self.MenuActive and #menu.Order >= minRows)
+	const minRows = 2
+	const showMenu = not touch
+		and (Menu.CurrentCount(menu) >= minRows or (self.MenuActive and #menu.Order >= minRows))
 	self:SetMenuActive(showMenu)
 
 	if showMenu then
@@ -1007,8 +1022,7 @@ function PromptController:Tick()
 	end
 
 	for _, prompt in self.Prompts do
-		-- touch with one option keeps the pill (the circle has no label); several options show the dot only
-		if prompt == self.Target and (not showMenu or (touch and #Vide.untrack(self.MenuList) <= 1)) then
+		if prompt == self.Target and not showMenu then
 			Prompt.SetState(prompt, "Prompt")
 		elseif candidates[prompt] then
 			Prompt.SetState(prompt, "Indicator")

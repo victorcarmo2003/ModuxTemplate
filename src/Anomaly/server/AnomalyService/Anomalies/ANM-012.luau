@@ -10,7 +10,9 @@
 --   Window in face  the service window closed while she stands at the counter (she was Ordering on the last tick)
 --                   counts as the refusal: cue neck_snap, and SlamAfter s later she THROWS THE WINDOW OPEN again
 --                   (VehicleService:SetShutter(false), cue window_slam: a bang) and walks off. Resolved, no penalty.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
+local Content = require(ReplicatedStorage.shared.Content)
 local Api = require(script.Parent.Parent.Api)
 local Kit = require(script.Parent.Kit.CustomerActor)
 
@@ -22,7 +24,8 @@ const DEFAULT_SLAM_AFTER = 1.2
 
 type Vehicles = { SetShutter: (self: any, closed: boolean, player: Player?, force: boolean?) -> boolean }
 
-type Extra = { AtCounter: boolean, Snapped: boolean, Slamming: boolean }
+-- ShutWait (TASK-591): the ShutGrace wait of a player-closed window; a reopen in time cancels it
+type Extra = { AtCounter: boolean, Snapped: boolean, Slamming: boolean, ShutWait: thread? }
 
 const base = Kit.Module({
 	Ref = REF,
@@ -53,8 +56,9 @@ end
 local function extraOf(occ: Api.Occurrence): Extra
 	local extra = extras[occ]
 	if extra == nil then
-		extra = { AtCounter = false, Snapped = false, Slamming = false }
-		extras[occ] = extra
+		const created: Extra = { AtCounter = false, Snapped = false, Slamming = false, ShutWait = nil }
+		extras[occ] = created
+		extra = created
 	end
 	return extra :: Extra
 end
@@ -66,6 +70,25 @@ local function snap(ctx: Api.Context, occ: Api.Occurrence, actor: number)
 	end
 	extra.Snapped = true
 	ctx.Cue(occ, SNAP_CUE, actor)
+end
+
+-- shut in her face: the crack, then she throws the window open and leaves (the refusal)
+local function slam(ctx: Api.Context, occ: Api.Occurrence, actor: number)
+	snap(ctx, occ, actor)
+	const extra = extraOf(occ)
+	extra.Slamming = true
+	ctx.Succeed(occ)
+	task.delay(slamAfter(ctx), function()
+		if extras[occ] ~= extra then
+			return -- stopped meanwhile (night over, restore)
+		end
+		pcall(function()
+			vehicles():SetShutter(false, nil)
+		end)
+		ctx.Cue(occ, SLAM_CUE, actor)
+		Kit.SendAway(actor, nil)
+		ctx.Finish(occ)
+	end)
 end
 
 const TurnedNeck: Api.Module = {
@@ -93,24 +116,25 @@ const TurnedNeck: Api.Module = {
 		if actor ~= nil then
 			if event.Kind == "Customer" and event.Npc == actor and event.Action == "refuse" then
 				snap(ctx, occ, actor)
-			elseif event.Kind == "Shutter" and event.Closed and extraOf(occ).AtCounter and not extraOf(occ).Snapped then
-				-- shut in her face: the crack, then she throws the window open and leaves (the refusal)
-				snap(ctx, occ, actor)
+			elseif event.Kind == "Shutter" then
 				const extra = extraOf(occ)
-				extra.Slamming = true
-				ctx.Succeed(occ)
-				task.delay(slamAfter(ctx), function()
-					if extras[occ] ~= extra then
-						return -- stopped meanwhile (night over, restore)
-					end
-					pcall(function()
-						vehicles():SetShutter(false, nil)
+				if extra.ShutWait ~= nil then
+					task.cancel(extra.ShutWait)
+					extra.ShutWait = nil
+				end
+				if event.Closed and extra.AtCounter and not extra.Snapped then
+					-- TASK-591: shut in her face only counts once it stayed shut ShutGrace s (an accidental close
+					-- reopened in time changes nothing; automatic = at once)
+					const grace = if event.Player ~= nil then Content.ShopWindow.ShutGrace else 0
+					extra.ShutWait = task.delay(grace, function()
+						extra.ShutWait = nil
+						if extras[occ] ~= extra or extra.Snapped or not ctx.Vehicle.IsShutterClosed() then
+							return
+						end
+						slam(ctx, occ, actor)
 					end)
-					ctx.Cue(occ, SLAM_CUE, actor)
-					Kit.SendAway(actor, nil)
-					ctx.Finish(occ)
-				end)
-				return
+					return
+				end
 			end
 		end
 		const handler = base.OnEvent
@@ -120,6 +144,10 @@ const TurnedNeck: Api.Module = {
 	end,
 
 	Stop = function(ctx: Api.Context, occ: Api.Occurrence, reason: Api.StopReason)
+		const extra = extras[occ]
+		if extra ~= nil and extra.ShutWait ~= nil then
+			task.cancel(extra.ShutWait)
+		end
 		extras[occ] = nil
 		base.Stop(ctx, occ, reason)
 	end,

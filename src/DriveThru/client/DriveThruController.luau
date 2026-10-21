@@ -51,6 +51,9 @@ export type View = {
 	HopAt: number, -- os.clock() of the last horn (hop)
 	Seat: CFrame, -- the driver's root, from the car pivot
 	Rig: Model?, -- the customer's rig on that seat (nil = not found yet)
+	-- rest C0 of the joints this client bent on Rig (sitting pose, head turn), put back on release (owner 2026-10-20)
+	Rest: { [Motor6D]: CFrame },
+	Look: number, -- current head turn (rad) towards the local camera
 }
 
 const DRIVE = Content.Restaurant.Drive
@@ -71,6 +74,24 @@ const FALLBACK_COLOR = Color3.fromHex("#F4B183")
 const SEAT_SIDE = 0.22
 const SEAT_FORWARD = 0.04
 const SEAT_UP = 2.7
+-- Sitting driver (owner 2026-10-20: "vem andando e correndo ao invés de vir sentado"): the R6 sit pose of the table diners
+-- (SeatingService/Diner: hips and shoulders +-90 deg around each motor's Z), bent locally on the pooled rig and put back
+-- when the rig leaves the car. AnimController keeps a DriveThru rig on idle (its root moves with the car)
+const SIT_POSE: { [string]: number } = {
+	["Right Hip"] = math.pi / 2,
+	["Left Hip"] = -math.pi / 2,
+	["Right Shoulder"] = math.pi / 2,
+	["Left Shoulder"] = -math.pi / 2,
+}
+-- The head follows the local camera (owner 2026-10-20: "faz ele olhando para mim"), clamped like the starer (ANM-016)
+const LOOK_MAX = math.rad(75)
+const LOOK_TURN = 6 -- 1/s
+const LOOK_RANGE = 40 -- studs: farther cameras get the head back to the front
+-- The car at the window slides along its own axis so the driver's seat lines up with the shop window (DT-WIN / DT_Sill),
+-- fading in over ALIGN_RANGE studs of lane around the stop (owner 2026-10-20: "janela não tá alinhada com a da loja")
+const ALIGN_RANGE = 10
+const ALIGN_MAX = 6 -- studs at most
+const SILL = "DT_Sill"
 
 local function now(): number
 	return Workspace:GetServerTimeNow()
@@ -142,6 +163,29 @@ local function makeCar(look: number): Model
 	return model
 end
 
+-- The shop window the drive customer is served at: MapPoint DT-WIN, else the top of the DT_Sill part (same as the server)
+local function windowPoint(): Vector3?
+	const point = find(Content.Restaurant.Binding.DriveWindow)
+	if point ~= nil then
+		return point.Position
+	end
+	const sill = Workspace:FindFirstChild(SILL, true)
+	if sill ~= nil and sill:IsA("BasePart") then
+		return sill.Position + Vector3.new(0, sill.Size.Y / 2, 0)
+	end
+	return nil
+end
+
+local function motorsOf(rig: Model): { [string]: Motor6D }
+	const out: { [string]: Motor6D } = {}
+	for _, motor in rig:GetDescendants() do
+		if motor:IsA("Motor6D") and (SIT_POSE[motor.Name] ~= nil or motor.Name == "Neck") then
+			out[motor.Name] = motor
+		end
+	end
+	return out
+end
+
 -- Driver's seat (root of the rig) from the car pivot
 local function seatOf(model: Model): CFrame
 	const _, size = model:GetBoundingBox()
@@ -164,6 +208,8 @@ function DriveThruController:Setup()
 	self.DriveTalk = 0 :: number
 	self.FindAt = 0 :: number
 	self.Folder = nil :: Folder?
+	-- the shop window (DT-WIN), read on Rebuild; nil = no alignment
+	self.Window = nil :: Vector3?
 end
 
 function DriveThruController:Container(): Folder
@@ -217,6 +263,8 @@ function DriveThruController:Apply(spot: number, record: CarRecord)
 			HopAt = 0,
 			Seat = CFrame.identity,
 			Rig = nil,
+			Rest = {},
+			Look = 0,
 		}
 		view = made
 		self.Views[record.Npc] = made
@@ -326,6 +374,7 @@ function DriveThruController:Step()
 			if alpha >= 1 then
 				car.Move = nil
 				if car.State == "Leaving" then
+					self:Release(car)
 					car.Model:Destroy()
 					self.Views[npc] = nil
 					continue
@@ -338,6 +387,7 @@ function DriveThruController:Step()
 		if hop < HOP_TIME then
 			pose += Vector3.new(0, math.sin(math.pi * hop / HOP_TIME) * HOP_HEIGHT, 0)
 		end
+		pose = self:AlignWindow(car, pose)
 		car.Model:PivotTo(pose)
 		self:SeatDriver(car, pose)
 	end
@@ -347,17 +397,84 @@ function DriveThruController:Step()
 	end
 end
 
--- The customer's rig on the driver's seat (local pose; the server keeps it anchored at the lane spot)
+-- Near the window the car slides along its own axis so the driver's seat lines up with the shop window
+function DriveThruController:AlignWindow(car: View, pose: CFrame): CFrame
+	const lane = self.Lane
+	const window = self.Window
+	if lane == nil or window == nil then
+		return pose
+	end
+	const weight = math.clamp(1 - math.abs(car.S - Lane.Spot(lane, 1)) / ALIGN_RANGE, 0, 1)
+	if weight <= 0 then
+		return pose
+	end
+	const seat = (pose * car.Seat).Position
+	const along = math.clamp(pose.LookVector:Dot(window - seat), -ALIGN_MAX, ALIGN_MAX)
+	return pose + pose.LookVector * (along * weight)
+end
+
+-- The rig's bent joints back to rest (the rig goes back to the pool or to another use)
+function DriveThruController:Release(car: View)
+	for motor, rest in car.Rest do
+		if motor.Parent ~= nil then
+			motor.C0 = rest
+		end
+	end
+	car.Rest = {}
+	car.Look = 0
+	car.Rig = nil
+end
+
+-- The customer's rig on the driver's seat (local pose; the server keeps it anchored at the lane spot): sitting, its head
+-- turned to the local camera
 function DriveThruController:SeatDriver(car: View, pose: CFrame)
 	const rig = car.Rig
 	if rig == nil then
 		return
 	end
 	if rig.Parent == nil or rig:GetAttribute(HIDDEN) ~= true or rig:GetAttribute("NpcId") ~= car.Npc then
-		car.Rig = nil -- back in the pool (or reused): leave it alone
+		self:Release(car) -- back in the pool (or reused): its joints back to rest, then leave it alone
 		return
 	end
 	rig:PivotTo(pose * car.Seat)
+	if next(car.Rest) == nil then
+		for name, motor in motorsOf(rig) do
+			car.Rest[motor] = motor.C0
+			const angle = SIT_POSE[name]
+			if angle ~= nil then
+				motor.C0 = motor.C0 * CFrame.Angles(0, 0, angle)
+			end
+		end
+	end
+	self:LookAtCamera(car, rig)
+end
+
+-- Head towards the local camera around the torso's up axis (torso front = -Z), eased, clamped to LOOK_MAX
+function DriveThruController:LookAtCamera(car: View, rig: Model)
+	const torso = rig:FindFirstChild("Torso")
+	const camera = Workspace.CurrentCamera
+	if torso == nil or not torso:IsA("BasePart") or camera == nil then
+		return
+	end
+	local neck: Motor6D? = nil
+	for motor in car.Rest do
+		if motor.Name == "Neck" then
+			neck = motor
+		end
+	end
+	if neck == nil then
+		return
+	end
+	const rest = car.Rest[neck]
+	const dir = torso.CFrame:PointToObjectSpace(camera.CFrame.Position)
+	local target = 0
+	if dir.Magnitude <= LOOK_RANGE then
+		target = math.clamp(math.atan2(-dir.X, -dir.Z), -LOOK_MAX, LOOK_MAX)
+	end
+	const dt = math.min(1, (1 / 60) * LOOK_TURN)
+	car.Look += (target - car.Look) * dt
+	const axis = rest:VectorToObjectSpace(Vector3.yAxis)
+	neck.C0 = rest * CFrame.fromAxisAngle(axis, car.Look)
 end
 
 -- Rigs of the drivers not found yet (the rig replicates a moment after the car record)
@@ -384,6 +501,7 @@ function DriveThruController:Rebuild()
 		return
 	end
 	self.Lane = lane
+	self.Window = windowPoint()
 	for spot, record in self.Records do
 		self:Apply(spot, record)
 	end

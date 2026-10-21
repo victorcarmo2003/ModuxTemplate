@@ -15,7 +15,7 @@ const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }
 export type Props = {
 	-- 0..1. Values above 1 read as "ready".
 	Progress: () -> number,
-	-- Overrides the cooking/ready colors (e.g. the thief bar uses Theme.Color.Violet).
+	-- Overrides the cooking/ready colors (e.g. Theme.Color.Violet).
 	FillColor: (() -> Color3)?,
 	Text: (() -> string)?,
 }

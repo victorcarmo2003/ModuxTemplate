@@ -9,6 +9,14 @@
 	no alert red, no strobe. The face is FACE_IMAGE (Assets/textures/ui/fx/jumpscare_face.png, drawn by
 	tools/icons/jumpscare_face.py in the UI sticker style, 2026-10-15). A `Jumpscare_Face` ImageLabel anywhere under
 	ReplicatedStorage.Assets still wins; the Frames drawing is the last fallback (empty FACE_IMAGE).
+
+	Kept warm (owner 2026-10-20: on slower PCs the first jumpscare showed nothing): the ScreenGui is built once at
+	start and never destroyed; a KEEP copy of the face is always drawn, so the texture stays resident after the
+	loading screen preloaded it. Show only flips the stage on, and waits up to LOAD_WAIT for a face still loading.
+	Sharp on console / TV (owner 2026-10-20: "no Xbox fica tudo pixelado"): the engine streams a texture at the mip its
+	largest drawn copy needs, and the KEEP copy used to be 1 px, so only a tiny mip stayed resident and the 0.6 s scare
+	showed it blown up. The KEEP copy is now drawn at the face's full on-screen size (KEEP_SCALE of the screen height),
+	nearly transparent, so the full-resolution mip is the one kept in memory.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -33,10 +41,21 @@ const INK = Color3.fromHex("#2B2233") -- Theme Ink: the house outline colour, ne
 const SKIN = Color3.fromHex("#4A3F55")
 const WHITE = Color3.fromHex("#FFFFFF")
 const TEETH = 7
+const LOAD_WAIT = 0.35 -- s Show waits for a face image still loading (the faint comes ~0.7 s after the cue)
+const KEEP_TRANSPARENCY = 0.995 -- the warm copy: drawn (texture kept in memory at full mip) but not visible
+const KEEP_SCALE = 0.75 -- of the screen height: the face at the end of the pop (holder 0.6 x 1.25)
 
 const Jumpscare = {}
 
+type Stage = {
+	Gui: ScreenGui,
+	Stage: Frame,
+	Holder: Frame,
+	Face: GuiObject,
+}
+
 local busy = false
+local built: Stage? = nil
 
 local function kitFace(): ImageLabel?
 	const assets = ReplicatedStorage:FindFirstChild("Assets")
@@ -145,17 +164,16 @@ local function near(ctx: Effect.Context, npcId: number): boolean
 	return (model:GetPivot().Position - root.Position).Magnitude <= RANGE
 end
 
--- Shows the face once (one at a time). Yields for ~HOLD s.
-function Jumpscare.Show(ctx: Effect.Context)
-	if busy then
-		return
+-- The one jumpscare ScreenGui, built on first need and kept: the stage hidden, the full-size warm copy always drawn.
+local function stage(): Stage?
+	if built ~= nil and built.Gui.Parent ~= nil then
+		return built
 	end
-	busy = true
 	const playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
 	if playerGui == nil then
-		busy = false
-		return
+		return nil
 	end
+	const head = face()
 	const holder = create("Frame")({
 		Name = "Holder",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -163,13 +181,13 @@ function Jumpscare.Show(ctx: Effect.Context)
 		Size = UDim2.fromScale(0.6, 0.6),
 		BackgroundTransparency = 1,
 		create("UIAspectRatioConstraint")({ AspectRatio = 1 }),
-		face(),
+		head,
 	}) :: Frame
-	const gui = create("ScreenGui")({
-		Name = "Jumpscare",
-		ResetOnSpawn = false,
-		IgnoreGuiInset = true,
-		DisplayOrder = 50,
+	const frame = create("Frame")({
+		Name = "Stage",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Visible = false,
 		create("Frame")({
 			Name = "Shade",
 			Size = UDim2.fromScale(1, 1),
@@ -177,8 +195,64 @@ function Jumpscare.Show(ctx: Effect.Context)
 			BackgroundTransparency = 0.15,
 		}),
 		holder,
+	}) :: Frame
+	const gui = create("ScreenGui")({
+		Name = "Jumpscare",
+		ResetOnSpawn = false,
+		IgnoreGuiInset = true,
+		ScreenInsets = Enum.ScreenInsets.None,
+		ClipToDeviceSafeArea = false,
+		DisplayOrder = 50,
+		frame,
 	}) :: ScreenGui
+	if head:IsA("ImageLabel") then
+		const keep = head:Clone()
+		keep.Name = "Keep"
+		keep.AnchorPoint = Vector2.new(0.5, 0.5)
+		keep.Position = UDim2.fromScale(0.5, 0.5)
+		keep.Size = UDim2.fromScale(KEEP_SCALE, KEEP_SCALE)
+		keep.SizeConstraint = Enum.SizeConstraint.RelativeYY
+		keep.ScaleType = Enum.ScaleType.Fit
+		keep.ImageTransparency = KEEP_TRANSPARENCY
+		keep.Active = false
+		keep.Selectable = false
+		keep.Parent = gui
+	end
 	gui.Parent = playerGui
+	built = { Gui = gui, Stage = frame, Holder = holder, Face = head }
+	return built
+end
+
+-- Builds the gui ahead of the first scare (called at require; PlayerGui may come a moment later).
+function Jumpscare.Warm()
+	task.spawn(function()
+		Players.LocalPlayer:WaitForChild("PlayerGui")
+		stage()
+	end)
+end
+
+-- Shows the face once (one at a time). Yields for ~HOLD s.
+function Jumpscare.Show(ctx: Effect.Context)
+	if busy then
+		return
+	end
+	busy = true
+	const parts = stage()
+	if parts == nil then
+		busy = false
+		return
+	end
+	const head = parts.Face
+	if head:IsA("ImageLabel") and not head.IsLoaded then
+		const deadline = os.clock() + LOAD_WAIT
+		while not head.IsLoaded and os.clock() < deadline do
+			RunService.RenderStepped:Wait()
+		end
+	end
+	const holder = parts.Holder
+	holder.Size = UDim2.fromScale(0.6, 0.6)
+	holder.Position = UDim2.fromScale(0.5, 0.5)
+	parts.Stage.Visible = true
 
 	ctx.Play("jumpscare", nil, true)
 	Haptics.Play("Scare") -- strong and short, own player only (TASK-268)
@@ -193,16 +267,27 @@ function Jumpscare.Show(ctx: Effect.Context)
 	end)
 	task.wait(HOLD)
 	shake:Disconnect()
-	gui:Destroy()
+	parts.Stage.Visible = false
 	busy = false
 end
 
 -- Cue handler for the `jumpscare` cue of any family A anomaly.
+-- Only the player who pays sees it (owner 2026-10-20): with cue.User (the server names him) nobody else does, near or
+-- not; an old cue without User keeps the range rule.
 function Jumpscare.Cue(ctx: Effect.Context, cue: Effect.Cue)
-	if cue.Cue ~= "jumpscare" or not near(ctx, cue.Entity) then
+	if cue.Cue ~= "jumpscare" then
+		return
+	end
+	if cue.User ~= nil then
+		if cue.User ~= Players.LocalPlayer.UserId or Watch.Watching() then
+			return
+		end
+	elseif not near(ctx, cue.Entity) then
 		return
 	end
 	Jumpscare.Show(ctx)
 end
+
+Jumpscare.Warm()
 
 return table.freeze(Jumpscare)

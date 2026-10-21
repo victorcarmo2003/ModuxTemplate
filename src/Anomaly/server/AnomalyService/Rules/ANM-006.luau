@@ -3,7 +3,11 @@
 -- at it, the closer it comes. PROVISIONAL numbers (owner request 2026-10-16, tune in play).
 --   Steps       steps from the far sidewalk to the service window (many small ones: the client walks it smoothly)
 --   StepEvery   s of stare per step (any Active player who has it ON SCREEN; several lookers do not stack)
---   ViewAngle   degrees, full cone of "on screen" (owner 2026-10-16: not only the centre of the aim)
+--   ViewAngle   degrees, full cone of "on screen" (owner 2026-10-16: not only the centre of the aim). 110: a 16:9
+--               first-person view (70 deg vertical FOV) reaches ~50 deg sideways at the screen edge (90 missed it)
+--   AimLow      studs above the street of the lower gaze point (the body); the stare counts when the line of sight
+--   AimHigh     reaches ANY of the two points, so the counter wall below the glass hiding the legs does not block it
+--               (head and eyes stay visible above it); an opaque post hiding both still blocks
 --   AutoOff     s from the start: nobody brought it to the window, it fades away (Resolved)
 --   LeapDelay   s between reaching the window and leaping in (the last chance: close the window)
 --   ScareFaint  s between the jumpscare and the faint of the nearest player
@@ -17,7 +21,9 @@ return {
 	Params = {
 		Steps = 20,
 		StepEvery = 0.6, -- 12 s of stare from the sidewalk to the window (was 6 x 1.2 = 7.2 s; owner: slower)
-		ViewAngle = 90,
+		ViewAngle = 110,
+		AimLow = 5, -- placeholder body centre (Effects/ANM-006: body 1.8..7.4)
+		AimHigh = 8.4, -- placeholder head / eyes
 		AutoOff = 28,
 		LeapDelay = 1,
 		ScareFaint = 0.7,

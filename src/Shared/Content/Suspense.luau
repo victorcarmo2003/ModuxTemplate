@@ -46,6 +46,26 @@ export type Hijack = {
 	Words: number, -- s of whispers (HorrorScenes.Words.suspense) after the pull
 }
 
+-- The forgotten customer (owner 2026-10-19): a customer waits in the queue unseen by every player; the first glance at it
+-- after At of its queue patience is gone is a jumpscare for whoever finally looks (owner 2026-10-19: "sequestra a câmera, dá
+-- zoom no npc, treme e faz aqueles efeitos, coisa de 1-2 segundos"): the look pulled onto its head, a hard zoom held, a shake,
+-- a sting, a pulse and the edges closing.
+-- Seen earlier by anyone = no scare (multiplayer: someone already found it). Not during the tutorial, not from a cooking focus
+export type Forgotten = {
+	At: number, -- share of the queue patience gone (0..1) from which the first glance scares
+	Range: number, -- studs: the glance counts up to this distance
+	ScreenMargin: number, -- 0..0.5 share of the screen edge that does not count
+	Pull: number, -- degrees the look is pulled to its head
+	Duration: number, -- s of the pull
+	Fov: number, -- degrees of zoom (negative = in; |Fov| <= HorrorScenes.Rules.MaxFov)
+	Hold: number, -- s the zoom lasts (reaches Fov fast, eases back over the rest)
+	Shake: string, -- HorrorScenes.Rules.Shakes profile
+	Sound: string, -- Content.Sounds key (Scare)
+	Pulse: number, -- s of Screen.Pulse (<= 0.3)
+	Vignette: number, -- 0..HorrorScenes.Rules.MaxVignette
+	VignetteFor: number, -- s until the edges open again
+}
+
 export type Rules = {
 	FromNight: number, -- no event before this night
 	PerNight: { number }, -- { min, max } events drawn per night
@@ -62,6 +82,7 @@ export type Rules = {
 	SeenAngle: number, -- degrees, full cone the server accepts for a "seen" claim (generous: Gaze is 10 Hz)
 	ScreenMargin: number, -- 0..0.5 share of the screen edge that does not count yet (the corner of the eye)
 	Hijack: Hijack,
+	Forgotten: Forgotten,
 }
 
 const rules: Rules = {
@@ -89,6 +110,22 @@ const rules: Rules = {
 		Pulse = 0.25,
 		Linger = 0.35,
 		Words = 2.5,
+	},
+	-- owner 2026-10-19 ("chegando a barra em 70%, 80%"; "um pequeno susto e um pequeno foco"). Provisional, judged in Play
+	Forgotten = {
+		At = 0.45, -- owner 2026-10-19 after Play: the scare came too late (~80% of the bar); 0.7 -> 0.5 -> 0.45 (owner 2026-10-20)
+		Range = 60,
+		ScreenMargin = 0.12,
+		-- owner 2026-10-19 again: "não está funcionando" - the old one (12 deg, -4 fov, 0.35 s, no shake) was not felt
+		Pull = 30,
+		Duration = 0.45,
+		Fov = -16,
+		Hold = 1.5,
+		Shake = "Scare",
+		Sound = "horror_sting",
+		Pulse = 0.3,
+		Vignette = 0.5,
+		VignetteFor = 1.8,
 	},
 }
 

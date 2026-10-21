@@ -157,6 +157,8 @@ function VitalService:Setup()
 	-- dev, per player (TASK-332): sanity never goes down and the member never faints (only dev falls); mirrored to the
 	-- player attribute DEV_INFINITE for the settings panel
 	self.DevInfinite = {} :: { [number]: boolean }
+	-- TutorialService (owner 2026-10-19): while it says so, no sanity is lost
+	self.Hold = nil :: (() -> boolean)?
 	-- dev: players revived automatically right after they faint (DevSetAutoRevive)
 	self.DevAutoRevive = {} :: { [number]: boolean }
 	self.DevFalling = false :: boolean
@@ -205,7 +207,7 @@ function VitalService:Ensure(player: Player): Entry
 			classes:GetModifier(player, "SanityStart", rows.Start),
 			classes:GetModifier(player, "SanityMax", rows.Start)
 		)
-		-- Night 1 starts low so the rookie learns the coffee (user request 2026-10-11, Provisional): never raises
+		-- Night 1 starts low so the rookie learns the coffee (user request 2026-10-11; 60 since TASK-596, Provisional): never raises
 		const first = if self.Dependencies.RoundService:GetNight() == 1 then rows.FirstNightStart else start
 		entry.Sanity = Sanity.clamp(math.min(start, first), max)
 		entry.Max = max
@@ -389,6 +391,11 @@ end
 -- Sanity ------------------------------------------------------------------------------------------------------------
 
 -- Changes the sanity of an Active member at night (no sanity by day). 0 makes the member fall. Returns the value.
+-- While `hold` says so, sanity only goes up (TutorialService: a rookie's tutorial runs)
+function VitalService:SetHold(hold: () -> boolean)
+	self.Hold = hold
+end
+
 function VitalService:AddSanity(player: Player, delta: number, cause: string): number
 	if not self.Enabled or not finite(delta) then
 		return 0
@@ -396,6 +403,13 @@ function VitalService:AddSanity(player: Player, delta: number, cause: string): n
 	const entry = self:Ensure(player)
 	if entry.Max <= 0 or not self.Dependencies.RunStateService:IsActive(player) then
 		return entry.Sanity
+	end
+	-- owner 2026-10-19: no sanity is lost while a rookie's tutorial runs (TutorialService:SetHold)
+	if delta < 0 and self.Hold ~= nil then
+		const ok, held = pcall(self.Hold)
+		if ok and held then
+			return entry.Sanity
+		end
 	end
 	if delta < 0 and self.DevInfinite[player.UserId] then
 		return entry.Sanity
@@ -724,6 +738,23 @@ end
 
 -- Tick ----------------------------------------------------------------------------------------------------------------
 
+-- A tutorial hold is on (sanity only goes up)
+function VitalService:Held(): boolean
+	if self.Hold == nil then
+		return false
+	end
+	const ok, held = pcall(self.Hold)
+	return ok and held == true
+end
+
+-- The dread of the lights left off (Content.Sanity.DreadAfter): a Player attribute the client turns into the scare
+function VitalService:SetDread(player: Player, on: boolean)
+	const attribute = Content.Sanity.DreadAttribute
+	if (player:GetAttribute(attribute) == true) ~= on then
+		player:SetAttribute(attribute, if on then true else nil)
+	end
+end
+
 function VitalService:DarkTick(t: number)
 	const round = self.Dependencies.RoundService
 	const counts = round:IsNight() and isDarkPhase(round:GetPhase())
@@ -731,6 +762,7 @@ function VitalService:DarkTick(t: number)
 	const characters = self.Dependencies.CharacterService
 	for _, player in Players:GetPlayers() do
 		if not runState:IsActive(player) then
+			self:SetDread(player, false)
 			continue
 		end
 		const entry = self:Ensure(player)
@@ -738,15 +770,17 @@ function VitalService:DarkTick(t: number)
 		const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
 		if not counts or entry.Max <= 0 or root == nil or not root:IsA("BasePart") or characters:IsFainted(player) then
 			entry.DarkSince = nil
+			self:SetDread(player, false)
 			continue
 		end
 		if self:IsLit(root.Position) then
 			entry.DarkSince = nil
+			self:SetDread(player, false)
 			continue
 		end
-		if entry.DarkSince == nil then
-			entry.DarkSince = t
-		end
+		const darkSince = entry.DarkSince or t
+		entry.DarkSince = darkSince
+		self:SetDread(player, t - darkSince >= Content.Sanity.DreadAfter and not self:Held())
 		entry.DarkOwed += Sanity.darkLoss(entry.DarkSince, entry.ProtectUntil, t, Content.Sanity)
 		const whole = math.floor(entry.DarkOwed)
 		if whole > 0 then

@@ -6,9 +6,8 @@
 -- shared Cash and the cash drawer became a TIP JAR: the set field `Drawer` is kept for the wire and now means "tips in the
 -- jar" (renaming it would break the client and Net; TipJarService and EconomyController read it as the jar). Others call:
 --   Spend(amount, player?)        purchases (Mart, bench, trailer); atomic check-and-debit, never below 0
---   AddSale(amount, kind)         order price ("Sale") or thief caught ("Catch"): straight into Cash; while the shop takes entries
+--   AddSale(amount, kind)         order price ("Sale"): straight into Cash; while the shop takes entries
 --   AddTip(amount)                customer tip or table tip: into the tip jar (AddToDrawer(amount, "Tip") is the same call)
---   Steal(amount)                 thief (FEAT-013): takes up to the jar, counted in the ledger's Stolen
 --   CountArrival(), CountResult() ledger for the grade (CustomerService, TASK-032/033)
 --   AddReportStep(name, fn)       fills ShiftReport fields of other features before it is sent (T48)
 --   CollectTips()                 prompt on the jar (collect_tips): jar -> Cash now; the ledger remembers it for the report
@@ -19,7 +18,7 @@
 --                                 failure with `player`
 -- Cash changes by Spend, AddSale, CollectTips, the deposit, TopUp and DevAddCash.
 -- Deposit on RoundService.ShiftEnded (start of Summary): grade A-D, bonus floor(day take x %) where the day take = Sales +
--- Tips + Catches - Stolen (DEC-051 parity), Cash += tips left in the jar + bonus, Drawer = 0, report steps, ShiftReport to
+-- Tips (DEC-051 parity), Cash += tips left in the jar + bonus, Drawer = 0, report steps, ShiftReport to
 -- the group (Drawer = the day take), Reported(info, report).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -58,7 +57,7 @@ const CLOSING = "Closing"
 -- Seconds between two Cash pack prompts for the same player (a refused buy spammed on a prompt must not stack them)
 const TOP_UP_COOLDOWN = 4
 const CASH_OFFER = "offer_cash" -- Content.Shop.Offers key of the Cash offer (TASK-364)
-const SALE_KINDS: { [string]: boolean } = { Sale = true, Catch = true }
+const SALE_KINDS: { [string]: boolean } = { Sale = true }
 -- Sale.Result enum (network.md §4.3)
 const RESULTS: { [string]: boolean } =
 	{ Perfect = true, Complete = true, Incomplete = true, Wrong = true, Left = true, Refused = true, Slow = true }
@@ -196,7 +195,7 @@ function EconomyService:PromptCashPack(player: Player, missing: number)
 	})
 end
 
--- Order price or thief reward straight into the shared Cash (DEC-238; it used to fall in the drawer, DEC-050). Only while
+-- Order price straight into the shared Cash (DEC-238; it used to fall in the drawer, DEC-050). Only while
 -- the shop takes entries; returns what actually went in (0 when refused or Cash is at its cap).
 function EconomyService:AddSale(amount: number, kind: SaleKind): number
 	const value = amountOf(amount)
@@ -205,7 +204,7 @@ function EconomyService:AddSale(amount: number, kind: SaleKind): number
 		return 0
 	end
 	if not SALE_KINDS[kind] then
-		fail(`[EconomyService] AddSale: unknown kind {kind} (Sale or Catch; tips go through AddTip)`)
+		fail(`[EconomyService] AddSale: unknown kind {kind} (Sale; tips go through AddTip)`)
 		return 0
 	end
 	if not self:IsDrawerOpen() then
@@ -253,26 +252,6 @@ function EconomyService:AddToDrawer(amount: number, kind: DrawerKind): number
 		return 0
 	end
 	return self:AddTip(amount)
-end
-
--- Thief (FEAT-013): takes up to the tip jar, adds it to the ledger's Stolen, returns what was taken. The amount
--- (floor(Drawer x StealPct / 100) when Drawer >= MinDrawer) is ThiefService's call, from Content. Dormant while the jar
--- stays small (DEC-239).
-function EconomyService:Steal(amount: number): number
-	const value = amountOf(amount)
-	if value == nil then
-		fail(`[EconomyService] Steal: amount must be a non-negative integer, got {amount}`)
-		return 0
-	end
-	const drawer = self.Drawer()
-	const taken = math.min(value, drawer)
-	if taken <= 0 then
-		return 0
-	end
-	self.Drawer(drawer - taken)
-	self.Shift.Stolen += taken
-	MetricsLog.server("tips_stolen", taken)
-	return taken
 end
 
 -- "Collect Tips" (DEC-239; it was "Collect Cash", Q-201): everything in the tip jar goes to Cash right now. Same rules
@@ -391,9 +370,8 @@ function EconomyService:Deposit(info: ShiftInfo): Report
 		IsNight = info.IsNight,
 		Arrived = math.min(ledger.Arrived, COUNT_MAX),
 		Completed = math.min(ledger.Completed, COUNT_MAX),
-		Drawer = math.min(settlement.Take, DRAWER_MAX), -- the day take: Sales + Tips + Catches - Stolen (field name kept)
+		Drawer = math.min(settlement.Take, DRAWER_MAX), -- the day take: Sales + Tips (field name kept)
 		Tips = math.min(ledger.Tips, TIPS_MAX),
-		Stolen = math.min(ledger.Stolen, DRAWER_MAX),
 		Grade = settlement.Grade,
 		Bonus = math.min(settlement.Bonus, DRAWER_MAX),
 		Deposited = math.min(settlement.Deposited, DRAWER_MAX),

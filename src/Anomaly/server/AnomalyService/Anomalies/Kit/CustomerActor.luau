@@ -16,6 +16,11 @@
 --             (Shutter event, Closed) while the actor is still in line IS the refusal: handled as Customer action
 --             "refuse" by who closed (nil = automatic: no Fail, the actor still leaves). CustomerService.SendLineAway
 --             skips actors, so this is the only place the window reaches them.
+--             TASK-591 (owner 2026-10-19): only once the window stayed shut Content.ShopWindow.ShutGrace s (the NPCs'
+--             grace): a quick reopen after an accidental close changes nothing. Params.WindowRefuses = false: the
+--             window does not reach the actor at all (ANM-022 leaves only when the lights go out).
+--   WrongServe TASK-591: Params.WrongServeFails = true makes a serve outside Params.Pass the error too (ANM-011: only
+--             a plain hot dog calms him), not just a send-away.
 -- The actor gone without one of these (removed, sent away by someone else) ends the occurrence with no outcome.
 -- Stop sends a still-standing actor away (NightOver, Restore, dev stop).
 --
@@ -60,6 +65,7 @@ export type State = {
 	LastTick: number,
 	Fronted: boolean, -- the actor reached Q1 (CounterCue sent)
 	Counted: boolean, -- DEC-051 arrival + Wrong already counted
+	ShutWait: thread?, -- TASK-591: the ShutGrace wait of a player-closed window
 }
 
 -- Spawns the actor. nil = no slot/actor now (Start returns false, the agenda retries).
@@ -118,10 +124,12 @@ function Kit.Vital(): Vital
 	return vitalCache :: Vital
 end
 
--- V2 error (DEC-255, DEC-256): jumpscare for who is near the actor, then `player` faints. Ledger as Kit.Fail.
+-- V2 error (DEC-255, DEC-256): jumpscare for `player` only (owner 2026-10-20: "somente naquele que morreu"; it used to
+-- be every player near the actor), then `player` faints. Entity stays the actor (the client's face comes from it), User
+-- = the one who pays. Ledger as Kit.Fail.
 function Kit.Scare(ctx: Api.Context, occ: Api.Occurrence, state: State, player: Player)
 	ctx.Publish(occ, { Phase = "Failed" })
-	ctx.Cue(occ, SCARE_CUE, state.Actor)
+	ctx.Cue(occ, SCARE_CUE, state.Actor, player.UserId)
 	if not state.Counted then
 		state.Counted = true
 		ctx.Economy.CountArrival()
@@ -194,6 +202,14 @@ local function defaultSpawn(ctx: Api.Context, _occ: Api.Occurrence, rule: Api.Ru
 	return ctx.Spawn({ Variant = variant })
 end
 
+local function cancelShut(state: State)
+	const wait = state.ShutWait
+	if wait ~= nil then
+		state.ShutWait = nil
+		task.cancel(wait)
+	end
+end
+
 -- Builds the module of one customer anomaly.
 function Kit.Module(options: Options): Api.Module
 	const ref = options.Ref
@@ -212,6 +228,44 @@ function Kit.Module(options: Options): Api.Module
 		return rule
 	end
 
+	-- One customer action on the actor (or the window standing in for "refuse"): the verb resolves, the wrong one fails
+	local function act(ctx: Api.Context, occ: Api.Occurrence, state: State, action: string, player: Player?, result: string?)
+		const rule = ctx.Rule(occ.Key)
+		if rule == nil then
+			return
+		end
+		cancelShut(state)
+		const right = VERB_ACTION[rule.Verb]
+		const wrongServe = action == SERVE and action == right and not passes(rule, result) and params(rule).WrongServeFails == true
+		if action == right and not wrongServe then
+			if action ~= SERVE or passes(rule, result) then
+				ctx.Succeed(occ)
+			end
+			-- PROVISIONAL (N5 wrongServeRetry): a Wrong serve sends the actor away (CustomerService has no
+			-- "keep waiting"); the right verb was used, so no penalty and no success.
+			ctx.Finish(occ)
+		elseif action == params(rule).Wrong or wrongServe then
+			if player ~= nil then
+				if options.Scare then
+					Kit.Scare(ctx, occ, state, player)
+				else
+					Kit.Fail(ctx, occ, state, { player })
+				end
+			end
+			const cue = options.FailCue
+			if cue ~= nil then
+				ctx.Cue(occ, cue, state.Actor)
+			end
+			Kit.SendAway(state.Actor, nil)
+			ctx.Finish(occ)
+		elseif action == GIVE_UP then
+			if params(rule).OmissionFails == true then
+				Kit.Fail(ctx, occ, state, "active")
+			end
+			ctx.Finish(occ)
+		end
+	end
+
 	return {
 		Ref = ref,
 
@@ -220,7 +274,8 @@ function Kit.Module(options: Options): Api.Module
 			if rule == nil then
 				return false
 			end
-			const state: State = { Actor = 0, Original = nil, LastTick = ctx.Now(), Fronted = false, Counted = false }
+			const state: State =
+					{ Actor = 0, Original = nil, LastTick = ctx.Now(), Fronted = false, Counted = false, ShutWait = nil }
 			const actor = spawn(ctx, occ, rule, state)
 			if actor == nil then
 				return false
@@ -257,50 +312,32 @@ function Kit.Module(options: Options): Api.Module
 
 		OnEvent = function(ctx: Api.Context, occ: Api.Occurrence, event: Api.Event)
 			const state = occ.State :: State
-			local action: string
-			local player: Player?
-			local result: string? = nil
 			if event.Kind == "Customer" then
 				if event.Npc ~= state.Actor then
 					return
 				end
-				action, player, result = event.Action, event.Player, event.Result
-			elseif event.Kind == "Shutter" and event.Closed and Kit.Standing(state.Actor) ~= nil then
-				action, player = REFUSE, event.Player -- the window shut in its face (TASK-354)
-			else
-				return
-			end
-			const rule = ctx.Rule(occ.Key)
-			if rule == nil then
-				return
-			end
-			const right = VERB_ACTION[rule.Verb]
-			if action == right then
-				if action ~= SERVE or passes(rule, result) then
-					ctx.Succeed(occ)
+				act(ctx, occ, state, event.Action, event.Player, event.Result)
+			elseif event.Kind == "Shutter" then
+				const rule = ctx.Rule(occ.Key)
+				if rule == nil or params(rule).WindowRefuses == false then
+					return
 				end
-				-- PROVISIONAL (N5 wrongServeRetry): a Wrong serve sends the actor away (CustomerService has no
-				-- "keep waiting"); the right verb was used, so no penalty and no success.
-				ctx.Finish(occ)
-			elseif action == params(rule).Wrong then
-				if player ~= nil then
-					if options.Scare then
-						Kit.Scare(ctx, occ, state, player)
-					else
-						Kit.Fail(ctx, occ, state, { player })
+				cancelShut(state)
+				if not event.Closed or Kit.Standing(state.Actor) == nil then
+					return -- reopened in time: nothing happened
+				end
+				const player = event.Player
+				if player == nil then
+					act(ctx, occ, state, REFUSE, nil, nil) -- automatic: at once, as for the NPCs
+					return
+				end
+				-- the window shut in its face (TASK-354), counted only once it stayed shut (TASK-591)
+				state.ShutWait = task.delay(Content.ShopWindow.ShutGrace, function()
+					state.ShutWait = nil
+					if occ.State == state and ctx.Vehicle.IsShutterClosed() and Kit.Standing(state.Actor) ~= nil then
+						act(ctx, occ, state, REFUSE, player, nil)
 					end
-				end
-				const cue = options.FailCue
-				if cue ~= nil then
-					ctx.Cue(occ, cue, state.Actor)
-				end
-				Kit.SendAway(state.Actor, nil)
-				ctx.Finish(occ)
-			elseif action == GIVE_UP then
-				if params(rule).OmissionFails == true then
-					Kit.Fail(ctx, occ, state, "active")
-				end
-				ctx.Finish(occ)
+				end)
 			end
 		end,
 
@@ -309,6 +346,7 @@ function Kit.Module(options: Options): Api.Module
 			if state == nil or state.Actor == 0 then
 				return
 			end
+			cancelShut(state)
 			Kit.SendAway(state.Actor, if reason == "Done" then nil else SHIFT_END)
 		end,
 	}

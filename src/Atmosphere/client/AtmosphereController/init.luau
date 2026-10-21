@@ -36,6 +36,7 @@ local Rain = require(script.Rain)
 local Lightning = require(script.Lightning)
 local Flicker = require(script.Flicker)
 local GroundFog = require(script.GroundFog)
+local Dread = require(script.Dread)
 
 type AtmosphereRow = Content.Atmosphere
 type Preset = Content.LightPreset
@@ -432,6 +433,8 @@ AtmosphereController:OnStart(function(self)
 	Flicker(self.Dependencies.LightController :: any, self.Dependencies.AudioController :: any)
 	-- owner 2026-10-18: the low mist of the Hush on every night, by default
 	GroundFog()
+	-- owner 2026-10-19: the lights left off too long turn the place terrifying (VitalService DreadAttribute)
+	Dread(self.Dependencies.AudioController :: any)
 	self:Retarget()
 	-- late joiner / reconnect: the night's atmosphere is already full
 	if self.Target then

@@ -5,6 +5,8 @@
 --   Pop(shown)     scale 0 -> 1 with overshoot when shown, back to 0 when hidden (clamped >= 0)
 --   Reveal(shown)  progressive HUD reveal (Content.HudReveal): 0 -> 1 in Theme.Motion.Reveal s, no overshoot; with the
 --                  "reduced motion" setting of the player it jumps (0 or 1) instead of animating
+--   RevealPop(shown)  the HUD's progressive reveal as a cartoon pop (owner 2026-10-19: "faz um pop-up"): 0 -> 1 with the
+--                  overshoot of Pop; with reduced motion it jumps like Reveal. Only for scales (it goes past 1)
 --   Reduced()      whether the player asked for reduced motion (UserGameSettings.ReducedMotion, false when the engine
 --                  has no such setting; or the game's own Settings panel switch, Settings.Prefs, TASK-279)
 --   Press(pressed, hovered?)  squash on press, slight grow on hover
@@ -118,6 +120,20 @@ local function reveal(shown: () -> boolean): () -> number
 	end
 end
 
+local function revealPop(shown: () -> boolean): () -> number
+	if reduced() then
+		return function(): number
+			return if shown() then 1 else 0
+		end
+	end
+	const s = spring(function()
+		return if shown() then 1 else 0
+	end, Theme.Motion.Pop, Theme.Motion.PopDamping)
+	return function(): number
+		return math.max(s(), 0)
+	end
+end
+
 local function pop(shown: () -> boolean): () -> number
 	const s = spring(function()
 		return if shown() then 1 else 0
@@ -146,6 +162,7 @@ return table.freeze({
 	Count = count,
 	Pop = pop,
 	Reveal = reveal,
+	RevealPop = revealPop,
 	Reduced = reduced,
 	Press = press,
 })

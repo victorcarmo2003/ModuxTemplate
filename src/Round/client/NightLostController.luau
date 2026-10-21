@@ -121,6 +121,8 @@ function NightLostController:Mount(playerGui: Instance)
 			Name = "NightLost",
 			ResetOnSpawn = false,
 			IgnoreGuiInset = true,
+			ScreenInsets = Enum.ScreenInsets.None,
+			ClipToDeviceSafeArea = false,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			DisplayOrder = DISPLAY_ORDER,
 

@@ -42,8 +42,8 @@ export type Rules = {
 	PerClass: number, -- circles under the card (ClassSelect): the first N skins of the class on show
 }
 
--- Halloween lot 1 (Q-301): on sale until 2026-11-03 00:00 UTC.
-const HALLOWEEN_END = 1793664000
+-- Halloween lot 1 (DEC-316, answers Q-301): on sale through 2026-11-05 in Brasilia = until 2026-11-06 03:00 UTC.
+const HALLOWEEN_END = 1793934000
 
 const list: { Skin } = {
 	{

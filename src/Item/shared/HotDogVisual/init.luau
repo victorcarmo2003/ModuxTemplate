@@ -17,6 +17,9 @@
 	in the sauce colour, laid over the top of the stack. Bun space -> Handle space: X along the longest horizontal side of the Handle
 	(BUN_LENGTH of it), Y across (BUN_WIDTH of the other side), on the up axis of Att_Topping1. A Tool without `Sauce` (the world
 	prompts, an old snapshot) keeps the models.
+	Owner 2026-10-19 ("a linha não tá alinhada com a salsicha"): with a `Sausage` part, Y wraps around the sausage instead of lying
+	flat over it: Y 0..1 = an angle of -WRAP..WRAP around the sausage's axis from its top (HotDogVisual.around), so the line hugs the
+	sausage from every camera. The cooking focus draws its guide and its live line with the same mapping.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -33,11 +36,35 @@ const BUN_WIDTH = 0.7
 const BEAD = 0.05 -- share of the bun length
 const BEAD_MIN = 0.04 -- studs
 const SAUCE_LIFT = 0.35 -- beads over the top of the stack
+const WRAP = math.rad(75) -- the angle around the sausage Y = 0 / 1 reaches from its top
 
 local HotDogVisual = {}
 
 HotDogVisual.VisualName = VISUAL_NAME
 HotDogVisual.Sauce = Sauce
+HotDogVisual.Wrap = WRAP
+
+-- The direction from the sausage's axis of the bun-space share `y` (0..1 across): `up` at 0.5, toward `across` past it
+function HotDogVisual.around(up: Vector3, across: Vector3, y: number): Vector3
+	const angle = (2 * y - 1) * WRAP
+	return up * math.cos(angle) + across * math.sin(angle)
+end
+
+-- The bun-space share across of an offset from the sausage's axis (its parts on `up` and `across`); past 0..1 off the wrap
+function HotDogVisual.acrossOf(onUp: number, onAcross: number): number
+	return math.atan2(onAcross, onUp) / (2 * WRAP) + 0.5
+end
+
+-- The radius of the sausage (studs, Handle scale) of a hot dog, nil = no Sausage part (flat sauce)
+function HotDogVisual.radiusOf(hotDog: Instance): number?
+	const sausage = hotDog:FindFirstChild("Sausage")
+	if sausage == nil or not sausage:IsA("BasePart") then
+		return nil
+	end
+	const size = sausage.Size
+	-- the two short sides are its section
+	return (size.X + size.Y + size.Z - math.max(size.X, size.Y, size.Z)) / 4
+end
 
 -- "ketchup,cheese" -> { "ketchup", "cheese" } (Tool attribute Toppings, assembly order; "" = none).
 function HotDogVisual.parse(value: string?): { string }
@@ -128,7 +155,15 @@ local function bead(visual: Instance, handle: BasePart, from: CFrame, to: Vector
 end
 
 -- The lines of the drawn sauces over the top of the stack (`top` = Handle space, up axis = Att_Topping1's)
-local function drawSauces(visual: Instance, handle: BasePart, top: CFrame, sauces: { [string]: Sauce.Segments }, anchored: boolean)
+local function drawSauces(
+	visual: Instance,
+	handle: BasePart,
+	top: CFrame,
+	sauces: { [string]: Sauce.Segments },
+	anchored: boolean,
+	anchor: CFrame,
+	radius: number?
+)
 	-- the bun's long side: the Handle axis with the largest size that is not the up axis
 	const up = top.UpVector
 	local along, alongSize, across, acrossSize = Vector3.xAxis, 0, Vector3.zAxis, 0
@@ -149,6 +184,12 @@ local function drawSauces(visual: Instance, handle: BasePart, top: CFrame, sauce
 	const thickness = math.max(length * BEAD, BEAD_MIN)
 	const origin = top.Position + up * (thickness * SAUCE_LIFT)
 	local function at(uv: Vector2): Vector3
+		if radius ~= nil then
+			-- around the sausage: its axis under Att_Topping1, the stack above it adds to the radius
+			const axis = anchor.Position - up * radius
+			const reach = (origin - axis):Dot(up)
+			return axis + along * ((uv.X - 0.5) * length) + HotDogVisual.around(up, across, uv.Y) * reach
+		end
 		return origin + along * ((uv.X - 0.5) * length) + across * ((uv.Y - 0.5) * width)
 	end
 	for key, segments in sauces do
@@ -248,7 +289,7 @@ function HotDogVisual.apply(hotDog: Instance, toppings: { string } | string, kit
 		end
 	end
 	if anyDrawn then
-		drawSauces(visual, handle, cursor, drawn, anchored)
+		drawSauces(visual, handle, cursor, drawn, anchored, anchor.CFrame, HotDogVisual.radiusOf(hotDog))
 	end
 	visual.Parent = hotDog
 	return missing

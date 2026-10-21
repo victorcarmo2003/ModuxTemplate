@@ -13,6 +13,8 @@ export type Rows = {
 	Bands: { High: number, Mid: number },
 	DarkDelay: number,
 	DarkPerSecond: number,
+	DreadAfter: number,
+	DreadPerSecond: number,
 }
 
 -- Sanity packet wire range (network.md §13.1: Lync.int(0, 200)).
@@ -56,6 +58,10 @@ function Sanity.darkLoss(darkSince: number?, protectUntil: number, now: number, 
 	end
 	if now - darkSince < rows.DarkDelay then
 		return 0
+	end
+	-- the dread: the lights left off too long
+	if now - darkSince >= rows.DreadAfter then
+		return rows.DreadPerSecond
 	end
 	return rows.DarkPerSecond
 end

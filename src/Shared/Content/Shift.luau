@@ -82,10 +82,11 @@ const base = Table.new({
 		SkipWithoutProbe = false,
 		Night = { Duration = 10, ClockFrom = hours(30), ClockTo = hours(30) },
 	},
-	-- Boss call before the night; cap 60 s, clock stopped at 7:00 PM (FEAT-018). Ends by the Boss probe.
+	-- Boss call before the night; cap 120 s (BossCalls ReadyWait 20 + ring up to 15 + lines + coffee), clock stopped at
+	-- 7:00 PM (FEAT-018). Ends by the Boss probe.
 	{
 		Key = "Call",
-		Duration = 60,
+		Duration = 120,
 		ClockFrom = hours(19),
 		ClockTo = hours(19),
 		Kind = "Night",
@@ -125,6 +126,9 @@ return Table.with(base, {
 	-- Safety cap on the Day 1 hold (user decision 2026-10-12, PROVISIONAL): TutorialService freezes the clock and holds the
 	-- regular customers while a rookie is in the tutorial; after this many seconds of holding it lets go (AFK rookie).
 	TutorialHoldMax = 600,
+	-- Co-op cap (DEC-320, Q-412 C, Provisional): seconds per RUN the clock may stay held while a crewmate who is done
+	-- waits for a rookie (TutorialService:CountWait); a rookie who joins later never restarts it
+	TutorialWaitMax = 180,
 	-- Back door of the trailer (user request 2026-10-12, Provisional): false = the prompt opens / closes the leaf and the
 	-- player walks through; true = the old fade + teleport (Exit / Enter Trailer).
 	TrailerDoorTeleport = false,

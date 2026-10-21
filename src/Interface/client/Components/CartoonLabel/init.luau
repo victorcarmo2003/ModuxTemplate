@@ -63,6 +63,11 @@ return function(props: Props): TextLabel
 	}
 	if props.Scaled and props.MaxTextSize then
 		table.insert(children, createRaw("UITextSizeConstraint")({ MaxTextSize = props.MaxTextSize }))
+	elseif not props.Scaled then
+		-- Caps the player's Text Size setting (GuiService.PreferredTextSize, on by default): it adds px after the
+		-- UIScale, so on a phone (scale 0.6) the text outgrew its box and covered the bars (owner 2026-10-20). The UI
+		-- scale already sizes the text for the screen.
+		table.insert(children, createRaw("UITextSizeConstraint")({ MaxTextSize = size }))
 	end
 	if props.Children then
 		table.insert(children, props.Children)

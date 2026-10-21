@@ -54,7 +54,12 @@ return Lync.define("game", {
 		Selected = Lync.enum(Content.Classes.Keys),
 		-- Legacy (data.md §1.1): no longer read by anyone, the tutorial runs on Day 1 of every run (Provisional, 2026-10-11)
 		TutorialDone = Lync.bool(),
+		-- lobby floor guides already shown (Content.Lobby.Guide.Keys; owner request 2026-10-20, Provisional)
+		Guides = Lync.bitfield(Content.Lobby.Guide.Keys),
 	})),
+	-- c -> s (owner request 2026-10-20, Provisional). Responder: LobbyService. The lobby floor guide `Key` reached its
+	-- target (or is no longer needed): saved in LobbyGuides so it never shows again. Cosmetic only, idempotent.
+	LobbyGuideDone = Lync.packet(Lync.enum(Content.Lobby.Guide.Keys)),
 
 	-- c -> s, at most once per session (Provisional, user request 2026-10-11). Responder: TutorialService. The
 	-- first-hot-dog tutorial ended (finished or skipped) on this client: closed for this run in server memory (nothing
@@ -90,12 +95,20 @@ return Lync.define("game", {
 		Tool = Lync.enum({ "Coffee", "InfiniteSanity" }),
 		On = Lync.bool(),
 	})),
+	-- c -> s, dev mode only (trailer capture camera TASK-C1, docs/marketing/trailer-blackout-60s.md §7; owner request
+	-- 2026-10-20, Provisional). Writer: DevCameraController, 2 Hz, the sender's camera position and the point it looks
+	-- at. Responder: DevService (OnInit, only when PlaceService:IsDev; keeps the last value on the Player as the
+	-- attributes DevCameraPos / DevCameraLook, read by `/dev track here`). Nothing listens in a published server.
+	DevCameraHere = Lync.packet(Lync.struct({
+		Pos = Lync.vec3(),
+		Look = Lync.vec3(),
+	})),
 
 	-- Dev showcase (docs/tech/showcase.md; user request 2026-10-12, Provisional). Packets only, dev mode only (Studio
 	-- Run place): the responder lives in ShowcaseService, which refuses unless PlaceService:IsDev and
 	-- AdminSettings.IsAllowed on EVERY request. Nothing here exists in a published server (no responder, no sender).
 	-- c -> s. Action = open | close | trigger | resolve | stop | reset | extra | scare | ctl; Id = item id ("ANM-007",
-	-- "mech_thief", "fake_call") or control name; Arg / Value = parameters of that action.
+	-- "fake_call") or control name; Arg / Value = parameters of that action.
 	ShowcaseDo = Lync.packet(Lync.struct({
 		Action = Lync.str(0, 24),
 		Id = Lync.str(0, 40),
@@ -186,6 +199,12 @@ return Lync.define("game", {
 	SuspenseSeen = Lync.packet(Lync.struct({
 		Id = Lync.int(0, 255),
 	})),
+	-- c -> s and s -> group (owner 2026-10-19, Provisional; Content.Suspense.Forgotten). A player's camera caught a customer
+	-- of the queue (NpcId) for the first time: the server passes it on once per customer, so nobody else gets the
+	-- "forgotten customer" scare for it. Responder: SuspenseService. Presentation only
+	CustomerNoticed = Lync.packet(Lync.struct({
+		Npc = Lync.int(1, 65535),
+	})),
 
 	-- Run sets, wave 1 ---------------------------------------------------------------------------------------------
 
@@ -223,7 +242,7 @@ return Lync.define("game", {
 	-- §3.4, record = Content.Ingredients.IndexOf[key] (all 9 always). Writer: KitchenService
 	Stock = Lync.replicate(Lync.struct({
 		Amount = Lync.int(0, 999),
-		Capacity = Lync.int(0, 999), -- Cooler level of the current vehicle (DEC-184)
+		Capacity = Lync.int(0, 999), -- capacity level (CapacityStat) of the current vehicle (DEC-184, DEC-331)
 		Blocked = Lync.bool(), -- not unlocked yet: bowl lid, Mart "Out of stock", order draw (DEC-156, DEC-180)
 		-- Gift bowl (owner request 2026-10-14, Provisional): unlocked but still closed (Ingredients.GiftKeys, not opened this
 		-- run). nil = false. Optional so a record that never had it reads as an open bowl; 9 records with Amount 10 bits wide,
@@ -313,6 +332,9 @@ return Lync.define("game", {
 	Notice = Lync.packet(Lync.struct({
 		Kind = Lync.enum(Content.Notices.Keys),
 		Value = Lync.int(-1000000, 1000000), -- {value} of the text, or a table index
+		-- UserId of the player who did it (DEC-320, Q-408: "who bought"); nil = nobody in particular. The client names
+		-- a crewmate in front of the text, never itself
+		By = Lync.optional(Lync.f64()),
 	})),
 
 	-- §4.3 s -> group. Writer: CustomerService
@@ -320,6 +342,13 @@ return Lync.define("game", {
 		Npc = Lync.int(1, 65535), -- NpcId
 		Result = Lync.enum({ "Perfect", "Complete", "Incomplete", "Wrong", "Left", "Refused", "Slow" }), -- Left = never attended (queue clock), Slow = food took too long (order clock, Q-192)
 		Amount = Lync.int(0, 1000), -- what was paid (price into Cash, tip into the jar)
+	})),
+
+	-- §4.3a s -> group. Writer: CustomerService: a customer complains over its head before the closed service window
+	-- sends it away (Content.ShopWindow.ShutLines[Line]). Presentation only; the Refused comes later in Sale
+	CustomerComplain = Lync.packet(Lync.struct({
+		Npc = Lync.int(1, 65535), -- NpcId
+		Line = Lync.int(1, 64), -- index into Content.ShopWindow.ShutLines
 	})),
 
 	-- §4.3b s -> group. Writer: TipJarService ("Collect Tips", DEC-239): the tip jar went to Cash. Presentation only
@@ -334,9 +363,8 @@ return Lync.define("game", {
 		IsNight = Lync.bool(),
 		Arrived = Lync.int(0, 999),
 		Completed = Lync.int(0, 999),
-		Drawer = Lync.int(0, 1000000), -- the day take (Sales + Tips + Catches - Stolen); name kept for the wire
+		Drawer = Lync.int(0, 1000000), -- the day take (Sales + Tips); name kept for the wire
 		Tips = Lync.int(0, 100000),
-		Stolen = Lync.int(0, 1000000), -- wave 1: 0
 		Grade = Lync.enum({ "A", "B", "C", "D" }), -- no customer = C (DEC-051)
 		Bonus = Lync.int(0, 1000000),
 		Deposited = Lync.int(0, 1000000),
@@ -418,13 +446,6 @@ return Lync.define("game", {
 		StartedAt = Lync.f64(),
 	})),
 
-	-- §13.4, record 1. Writer: ThiefService. Bar over Bar_Thief by StartedAt / Duration
-	Thief = Lync.replicate(Lync.struct({
-		State = Lync.enum({ "None", "Lurking", "Approaching", "Opening", "Fleeing" }),
-		StartedAt = Lync.f64(),
-		Duration = Lync.quant(0, 30, 0.1), -- Opening: 8 s (16 s with UPG-004)
-	})),
-
 	-- Wave 3 (network.md §13.5-§13.7) ----------------------------------------------------------------------------
 
 	-- §13.5, record = occurrence 1..255 (cyclic, per night). Writer: AnomalyService. No verb or deadline (T10)
@@ -444,6 +465,9 @@ return Lync.define("game", {
 		Cue = Lync.enum(Content.AnomalyCues.Keys),
 		Entity = Lync.int(0, 65535),
 		Seed = Lync.int(0, 65535),
+		-- DEC-320 (B-13): full UserId of the player a personal cue is for (Entity = UserId % 65536 then); nil = not a
+		-- personal cue. The client uses it to drop a 16-bit collision with another player
+		User = Lync.optional(Lync.f64()),
 	})),
 
 	-- §13.5 c -> s, 10 Hz, latest wins. Sender: CameraController (night, Active). Responder: AnomalyService.
@@ -644,6 +668,8 @@ return Lync.define("game", {
 		Access = Lync.enum(PartyRules.Access),
 		MaxPlayers = Lync.int(1, 4), -- set by the leader, never below the member count
 		StartAt = Lync.f64(), -- workspace:GetServerTimeNow() when the teleport starts; 0 = no countdown
+		-- members who skip the tutorial of the run (pad bar, owner request 2026-10-21); rides TeleportData SkipTutorial
+		Skip = Lync.map(Lync.f64(), Lync.bool(), 0, 4),
 	})),
 	-- §16.2 c -> s. New squad with the sender as leader (refused when already in one)
 	PartyCreate = Lync.packet(Lync.empty()),
@@ -683,6 +709,13 @@ return Lync.define("game", {
 	-- §16.8 c -> s. Leader only, State "Starting" and still before StartAt - Rules.CancelCutoff: aborts the countdown
 	-- (idle state again; a solo quick play squad is disbanded). Idempotent: later or repeated = notice / no-op
 	PartyCancel = Lync.packet(Lync.empty()),
+	-- c -> s (owner request 2026-10-21, Provisional). The pad bar under a pad room: StartNow (leader: the countdown
+	-- drops to Rules.StartNow s), SkipTutorial (each member, On = skip it in the run), FriendsOnly (leader: Access
+	-- Friends / Open). Responder: PartyService
+	PartyPad = Lync.packet(Lync.struct({
+		Action = Lync.enum({ "StartNow", "SkipTutorial", "FriendsOnly" }),
+		On = Lync.bool(),
+	})),
 	-- §16.3 s -> player. Key = PartyRules.NoticeKeys; UserId = the other player when the notice names one
 	PartyNotice = Lync.packet(Lync.struct({
 		Key = Lync.enum(PartyRules.NoticeKeys),

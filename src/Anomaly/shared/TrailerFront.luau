@@ -38,23 +38,27 @@ function TrailerFront.Of(trailer: CFrame, across: CFrame?, ground: number?): Fro
 end
 
 -- Restaurant (TASK-490, DEC-279 "the long car goes to the drive-thru"): the car comes down the drive-thru lane from the
--- street and brakes at MapPoint DT-STOP with its nose turned NOSE_YAW towards the kitchen (MapPoint TRL), so its high
--- beam lands on the drive-thru window. `from` = a point it comes from (the street abeam the stop).
-const NOSE_YAW = math.rad(28)
+-- street and brakes short of the drive-thru window, nose turned NOSE_YAW towards the kitchen (MapPoint TRL) and pointed
+-- straight AT the window spot, so its high beam lands on the window (owner 2026-10-19: it was braking abeam the window,
+-- beams on the diagonal past it). DT-STOP is the window's spot on the lane; the car stops NOSE_REACH studs back from the
+-- window along its nose. `from` = a point it comes from (the street abeam the stop).
+const NOSE_YAW = math.rad(30)
+const NOSE_REACH = 20 -- studs from the car pivot to the window spot (nose ~9.7 out; the front corner clears the wall)
 const DT_WINDOW_OUT = 6 -- studs from DT-STOP towards the kitchen to the drive-thru window spot
 
 function TrailerFront.DriveThru(stop: CFrame, kitchen: CFrame, from: Vector3, ground: number?): Front
 	const toKitchen = flat(kitchen.Position - stop.Position)
 	const travel = flat(stop.Position - from)
-	-- yaw the travel direction a little towards the kitchen side
+	-- yaw the travel direction towards the kitchen side
 	const side = if travel:Cross(Vector3.yAxis):Dot(toKitchen) > 0 then -1 else 1
-	const nose = (CFrame.fromAxisAngle(Vector3.yAxis, side * NOSE_YAW) * CFrame.new(Vector3.zero, travel)).LookVector
-	const base = stop.Position
+	const nose = flat((CFrame.fromAxisAngle(Vector3.yAxis, side * NOSE_YAW) * CFrame.new(Vector3.zero, travel)).LookVector)
+	const window = stop.Position + toKitchen * DT_WINDOW_OUT
+	const base = window - nose * NOSE_REACH
 	const position = if ground ~= nil then Vector3.new(base.X, ground, base.Z) else base
 	return {
 		Out = -toKitchen,
-		Window = base + toKitchen * DT_WINDOW_OUT,
-		Stop = CFrame.lookAt(position, position + flat(nose)),
+		Window = window,
+		Stop = CFrame.lookAt(position, position + nose),
 	}
 end
 

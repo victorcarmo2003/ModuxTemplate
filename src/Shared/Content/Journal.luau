@@ -45,10 +45,11 @@ const written: { Page } = {
 		"No eyes, no nose, no mouth.",
 	}, { "Real customers always have a face." }, { "Refuse them: close the window.", "Never take their order." }),
 
-	page("anm_011_shaker", "The Shaker", "Refuse", {
+	-- TASK-591 (owner 2026-10-19, Provisional Q-399): starving, not a monster
+	page("anm_011_shaker", "The Shaker", "Careful", {
 		"Shakes fast, all over.",
 		"Even while standing still in line.",
-	}, { "No sound. The face looks normal." }, { "Refuse them: close the window." }),
+	}, { "He is just starving." }, { "Serve him a PLAIN hot dog.", "Nothing on it. Never shut him out." }),
 
 	page("anm_012_turned_neck", "The Turned Neck", "Refuse", {
 		"The head is turned all the way back.",
@@ -103,7 +104,13 @@ const written: { Page } = {
 	page("anm_016_starer", "The Starer", "Refuse", {
 		"Never blinks. Never moves.",
 		"The head follows you everywhere.",
-	}, { "Looking at it on the cameras is safe." }, { "Refuse them: close the window." }),
+	}, { "Looking at it on the cameras is safe." }, { "Refuse them: close the window.", "When it reaches you, it makes you look." }),
+
+	-- TASK-591 (Provisional Q-399)
+	page("anm_022_head_banger", "The Head Banger", "Careful", {
+		"Stands at the window and will not leave.",
+		"Shut the window and it beats its head on it.",
+	}, { "Closing the window does nothing." }, { "Turn OFF the shop lights.", "Never take its order." }),
 
 	page("anm_008_long_car", "The Long Car", "Careful", {
 		"A long car stops by the trailer.",

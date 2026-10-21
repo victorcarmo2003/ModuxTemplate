@@ -15,13 +15,25 @@
 	  progression  Day k / Night k Start and Complete/Fail per player (RoundService), Run Complete/Fail (RunEnded)
 	  onboarding   the Day 1 tutorial: step 1 = began (TutorialService), the client's steps (MetricTutorial), last =
 	               completed (TutorialService)
-	  anomaly      anomaly_start / anomaly_end (key, phase, failed, party, reason) (AnomalyService)
+	  anomaly      anomaly_start / anomaly_end (key, phase, failed, party, reason, night, attempt, seconds, t_active) and
+	               anomaly_failed per player (key, night, attempt, party, seconds) (AnomalyService). Funnel anomaly_<key>
+	               (owner request 2026-10-20, Provisional): one session per occurrence (same id for the whole party), a
+	               step once per player: 1 start, 2 signal, 3 active (Content.Metrics.AnomalyFunnel), 4 outcome named
+	               resolved | failed | cut with result = resolved | survived | failed | cut. Skipped steps are filled with
+	               filled = true. Props: key, night, attempt, party, seconds (since start), t (s to that phase), and on
+	               step 4 result, reason, failed, t_active (-1 = never Active). Players: the party at the start still
+	               connected; who joined later is only in anomaly_failed.
+	               night_result / Night Fail also carry cause_kind, cause_key, cause_anomaly, active: LastCause of the last
+	               player to fall (the FINAL blow, not the total drained: a night of slow drain by several anomalies shows
+	               only the one that finished it) and the anomalies still alive at that moment
 	  customer     customer_take_order / serve / refuse / give_up with the sale result (CustomerService.Acted)
 	  life         life_state from -> to (faint, revive, spectator) per player (VitalService)
 	  world        window_toggle, light_switch, discard, kitchen events, upgrades, every validated or refused action
 	  shop / ui    client UI moments (MetricUi: shop/settings opened, purchase prompts) and prompts closed unbought
 	  lobby        lobby servers only (Lobby.luau, owner request 2026-10-17): visit funnel, zones and dwell, squads
 	               (PartyService.Tracked), solo / squad starts, window funnels (shop, classes, codes)
+	  run zones    run servers only (Zones.luau, owner request 2026-10-21): Zone:run.<zone> per zone change and zone_dwell
+	               on leave, from Content.RunZones, the pantry SafeBox and the trailer LightZone
 	Economy (Gems per player, crew Cash) is logged where it changes (Log.gems / Log.cash in Class, Codes, Reward,
 	Shop and Economy services).
 ]]
@@ -37,11 +49,25 @@ local Content = require(ReplicatedStorage.shared.Content)
 local Verbose = require(ReplicatedStorage.shared.Verbose)
 local Log = require(script.Log)
 local Lobby = require(script.Lobby)
+local Zones = require(script.Zones)
+local AnomalyTypes = require(ServerScriptService.server.ModuxTypes.AnomalyService)
 
 const SECRET = "rometrics_key"
 const KEY_ATTRIBUTE = "RoMetricsTestKey" -- ServerStorage attribute, Studio only (place file, never in git)
 
 type Props = Log.Props
+type Trace = AnomalyTypes.Trace
+
+const CAUSE_ANOMALY = { anomaly = true, see = true, stare = true } -- LastCause kinds that name an anomaly key
+const ACTIVE_MAX = 256 -- RoMetrics string prop limit
+
+local function sessionId(): string
+	return string.sub(HttpService:GenerateGUID(false), 1, 8)
+end
+
+local function round1(value: number): number
+	return math.floor(value * 10 + 0.5) / 10
+end
 
 const MetricsService = Modux.Service("MetricsService", {
 	Require = {
@@ -72,6 +98,10 @@ function MetricsService:Setup()
 	self.Tutorial = {} :: { [Player]: { [number]: boolean } }
 	-- lobby funnels (lobby servers only, WireLobby)
 	self.Lobby = nil :: Lobby.Lobby?
+	-- run hot zones (run servers only, WireRunZones)
+	self.Zones = nil :: Zones.Zones?
+	-- anomaly funnels in progress (WireAnomalies): session id and the steps already logged
+	self.Live = {} :: { [Trace]: { Session: string, Steps: { [number]: boolean } } }
 	-- ProductId -> Content.Shop key
 	self.ProductKeys = {} :: { [number]: string }
 	for _, list in { Content.Shop.GemPacks.List :: { any }, Content.Shop.Utilities.List :: { any } } do
@@ -109,6 +139,29 @@ function MetricsService:Init()
 		debug = studio and Verbose.On(),
 	})
 	self.Started = true
+	self:DefineFunnels()
+end
+
+-- Declared steps of every funnel the game logs (Log.define; each server resends them as it starts). The step names a
+-- call logs win over these labels (classes step 3 is "buy" or "equip", anomaly step 4 resolved | failed | cut).
+function MetricsService:DefineFunnels()
+	Log.define("lobby", { "join", "moved", "zone", "pad_or_play", "start" }) -- Lobby.luau STEP_NAMES
+	Log.define("squad", { "created", "room", "joined", "started" })
+	Log.define("panel_shop", { "open", "pick", "bought" })
+	Log.define("panel_classes", { "open", "pick", "buy" })
+	Log.define("panel_codes", { "open", "try", "redeemed" })
+	-- onboarding: 1 = began, the milestones, last = completed (TutorialService)
+	const onboarding = { "begin" }
+	for _, name in Content.Metrics.TutorialFunnel do
+		table.insert(onboarding, name)
+	end
+	table.insert(onboarding, "complete")
+	Log.define("Onboarding", onboarding)
+	const anomaly = table.clone(Content.Metrics.AnomalyFunnel)
+	table.insert(anomaly, "outcome")
+	for _, row in Content.Anomalies.List do
+		Log.define(`anomaly_{row.Key}`, anomaly)
+	end
 end
 
 -- Day / Night progression level name ("day_3", "night_2")
@@ -121,6 +174,25 @@ end
 
 function MetricsService:Members(): { Player }
 	return Players:GetPlayers()
+end
+
+-- Props of a lost night: the final blow (VitalService LastCause of the last to fall, "kind:key") and the anomalies alive
+function MetricsService:LostCause(): Props
+	const vital = self.Dependencies.VitalService
+	const entry = vital.Entries[vital.LastFallen]
+	const cause = if entry ~= nil then entry.LastCause else ""
+	const kind, key = string.match(cause, "^(%w+):(.+)$")
+	const keys: { string } = {}
+	for trace in self.Live do
+		table.insert(keys, trace.Key)
+	end
+	table.sort(keys)
+	return {
+		cause_kind = kind or cause,
+		cause_key = key or "",
+		cause_anomaly = if kind ~= nil and key ~= nil and CAUSE_ANOMALY[kind] then key else "",
+		active = string.sub(table.concat(keys, ","), 1, ACTIVE_MAX),
+	}
 end
 
 function MetricsService:WireRound()
@@ -150,10 +222,18 @@ function MetricsService:WireRound()
 	round.NightResolved:Connect(function(info, result, reason)
 		const status: Log.Status = if result == "Won" then "Complete" else "Fail"
 		const props: Props = { attempt = info.Attempt, reason = reason or "" }
+		const extra: Props = { result = result, reason = reason or "", attempt = info.Attempt }
+		if result == "Lost" then
+			-- fires before the phase change: the occurrences are still alive and LastCause is intact
+			for key, value in self:LostCause() do
+				props[key] = value
+				extra[key] = value
+			end
+		end
 		for _, player in self:Members() do
 			Log.progress(player, "Night", status, info.Night, `night_{info.Night}`, props)
 		end
-		Log.server("night_result", info.Night, { result = result, reason = reason or "", attempt = info.Attempt })
+		Log.server("night_result", info.Night, extra)
 	end)
 	round.RunEnded:Connect(function(result)
 		for _, player in self:Members() do
@@ -163,16 +243,144 @@ function MetricsService:WireRound()
 	end)
 end
 
+-- s from the start to Active, -1 when it never got there
+local function activeAt(trace: Trace): number
+	const at = trace.Marks.Active
+	return if at ~= nil then round1(at) else -1
+end
+
+-- Connected members of the occurrence's party at its start
+function MetricsService:PartyOf(trace: Trace): { Player }
+	const list: { Player } = {}
+	for _, userId in trace.Party do
+		const player = Players:GetPlayerByUserId(userId)
+		if player ~= nil and player.Parent ~= nil then
+			table.insert(list, player)
+		end
+	end
+	return list
+end
+
+-- Props every funnel step shares; t = s from the start to that phase
+function MetricsService:AnomalyBase(trace: Trace, t: number): Props
+	return {
+		key = trace.Key,
+		night = trace.Night,
+		attempt = trace.Attempt,
+		party = #trace.Party,
+		seconds = round1(workspace:GetServerTimeNow() - trace.StartedAt),
+		t = round1(t),
+	}
+end
+
+-- Funnel anomaly_<key>: step (1 start, 2 signal, 3 active) once per occurrence for each member of the party; an earlier
+-- step not seen yet is logged first with filled = true (Lobby.Step pattern). upTo = last step to fill when it is not
+-- step itself. Step 4 (the outcome) is per player: AnomalyOutcome
+function MetricsService:AnomalyStep(trace: Trace, step: number, upTo: number?)
+	const live = self.Live[trace]
+	if live == nil then
+		return
+	end
+	const members = self:PartyOf(trace)
+	for at = 1, upTo or step do
+		if live.Steps[at] then
+			continue
+		end
+		live.Steps[at] = true
+		const phase = if at == 2 then "Signal" elseif at == 3 then "Active" else nil
+		const props = self:AnomalyBase(trace, if phase ~= nil then trace.Marks[phase] or 0 else 0)
+		if at < step then
+			props.filled = true
+		end
+		for _, player in members do
+			Log.funnel(player, `anomaly_{trace.Key}`, live.Session, at, Content.Metrics.AnomalyFunnel[at], props)
+		end
+	end
+end
+
+-- Step 4 per player: resolved (Resolved, or survived to the end), failed, or cut (the night ended / was restored in Signal)
+function MetricsService:AnomalyOutcome(trace: Trace, phase: string, failed: { Player }, reason: string)
+	if self.Live[trace] == nil then
+		return
+	end
+	const live = self.Live[trace]
+	const cut = phase == "Signal" and (reason == "Restore" or reason == "NightOver")
+	self:AnomalyStep(trace, 3, if cut then 2 else 3)
+	const failedSet: { [number]: boolean } = {}
+	for _, player in failed do
+		failedSet[player.UserId] = true
+	end
+	const tActive = activeAt(trace)
+	const props = self:AnomalyBase(trace, trace.Marks.Active or 0)
+	props.reason = reason
+	props.failed = #failed
+	props.t_active = tActive
+	for _, player in self:PartyOf(trace) do
+		local result: string
+		if failedSet[player.UserId] or phase == "Failed" then
+			result = "failed"
+		elseif cut then
+			result = "cut"
+		elseif phase == "Resolved" then
+			result = "resolved"
+		else
+			result = "survived"
+		end
+		props.result = result
+		Log.funnel(player, `anomaly_{trace.Key}`, live.Session, 4, if result == "survived" then "resolved" else result, props)
+	end
+end
+
 function MetricsService:WireAnomalies()
 	const anomaly = self.Dependencies.AnomalyService
-	anomaly.Started:Connect(function(key, party)
-		Log.server("anomaly_start", party, { key = key })
-	end)
-	anomaly.Outcome:Connect(function(key, phase, failed, party, reason)
-		Log.server("anomaly_end", #failed, { key = key, phase = phase, party = party, reason = reason })
-		for _, player in failed do
-			Log.player(player, "anomaly_failed", nil, { key = key })
+	anomaly.Started:Connect(function(key, party, trace)
+		self.Live[trace] = { Session = sessionId(), Steps = {} }
+		Log.server("anomaly_start", party, {
+			key = key,
+			night = trace.Night,
+			attempt = trace.Attempt,
+			party = party,
+			seconds = 0,
+		})
+		self:AnomalyStep(trace, 1)
+		if trace.Marks.Signal ~= nil then
+			self:AnomalyStep(trace, 2)
 		end
+		if trace.Marks.Active ~= nil then
+			self:AnomalyStep(trace, 3)
+		end
+	end)
+	anomaly.Staged:Connect(function(trace, phase)
+		if phase == "Signal" then
+			self:AnomalyStep(trace, 2)
+		elseif phase == "Active" then
+			self:AnomalyStep(trace, 3)
+		end
+	end)
+	anomaly.Outcome:Connect(function(key, phase, failed, party, reason, trace)
+		self:AnomalyOutcome(trace, phase, failed, reason)
+		const seconds = round1(workspace:GetServerTimeNow() - trace.StartedAt)
+		Log.server("anomaly_end", #failed, {
+			key = key,
+			phase = phase,
+			party = party,
+			reason = reason,
+			night = trace.Night,
+			attempt = trace.Attempt,
+			seconds = seconds,
+			t_active = activeAt(trace),
+		})
+		for _, player in failed do
+			const at = trace.FailedAt[player.UserId]
+			Log.player(player, "anomaly_failed", nil, {
+				key = key,
+				night = trace.Night,
+				attempt = trace.Attempt,
+				party = party,
+				seconds = if at ~= nil then round1(at) else seconds,
+			})
+		end
+		self.Live[trace] = nil
 	end)
 end
 
@@ -188,7 +396,12 @@ function MetricsService:WireCrew()
 	self.Dependencies.VitalService.MemberStateChanged:Connect(function(userId, from, to)
 		const player = Players:GetPlayerByUserId(userId)
 		if player ~= nil then
-			Log.player(player, "life_state", nil, { from = from, to = to })
+			const props: Props = { from = from, to = to }
+			if to == "Down" or to == "Spectator" then
+				const entry = self.Dependencies.VitalService.Entries[userId]
+				props.cause = if entry ~= nil then entry.LastCause else ""
+			end
+			Log.player(player, "life_state", nil, props)
 		end
 	end)
 end
@@ -303,6 +516,47 @@ function MetricsService:WireLobby()
 	end)
 end
 
+-- Run servers: hot zones of the restaurant (position polled, only while Active)
+function MetricsService:WireRunZones()
+	if not self.Dependencies.PlaceService:Is("Run") then
+		return
+	end
+	const vehicle = self.Dependencies.VehicleService
+	const round = self.Dependencies.RoundService
+	const vital = self.Dependencies.VitalService
+	const zones = Zones.new({
+		InKitchen = function(position)
+			return vehicle:IsInsidePoint(position)
+		end,
+		IsActive = function(player)
+			return vital:IsActive(player)
+		end,
+		Shift = function()
+			const _, _, name = levelOf(round:Info())
+			return round:GetPhase(), name
+		end,
+	})
+	self.Zones = zones
+	Players.PlayerAdded:Connect(function(player)
+		zones:Join(player)
+	end)
+	for _, player in Players:GetPlayers() do
+		zones:Join(player)
+	end
+	Players.PlayerRemoving:Connect(function(player)
+		zones:Leave(player)
+	end)
+	vital.MemberStateChanged:Connect(function(userId, _from, to)
+		const player = Players:GetPlayerByUserId(userId)
+		if player ~= nil and to ~= "Active" then
+			zones:Rest(player, true)
+		end
+	end)
+	RunService.Heartbeat:Connect(function()
+		zones:Poll()
+	end)
+end
+
 function MetricsService:WireNet()
 	const net = self.Libs.Net
 	net.MetricUi:onServer(function(value, player)
@@ -345,6 +599,7 @@ MetricsService:OnInit(function(self)
 	self:WireWorld()
 	self:WireNet()
 	self:WireLobby()
+	self:WireRunZones()
 end)
 
 return MetricsService

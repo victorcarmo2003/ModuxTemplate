@@ -6,8 +6,11 @@
 	his grill claim, so the crew tells who is who anywhere.
 
 	  - Built on every character spawn, recoloured when the `CrewColor` attribute arrives or changes.
-	  - Both live inside the character, so the prep mode (Prep/Mates, which switches off the BillboardGui / Highlight of
-	    other characters while the player cooks) hides and restores them like the rest.
+	  - Lobby (owner 2026-10-20): no name tag at all, ours or Roblox's default name (Humanoid.DisplayDistanceType None and
+	    LocalPlayer.NameDisplayDistance 0, set on this client only).
+	  - Cooking focus (owner 2026-10-20: the tags got in the way of the plate): while the local `CookStation` attribute is
+	    set (CookController, the focus is open) the tags of the others are disabled, and come back when it clears. The
+	    outline stays.
 	  - Highlight: outline only, Occluded (never seen through walls: hiding stays fair at night); at most MAX_OUTLINES
 	    (the nearest), none at Budget.LowQuality. The tag fades out past Presence.Range.
 	Local only; the server never sees these instances.
@@ -28,7 +31,7 @@ const HEAD_LIFT = 1.4 -- studs over the head (Mates.Tag adds Presence.Tag.Lift)
 
 type Entry = { Connections: { RBXScriptConnection } }
 
-const LOBBY_INK = Color3.fromHex("#2B2233") -- lobby tag: name only, neutral Ink edge, no colour chip, no outline
+const COOK_FOCUS = "CookStation" -- local Player attribute: the cooking focus station open now (CookController)
 
 const NameTagController = Modux.Controller("NameTagController", { Require = { "PlaceController" }, Priority = 300 })
 
@@ -36,13 +39,41 @@ function NameTagController:Setup()
 	self.Entries = {} :: { [Player]: Entry }
 end
 
--- Colours and outlines are for the run only (owner 2026-10-16): in the lobby the tag shows just the name
+-- Tags and outlines are for the run only (owner 2026-10-20: none in the lobby)
 function NameTagController:InRun(): boolean
 	return self.Dependencies.PlaceController:Is("Run")
 end
 
--- Tag + outline on `character` of `player`, replacing any older ones
+-- true while the local player is in the cooking focus (tags of the others hidden)
+function NameTagController:Cooking(): boolean
+	return Players.LocalPlayer:GetAttribute(COOK_FOCUS) ~= nil
+end
+
+-- Show / hide every tag at once (cooking focus opened or closed)
+function NameTagController:ShowTags(visible: boolean)
+	for player in self.Entries do
+		const character = player.Character
+		const tag = if character ~= nil then character:FindFirstChild(TAG_NAME) else nil
+		if tag ~= nil and tag:IsA("BillboardGui") then
+			tag.Enabled = visible
+		end
+	end
+end
+
+-- Lobby (owner 2026-10-20): the default Roblox name over `character` off on this client
+function NameTagController:HideDefaultName(character: Model)
+	const humanoid = character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid", 10)
+	if humanoid ~= nil and humanoid:IsA("Humanoid") then
+		humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	end
+end
+
+-- Tag + outline on `character` of `player`, replacing any older ones; nothing in the lobby
 function NameTagController:Decorate(player: Player, character: Model)
+	if not self:InRun() then
+		self:HideDefaultName(character)
+		return
+	end
 	const head = character:WaitForChild("Head", 10)
 	if head == nil or character.Parent == nil then
 		return
@@ -53,18 +84,11 @@ function NameTagController:Decorate(player: Player, character: Model)
 			old:Destroy()
 		end
 	end
-	const inRun = self:InRun()
-	const color = if inRun then CrewColor.Of(player) else LOBBY_INK
+	const color = CrewColor.Of(player)
 	const tag = Mates.Tag(player.DisplayName, color, head, character)
 	tag.Name = TAG_NAME
 	tag.StudsOffsetWorldSpace += Vector3.new(0, HEAD_LIFT, 0)
-	if not inRun then
-		const chip = tag:FindFirstChild("Chip", true)
-		if chip ~= nil and chip:IsA("GuiObject") then
-			chip.Visible = false
-		end
-		return -- no outline in the lobby
-	end
+	tag.Enabled = not self:Cooking()
 
 	const outline = Instance.new("Highlight")
 	outline.Name = OUTLINE_NAME
@@ -159,6 +183,12 @@ end
 
 NameTagController:OnStart(function(self)
 	self:Setup()
+	if not self:InRun() then
+		Players.LocalPlayer.NameDisplayDistance = 0 -- lobby: no default names (owner 2026-10-20)
+	end
+	Players.LocalPlayer:GetAttributeChangedSignal(COOK_FOCUS):Connect(function()
+		self:ShowTags(not self:Cooking())
+	end)
 	Players.PlayerAdded:Connect(function(player)
 		self:Track(player)
 	end)

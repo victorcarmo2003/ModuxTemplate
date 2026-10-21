@@ -35,7 +35,6 @@ export type Public = {
 	AddSale: (self: Public, amount: number, kind: SaleKind) -> number,
 	AddTip: (self: Public, amount: number) -> number,
 	AddToDrawer: (self: Public, amount: number, kind: DrawerKind) -> number,
-	Steal: (self: Public, amount: number) -> number,
 	CollectTips: (self: Public) -> number,
 	CountArrival: (self: Public) -> (),
 	CountResult: (self: Public, result: SaleResult) -> (),

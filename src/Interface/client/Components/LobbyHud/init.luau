@@ -16,6 +16,11 @@
 --                  (GearButton) sits on its right: it reopens the room setup (OnGear). The squad card that sat over it
 --                  is gone (owner request 2026-10-17, mobile clean-up): the faces and the countdown live on the pad sign
 --                  (PadTag)
+--   bottom centre, in a pad room (owner request 2026-10-21, Provisional; `Pad`)  instead of Play: SKIP TUTORIAL (mine)
+--                  on the left, START NOW (Green, bigger, leader) in the middle, FRIENDS ONLY (leader) on the right. A
+--                  toggle is grey off, Green on; each flip turns it over like a card (180 deg on a spring: it narrows to
+--                  its edge and opens again, with a slight tilt and pop), the colour blends Slate <-> Green on the way and
+--                  a white shine sweeps across it. Reduced motion: the colour only. The countdown lives on the pad sign
 -- Mobile clean-up (owner request 2026-10-17, Provisional): each tile's name sits UNDER the tile (white, thin Ink
 -- stroke), never inside it (it spilled out and overlapped on phones); bigger icons; Normal outlines instead of Thick;
 -- smaller gem and online pills.
@@ -42,6 +47,7 @@ local Count = require(script.Parent.HudPill.Count)
 const create = Vide.create
 const source = Vide.source
 const cleanup = Vide.cleanup
+const spring = Vide.spring
 -- Vide 0.4.1 types `create` for 19 classes only; UIScale and UIGridLayout are not among them.
 const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }) -> Instance
 
@@ -54,6 +60,15 @@ export type PlayButton = {
 	Text: string,
 	Kind: PlayKind,
 	Enabled: boolean,
+}
+
+export type PadAction = "StartNow" | "SkipTutorial" | "FriendsOnly"
+
+-- The pad bar of a pad room (LobbyController:PadBar)
+export type PadBar = {
+	Leader: boolean, -- START NOW and FRIENDS ONLY are the leader's
+	Skip: boolean, -- I skip the run's tutorial
+	Friends: boolean, -- Access Friends
 }
 
 export type Props = {
@@ -77,6 +92,9 @@ export type Props = {
 	Scale: (() -> number)?,
 	-- Players online in the whole game (TASK-312, `Online` set); missing or 0 = no pill.
 	Online: (() -> number)?,
+	-- The pad bar (in a pad room); missing or nil = none.
+	Pad: (() -> PadBar?)?,
+	OnPad: ((action: PadAction) -> ())?,
 }
 
 const MARGIN = 12
@@ -93,6 +111,27 @@ const PILL = 34
 const PLAY_WIDTH = 190
 const PLAY_HEIGHT = 46
 const GEAR_GAP = 8 -- px between the Play button and the gear (the gear is PLAY_HEIGHT round)
+const PAD_START = Vector2.new(196, 58) -- px, START NOW (the big one, in the middle)
+const PAD_TOGGLE = Vector2.new(156, 46) -- px, a toggle (over the 44 px touch target)
+const PAD_GAP = 12
+const PAD_WIDTH = PAD_START.X + PAD_TOGGLE.X * 2 + PAD_GAP * 2
+-- toggle flip (PROVISIONAL, tune in play): springs of the turn and of the colour, tilt and pop at the edge
+const FLIP_PERIOD, FLIP_DAMPING = 0.5, 0.5
+const TINT_PERIOD, TINT_DAMPING = 0.4, 1
+const FLIP_TILT = 7 -- deg at the edge
+const FLIP_POP = 0.14 -- extra scale at the edge
+const FLIP_TEXT_HIDE = 0.35 -- the label fades out while the card is narrower than this
+
+-- Slate -> Green at t (0..1), every colour of the two-tone surface
+local function blendTone(a: Theme.Tone, b: Theme.Tone, t: number): Theme.Tone
+	return {
+		Top = a.Top:Lerp(b.Top, t),
+		Bottom = a.Bottom:Lerp(b.Bottom, t),
+		Lip = a.Lip:Lerp(b.Lip, t),
+		Text = a.Text:Lerp(b.Text, t),
+		Stroke = if t < 0.5 then a.Stroke else b.Stroke,
+	}
+end
 const SHORT = 440 -- px tall screens under this get the 2 x 2 grid
 const NARROW = 420 -- px wide screens under this get the small tiles
 -- The gem pill sits at the middle of the screen height, but never lower than this many real px from the bottom edge: the
@@ -148,7 +187,7 @@ const TILES: { TileDef } = {
 
 return function(props: Props): Frame
 	const scale = function(): number
-		return if props.Scale then math.max(math.min(props.Scale(), UiScale.Current()), Theme.Scale.Min) else 1
+		return if props.Scale then math.max(math.min(props.Scale(), UiScale.Current()), UiScale.Floor()) else 1
 	end
 	const pop = Motion.Pop(props.Visible)
 	const scaled = function(): number
@@ -160,6 +199,133 @@ return function(props: Props): Frame
 	const playPop = Motion.Pop(playShown)
 	const gearShown = function(): boolean
 		return props.Gear ~= nil and props.Gear()
+	end
+	const padBar = function(): PadBar?
+		return if props.Pad then props.Pad() else nil
+	end
+	const pressPad = function(action: PadAction)
+		return function()
+			if props.OnPad then
+				props.OnPad(action)
+			end
+		end
+	end
+	-- toggle: grey off, Green on; every flip adds half a turn that a spring follows (a card turned over), the colour
+	-- blends on its own spring. `mine` = this player may flip it
+	local function padToggle(
+		action: PadAction,
+		order: number,
+		text: string,
+		on: (bar: PadBar) -> boolean,
+		mine: (bar: PadBar) -> boolean
+	)
+		const isOn = function(): boolean
+			const bar = padBar()
+			return bar ~= nil and on(bar)
+		end
+		const reduced = Motion.Reduced()
+		const turns = source(0) -- degrees the card should be turned to
+		const lit = source(if Vide.untrack(isOn) then 1 else 0)
+		local last = Vide.untrack(isOn)
+		Vide.effect(function()
+			const now = isOn()
+			if now ~= last then
+				last = now
+				-- written outside the effect: a source write inside one breaks Vide's graph
+				task.defer(function()
+					turns(Vide.untrack(turns) + 180)
+					lit(if now then 1 else 0)
+				end)
+			end
+		end)
+		const angle: () -> number = if reduced then turns else spring(turns, FLIP_PERIOD, FLIP_DAMPING)
+		const tint: () -> number = if reduced then lit else spring(lit, TINT_PERIOD, TINT_DAMPING)
+		-- 1 = face on, 0 = edge on
+		const face = function(): number
+			return if reduced then 1 else math.abs(math.cos(math.rad(angle())))
+		end
+		const edge = function(): number
+			return if reduced then 0 else math.abs(math.sin(math.rad(angle())))
+		end
+		-- 0..1 through the current half turn (the shine crosses the card once per flip)
+		const sweep = function(): number
+			return math.clamp(1 - (turns() - angle()) / 180, 0, 1)
+		end
+		return create("Frame")({
+			Name = action,
+			LayoutOrder = order,
+			Size = UDim2.fromOffset(PAD_TOGGLE.X, PAD_TOGGLE.Y),
+			BackgroundTransparency = 1,
+			createRaw("UIScale")({
+				Scale = function()
+					return 1 + FLIP_POP * edge()
+				end,
+			}),
+			create("Frame")({
+				Name = "Card",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = function()
+					return UDim2.fromScale(math.max(face(), 0.04), 1)
+				end,
+				Rotation = function()
+					return if reduced then 0 else FLIP_TILT * math.sin(math.rad(angle() * 2))
+				end,
+				BackgroundTransparency = 1,
+				CartoonButton({
+					Name = "Button",
+					Size = UDim2.fromScale(1, 1),
+					Outline = Theme.Outline.Normal,
+					Radius = Theme.Radius.Card,
+					Tone = function()
+						return blendTone(Theme.Tone.Slate, Theme.Tone.Green, math.clamp(tint(), 0, 1))
+					end,
+					Enabled = function()
+						const bar = padBar()
+						return bar ~= nil and mine(bar)
+					end,
+					OnActivated = pressPad(action),
+					Children = {
+						CartoonLabel({
+							Name = "Label",
+							Box = UDim2.fromScale(1, 1),
+							TextSize = 16,
+							Text = text,
+							Transparency = function()
+								return math.clamp((FLIP_TEXT_HIDE - face()) / FLIP_TEXT_HIDE, 0, 1)
+							end,
+						}),
+						-- white shine crossing the card during a flip
+						create("Frame")({
+							Name = "Shine",
+							Size = UDim2.fromScale(1, 1),
+							BackgroundColor3 = Color3.new(1, 1, 1),
+							BackgroundTransparency = 0,
+							BorderSizePixel = 0,
+							ZIndex = 3,
+							Visible = function()
+								const at = sweep()
+								return not reduced and at > 0.02 and at < 0.98
+							end,
+							create("UICorner")({ CornerRadius = Theme.Radius.Card }),
+							create("UIGradient")({
+								Rotation = 20,
+								Transparency = NumberSequence.new({
+									NumberSequenceKeypoint.new(0, 1),
+									NumberSequenceKeypoint.new(0.4, 1),
+									NumberSequenceKeypoint.new(0.5, 0.45),
+									NumberSequenceKeypoint.new(0.6, 1),
+									NumberSequenceKeypoint.new(1, 1),
+								}),
+								Offset = function()
+									return Vector2.new(-1 + 2 * sweep(), 0)
+								end,
+							}),
+						}),
+					},
+				}),
+			}),
+		})
 	end
 
 	-- Real px size of the screen (this root fills it): decides the grid and the tile size.
@@ -422,6 +588,52 @@ return function(props: Props): Frame
 				CellPadding = UDim2.fromOffset(TILE_GAP, TILE_GAP),
 			}),
 			tiles,
+		}),
+
+		-- Pad bar (pad room): SKIP TUTORIAL · START NOW (big, middle) · FRIENDS ONLY
+		create("Frame")({
+			Name = "PadBar",
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 1, -MARGIN),
+			Size = UDim2.fromOffset(PAD_WIDTH, PAD_START.Y),
+			BackgroundTransparency = 1,
+			Visible = function()
+				return padBar() ~= nil
+			end,
+			createRaw("UIScale")({ Scale = scaled }),
+			create("UIListLayout")({
+				FillDirection = Enum.FillDirection.Horizontal,
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, PAD_GAP),
+			}),
+			padToggle("SkipTutorial", 1, "SKIP TUTORIAL", function(bar: PadBar): boolean
+				return bar.Skip
+			end, function(_bar: PadBar): boolean
+				return true
+			end),
+			CartoonButton({
+				Name = "StartNow",
+				LayoutOrder = 2,
+				Size = UDim2.fromOffset(PAD_START.X, PAD_START.Y),
+				TextSize = 22,
+				Outline = Theme.Outline.Normal,
+				Radius = Theme.Radius.Card,
+				Studs = true,
+				Tone = Theme.Tone.Green,
+				Text = "START NOW",
+				Enabled = function()
+					const bar = padBar()
+					return bar ~= nil and bar.Leader
+				end,
+				OnActivated = pressPad("StartNow"),
+			}),
+			padToggle("FriendsOnly", 3, "FRIENDS ONLY", function(bar: PadBar): boolean
+				return bar.Friends
+			end, function(bar: PadBar): boolean
+				return bar.Leader
+			end),
 		}),
 
 		-- Play, with the squad status card over it

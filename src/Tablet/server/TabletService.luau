@@ -522,6 +522,14 @@ TabletService:OnStart(function(self)
 		self:UpdateFull(tablet)
 		self:Publish(tablet)
 	end
+	-- The Take Order prompt turns on the moment the head customer reaches Q1, not on the next tick (up to 1 / TICK_RATE s)
+	self.Dependencies.CustomerService.Fronted:Connect(function()
+		if self.Enabled then
+			for _, tablet in self.Tablets do
+				self:SyncPrompt(tablet)
+			end
+		end
+	end)
 	-- A new shift starts with every tablet idle (the customers are gone)
 	self.Dependencies.RoundService.ShiftStarted:Connect(function()
 		for _, tablet in self.Tablets do

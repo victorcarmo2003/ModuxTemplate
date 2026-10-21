@@ -219,7 +219,7 @@ function UpgradeService:CanBuy(key: string): (boolean, Reason?)
 	if self.Dependencies.RoundService:GetDay() < upgrade.UnlockDay then
 		return false, "locked"
 	end
-	-- anomaly mode (Content.Mode, owner request 2026-10-14): tables, Drawer Lock and Wide Counter are not sold
+	-- anomaly mode (Content.Mode, owner request 2026-10-14): tables and Wide Counter are not sold
 	if Content.Mode.IsOff(key) then
 		return false, "locked"
 	end
@@ -263,7 +263,7 @@ function UpgradeService:Buy(key: string, player: Player?, quiet: boolean?): (boo
 	end
 	self:SetLevel(self.Vehicle(), key, nextRow.Level)
 	if not quiet then
-		self.Dependencies.RunStateService:Notify("all", BOUGHT_NOTICE, Content.Upgrades.IndexOf[key])
+		self.Dependencies.RunStateService:Notify("all", BOUGHT_NOTICE, Content.Upgrades.IndexOf[key], player)
 	end
 	return true, nil
 end

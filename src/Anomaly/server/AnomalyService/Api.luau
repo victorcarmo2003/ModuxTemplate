@@ -25,8 +25,9 @@
 
 -- Verbs (FEAT-023, DEC-054): exactly one per anomaly, in Rules/ only (T10: never on the client). "shutter" = close the
 -- trailer service window (was "hide", DEC-221). "hide" (V2 family B, DEC-254; TASK-272) = leave the trailer by the back
--- door and stand in a HideZone behind it before the monster looks in (Anomalies/Kit/Hide.luau).
-export type Verb = "refuse" | "serve" | "dont_look" | "light" | "shutter" | "discard" | "safe_spot" | "hide"
+-- door and stand in a HideZone behind it before the monster looks in (Anomalies/Kit/Hide.luau). "lock" (TASK-592,
+-- PROVISIONAL Q-398) = run to the restaurant's back door and lock it by hand (RestaurantDoorService:SetLockable).
+export type Verb = "refuse" | "serve" | "dont_look" | "light" | "shutter" | "discard" | "safe_spot" | "hide" | "lock"
 
 -- Anomalies set record phase (network.md §13.5)
 export type Phase = "Signal" | "Active" | "Resolved" | "Failed"
@@ -69,7 +70,8 @@ export type Context = {
 	-- set Anomalies (record of this occurrence)
 	Publish: (occ: Occurrence, fields: Fields) -> (),
 	-- packet AnomalyCue to everyone (DEC-204). cue = a key of the anomaly's Cues; entity = NpcId/anchor index (0)
-	Cue: (occ: Occurrence, cue: string, entity: number?) -> (),
+	-- user: full UserId of a personal cue (Entity = UserId % 65536), so a 16-bit twin never sees it (DEC-320, B-13)
+	Cue: (occ: Occurrence, cue: string, entity: number?, user: number?) -> (),
 	-- -RuleBroken each (once per player per occurrence); critical -> LoseNight("critical"). Party scope -> Phase Failed
 	Fail: (occ: Occurrence, who: { Player } | "active") -> (),
 	-- Phase Resolved
@@ -144,6 +146,7 @@ const VERBS: { [string]: boolean } = {
 	discard = true,
 	safe_spot = true,
 	hide = true,
+	lock = true,
 }
 
 const Api = {}

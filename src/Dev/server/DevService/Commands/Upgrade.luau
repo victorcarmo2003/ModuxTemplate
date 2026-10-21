@@ -35,7 +35,8 @@ const Upgrade: Api.Module = function(ctx: Api.Context): { Api.Command }
 		const parts: { string } = {}
 		for _, upgrade in Content.Upgrades.List do
 			const level = upgrades:GetLevel(upgrade.Key)
-			table.insert(parts, `{upgrade.Key}={if level == nil then "-" else tostring(level)}`)
+			const off = if Content.Mode.IsOff(upgrade.Key) then " (off)" else ""
+			table.insert(parts, `{upgrade.Key}={if level == nil then "-" else tostring(level)}{off}`)
 		end
 		return `{vehicle}: {table.concat(parts, " ")}`
 	end

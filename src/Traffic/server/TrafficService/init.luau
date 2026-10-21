@@ -691,7 +691,7 @@ end
 
 -- Hold (§19.17) -----------------------------------------------------------------------------------------------------
 
--- No car spawns while any reason is on (anm_008, anm_010, cutscene, ambulance). Cars on the street finish.
+-- No car spawns while any reason is on (anm_008, anm_010, cutscene). Cars on the street finish.
 function TrafficService:Hold(reason: string, on: boolean)
 	if type(reason) ~= "string" or reason == "" then
 		return

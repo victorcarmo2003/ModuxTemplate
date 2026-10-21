@@ -68,7 +68,7 @@ local function scare(ctx: Api.Context, occ: Api.Occurrence, state: State, player
 	if not state.AnyFailed then
 		state.AnyFailed = true
 	end
-	ctx.Cue(occ, SCARE_CUE, userId % ENTITY_MOD)
+	ctx.Cue(occ, SCARE_CUE, userId % ENTITY_MOD, userId)
 	task.delay(state.ScareFaint, function()
 		if player.Parent ~= nil then
 			Kit.Vital():Fall(player)
