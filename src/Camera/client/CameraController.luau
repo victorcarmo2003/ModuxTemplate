@@ -12,6 +12,8 @@
 	    head): always hidden in first person, so a big animal head never covers the view;
 	  - arms: visible in first person, day and night (DEC-219; the band skin is the server's
 	    `LookPack`, DEC-167). `SetArmsVisible(false)` stays as a hook;
+	  - `SetBodyHidden(true)` (owner 2026-10-21, the order talk's close-up): the whole own character hides in any mode
+	    until `SetBodyHidden(false)` - the camera is off the head and the body would stand in the shot;
 	  - rest of the body (Torso, legs, Apron, tail): hidden, as the stock camera does;
 	  - Tools are never touched, so the held item stays visible (DEC-097).
 
@@ -375,6 +377,8 @@ function CameraController:Setup()
 	self.Mode = Vide.source("FirstPerson" :: Mode) :: Vide.Source<Mode>
 	-- DEC-219: real arms of the animal visible in first person, day and night.
 	self.ArmsVisible = Vide.source(true) :: Vide.Source<boolean>
+	-- the whole own character hidden on this screen, whatever the mode (TabletController close-up)
+	self.BodyHidden = Vide.source(false) :: Vide.Source<boolean>
 	-- UserId of the mate being watched (Spectate), nil otherwise. HUD: "Watching: {name}".
 	self.Watching = Vide.source(nil :: number?) :: Vide.Source<number?>
 	-- MapPoint id of the Fixed camera, nil otherwise. HUD: "Watching the trailer".
@@ -771,6 +775,10 @@ function CameraController:LookAt(position: Vector3?)
 	self:Focus(function(): Vector3?
 		return at
 	end, nil)
+end
+
+function CameraController:SetBodyHidden(hidden: boolean)
+	self.BodyHidden(hidden)
 end
 
 function CameraController:SetArmsVisible(visible: boolean)
@@ -1707,6 +1715,17 @@ function CameraController:Update(dt: number)
 	if self.Dirty then
 		self.Dirty = false
 		self.Groups = classify(character)
+	end
+
+	-- the close-up of the order talk: everything of the own character out of the shot, in any mode
+	if self.BodyHidden() then
+		for part in self.Groups do
+			if part.LocalTransparencyModifier ~= 1 then
+				part.LocalTransparencyModifier = 1
+			end
+		end
+		self.Applied = true
+		return
 	end
 
 	if not self:IsFirstPerson() then

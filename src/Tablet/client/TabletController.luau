@@ -381,18 +381,25 @@ const OCCLUDER_POINTS: { Vector3 } = {
 	Vector3.new(-0.8, 0.3, 0),
 	Vector3.new(0, -1.4, 0),
 }
-function TabletController:HideBetween(eye: Vector3, rig: Model, head: BasePart)
+-- the sampled view (2nd pass): offsets from the head, points per line, share of the way to the head they cover, margin
+const VIEW_POINTS: { Vector3 } = {
+	Vector3.new(0, 0, 0),
+	Vector3.new(0, 1.3, 0),
+	Vector3.new(1.3, 0.4, 0),
+	Vector3.new(-1.3, 0.4, 0),
+	Vector3.new(1.3, -1.4, 0),
+	Vector3.new(-1.3, -1.4, 0),
+	Vector3.new(0, -1.4, 0),
+}
+const VIEW_STEPS = 24
+const VIEW_REACH = 0.92 -- stop short of the customer (the wall behind it never counts)
+const VIEW_MARGIN = 0.1
+function TabletController:HideBetween(eye: Vector3, rig: Model, head: BasePart, scope: Instance?)
 	const ignore: { Instance } = { rig }
-	-- owner 2026-10-21 (print): my own body stands between the lens and the customer - it hides whole on my screen
+	-- my own body (owner print: it stood in the shot) is hidden by CameraController:SetBodyHidden, which owns its modifier
 	const character = Players.LocalPlayer.Character
 	if character ~= nil then
 		table.insert(ignore, character)
-		for _, part in character:GetDescendants() do
-			if part:IsA("BasePart") and self.Hidden[part] == nil then
-				self.Hidden[part] = part.LocalTransparencyModifier
-				part.LocalTransparencyModifier = 1
-			end
-		end
 	end
 	const params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
@@ -410,6 +417,54 @@ function TabletController:HideBetween(eye: Vector3, rig: Model, head: BasePart)
 			if part:IsA("BasePart") and self.Hidden[part] == nil then
 				self.Hidden[part] = part.LocalTransparencyModifier
 				part.LocalTransparencyModifier = 1
+			end
+		end
+	end
+	-- owner 2026-10-21 (2nd print): most of the trailer's trim (shutter box, window trim, skins) has CanQuery off and never
+	-- answers a ray. So the view is sampled - points along lines from the eye to the customer's head, shoulders and chest -
+	-- and every part of the shop around the tablet (and every other rig) whose box holds one of them hides too
+	const candidates: { BasePart } = {}
+	local function collect(root: Instance?)
+		if root == nil then
+			return
+		end
+		for _, part in root:GetDescendants() do
+			if part:IsA("BasePart") and self.Hidden[part] == nil and not part:IsDescendantOf(rig) then
+				table.insert(candidates, part)
+			end
+		end
+	end
+	collect(scope)
+	for _, other in CollectionService:GetTagged(CrewRig.Tag) do
+		if other ~= rig and other:IsA("Model") then
+			collect(other)
+		end
+	end
+	for _, player in Players:GetPlayers() do
+		if player ~= Players.LocalPlayer then
+			collect(player.Character)
+		end
+	end
+	const samples: { Vector3 } = {}
+	for _, offset in VIEW_POINTS do
+		const target = head.Position + offset
+		for step = 1, VIEW_STEPS do
+			table.insert(samples, eye:Lerp(target, step / (VIEW_STEPS + 1) * VIEW_REACH))
+		end
+	end
+	const span = (head.Position - eye).Magnitude + 2
+	for _, part in candidates do
+		const half = part.Size / 2 + Vector3.one * VIEW_MARGIN
+		-- far from the view: skip without testing the points
+		if (part.Position - eye).Magnitude > span + half.Magnitude then
+			continue
+		end
+		for _, point in samples do
+			const p = part.CFrame:PointToObjectSpace(point)
+			if math.abs(p.X) <= half.X and math.abs(p.Y) <= half.Y and math.abs(p.Z) <= half.Z then
+				self.Hidden[part] = part.LocalTransparencyModifier
+				part.LocalTransparencyModifier = 1
+				break
 			end
 		end
 	end
@@ -463,7 +518,8 @@ function TabletController:SyncCloseUp()
 		end
 		-- owner 2026-10-21 (print: "o chapéu tá cobrindo o rosto" - the shutter box over the service window): anything else
 		-- between the lens and the customer hides on this screen too
-		self:HideBetween(eye, rig :: Model, head)
+		camera:SetBodyHidden(true)
+		self:HideBetween(eye, rig :: Model, head, if model ~= nil then model:FindFirstAncestor("Trailer") or model.Parent else nil)
 		ContextActionService:BindActionAtPriority(CLOSE_FREEZE, function(): Enum.ContextActionResult
 			return Enum.ContextActionResult.Sink
 		end, false, DECIDE_PRIORITY - 1, table.unpack(FREEZE_INPUTS))
@@ -486,6 +542,7 @@ function TabletController:SyncCloseUp()
 			part.LocalTransparencyModifier = modifier
 		end
 		table.clear(self.Hidden)
+		camera:SetBodyHidden(false)
 		ContextActionService:UnbindAction(CLOSE_FREEZE)
 		GuiService.TouchControlsEnabled = true
 		Players.LocalPlayer:SetAttribute(CLOSE_UP_ATTRIBUTE, nil)

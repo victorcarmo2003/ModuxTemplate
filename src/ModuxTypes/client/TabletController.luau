@@ -58,6 +58,7 @@ export type Public = {
 	MyTalk: (self: Public) -> MyTalk?,
 	SpotOf: (self: Public, index: number) -> Spot,
 	WriteRecord: (self: Public, index: number, record: Record?) -> (),
+	HideBetween: (self: Public, eye: Vector3, rig: Model, head: BasePart, scope: Instance?) -> (),
 	SyncCloseUp: (self: Public) -> (),
 	SyncDecide: (self: Public) -> (),
 	Decide: (self: Public, serve: boolean) -> (),
