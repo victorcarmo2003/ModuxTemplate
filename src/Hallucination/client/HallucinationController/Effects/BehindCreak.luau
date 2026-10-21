@@ -4,10 +4,10 @@
 local Behind = require(script.Parent.Parent.Behind)
 local Context = require(script.Parent.Parent.Context)
 
-const KEY = "floor_creak"
+const KEY = "behind_creak" -- sound, volume and pitch tuned in Studio (Assets.SFX.Behind["Behind Creak"])
 const NEAR = 2.5 -- studs behind the player
 const PAUSE = 1.7 -- s before the second, softer creak
-const VOLUME = 0.55
+const VOLUME = 1 -- x the Studio Sound volume
 
 const BehindCreak: Context.Effect = {
 	CanRun = function(_env: Context.Env): boolean
@@ -19,11 +19,11 @@ const BehindCreak: Context.Effect = {
 		if spot == nil then
 			return
 		end
-		env.Sound(KEY, Behind.At(spot, NEAR, 0), { Volume = VOLUME, Speed = 0.95, Vary = 0.05 })
+		env.Sound(KEY, Behind.At(spot, NEAR, 0), { Volume = VOLUME, Speed = 1, Vary = 0.05 })
 		if not run:Wait(PAUSE + env.Random:NextNumber(0, 0.6)) then
 			return
 		end
-		env.Sound(KEY, Behind.At(spot, NEAR - 0.6, 0), { Volume = VOLUME * 0.55, Speed = 0.85, Vary = 0.05 })
+		env.Sound(KEY, Behind.At(spot, NEAR - 0.6, 0), { Volume = VOLUME * 0.55, Speed = 0.9, Vary = 0.05 })
 		run:Wait(1)
 	end,
 }

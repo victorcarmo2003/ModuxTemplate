@@ -4,13 +4,13 @@
 local Behind = require(script.Parent.Parent.Behind)
 local Context = require(script.Parent.Parent.Context)
 
-const KEY = "walker_step"
+const KEY = "behind_step" -- sound, volume and pitch tuned in Studio (Assets.SFX.Behind["Behind Step"])
 const FROM = 7 -- studs behind the player where the steps start
 const TO = 1.8 -- studs behind the player where they stop
 const STEPS = 4
 const GAP = 0.6 -- s between two steps (slow, careful)
-const VOLUME = 0.5
-const SPEED = 1.1
+const VOLUME = 1 -- x the Studio Sound volume
+const SPEED = 1 -- x the Studio Sound pitch
 
 const BehindSteps: Context.Effect = {
 	CanRun = function(_env: Context.Env): boolean

@@ -294,6 +294,14 @@ function AudioController:FromStudio(row: Content.Sound): Content.Sound?
 	end
 	const resolved = table.clone(row)
 	resolved.Id = id
+	-- owner 2026-10-21: a StudioTune row takes the Studio Sound's volume and pitch as well
+	if row.StudioTune then
+		const sound = Studio.Find(name)
+		if sound ~= nil then
+			resolved.Volume = sound.Volume
+			resolved.Speed = sound.PlaybackSpeed
+		end
+	end
 	self.Resolved[row.Key] = resolved
 	return resolved
 end
@@ -384,7 +392,7 @@ end
 function AudioController:Configure(sound: Sound, row: Content.Sound, opts: PlayOptions?, looped: boolean)
 	const default = if not looped and (row.Group == "Sfx" or row.Group == "Voice") then VARY else 0
 	const vary = if opts and opts.Vary ~= nil then opts.Vary else default
-	const speed = (if opts and opts.Speed then opts.Speed else 1) * (1 + self.Rng:NextNumber(-vary, vary))
+	const speed = (if opts and opts.Speed then opts.Speed else 1) * (row.Speed or 1) * (1 + self.Rng:NextNumber(-vary, vary))
 	-- jumpscares go to their own group (Settings: Jumpscares volume), whatever the row's group
 	-- kitchen keys go to Kitchen (under Sfx) so the horror score can duck them alone (TASK-443)
 	sound.SoundGroup = if opts and opts.Scare

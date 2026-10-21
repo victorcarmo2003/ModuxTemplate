@@ -1,16 +1,16 @@
 --!strict
 -- behind_tap (owner 2026-10-21, Provisional; Content.Nights.Behind): light taps on the window glass behind the player
 -- who cooks with the back to it - three, a pause, one more. Nobody at the window when they turn. Audio only
--- (`door_knock` played higher and softer, a knuckle on glass; a dedicated glass tap has no key yet).
+-- (the Studio Sound "Behind Tap": a knuckle on glass).
 local Behind = require(script.Parent.Parent.Behind)
 local Context = require(script.Parent.Parent.Context)
 
-const KEY = "door_knock"
+const KEY = "behind_tap" -- sound, volume and pitch tuned in Studio (Assets.SFX.Behind["Behind Tap"])
 const TAPS = { 0, 0.32, 0.64, 2.2 } -- s from the start
 const BEFORE_WINDOW = 1.5 -- studs on the player's side of the window spot (the glass, not the street)
 const LIFT = 1.5 -- studs above the root: the height of the glass
-const VOLUME = 0.4
-const SPEED = 1.7
+const VOLUME = 1 -- x the Studio Sound volume
+const SPEED = 1 -- x the Studio Sound pitch
 
 const BehindTap: Context.Effect = {
 	CanRun = function(_env: Context.Env): boolean

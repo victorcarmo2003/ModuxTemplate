@@ -30,6 +30,11 @@ export type Sound = {
 	-- Name of the owner's Sound under ReplicatedStorage.Assets.SFX (searched by name in every subfolder, so the folder
 	-- can be reorganised, TASK-445). While Id is "" AudioController plays that Sound's SoundId instead (TASK-443).
 	Studio: string?,
+	-- owner 2026-10-21: true = the owner tunes this row by hand in Studio - the Studio Sound's Volume and PlaybackSpeed
+	-- replace Volume and Speed (needs Studio and Id "")
+	StudioTune: boolean?,
+	-- PlaybackSpeed multiplier of the row (nil = 1); a StudioTune row takes its Studio Sound's PlaybackSpeed
+	Speed: number?,
 }
 
 export type When = {
@@ -237,6 +242,12 @@ local function studio(row: Sound, name: string): Sound
 	if row.Ref == "" then
 		row.Ref = `{name} (owner Studio upload)`
 	end
+-- Row tuned by hand in Studio (StudioTune): sound, volume and pitch all come from the Studio Sound `name`
+local function tuned(row: Sound, name: string): Sound
+	row.StudioTune = true
+	return studio(row, name)
+end
+
 	return row
 end
 
@@ -390,6 +401,11 @@ const base = Table.new({
 	sfx("camera_fixed", false, { Volume = 0.6, MaxDistance = 40, Id = "rbxassetid://9118026602", Ref = "SFX-261 Radio Static 1 (SFX), ProSoundEffects" }),
 	-- TASK-483: the boards giving under the crawler (restaurant, Signal of its scene)
 	sfx("floor_creak", false, { Volume = 0.6, MaxDistance = 50, Id = "rbxassetid://9120832269", Ref = "SFX-247 Wood Creak Intense Cracking Splintering 1 (SFX), ProSoundEffects" }),
+	-- owner 2026-10-21: the "behind you" sounds (Content.Nights.Behind), tuned by hand in Studio under
+	-- ReplicatedStorage.Assets.SFX.Behind (SoundId, Volume, PlaybackSpeed); silent until those Sounds exist
+	tuned(sfx("behind_step", false, { MaxDistance = 40 }), "Behind Step"),
+	tuned(sfx("behind_creak", false, { MaxDistance = 40 }), "Behind Creak"),
+	tuned(sfx("behind_tap", false, { MaxDistance = 40 }), "Behind Tap"),
 	-- restaurant (tech/restaurant-flow.md rev. 2 §4.2; wave R0 rows, Id "" = silence until the audio list uploads them)
 	sfx("plate_put", false, { Volume = 0.5, MaxDistance = 40 }),
 	sfx("ticket_pop", false, { Spatial = false, Volume = 0.4 }), -- HUD note pop-up per item at the tablet
