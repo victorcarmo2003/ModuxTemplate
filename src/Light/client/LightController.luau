@@ -180,6 +180,11 @@ const NIGHT_1: Preset = PRESETS.Night1
 const NIGHT_10: Preset = PRESETS.Night10
 const LOBBY: Preset = PRESETS.Lobby
 const CINEMATIC: Preset = PRESETS.Cinematic
+const CLASS_STAGE: Preset = PRESETS.ClassStage
+const CLASS_STAGE_BLEND = PRESETS.ClassStageBlend
+-- attribute of the local player LobbyController sets while the class screen shows the rig (dark stage, owner 2026-10-21)
+const STAGE_ATTRIBUTE = "ClassStage"
+const STAGE_MODE = "look:stage"
 -- attribute of the local player CutsceneController sets while a scene with a Look plays (Content.Cutscenes[].Look)
 const LOOK_ATTRIBUTE = "CutsceneLook"
 -- s of blend into the night when the look leaves at a scene's Nightfall (DEC-300; set by CutsceneController)
@@ -763,6 +768,9 @@ end
 
 function LightController:BaseTarget(): (Preset, number, string)
 	if self.Dependencies.PlaceController:Is("Lobby") then
+		if Players.LocalPlayer:GetAttribute(STAGE_ATTRIBUTE) == true then
+			return CLASS_STAGE, LOBBY_CLOCK, STAGE_MODE
+		end
 		return LOBBY, LOBBY_CLOCK, "lobby"
 	end
 	if self:IsNight() then
@@ -824,12 +832,16 @@ function LightController:RefreshPreset()
 		return
 	end
 	if mode ~= self.Mode then
+		const stage = mode == STAGE_MODE or self.Mode == STAGE_MODE
 		self.Mode = mode
 		self.From = previous
 		self.FromClock = self.AppliedClock
 		self.BlendStart = now
 		const nightfall = Players.LocalPlayer:GetAttribute(NIGHTFALL_ATTRIBUTE)
-		self.BlendTime = if type(nightfall) == "number" and nightfall > 0 then nightfall else BLEND_TIME
+		self.BlendTime = if stage
+			then CLASS_STAGE_BLEND
+			elseif type(nightfall) == "number" and nightfall > 0 then nightfall
+			else BLEND_TIME
 	end
 	local preset = target
 	local outClock = clock

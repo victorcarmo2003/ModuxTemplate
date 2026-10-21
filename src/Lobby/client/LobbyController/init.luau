@@ -328,6 +328,8 @@ function LobbyController:Setup()
 	self.GuideKey = "" :: string
 	self.GuideSent = {} :: { [string]: boolean }
 	self.Hiding = false :: boolean
+	self.StageLights = nil :: Folder? -- local spotlights of the dark class stage (SetStageLights)
+	self.StageDimmed = nil :: any -- lights / Neon switched off around the stage while it shows (restored after)
 
 	self.Gui = nil :: ScreenGui?
 	self.Unmount = nil :: (() -> ())?
@@ -512,11 +514,143 @@ local function setCharacterTransparency(value: number)
 	end
 end
 
+-- Stage props that sit between the class camera and the rig: hidden locally with the characters (owner 2026-10-21:
+-- the red safety rope "Cinta" crossed the class screen). Paths under LOBBY_Assets; missing = skipped.
+const STAGE_HIDE = { { "LobbyProcedural", "Cinta" } }
+
+local function setStagePropsHidden(hidden: boolean)
+	const root = workspace:FindFirstChild("LOBBY_Assets")
+	if root == nil then
+		return
+	end
+	for _, path in STAGE_HIDE do
+		local item: Instance? = root
+		for _, name in path do
+			item = if item then item:FindFirstChild(name) else nil
+		end
+		if item then
+			const parts = item:GetDescendants()
+			table.insert(parts, item)
+			for _, part in parts do
+				if part:IsA("BasePart") then
+					part.LocalTransparencyModifier = if hidden then 1 else 0
+				end
+			end
+		end
+	end
+end
+
+-- Dark stage while the class screen shows the rig (owner 2026-10-21: "the focus should be only on the skin"): the
+-- LightController blends to Content.LightPresets.ClassStage on this player attribute, and two local spotlights (key from
+-- the front, soft rim from behind) light only the rig. Offsets from the stage point (its LookVector faces the camera).
+const STAGE_LOOK_ATTRIBUTE = "ClassStage"
+const STAGE_LIGHTS = {
+	-- key far up in front, no shadow (a shadowed key put the cap's shadow over the eyes), narrow cone on the rig (2nd pass,
+	-- owner 2026-10-21: "move the light away, put it higher, the rig is too dark")
+	{ Name = "Key", Ahead = 13, Up = 14, Color = Color3.fromRGB(255, 242, 225), Brightness = 4.5, Range = 30, Angle = 32, Shadows = false },
+	{ Name = "Rim", Ahead = -4, Up = 8, Color = Color3.fromRGB(190, 200, 255), Brightness = 2.5, Range = 14, Angle = 50, Shadows = false },
+}
+const STAGE_AIM = 3 -- studs over the stage point the lights aim at (the rig's chest)
+-- Local lights and Neon of the lobby around the stage ignore the Lighting preset: within this radius they are switched
+-- off / turned matte for this client while the stage shows, and restored after.
+const STAGE_DIM_RADIUS = 28
+const STAGE_DIM_COLOR = 0.35 -- Neon parts keep this share of their colour while matte
+
+type Dimmed = { Lights: { [Light]: boolean }, Neon: { [BasePart]: Color3 } }
+
+local function dimAround(centre: Vector3): Dimmed
+	const dimmed: Dimmed = { Lights = {}, Neon = {} }
+	const root = workspace:FindFirstChild("LOBBY_Assets")
+	if root == nil then
+		return dimmed
+	end
+	for _, item in root:GetDescendants() do
+		if item:IsA("Light") then
+			const holder = item.Parent
+			if holder and holder:IsA("BasePart") and (holder.Position - centre).Magnitude <= STAGE_DIM_RADIUS and item.Enabled then
+				dimmed.Lights[item] = true
+				item.Enabled = false
+			end
+		elseif item:IsA("BasePart") and item.Material == Enum.Material.Neon then
+			if (item.Position - centre).Magnitude <= STAGE_DIM_RADIUS then
+				dimmed.Neon[item] = item.Color
+				item.Material = Enum.Material.SmoothPlastic
+				item.Color = item.Color:Lerp(Color3.new(), 1 - STAGE_DIM_COLOR)
+			end
+		end
+	end
+	return dimmed
+end
+
+local function restoreDimmed(dimmed: Dimmed)
+	for light in dimmed.Lights do
+		if light.Parent then
+			light.Enabled = true
+		end
+	end
+	for part, color in dimmed.Neon do
+		if part.Parent then
+			part.Material = Enum.Material.Neon
+			part.Color = color
+		end
+	end
+end
+
+function LobbyController:SetStageLights(on: boolean)
+	Players.LocalPlayer:SetAttribute(STAGE_LOOK_ATTRIBUTE, if on then true else nil)
+	const old = self.StageLights
+	if old then
+		old:Destroy()
+		self.StageLights = nil
+	end
+	const dimmed = self.StageDimmed
+	if dimmed then
+		restoreDimmed(dimmed)
+		self.StageDimmed = nil
+	end
+	if not on then
+		return
+	end
+	const point = self:FindStagePoint()
+	if point == nil then
+		return
+	end
+	const folder = Instance.new("Folder")
+	folder.Name = "ClassStageLights"
+	const aim = point.Position + Vector3.new(0, STAGE_AIM, 0)
+	for _, row in STAGE_LIGHTS do
+		const at = point.Position + point.LookVector * row.Ahead + Vector3.new(0, row.Up, 0)
+		const part = Instance.new("Part")
+		part.Name = row.Name
+		part.Size = Vector3.new(0.2, 0.2, 0.2)
+		part.Transparency = 1
+		part.Anchored = true
+		part.CanCollide = false
+		part.CanQuery = false
+		part.CanTouch = false
+		part.CFrame = CFrame.lookAt(at, aim)
+		const light = Instance.new("SpotLight")
+		light.Face = Enum.NormalId.Front
+		light.Color = row.Color
+		light.Brightness = row.Brightness
+		light.Range = row.Range
+		light.Angle = row.Angle
+		light.Shadows = row.Shadows
+		light.Parent = part
+		part.Parent = folder
+	end
+	folder.Parent = workspace
+	self.StageLights = folder
+	self.StageDimmed = dimAround(point.Position)
+end
+
 function LobbyController:HideCharacters(on: boolean)
 	if on == self.Hiding then
 		return
 	end
 	self.Hiding = on
+	setStagePropsHidden(on)
+	self:SetStageLights(on)
 	if on then
 		RunService:BindToRenderStep(HIDE_STEP, HIDE_PRIORITY, function()
 			setCharacterTransparency(1)

@@ -149,9 +149,12 @@ const NAME_WIDTH = 170 -- class name over the arrows (TASK-298); a long name shr
 const NAME_HEIGHT = 34
 const FOOT = NAME_HEIGHT + 2 + ARROW
 const STAGE_WIDTH = 220
-const SKIN = 40 -- skin circle under the card (uniform + 5 skins fit the card width)
-const SKIN_GAP = 6
-const SKIN_TOP = 4 -- px between the card and the skin row
+-- Skin bubbles (owner 2026-10-21: "the skins are too discreet"): a column of big round buttons hugging the LEFT side
+-- of the class card, from its top down (uniform first, then the class skins); not owned = shaded with a lock.
+const SKIN = 56 -- skin bubble px
+const SKIN_GAP = 16 -- px between two bubbles (room for the LIMITED tag over each one)
+const SKIN_SIDE = 10 -- px between the bubbles and the card
+const SKIN_TOP = 14 -- px from the card top to the first bubble
 -- Card (TASK-299)
 const PORTRAIT = 58
 const CHIP = 24
@@ -241,7 +244,7 @@ return function(props: Props): Frame
 	-- on the left) and keeps the skin row under it. A phone reported a far taller Roblox block than Studio, and the old
 	-- shared, mirrored clearance left the card at BODY_MIN with nothing past the blurb (owner 2026-10-20).
 	const skinRoom = function(): number
-		return if props.Skins then (SKIN_TOP + SKIN + 14) * scale() else 0
+		return 0 -- the skin bubbles sit beside the card now, not under it
 	end
 	type Band = { Top: number, Bottom: number }
 	const listBand = function(): Band
@@ -1365,16 +1368,23 @@ return function(props: Props): Frame
 			card,
 		}),
 
-		-- skins of the focused class, under the card (owner 2026-10-17)
+		-- skins of the focused class: a column of bubbles on the left side of the card, from its top (owner 2026-10-21)
 		if skins
 			then create("Frame")({
 				Name = "SkinAnchor",
-				AnchorPoint = Vector2.new(0.5, 0),
+				AnchorPoint = Vector2.new(1, 0),
 				Position = function()
 					const s = scale()
-					return UDim2.new(1, -MARGIN - CARD_WIDTH * s / 2, 0.5, centreOf(cardBand()) + (cardHeight() / 2 + SKIN_TOP) * s)
+					return UDim2.new(
+						1,
+						-MARGIN - (CARD_WIDTH + SKIN_SIDE) * s,
+						0.5,
+						centreOf(cardBand()) - (cardHeight() / 2 - SKIN_TOP) * s
+					)
 				end,
-				Size = UDim2.fromOffset(CARD_WIDTH, SKIN + 14),
+				Size = function()
+					return UDim2.fromOffset(SKIN + 16, math.max(cardHeight() - SKIN_TOP, SKIN + 16))
+				end,
 				BackgroundTransparency = 1,
 				Visible = function()
 					return #skinEntries() > 1
@@ -1387,6 +1397,7 @@ return function(props: Props): Frame
 					OnFocus = skins.OnFocus,
 					Size = SKIN,
 					Gap = SKIN_GAP,
+					Vertical = true,
 				}),
 			})
 			else nil,

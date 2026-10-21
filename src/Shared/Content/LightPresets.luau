@@ -81,6 +81,8 @@ export type LightPresets = {
 	Night10: LightPreset,
 	Lobby: LightPreset,
 	Cinematic: LightPreset, -- the opening cutscene only (Cutscenes[].Look): warm, contrasty, soft bloom and sun rays
+	ClassStage: LightPreset, -- lobby while the class screen is open: the world dims, a spotlight keeps the rig lit
+	ClassStageBlend: number, -- s of the blend into and out of ClassStage (faster than BlendTime: it follows a screen)
 	LobbyClock: number, -- ClockTime of the lobby (the user set it at night)
 	NightClock: number, -- ClockTime of every night (§5.3: fixed near 0)
 	GoldenFrom: number, -- hour the golden hour starts (§5.2: 4 PM)
@@ -276,6 +278,37 @@ const presets: LightPresets = {
 		SunRays = 0.09,
 		SunRaysSpread = 0.28,
 	},
+	-- Class screen stage (owner 2026-10-21: "too much red, too much contrast, the focus should be only on the skin"):
+	-- the lobby dims to a soft night and the haze softens the background; LobbyController adds a local spotlight on the
+	-- rig. 2nd pass (owner: "too dark behind and on the rig, more outside light"): a dim night, not a black void.
+	-- PROVISIONAL until Play review.
+	ClassStage = {
+		Brightness = 0.3,
+		Exposure = -0.5,
+		Ambient = Color3.fromRGB(44, 42, 56),
+		OutdoorAmbient = Color3.fromRGB(38, 40, 56),
+		ColorShiftTop = Color3.fromRGB(50, 54, 80),
+		ColorShiftBottom = Color3.fromRGB(0, 0, 0),
+		EnvDiffuse = 0.35,
+		EnvSpecular = 0.35,
+		ShadowSoftness = 0.2,
+		AtmDensity = 0.4,
+		AtmOffset = 0.2,
+		AtmGlare = 0,
+		AtmHaze = 1.6,
+		AtmColor = Color3.fromRGB(26, 24, 36),
+		AtmDecay = Color3.fromRGB(20, 18, 28),
+		CCBrightness = 0.02,
+		Saturation = -0.05,
+		Contrast = 0.1,
+		Tint = Color3.fromRGB(255, 255, 255),
+		BloomIntensity = 0.45,
+		BloomSize = 22,
+		BloomThreshold = 1.4,
+		SunRays = 0,
+		SunRaysSpread = 0.1,
+	},
+	ClassStageBlend = 0.5,
 	LobbyClock = 20.75,
 	NightClock = 0,
 	GoldenFrom = 16,

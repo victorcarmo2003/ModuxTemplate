@@ -1,9 +1,10 @@
 --!strict
 -- SkinRow: the row of round skin buttons under the class card (owner request 2026-10-17, design/skins-proposal.md).
 -- First circle = the crew uniform (""), then the skins of the focused class. A click only previews (OnFocus): buying and
--- equipping are the card buttons. The focused circle is Mustard and bigger outline; a check marks the one worn; a lock
--- marks one not owned; a "LIMITED" tag sits on a limited skin. The art is the skin icon when uploaded (Image), else the
--- two Swatch colours split diagonally.
+-- equipping are the card buttons. The focused circle is Mustard and bigger outline; a check marks the one worn; a skin
+-- not owned is shaded (dark, translucent) with a lock in the middle, and still previews on click (owner 2026-10-21);
+-- a "LIMITED" tag sits on a limited skin. The art is the skin icon when uploaded (Image), else the two Swatch colours
+-- split diagonally. `Vertical` stacks the circles in a column (the bubbles beside the class card).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Theme = require(script.Parent.Parent.Theme)
@@ -36,7 +37,10 @@ export type Props = {
 	OnFocus: (key: string) -> (),
 	Size: number, -- circle px at scale 1
 	Gap: number,
+	Vertical: boolean?, -- column instead of a row
 }
+
+const SHADE = 0.4 -- transparency of the dark veil over a skin not owned (0 = opaque)
 
 return function(props: Props): Frame
 	local function circle(entry: () -> SkinEntry, index: number)
@@ -45,6 +49,10 @@ return function(props: Props): Frame
 		end
 		const state = function(): SkinState
 			return props.StateOf(entry().Key)
+		end
+		const locked = function(): boolean
+			const s = state()
+			return s == "Locked" or s == "NeedsClass" or s == "Soon"
 		end
 		return CartoonButton({
 			Name = "Skin",
@@ -101,7 +109,25 @@ return function(props: Props): Frame
 						create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
 					}),
 				}),
-				-- status: check (worn), lock (not owned / needs the class)
+				-- not owned: dark translucent veil over the art, lock in the middle
+				create("Frame")({
+					Name = "Veil",
+					Size = UDim2.fromScale(1, 1),
+					BackgroundColor3 = Theme.Color.Ink,
+					BackgroundTransparency = SHADE,
+					ZIndex = 2,
+					Visible = locked,
+					create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
+					create("Frame")({
+						Name = "Lock",
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Position = UDim2.fromScale(0.5, 0.5),
+						Size = UDim2.fromScale(0.5, 0.5),
+						BackgroundTransparency = 1,
+						Icon("Notice/lock", math.floor(props.Size * 0.5), 1),
+					}),
+				}),
+				-- status: check (worn)
 				create("Frame")({
 					Name = "Status",
 					AnchorPoint = Vector2.new(1, 1),
@@ -111,10 +137,7 @@ return function(props: Props): Frame
 					ZIndex = 3,
 					Icon(function()
 						const s = state()
-						return if s == "Equipped"
-							then "Ui/check"
-							elseif s == "Locked" or s == "NeedsClass" then "Notice/lock"
-							else ""
+						return if s == "Equipped" then "Ui/check" else ""
 					end, 20, 1),
 				}),
 				-- LIMITED tag across the bottom of a limited skin
@@ -146,14 +169,15 @@ return function(props: Props): Frame
 		})
 	end
 
+	const vertical = props.Vertical == true
 	return create("Frame")({
 		Name = "SkinRow",
-		Size = UDim2.new(1, 0, 0, props.Size + 14),
+		Size = if vertical then UDim2.fromScale(1, 1) else UDim2.new(1, 0, 0, props.Size + 14),
 		BackgroundTransparency = 1,
 		create("UIListLayout")({
-			FillDirection = Enum.FillDirection.Horizontal,
+			FillDirection = if vertical then Enum.FillDirection.Vertical else Enum.FillDirection.Horizontal,
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			VerticalAlignment = Enum.VerticalAlignment.Bottom,
+			VerticalAlignment = if vertical then Enum.VerticalAlignment.Top else Enum.VerticalAlignment.Bottom,
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			Padding = UDim.new(0, props.Gap),
 		}),

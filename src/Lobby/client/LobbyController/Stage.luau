@@ -5,7 +5,12 @@
 -- never tagged (RigController leaves them alone), dressed by the caller's Build. Same motion as the viewport stage
 -- (ClassStage.Rig: slow swing, pop on swap). The camera is taken with `Take()` (CameraController External) and
 -- given back with `Release()`. Without the point the caller uses the ClassStage viewport instead.
+-- Drag to turn (owner 2026-10-21): pressing on the world (not on the UI) and dragging, with the mouse or a finger,
+-- turns the rig a full 360 to see its back; the slow swing pauses while dragging, the turn holds DRAG_HOLD s after the
+-- release and then eases back to the front, where the swing goes on.
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Rig = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ClassStage.Rig)
 
@@ -31,6 +36,14 @@ const RISE = 0.06 -- the camera looks a little down at the rig
 -- The rig sits this share of the half view above the screen centre: its feet clear the class name and the arrows
 -- under it (ClassSelect, TASK-298).
 const LIFT_VIEW = 0.12
+const DRAG_SPEED = math.rad(0.6) -- rad of turn per px dragged
+const DRAG_HOLD = 2 -- s the dragged turn holds after the release
+const DRAG_RETURN = 3 -- 1/s: how fast the turn eases back to the front after the hold
+
+-- angle wrapped to (-pi, pi]: the way back to the front is always the short one
+local function wrap(angle: number): number
+	return (angle + math.pi) % (2 * math.pi) - math.pi
+end
 
 return function(options: Options): Stage
 	const folder = Instance.new("Folder")
@@ -42,6 +55,11 @@ return function(options: Options): Stage
 	local open = false
 	local stopPop: () -> () = function() end
 	local sway: RBXScriptConnection? = nil
+	local inputs: { RBXScriptConnection } = {}
+	local turn = 0 -- rad added by dragging
+	local dragging: InputObject? = nil -- the mouse button / touch that drags
+	local lastX = 0
+	local releasedAt = -math.huge
 	-- until a rig is framed (or when every rig fails to build): a fixed view of the point
 	local framing: CFrame = CFrame.lookAt(base.Position + base.LookVector * 12 + Vector3.new(0, 1, 0), base.Position)
 	local framed = false
@@ -94,6 +112,70 @@ return function(options: Options): Stage
 			sway:Disconnect()
 			sway = nil
 		end
+		for _, connection in inputs do
+			connection:Disconnect()
+		end
+		table.clear(inputs)
+		dragging = nil
+	end
+
+	local function isPress(input: InputObject): boolean
+		return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch
+	end
+
+	-- The class screen's root frame is Active over the whole screen, so every press arrives "processed": instead, a
+	-- press drags unless it lands on a button or on a visible panel (the list, the card, the bubbles).
+	local function overUi(at: Vector3): boolean
+		const gui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+		if gui == nil then
+			return false
+		end
+		for _, item in gui:GetGuiObjectsAtPosition(at.X, at.Y) do
+			if not item.Visible then
+				continue
+			end
+			if item:IsA("GuiButton") then
+				return true
+			end
+			if item.BackgroundTransparency < 0.95 then
+				return true
+			end
+			if item:IsA("ImageLabel") and item.Image ~= "" and item.ImageTransparency < 0.95 then
+				return true
+			end
+		end
+		return false
+	end
+
+	local function listen()
+		table.insert(inputs, UserInputService.InputBegan:Connect(function(input: InputObject)
+			if dragging ~= nil or not isPress(input) or overUi(input.Position) then
+				return
+			end
+			dragging = input
+			lastX = input.Position.X
+		end))
+		table.insert(inputs, UserInputService.InputChanged:Connect(function(input: InputObject)
+			const drag = dragging
+			if drag == nil then
+				return
+			end
+			const moved = if drag.UserInputType == Enum.UserInputType.Touch
+				then input == drag
+				else input.UserInputType == Enum.UserInputType.MouseMovement
+			if moved then
+				const x = input.Position.X
+				turn = wrap(turn + (x - lastX) * DRAG_SPEED)
+				lastX = x
+			end
+		end))
+		table.insert(inputs, UserInputService.InputEnded:Connect(function(input: InputObject)
+			const drag = dragging
+			if drag ~= nil and (input == drag or input.UserInputType == drag.UserInputType) then
+				dragging = nil
+				releasedAt = os.clock()
+			end
+		end))
 	end
 
 	local function show(species: string, skin: string?)
@@ -103,11 +185,21 @@ return function(options: Options): Stage
 			folder.Parent = workspace
 			local t = 0
 			stopSway()
+			turn = 0
+			listen()
 			sway = RunService.RenderStepped:Connect(function(dt: number)
-				t += dt
+				if dragging == nil then
+					t += dt -- the swing waits while the player turns the rig
+					if turn ~= 0 and os.clock() - releasedAt >= DRAG_HOLD then
+						turn = turn * math.exp(-DRAG_RETURN * dt)
+						if math.abs(turn) < 0.002 then
+							turn = 0
+						end
+					end
+				end
 				const model = current
 				if model and model.Parent == folder then
-					model:PivotTo(base * Rig.Sway(t))
+					model:PivotTo(base * CFrame.Angles(0, turn, 0) * Rig.Sway(t))
 				end
 				apply()
 			end)
