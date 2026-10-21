@@ -448,7 +448,8 @@ function TabletController:HideBetween(eye: Vector3, rig: Model, head: BasePart, 
 	const samples: { Vector3 } = {}
 	for _, offset in VIEW_POINTS do
 		const target = head.Position + offset
-		for step = 1, VIEW_STEPS do
+		-- step 0 = the eye itself: a part the lens starts inside hides too
+		for step = 0, VIEW_STEPS do
 			table.insert(samples, eye:Lerp(target, step / (VIEW_STEPS + 1) * VIEW_REACH))
 		end
 	end
@@ -499,7 +500,17 @@ function TabletController:SyncCloseUp()
 			return
 		end
 		self.CloseTablet = index
-		const facing = Vector3.new(head.CFrame.LookVector.X, 0, head.CFrame.LookVector.Z)
+		-- the camera stands on my side of the counter: from the customer toward me (owner print: the customer's own facing
+		-- put it inside the trailer when it did not face the counter); its facing only when I have no body
+		const mine = Players.LocalPlayer.Character
+		const root = if mine ~= nil then mine:FindFirstChild("HumanoidRootPart") else nil
+		local facing = Vector3.new(head.CFrame.LookVector.X, 0, head.CFrame.LookVector.Z)
+		if root ~= nil and root:IsA("BasePart") then
+			const toward = Vector3.new(root.Position.X - head.Position.X, 0, root.Position.Z - head.Position.Z)
+			if toward.Magnitude > 1e-3 then
+				facing = toward
+			end
+		end
 		const forward = if facing.Magnitude > 1e-3 then facing.Unit else Vector3.zAxis
 		-- a medium shot slid sideways (owner sketch): the customer on the right half, the talk card on the left. The camera
 		-- looks back along -forward; its right is (-forward) x up, so sliding the view by -right moves the customer right
