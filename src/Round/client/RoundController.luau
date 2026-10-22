@@ -128,6 +128,9 @@ function RoundController:Setup()
 	self.WipeEndsAt = Vide.source(0) :: Vide.Source<number>
 	-- true once the first Shift record arrived
 	self.Ready = Vide.source(false) :: Vide.Source<boolean>
+	-- dark out (owner 2026-10-21): a night shift outside its morning (Call / Prep before Content.Shift.Morning.DuskFrom);
+	-- the light reads it, IsNight stays the shift's
+	self.Dark = Vide.source(false) :: Vide.Source<boolean>
 	self.Clock = nil :: Clock?
 	self.InNight = false
 	-- last stepped minute written to ClockText (avoids rewriting the same text)
@@ -147,6 +150,17 @@ function RoundController:Refresh()
 	self.Minutes = minutes
 	self.ClockText(self:Format(minutes))
 	self.NightWindow(if self.InNight then self:WindowAt(minutes) else nil)
+	self:SyncDark()
+end
+
+-- Dark out now: the shift is a night one and it is not its morning (Call / Prep before the dusk minute)
+function RoundController:SyncDark()
+	const phase = Vide.untrack(self.Phase)
+	const morning = (phase == "Call" or phase == "Prep") and self.Minutes ~= NO_MINUTE and self.Minutes < Content.Shift.Morning.DuskFrom
+	const dark = Vide.untrack(self.IsNight) and not morning
+	if Vide.untrack(self.Dark) ~= dark then
+		self.Dark(dark)
+	end
 end
 
 function RoundController:Apply(record: Record)
@@ -179,6 +193,7 @@ function RoundController:Apply(record: Record)
 		self.Chances(record.Chances)
 		self.WipeEndsAt(record.WipeEndsAt)
 		self:Refresh()
+		self:SyncDark()
 		self.Ready(true)
 	end)
 end

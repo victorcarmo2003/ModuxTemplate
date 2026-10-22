@@ -11,8 +11,9 @@
 -- LastCall (DEC-240, user decision 2026-10-13): on a DAY shift the Closing row is "Last call": the clock stands at 6 PM,
 -- nobody new arrives (Selling stays false) but the trailer is still OPEN (the sign shows OPEN, the kitchen, the prep mode,
 -- the tables and the drawer keep working) and the queue and the tables are served without a rush. The day closes by itself
--- when they are empty (counter probe); Duration is only the safety cap against an AFK crew. The night Closing
--- (Night override) is NOT a last call: it keeps its own short cap and the counter is emptied.
+-- when they are empty (counter probe); Duration is only the safety cap against an AFK crew. The night Closing (6 AM) is a
+-- last call too since 2026-10-21 (Night override LastCall, owner request, Provisional): the line still at the window when
+-- the night ends is served, then the shift ends (an empty line ends it at once).
 local Table = require(script.Parent.Table)
 
 export type Kind = "Day" | "Night" | "Any"
@@ -23,6 +24,8 @@ export type NightOverride = {
 	ClockTo: number,
 	-- seconds the phase probe cannot end it (an empty counter waits until then); nil = the probe ends it any time
 	Min: number?,
+	-- night Last call (Closing only): the line still there at 6 AM is served, nobody new arrives (see LastCall)
+	LastCall: boolean?,
 }
 
 export type Phase = {
@@ -55,7 +58,11 @@ const base = Table.new({
 		Kind = "Any",
 		Selling = false,
 		SkipWithoutProbe = false,
-		Night = { Duration = 36, ClockFrom = hours(19), ClockTo = hours(20) }, -- was 90 s, cut 60% (owner 2026-10-21, Provisional)
+		-- the night's buying break: 30 s after the report and the boss call, then the night starts with the window open
+		-- (opening the window earlier starts it at once). Was 90 s, then 36 s (owner 2026-10-21, Provisional)
+		-- owner 2026-10-21: the MORNING after the night - the clock runs 6 AM -> 8 PM over the 30 s (day light, walkers and
+		-- day traffic follow it; Shift.Morning: dusk in the last ~5 s)
+		Night = { Duration = 30, ClockFrom = hours(6), ClockTo = hours(20) },
 	},
 	-- Open: 8:00 AM -> 6:00 PM in 216 s, 1 game hour = 21.6 s (DEC-048, FEAT-003; was 360 s / 36 s, Q-200).
 	{ Key = "Open", Duration = 216, ClockFrom = hours(8), ClockTo = hours(18), Kind = "Day", Selling = true, SkipWithoutProbe = false },
@@ -71,9 +78,12 @@ const base = Table.new({
 		Kind = "Any",
 		Selling = false,
 		SkipWithoutProbe = false,
-		-- owner 2026-10-21 (Provisional): more time after the night to buy upgrades at the Gear Stand. Was a 30 s cap that
-		-- the empty counter ended at once; now it stays at least 45 s (Min), 60 s at most
-		Night = { Duration = 60, ClockFrom = hours(30), ClockTo = hours(30), Min = 45 },
+		-- owner 2026-10-21 (Provisional): the night's last call. The customer still in line at 6 AM is served, then the
+		-- shift ends (window shut, report) the moment nobody is left; an empty line ends it at once. Nothing holds it:
+		-- 60 s is only the ceiling against a crew that walked away from a customer. Was
+		-- Min = 45 (upgrade time after the night: the minute where nothing happened; the Gear Stand stays open through
+		-- Summary, Call and Prep anyway)
+		Night = { Duration = 60, ClockFrom = hours(30), ClockTo = hours(30), LastCall = true },
 	},
 	-- Summary: 8 s on day, 10 s at night (DEC-048, FEAT-014; was 15 / 20 s, halved by Q-200). Clock stopped.
 	{
@@ -92,8 +102,9 @@ const base = Table.new({
 	{
 		Key = "Call",
 		Duration = 50,
-		ClockFrom = hours(19),
-		ClockTo = hours(19),
+		-- owner 2026-10-21: Walt calls in the morning, right after the report (was 7 PM)
+		ClockFrom = hours(6),
+		ClockTo = hours(6),
 		Kind = "Night",
 		Selling = false,
 		SkipWithoutProbe = true,
@@ -140,5 +151,10 @@ return Table.with(base, {
 	-- A new run skips the day shift (owner 2026-10-18, DEC-300): it opens straight on Night 1 (Day 2), with the boss call
 	-- (the intro cutscene was removed, DEC-309). false = the old Day 1 (day shift + tutorial) first.
 	RunStartsAtNight = true,
+	-- The morning of a night shift (owner 2026-10-21, Provisional): Call and Prep of a night shift are daytime - day
+	-- light, more walkers, day traffic, no Hunter (OutsideService is Night-phase only) - until DuskFrom (game minutes of the
+	-- Prep clock), when it darkens fast (LightController blend), the fog comes back and walkers / cars stop spawning.
+	-- 5:40 PM = the last ~5 s of the 30 s Prep (6 AM -> 8 PM). RoundService:IsDark() / RoundController.Dark read it.
+	Morning = { DuskFrom = hours(17, 40) },
 	ClockStepMinutes = 5, -- HUD updates every 5 game minutes (1.8 s real on day) (DEC-048; user request 2026-10-11, was 10)
 })

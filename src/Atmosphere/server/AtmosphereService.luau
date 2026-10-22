@@ -44,6 +44,7 @@ function AtmosphereService:Setup()
 	self.Enabled = false :: boolean
 	self.Natural = nil :: string? -- key the round asks for
 	self.Forced = nil :: string? -- dev override; "" = forced off
+	self.Dark = false :: boolean -- RoundService:IsDark() at the last Refresh (the morning's dusk comes by the clock)
 end
 
 -- Key of the night (Content.Nights field, else the provisional fallback, else Default).
@@ -113,7 +114,9 @@ end
 
 function AtmosphereService:Refresh()
 	const round = self.Dependencies.RoundService
-	const night = round:IsNight()
+	-- owner 2026-10-21: the morning of a night shift is clear; the night's atmosphere (fog, rain) comes back at its dusk
+	const night = round:IsDark()
+	self.Dark = night
 	self:Set(if night then self:KeyFor(round:GetNight()) else nil)
 end
 
@@ -127,6 +130,13 @@ AtmosphereService:OnInit(function(self)
 		self:Refresh()
 	end)
 end)
+
+-- the dusk of the morning comes inside the Prep phase, by the clock: catch it
+AtmosphereService:OnTick(function(self)
+	if self.Enabled and self.Dependencies.RoundService:IsDark() ~= self.Dark then
+		self:Refresh()
+	end
+end, 2)
 
 AtmosphereService:OnStart(function(self)
 	if self.Enabled then

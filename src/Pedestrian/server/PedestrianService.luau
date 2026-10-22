@@ -791,7 +791,8 @@ end
 -- New target for the shift: walkers of the other shift's paths leave now, extras leave at their path end
 function PedestrianService:Retarget()
 	const round = self.Dependencies.RoundService
-	const night = round:IsNight()
+	-- owner 2026-10-21: the morning of a night shift has the day's walkers (RoundService:IsDark, Content.Shift.Morning)
+	const night = round:IsDark()
 	const range = if night then Content.Flow.NightWalkers else Content.Flow.DayWalkers
 	const low, high = range[1] or 0, range[2] or range[1] or 0
 	self.TargetCount = math.min(self.Rng:NextInteger(low, math.max(high, low)), RULES.Slots)
@@ -904,7 +905,11 @@ function PedestrianService:TrySpawn(t: number)
 		return
 	end
 	const round = self.Dependencies.RoundService
-	if not self.Drawn or self.TargetNight ~= round:IsNight() then
+	-- owner 2026-10-21: no new walker at the dusk of the morning; the night's few come with the Night phase
+	if round:IsDusk() then
+		return
+	end
+	if not self.Drawn or self.TargetNight ~= round:IsDark() then
 		self:Retarget()
 	end
 	const night = self.TargetNight
@@ -1143,7 +1148,7 @@ function PedestrianService:DevSpawn(pathKey: string?): string
 		end
 		geo = self:GeoOf(row :: WalkPath)
 	else
-		row, geo = self:PickPath(self.Dependencies.RoundService:IsNight(), false)
+		row, geo = self:PickPath(self.Dependencies.RoundService:IsDark(), false)
 	end
 	if row == nil or geo == nil then
 		error("no walk path with its nodes in the map", 0)

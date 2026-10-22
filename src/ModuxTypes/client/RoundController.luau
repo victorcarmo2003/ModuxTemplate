@@ -31,6 +31,7 @@ export type Public = {
 	Chances: Vide.Source<number>,
 	Clock: Clock?,
 	ClockText: Vide.Source<string>,
+	Dark: Vide.Source<boolean>,
 	Day: Vide.Source<number>,
 	InNight: boolean,
 	IsNight: Vide.Source<boolean>,
@@ -51,6 +52,7 @@ export type Public = {
 	HeldMinutes: (self: Public, isNight: boolean) -> number,
 	Setup: (self: Public) -> (),
 	Refresh: (self: Public) -> (),
+	SyncDark: (self: Public) -> (),
 	Apply: (self: Public, record: Record) -> (),
 }
 

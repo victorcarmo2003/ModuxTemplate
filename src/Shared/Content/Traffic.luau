@@ -182,6 +182,7 @@ const traffic: Traffic = {
 	Crosswalks = crosswalks,
 	Conflicts = conflicts,
 	Density = {
+		{ From = 360, To = 420, Night = false, MaxCars = 3, Interval = { 8, 12 } }, -- 6-7 AM: the morning after the night (owner 2026-10-21)
 		{ From = 420, To = 480, Night = false, MaxCars = 2, Interval = { 13, 17 } }, -- Prep 7-8 AM (MAP-01 §9.5)
 		{ From = 480, To = 1080, Night = false, MaxCars = 4, Interval = { 6, 10 } }, -- Open 8 AM-6 PM (FEAT-033)
 		{ From = 1080, To = 1140, Night = false, MaxCars = 2, Interval = { 13, 17 } }, -- Closing 6 PM

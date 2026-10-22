@@ -823,7 +823,8 @@ end
 
 function TrafficService:SpawnPhaseOk(): boolean
 	const round = self.Dependencies.RoundService
-	return round:IsStarted() and table.find(NO_TRAFFIC_PHASES, round:GetPhase()) == nil
+	-- owner 2026-10-21: no new car at the dusk of the morning (Content.Shift.Morning); the ones driving finish their way
+	return round:IsStarted() and table.find(NO_TRAFFIC_PHASES, round:GetPhase()) == nil and not round:IsDusk()
 end
 
 function TrafficService:TrySpawn(t: number)

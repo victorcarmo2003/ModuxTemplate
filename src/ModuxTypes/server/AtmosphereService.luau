@@ -1,6 +1,7 @@
 --!strict
 
 export type Public = {
+	Dark: boolean,
 	Enabled: boolean,
 	Forced: string?,
 	Natural: string?,

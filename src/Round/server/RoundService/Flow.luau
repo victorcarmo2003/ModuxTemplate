@@ -6,7 +6,7 @@
 
 export type Info = { Day: number, Night: number, IsNight: boolean, Attempt: number }
 
-export type Override = { Duration: number, ClockFrom: number, ClockTo: number, Min: number? }
+export type Override = { Duration: number, ClockFrom: number, ClockTo: number, Min: number?, LastCall: boolean? }
 
 -- Subset of Content.Shift rows that the flow reads
 export type Row = {

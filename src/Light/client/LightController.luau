@@ -303,12 +303,14 @@ function LightController:NightNumber(): number
 	return FIRST_NIGHT
 end
 
--- Night shift? Before the first Shift record (join, squad gate, loading) the run's first shift decides: a run that
+-- Night look? Before the first Shift record (join, squad gate, loading) the run's first shift decides: a run that
 -- starts at night (Shift.RunStartsAtNight, DEC-300) shows the night at once instead of a day sky until the run starts.
+-- Owner 2026-10-21: the morning of a night shift (Call / Prep before Shift.Morning.DuskFrom) is day - RoundController.Dark,
+-- and the day -> night blend at its dusk is the usual BlendTime
 function LightController:IsNight(): boolean
 	const round = self.Dependencies.RoundController
 	if round.Ready() then
-		return round.IsNight()
+		return round.Dark()
 	end
 	return Content.Shift.RunStartsAtNight
 end
@@ -694,7 +696,7 @@ function LightController:FixtureLit(fixture: Fixture, groupOn: boolean, now: num
 	if record == nil or group == nil or group.Kind ~= "Posts" or group.Step <= 0 then
 		return false
 	end
-	if not self.Dependencies.RoundController.IsNight() then
+	if not self.Dependencies.RoundController.Dark() then
 		return false
 	end
 	return now < record.At + fixture.Order * group.Step
@@ -869,7 +871,7 @@ end
 -- The kitchen is dark: night, a Switch group of the current vehicle off, no cutscene day look
 function LightController:WantsDark(): boolean
 	const round = self.Dependencies.RoundController
-	if not round.IsNight() or Players.LocalPlayer:GetAttribute(LOOK_ATTRIBUTE) == "Cinematic" then
+	if not round.Dark() or Players.LocalPlayer:GetAttribute(LOOK_ATTRIBUTE) == "Cinematic" then
 		return false
 	end
 	if self.Dependencies.PlaceController:Is("Lobby") then
@@ -939,7 +941,7 @@ function LightController:InTotalDark(): boolean
 	if self.Dark >= 0.5 then
 		return true
 	end
-	if not self.Dependencies.RoundController.IsNight() or self.Dependencies.PlaceController:Is("Lobby") then
+	if not self.Dependencies.RoundController.Dark() or self.Dependencies.PlaceController:Is("Lobby") then
 		return false
 	end
 	const ambient = Lighting.Ambient

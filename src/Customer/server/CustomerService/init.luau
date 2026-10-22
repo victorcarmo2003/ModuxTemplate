@@ -36,8 +36,9 @@
 -- Content.Shift[phase].Selling (Open, Night). Night flow: mean interval = Nights[k].Customers.BaseInterval (fallback
 -- Flow.NightInterval) / PartyMult[connected], no day growth and no Trailer Lights; cap Nights[k].Customers.Max (never
 -- above Flow.MaxCustomersNight). The drawer side follows EconomyService:IsDrawerOpen() (selling phase or Closing):
--- the queue is still served in the day Closing. Leaving a selling phase for anything but the day Closing sends every
--- customer away (NightEnd/NightLost, the 6 AM Closing, Summary...), so the night Closing finds the counter empty.
+-- the queue is still served in the Closing last call (day, and the 6 AM one since owner 2026-10-21). Leaving a selling
+-- phase for anything else sends every customer away (NightLost, Summary, Finale...); NightEnd keeps the line for the 6 AM
+-- last call.
 -- Acted(id, action, player, result) fires after take_order, serve, refuse and give_up (patience, no player) for the
 -- anomaly rules (§19.13). "Take Order" outside the drawer phases sends the D-04 notice shop_closed to that player.
 --
@@ -282,6 +283,9 @@ const SERVE = "serve"
 const REFUSE = "refuse"
 const GIVE_UP = "give_up"
 const CLOSING = "Closing"
+const NIGHT_END = "NightEnd"
+-- the 6 AM Closing is a last call (Content.Shift Closing Night.LastCall, owner 2026-10-21): NightEnd keeps the line for it
+const NIGHT_LAST_CALL = (Content.Shift.ByKey.Closing.Night ~= nil and Content.Shift.ByKey.Closing.Night.LastCall) == true
 const SHOP_CLOSED = "shop_closed" -- Content.Notices key (D-04 #10)
 -- Same notice to the same player at most once per this many seconds (FEAT-005 anti-spam). PROVISIONAL constant:
 -- no Content field holds it yet.
@@ -2897,10 +2901,12 @@ function CustomerService:OnPhase(phase: string)
 		return
 	end
 	self.NextSpawnAt = 0
-	-- The day Closing still serves the queue (DEC-048). Any other phase after selling (NightEnd, NightLost, the 6 AM
-	-- Closing, Summary, Finale, RunEnd) empties the counter: everyone still around walks off with no outcome.
-	if phase == CLOSING and not self:IsNightShift() then
-		-- Last call (DEC-240): the line stays; tell the crew nobody else is coming
+	-- The Closing last call still serves the queue (DEC-048, DEC-240; the 6 AM one too since owner 2026-10-21). Any other
+	-- phase after selling (NightLost, Summary, Finale, RunEnd) empties the counter: everyone still around walks off with
+	-- no outcome. The 6 AM beat (NightEnd) keeps the line for the night's last call right after it.
+	const round = self.Dependencies.RoundService
+	if phase == CLOSING and round:IsLastCall() then
+		-- Last call: the line stays; tell the crew nobody else is coming
 		self.Dependencies.RunStateService:Notify("all", "last_call", 0)
 		return
 	end
@@ -2936,6 +2942,9 @@ function CustomerService:StepGuarantee(t: number)
 		return
 	end
 	const guarantee = Content.Flow.Guarantee
+	if phase == NIGHT_END and NIGHT_LAST_CALL then
+		return
+	end
 	if self.EmptySince <= 0 then
 		self.EmptySince = t
 		const base = if self.Dependencies.RoundService:GetDay() <= 1 then guarantee.MaxEmptyDay1 else guarantee.MaxEmpty

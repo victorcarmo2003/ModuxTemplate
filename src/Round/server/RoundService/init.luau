@@ -173,6 +173,25 @@ function RoundService:IsStarted(): boolean
 	return self.Started
 end
 
+-- The morning of a night shift (owner 2026-10-21; Content.Shift.Morning): Call and Prep before the dusk minute
+function RoundService:IsMorning(): boolean
+	if not self.Started or not self.NightShift() then
+		return false
+	end
+	const phase = self.Phase()
+	return (phase == "Call" or phase == "Prep") and self:Minutes() < Content.Shift.Morning.DuskFrom
+end
+
+-- The last seconds of that morning: it darkens, no new walker or car
+function RoundService:IsDusk(): boolean
+	return self.Started and self.NightShift() and self.Phase() == "Prep" and self:Minutes() >= Content.Shift.Morning.DuskFrom
+end
+
+-- Dark out: a night shift outside its morning (the look, the fog, the night walkers). IsNight stays the shift's.
+function RoundService:IsDark(): boolean
+	return self.NightShift() and not self:IsMorning()
+end
+
 function RoundService:Info(): ShiftInfo
 	return { Day = self.Day(), Night = self.Night(), IsNight = self.NightShift(), Attempt = self.Attempt() }
 end
@@ -182,13 +201,18 @@ function RoundService:IsSelling(): boolean
 	return Content.Shift.ByKey[self.Phase()].Selling
 end
 
--- Last call (DEC-240): the DAY Closing (Content.Shift Closing.LastCall). Nobody new arrives but the trailer is still open:
--- the crew, the prep mode, the tables and the sign keep working until the line and the tables are empty.
+-- Last call (DEC-240): the DAY Closing (Content.Shift Closing.LastCall), and the night's 6 AM Closing when its Night
+-- override says LastCall (owner 2026-10-21, Provisional). Nobody new arrives but the trailer is still open: the crew, the
+-- prep mode, the tables and the sign keep working until the line and the tables are empty.
 function RoundService:IsLastCall(): boolean
-	if not self.Started or self.NightShift() then
+	if not self.Started then
 		return false
 	end
-	return Content.Shift.ByKey[self.Phase()].LastCall == true
+	const row = Content.Shift.ByKey[self.Phase()]
+	if self.NightShift() then
+		return row.Night ~= nil and row.Night.LastCall == true
+	end
+	return row.LastCall == true
 end
 
 -- The crew works the shop now: a selling phase or the day Last call (PrepService, SeatingService read this)
