@@ -172,7 +172,7 @@ function Pressure.extra(state: State, host: Host, t: number, minutes: number, wi
 		return state.Random:NextNumber()
 	end)
 	state.Extra += 1
-	host:Enqueue({ Key = key, At = at, Scripted = false, Slot = EXTRA_SLOT + state.Extra, Premiere = false })
+	host:Enqueue({ Key = key, At = at, Scripted = false, Slot = EXTRA_SLOT + state.Extra, Premiere = false, Night = false })
 	return key
 end
 

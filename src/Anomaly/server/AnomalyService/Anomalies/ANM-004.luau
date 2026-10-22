@@ -8,9 +8,9 @@
 -- until the copy spawns no other customer arrives (HoldSpawns), so the slot is the copy's; no room for the copy within
 -- COPY_WAIT s = the occurrence ends with no outcome. The original goes through CustomerService:Attempt, so the dev
 -- "arrivals off" (DevNoArrivals, regular flow only) never stops it.
--- Refuse the copy = resolved. "Take Order" on the copy = Fail of who took it, arrival + Wrong, cue mirror_smile and the
--- copy walks off. Refusing the original is only a lost sale (CustomerService counts it).
--- Copy left waiting = nothing.
+-- Owner 2026-10-22 (Provisional; anomalies-after-accept-proposal.md §9): no REFUSE any more; the copy's order is taken
+-- at the end of the talk and it waits in the delivery queue. Not migrated yet: condition "Serve" (interim, no error);
+-- its planned condition is NoServe (don't cook for it, proposal §2.4). Copy left waiting = nothing.
 -- Never on the same customer as N1: the copy is a "mirror" actor and the original is an ordinary Attempt spawn.
 -- Verb and numbers: Rules/ANM-004.luau. Body: Kit/CustomerActor.
 --
@@ -57,7 +57,7 @@ const waits: { [Api.Occurrence]: Wait } = setmetatable({}, { __mode = "k" }) :: 
 -- Spawns the original (an ordinary customer) and starts the waiting phase. false = no slot / room now.
 local function startOriginal(ctx: Api.Context, occ: Api.Occurrence): boolean
 	const rule = ctx.Rule(occ.Key)
-	if rule == nil or type(rule.Params.Variant) ~= "string" or type(rule.Params.Wrong) ~= "string" then
+	if rule == nil or type(rule.Params.Variant) ~= "string" then
 		return false
 	end
 	const customers = Kit.Customers()
@@ -82,8 +82,7 @@ local function startOriginal(ctx: Api.Context, occ: Api.Occurrence): boolean
 		From = npcs:GetNode(original),
 		LeftAt = nil,
 	}
-	const state: Kit.State = { Actor = 0, Original = original, LastTick = ctx.Now(), Fronted = false, Counted = false }
-	occ.State = state
+	occ.State = Kit.NewState(ctx, 0, original)
 	spawns():HoldSpawns(REASON, true)
 	ctx.Log(occ, `original #{original} at the counter; its copy comes after it leaves`)
 	return true
@@ -132,6 +131,8 @@ local function tickWait(ctx: Api.Context, occ: Api.Occurrence, wait: Wait, now: 
 		Species = look.Species,
 		Outfit = look.Outfit,
 		From = point,
+		-- owner 2026-10-22 (Provisional): the copy is NoServe, it does not wait long
+		PatienceScale = Kit.PatienceScale(rule),
 	})
 	if copy == nil then
 		spawns():HoldSpawns(REASON, true)

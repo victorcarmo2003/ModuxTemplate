@@ -7,6 +7,9 @@
 --   MaxActive  beats asking for action at once: anomalies running (counted by the host) plus the beats noted here that
 --              are still on (a chore until its deadline or end, a trip for Hold s)
 --   Reserve    a beat that is not an anomaly waits while a regular anomaly is due within Reserve s (the agenda first)
+--   Night lock owner 2026-10-22 (Provisional): the mandatory night event outranks every beat. While the lock is on
+--              (Director.lock: from Lead s before the event until its end + Tail s) clear() refuses every kind but
+--              "night" with the reason "night", and "night" itself skips the gap, the cap and the reserve.
 
 export type Rules = { Gap: { number }, MaxActive: { number }, Reserve: number, Hold: number }
 
@@ -15,17 +18,32 @@ export type State = {
 	LastAt: number,
 	-- beat key -> server time it stops counting as active
 	Active: { [string]: number },
+	-- night lock window in server time (LockFrom = math.huge: no lock); set by the host every step
+	LockFrom: number,
+	LockUntil: number,
 }
 
 const Director = {}
 
 function Director.new(): State
-	return { LastAt = 0, Active = {} }
+	return { LastAt = 0, Active = {}, LockFrom = math.huge, LockUntil = 0 }
 end
 
 function Director.reset(state: State)
 	state.LastAt = 0
 	table.clear(state.Active)
+	state.LockFrom = math.huge
+	state.LockUntil = 0
+end
+
+-- The night event's lock covers [from, untilAt) in server time (from = math.huge clears it)
+function Director.lock(state: State, from: number, untilAt: number)
+	state.LockFrom = from
+	state.LockUntil = untilAt
+end
+
+function Director.locked(state: State, t: number): boolean
+	return t >= state.LockFrom and t < state.LockUntil
 end
 
 local function pick(list: { number }, crew: number): number
@@ -46,7 +64,8 @@ function Director.count(state: State, t: number): number
 end
 
 -- Can a beat start now? running = anomaly occurrences in progress; dueIn = real seconds until the next regular anomaly
--- (math.huge if none); anomaly = the asker is the agenda itself (no Reserve). Returns (ok, reason).
+-- (math.huge if none); kind "anomaly" = the agenda itself (no Reserve), "night" = the night event (only the lock
+-- does not apply to it), any other kind is a beat that waits. Returns (ok, reason).
 function Director.clear(
 	state: State,
 	rules: Rules,
@@ -54,15 +73,21 @@ function Director.clear(
 	crew: number,
 	running: number,
 	dueIn: number,
-	anomaly: boolean
+	kind: string
 ): (boolean, string?)
+	if kind == "night" then
+		return true, nil
+	end
+	if Director.locked(state, t) then
+		return false, "night"
+	end
 	if state.LastAt > 0 and t - state.LastAt < pick(rules.Gap, crew) then
 		return false, "gap"
 	end
 	if running + Director.count(state, t) >= pick(rules.MaxActive, crew) then
 		return false, "active"
 	end
-	if not anomaly and dueIn < rules.Reserve then
+	if kind ~= "anomaly" and dueIn < rules.Reserve then
 		return false, "reserve"
 	end
 	return true, nil

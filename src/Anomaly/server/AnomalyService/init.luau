@@ -15,9 +15,12 @@
 --   Context     one table of functions shared by every module (Api.Context): Publish (set), Cue (packet to
 --               everyone, DEC-204), Fail (who pays, DEC-204; once per player per occurrence; critical ->
 --               LoseNight("critical"), DEC-094), Succeed, Finish, Active, Looking (Gaze + Vision), Pitch (Gaze), SeenTick/See
---               (VitalService:SeeAnomaly), Rule, Spawn, Light, Vehicle, InZone, Kitchen, Traffic, Economy.
+--               (VitalService:SeeAnomaly), Rule, Spawn, Light, Vehicle, InZone, Kitchen, Traffic, Economy (AddSale:
+--               the x2 of a customer anomaly served right, owner 2026-10-22). Wire phase "Queue": a customer anomaly
+--               waiting for its order (Kit/CustomerActor conditions).
 --   Stare       TASK-482 (DEC-294 §8; tech/stare-pressure.md): SeenTick of a row with Anomalies[k].Stare also counts
---               the continuous stare at the target in the narrow cone Sanity.Stare.Angle (Active record only). Looking
+--               the continuous stare at the target in the narrow cone Sanity.Stare.Angle (Queue record only since
+--               2026-10-22: a customer anomaly waiting for its order; the arrival is quiet). Looking
 --               away Release s restarts the count. Past DrainAfter s the player loses PerSecond sanity per second
 --               (whole points, the fraction carried), at most Cap per occurrence. The sight (SeeAnomaly, once per night
 --               at SeeTime) comes first and is never repeated by the stare.
@@ -41,6 +44,14 @@
 --               the crew to act. Regular entries (not the fixed premiere, not scripted ones), trips, chores
 --               (ChoreService) and suspense events (SuspenseService) ask BeatClear before they start and note it with
 --               BeatBegin; Gap between two starts, MaxActive at once, the agenda first (Reserve).
+--   Night event owner 2026-10-22 (Provisional; Scheduler.NightPool/NightAt, Content.Nights.Beats Night*): ONE mandatory
+--               world event per night (a B/C/D anomaly with a verb; the breaker trip when none is open, Nights 1-2) at a
+--               random minute, with priority over everything. StepNightEvent starts it whatever the grace, gap, caps,
+--               window end and shut window say (it waits NightMaxWait s for a running anomaly, then goes anyway; a pool
+--               key that ExclusiveWith something running is skipped, the last resort is the breaker). Its lock
+--               (Director.lock: NightLead s before to NightTail s after) stops the rest: BeatClear refuses every kind
+--               but "night", and the regular entries, the fixed premiere, the family D scares, the personal scares, the
+--               trips and "behind you" wait. Still held by the dev hold and the tutorial.
 --   Behind      owner 2026-10-21 (Behind.luau, Content.Nights.Behind, Provisional): in a calm stretch, a sound right
 --               behind a player who cooks with the back to the window (a scripted behind_* family D scare, that
 --               player only). Not a beat: no verb, no cost.
@@ -118,6 +129,19 @@ export type Run = {
 }
 
 export type Due = { Entry: Scheduler.Entry, RetryAt: number, Done: boolean }
+
+-- The night's mandatory world event (owner 2026-10-22, Provisional). Phase: "none" (no agenda tonight) | "pending" |
+-- "running" | "done". Pool = keys it may start, the drawn one first; the entry's key is "breaker" when the pool is empty
+-- (the breaker trips instead). LockEndAt = server time the lock lets go (set when it starts).
+export type NightEvent = {
+	Entry: Scheduler.Entry?,
+	Pool: { string },
+	Phase: string,
+	DueAt: number,
+	StartedAt: number,
+	RunId: number,
+	LockEndAt: number,
+}
 
 export type Gaze = { Yaw: number, Pitch: number, At: number }
 
@@ -211,7 +235,15 @@ local function candidate(row: Content.Anomaly): Scheduler.Candidate
 		Scripted = if scripted then { Night = scripted.Night, Clock = scripted.Clock } else nil,
 		Family = row.Family,
 		SkipAtmospheres = row.SkipAtmospheres,
+		Actor = row.Actor,
 	}
+end
+
+-- Key of the night event entry when no world anomaly is open tonight: the breaker trips instead
+const NIGHT_BREAKER = "breaker"
+
+local function newNightEvent(): NightEvent
+	return { Entry = nil, Pool = {}, Phase = "none", DueAt = 0, StartedAt = 0, RunId = 0, LockEndAt = 0 }
 end
 
 const AnomalyService = Modux.Service("AnomalyService", {
@@ -256,6 +288,8 @@ function AnomalyService:Setup()
 	self.Trip = Trip.new() :: Trip.State
 	-- beat budget of the current night (Director.luau)
 	self.Director = Director.new() :: Director.State
+	-- the mandatory night event of the current night (owner 2026-10-22)
+	self.NightEvent = newNightEvent() :: NightEvent
 	-- "behind you" sounds of the current night (Behind.luau)
 	self.Behind = Behind.new() :: Behind.State
 	-- SecurityService, false when this build has none (IsWatching)
@@ -559,7 +593,7 @@ function AnomalyService:Publish(occ: Api.Occurrence, fields: Api.Fields)
 	end
 	const record = table.clone(run.Record)
 	const phase = fields.Phase
-	if phase == "Signal" or phase == "Active" or phase == "Resolved" or phase == "Failed" then
+	if phase == "Signal" or phase == "Active" or phase == "Queue" or phase == "Resolved" or phase == "Failed" then
 		record.Phase = phase
 	elseif phase ~= nil then
 		self:WarnOnce(`phase:{occ.Key}`, `{occ.Ref}: Publish Phase "{tostring(phase)}" is not a wire phase`)
@@ -878,7 +912,8 @@ function AnomalyService:SeenTick(occ: Api.Occurrence, target: Vector3, range: nu
 			self:See(occ, player)
 		end
 	end
-	if run.Row.Stare and run.Record.Phase == "Active" then
+	-- owner 2026-10-22: the stare pressure only while a customer anomaly waits in the delivery queue (never on arrival)
+	if run.Row.Stare and run.Record.Phase == "Queue" then
 		self:StareTick(run, target, range, dt)
 	end
 end
@@ -1087,6 +1122,13 @@ function AnomalyService:BuildContext(): Api.Context
 			CountResult = function(result: string)
 				economy:CountResult(result :: any)
 			end,
+			AddSale = function(amount: number): number
+				const value = math.floor(amount)
+				if not finite(value) or value <= 0 then
+					return 0
+				end
+				return economy:AddSale(value, "Sale")
+			end,
 		},
 		Log = function(occ: Api.Occurrence, message: string)
 			warn(`{PREFIX} {occ.Ref}#{occ.Id}: {message}`)
@@ -1103,6 +1145,7 @@ function AnomalyService:BuildAgenda(info: { Day: number, Night: number, IsNight:
 	self.NextScareAt = 0
 	self.Pressure = Pressure.new()
 	self.Trip = Trip.new()
+	self.NightEvent = newNightEvent()
 	Director.reset(self.Director)
 	if not info.IsNight or info.Night < 1 then
 		return
@@ -1147,6 +1190,8 @@ function AnomalyService:BuildAgenda(info: { Day: number, Night: number, IsNight:
 		Events = night.Events + self:CrewEvents(),
 		Premiere = night.NewAnomaly,
 		PremiereAt = Content.Nights.PremiereAt[info.Night],
+		-- owner 2026-10-22 (Provisional): the mandatory night event, a world anomaly with a verb (B/C/D)
+		NightEvent = { Families = { "B", "C", "D" }, Grace = Content.Nights.Grace[info.Night], Span = Content.Nights.Beats.NightSpan },
 		Window = Content.Nights.Windows.Shift,
 		MinGap = night.MinGap,
 		MinutesPerSecond = if night.Duration > 0 then (phase.ClockTo - phase.ClockFrom) / night.Duration else 0,
@@ -1185,6 +1230,41 @@ function AnomalyService:BuildAgenda(info: { Day: number, Night: number, IsNight:
 		end
 		table.sort(self.Scares)
 	end
+	-- owner 2026-10-22 (Provisional): the mandatory night event. The pool lists the drawn key first; no pool = the breaker
+	-- trips at a minute drawn here (after every other draw, so those never change)
+	const pool = Scheduler.NightPool(input)
+	local chosen: Due? = nil
+	for _, due in self.Queue do
+		if due.Entry.Night then
+			chosen = due
+			break
+		end
+	end
+	const event = self.NightEvent
+	if chosen ~= nil then
+		const key = chosen.Entry.Key
+		table.insert(event.Pool, key)
+		for _, other in pool do
+			if other ~= key then
+				table.insert(event.Pool, other)
+			end
+		end
+		event.Entry = chosen.Entry
+	else
+		const fallback: Scheduler.Entry = {
+			Key = NIGHT_BREAKER,
+			At = Scheduler.NightAt(input, function(): number
+				return rng:NextNumber()
+			end),
+			Scripted = false,
+			Slot = 0,
+			Premiere = false,
+			Night = true,
+		}
+		table.insert(self.Queue, { Entry = fallback, RetryAt = 0, Done = false })
+		event.Entry = fallback
+	end
+	event.Phase = "pending"
 end
 
 -- Pressure host (DEC-352, Pressure.Host) ---------------------------------------------------------------------------
@@ -1212,7 +1292,7 @@ function AnomalyService:Queued(): { Scheduler.Entry }
 	end
 	for _, run in self.Running do
 		if not run.Done then
-			table.insert(out, { Key = run.Occ.Key, At = 0, Scripted = false, Slot = 0, Premiere = false })
+			table.insert(out, { Key = run.Occ.Key, At = 0, Scripted = false, Slot = 0, Premiere = false, Night = false })
 		end
 	end
 	return out
@@ -1298,10 +1378,10 @@ function AnomalyService:BeatDueIn(future: boolean?): number
 end
 
 -- May a beat of this kind start now? kind "anomaly" = the agenda itself (no Reserve); any other kind ("chore",
--- "trip", "suspense") also waits for a regular anomaly due within Beats.Reserve s
+-- "trip", "suspense") also waits for a regular anomaly due within Beats.Reserve s. Every kind but "night" (the night
+-- event, owner 2026-10-22) is refused during the night event's lock
 function AnomalyService:BeatClear(kind: string): boolean
-	const anomaly = kind == "anomaly"
-	const dueIn = if anomaly then math.huge else self:BeatDueIn()
+	const dueIn = if kind == "anomaly" or kind == "night" then math.huge else self:BeatDueIn()
 	const ok = Director.clear(
 		self.Director,
 		Content.Nights.Beats,
@@ -1309,9 +1389,26 @@ function AnomalyService:BeatClear(kind: string): boolean
 		self:CrewSize(),
 		self:RunningCount(),
 		dueIn,
-		anomaly
+		kind
 	)
 	return ok
+end
+
+-- The night event's lock is on now (owner 2026-10-22): nothing but the event itself starts. Refreshed every StepAgenda.
+function AnomalyService:NightLocked(): boolean
+	return Director.locked(self.Director, now())
+end
+
+-- Real seconds per game minute of the Night phase (0 when the night or the phase is not valid)
+function AnomalyService:SecondsPerMinute(): number
+	const nights = Content.Nights.List
+	const night = nights[math.clamp(self.Shift.Night, 1, #nights)]
+	const phase = Content.Shift.ByKey[NIGHT_PHASE]
+	const span = phase.ClockTo - phase.ClockFrom
+	if night == nil or span <= 0 then
+		return 0
+	end
+	return night.Duration / span
 end
 
 -- A beat started now; it counts as active for `hold` s (nil = Beats.Hold, 0 = only the gap) or until BeatEnd
@@ -1331,6 +1428,9 @@ end
 function AnomalyService:BehindWhy(): string?
 	const t = now()
 	const director = self.Director
+	if Director.locked(director, t) then
+		return "night event"
+	end
 	if self:RunningCount() > 0 then
 		return "anomaly running"
 	end
@@ -1438,8 +1538,117 @@ function AnomalyService:Held(minutes: number): boolean
 	return self:TutorialHeld() or self:InGrace(minutes)
 end
 
+-- Server-time window [from, until) of the night event's lock, nil when it is not locking (done, or the dev / tutorial
+-- hold has the agenda). Pending: from NightLead s before it is due, no end until it starts; running: until the run
+-- ends + NightTail (LockEndAt).
+function AnomalyService:NightLockWindow(t: number, minutes: number): (number?, number?)
+	const event = self.NightEvent
+	const entry = event.Entry
+	if entry == nil or event.Phase == "none" or event.Phase == "done" then
+		return nil, nil
+	end
+	if event.Phase == "running" then
+		return event.StartedAt, event.LockEndAt
+	end
+	const perMinute = self:SecondsPerMinute()
+	if perMinute <= 0 or self.DevHeld or self:TutorialHeld() then
+		return nil, nil
+	end
+	return t + (entry.At - minutes) * perMinute - Content.Nights.Beats.NightLead, math.huge
+end
+
+-- The night event: waits for its minute, then starts whatever the grace, the gap, the caps, the shut window and the window
+-- end say; an anomaly running when it is due gets NightMaxWait s to finish. Tries the pool in order (an ExclusiveWith
+-- or a failed Start moves to the next key), the breaker trip last.
+function AnomalyService:StepNightEvent(t: number, minutes: number, tutorial: boolean)
+	const event = self.NightEvent
+	const entry = event.Entry
+	const rules = Content.Nights.Beats
+	if entry == nil then
+		return
+	end
+	if event.Phase == "running" then
+		-- the lock lets go Tail s after the run ends (or at the cap set when it started)
+		-- (RunId -1 = the breaker trip: its lock runs a fixed NightSpan + NightTail)
+		const run = self.Running[event.RunId]
+		if event.RunId >= 0 and (run == nil or run.Done) and t + rules.NightTail < event.LockEndAt then
+			event.LockEndAt = t + rules.NightTail
+		end
+		if t >= event.LockEndAt then
+			event.Phase = "done"
+		end
+		return
+	end
+	if event.Phase ~= "pending" or tutorial or entry.At > minutes then
+		return
+	end
+	if event.DueAt == 0 then
+		event.DueAt = t
+	end
+	if self:RunningCount() > 0 and t - event.DueAt < rules.NightMaxWait then
+		return
+	end
+	const running = self:RunningCandidates()
+	for _, key in event.Pool do
+		const module, row = self.Modules[key], Content.Anomalies.ByKey[key]
+		if module == nil or row == nil then
+			continue
+		end
+		local blocked = false
+		for _, other in running do
+			if other.Key == key or table.find(row.ExclusiveWith, other.Key) ~= nil or table.find(other.ExclusiveWith, key) ~= nil then
+				blocked = true
+				break
+			end
+		end
+		if blocked then
+			continue
+		end
+		const started = self:StartOccurrence(key, module, entry.Slot)
+		if not started then
+			continue
+		end
+		local runId = 0
+		for id, run in self.Running do
+			if run.Occ.Key == key and id > runId then
+				runId = id
+			end
+		end
+		event.Phase = "running"
+		event.StartedAt = t
+		event.RunId = runId
+		-- an event that outlasts twice its span lets the lock go anyway (a blackout nobody fixes)
+		event.LockEndAt = t + rules.NightSpan * 2 + rules.NightTail
+		Director.begin(self.Director, "night", t, 0)
+		self:NightEntryDone()
+		return
+	end
+	-- last resort (and Nights 1-2, no world anomaly open): the breaker trips
+	const tripped = self:TripBreaker()
+	if not tripped then
+		warn(`{PREFIX} night event: no anomaly could start and the breaker could not trip (power already out?)`)
+	end
+	Director.begin(self.Director, "night", t, rules.NightSpan)
+	event.Phase = "running"
+	event.StartedAt = t
+	event.RunId = -1
+	event.LockEndAt = t + rules.NightSpan + rules.NightTail
+	self:NightEntryDone()
+end
+
+-- the night event's agenda entry is spent (listing, BeatDueIn)
+function AnomalyService:NightEntryDone()
+	const entry = self.NightEvent.Entry
+	for _, due in self.Queue do
+		if due.Entry == entry then
+			due.Done = true
+		end
+	end
+end
+
 function AnomalyService:StepAgenda(t: number)
 	if self.DevHeld then
+		Director.lock(self.Director, math.huge, 0)
 		return
 	end
 	const minutes = self.Dependencies.RoundService:Minutes()
@@ -1447,9 +1656,14 @@ function AnomalyService:StepAgenda(t: number)
 	const held = tutorial or self:InGrace(minutes)
 	const windowEnd = Content.Nights.Windows.Shift[2]
 	const limits = self:Limits()
+	-- owner 2026-10-22 (Provisional): the mandatory night event first, and its lock holds back everything else below
+	self:StepNightEvent(t, minutes, tutorial)
+	const lockFrom, lockUntil = self:NightLockWindow(t, minutes)
+	Director.lock(self.Director, lockFrom or math.huge, lockUntil or 0)
+	const locked = Director.locked(self.Director, t)
 	-- owner 2026-10-20 (Provisional Q-415): the scripted opening first, as the Night phase starts (only the tutorial holds it)
 	-- (OPENING_AFTER game minutes in, so the clients already show the Night phase and do not cancel it)
-	if not tutorial and self.Opening ~= "" and minutes >= Content.Nights.Windows.Calm[1] + OPENING_AFTER then
+	if not tutorial and not locked and self.Opening ~= "" and minutes >= Content.Nights.Windows.Calm[1] + OPENING_AFTER then
 		const key = self.Opening
 		self.Opening = ""
 		self.Dependencies.HallucinationService:Scare(nil, { key })
@@ -1457,7 +1671,7 @@ function AnomalyService:StepAgenda(t: number)
 	end
 	-- family D: a scare due now plays for everyone (any key of the D catalogue); none past the window. Owner 2026-10-20
 	-- (Provisional Q-415): not held by the grace, and one at a time (ScareGap apart) when several are due together
-	if not tutorial and t >= self.NextScareAt and #self.Scares > 0 and self.Scares[1] <= minutes then
+	if not tutorial and not locked and t >= self.NextScareAt and #self.Scares > 0 and self.Scares[1] <= minutes then
 		table.remove(self.Scares, 1)
 		if minutes < windowEnd then
 			self.Dependencies.HallucinationService:Scare(nil, nil)
@@ -1465,21 +1679,22 @@ function AnomalyService:StepAgenda(t: number)
 		end
 	end
 	-- DEC-352: low sanity brings personal scares (any time of the Night phase) and extra entries (not in the grace)
-	if not tutorial then
+	if not tutorial and not locked then
 		Pressure.scares(self.Pressure, self, t)
 		if not held then
 			Pressure.extra(self.Pressure, self, t, minutes, windowEnd)
 		end
 	end
 	-- Q-435: the breaker trips by itself (not in the grace, not past the window, never on top of an anomaly)
-	if not held and minutes < windowEnd then
+	if not held and not locked and minutes < windowEnd then
 		Trip.step(self.Trip, self, t)
 		-- owner 2026-10-21: a sound behind a player cooking with the back to the window, in a calm stretch
 		Behind.step(self.Behind, self, t)
 	end
 	for _, due in self.Queue do
 		const entry = due.Entry
-		if due.Done or entry.At > minutes or t < due.RetryAt then
+		-- the night event has its own step (StepNightEvent); nothing else starts while its lock is on
+		if due.Done or entry.Night or locked or entry.At > minutes or t < due.RetryAt then
 			continue
 		end
 		const module = self.Modules[entry.Key]
@@ -1596,6 +1811,8 @@ function AnomalyService:OnPhase(phase: string)
 		self.Queue = {}
 		self.Scares = {}
 		self.Opening = ""
+		self.NightEvent = newNightEvent()
+		Director.lock(self.Director, math.huge, 0)
 	end
 	if next(self.Running) ~= nil or next(self.Removing) ~= nil then
 		self:StopAll(if phase == "NightEnd" then "NightOver" else "Restore")
@@ -1769,7 +1986,9 @@ function AnomalyService:DevAgenda(): string
 		const row = Content.Anomalies.ByKey[entry.Key]
 		table.insert(
 			lines,
-			`{string.format("%02d:%02d", minutes // 60, minutes % 60)} {row.Ref}{if entry.Scripted
+			`{string.format("%02d:%02d", minutes // 60, minutes % 60)} {if row ~= nil then row.Ref else entry.Key}{if entry.Night
+				then " night"
+				elseif entry.Scripted
 				then " scripted"
 				elseif entry.Premiere then " premiere"
 				elseif entry.Slot > Pressure.EXTRA_SLOT then " extra (sanity)"
@@ -1862,7 +2081,34 @@ function AnomalyService:DevBeats(): string
 	const t = now()
 	const due = self:BeatDueIn()
 	const next = if due == math.huge then "none" else string.format("in %.0fs", due)
-	return `{Director.describe(self.Director, Content.Nights.Beats, t, self:CrewSize(), self:RunningCount())}; next anomaly {next}`
+	return `{Director.describe(self.Director, Content.Nights.Beats, t, self:CrewSize(), self:RunningCount())}; next anomaly {next}; {self:DescribeNightEvent(t)}`
+end
+
+-- Night event line for the dev commands: key, game clock, state and the lock
+function AnomalyService:DescribeNightEvent(t: number): string
+	const event = self.NightEvent
+	const entry = event.Entry
+	if entry == nil then
+		return "night event: none (no agenda)"
+	end
+	const minutes = math.floor(entry.At) % 1440
+	const lock = if Director.locked(self.Director, t) then "LOCK on" else "lock off"
+	const pool = table.concat(event.Pool, ", ")
+	return `night event: {entry.Key} at {string.format("%02d:%02d", minutes // 60, minutes % 60)} {event.Phase}, {lock}, pool [{pool}]`
+end
+
+-- Night event (owner 2026-10-22). now = it is due at once (still waits NightMaxWait s for a running anomaly)
+function AnomalyService:DevNightEvent(nowToo: boolean): string
+	self:DevCheck()
+	const event = self.NightEvent
+	const entry = event.Entry
+	if nowToo then
+		if entry == nil or event.Phase ~= "pending" then
+			error(`the night event is {event.Phase}: only a pending one can be hurried`, 0)
+		end
+		entry.At = self.Dependencies.RoundService:Minutes()
+	end
+	return self:DescribeNightEvent(now())
 end
 
 -- Lifecycle -------------------------------------------------------------------------------------------------------

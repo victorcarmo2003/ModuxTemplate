@@ -155,13 +155,33 @@ const occurrences: Occurrences = {
 --   MaxActive  beats asking for action at once (anomalies running + chores before their deadline + a tripped breaker)
 -- Reserve: a chore, trip or suspense event waits when a regular anomaly is due within this many real seconds, so the
 -- agenda keeps priority. Family D scares and the sanity pressure's personal scares are not beats (no verb, no cost).
-export type Beats = { Gap: { number }, MaxActive: { number }, Reserve: number, Hold: number }
+-- Night event (owner 2026-10-22, Provisional): each night has ONE mandatory world event (a B/C/D anomaly with a verb,
+-- drawn at a random minute; the breaker trip on the nights with none open) that outranks every other beat. Around it
+-- there is a lock: NightLead s before it and NightTail s after it nothing else starts (no anomaly, chore, trip, suspense
+-- event, family D scare, personal scare or "behind you"). It ignores the grace, the gap, the caps and the window end; if
+-- an anomaly is running when it is due it waits at most NightMaxWait s, then starts anyway. NightSpan = typical real
+-- seconds the event takes: it is drawn early enough to end before 5 AM, and the lock lets go of a run that lasts more
+-- than twice that.
+export type Beats = {
+	Gap: { number },
+	MaxActive: { number },
+	Reserve: number,
+	Hold: number,
+	NightLead: number,
+	NightTail: number,
+	NightMaxWait: number,
+	NightSpan: number,
+}
 const beats: Beats = {
 	Gap = { 25, 22, 18, 15 },
 	MaxActive = { 1, 1, 2, 2 },
 	Reserve = 15,
 	-- s a beat with no end of its own counts as active (a chore with no deadline, a breaker trip)
 	Hold = 20,
+	NightLead = 20,
+	NightTail = 10,
+	NightMaxWait = 25,
+	NightSpan = 30,
 }
 
 -- "Behind you" (owner 2026-10-21, Provisional): while a player cooks with the back to the window and the night is calm,
@@ -187,7 +207,8 @@ const behind: Behind = {
 	Point = "Q1",
 	Near = 36, -- the kitchen stations are 18-33 studs from Q1 (measured in Studio 2026-10-21)
 	Facing = 110,
-	Keys = { "behind_steps", "behind_creak", "behind_tap" },
+	-- owner 2026-10-21: behind_tap out (no knock sounds in the scares)
+	Keys = { "behind_steps", "behind_creak" },
 }
 
 -- DEC-320 (Q-413, Provisional): extra regular anomaly events of a night by the crew connected at its start (1..4 players):

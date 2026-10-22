@@ -5,6 +5,7 @@ local Achievements = require(script.Parent.Achievements)
 local Actions = require(script.Parent.Actions)
 local Animations = require(script.Parent.Animations)
 local Anomalies = require(script.Parent.Anomalies)
+local AnomalyHints = require(script.Parent.AnomalyHints)
 local BossCalls = require(script.Parent.BossCalls)
 local Classes = require(script.Parent.Classes)
 local CustomerTypes = require(script.Parent.CustomerTypes)
@@ -25,6 +26,7 @@ local Nights = require(script.Parent.Nights)
 local Notices = require(script.Parent.Notices)
 local OpalLines = require(script.Parent.OpalLines)
 local Orders = require(script.Parent.Orders)
+local OrderTalk = require(script.Parent.OrderTalk)
 local Outfits = require(script.Parent.Outfits)
 local Packages = require(script.Parent.Packages)
 local Prep = require(script.Parent.Prep)
@@ -41,7 +43,7 @@ local Stations = require(script.Parent.Stations)
 local Stats = require(script.Parent.Stats)
 local Suspense = require(script.Parent.Suspense)
 local Table = require(script.Parent.Table)
-local TipJar = require(script.Parent.TipJar)
+local Tics = require(script.Parent.Tics)
 local Traffic = require(script.Parent.Traffic)
 local Upgrades = require(script.Parent.Upgrades)
 local Vehicles = require(script.Parent.Vehicles)
@@ -535,6 +537,7 @@ local function checkOrders()
 	inRange("OrderRules", nil, nil, "OrderPatienceBase", rules.OrderPatienceBase, 1, rules.WireSpanMax)
 	inRange("OrderRules", nil, nil, "OrderPatiencePerK", rules.OrderPatiencePerK, 0, 60)
 	inRange("OrderRules", nil, nil, "WireSpanMax", rules.WireSpanMax, 1, 255)
+	inRange("OrderRules", nil, nil, "UnservablePatienceScale", rules.UnservablePatienceScale, 0.05, 1)
 	for index, row in Orders.List do
 		if #row.KWeights ~= rules.MaxToppings + 1 then
 			fail("OrderPhases", index, row.Key, `KWeights needs {rules.MaxToppings + 1} entries (K = 0..MaxToppings)`)
@@ -654,6 +657,7 @@ local function checkShopWindow()
 	inRange("ShopWindow", nil, nil, "ComplainTime", ShopWindow.ComplainTime, 0.5, 10)
 	inRange("ShopWindow", nil, nil, "WaitShutGrace", ShopWindow.WaitShutGrace, ShopWindow.ShutGrace, 60)
 	inRange("ShopWindow", nil, nil, "LeaveJitter", ShopWindow.LeaveJitter, 0, 5)
+	inRange("ShopWindow", nil, nil, "AutoOpenAfter", ShopWindow.AutoOpenAfter, 0, 600)
 	if not Moods.ByKey[ShopWindow.LeaveMood] then
 		fail("ShopWindow", nil, nil, `LeaveMood '{ShopWindow.LeaveMood}' is not a Moods key`)
 	end
@@ -1314,7 +1318,7 @@ local function checkHallucinations()
 		end
 		effects[row.Effect] = row.Key
 		inRange("Hallucinations", index, row.Key, "Cooldown", row.Cooldown, 0, 3600)
-		inRange("Hallucinations", index, row.Key, "Weight", row.Weight, 0.01, 100)
+		inRange("Hallucinations", index, row.Key, "Weight", row.Weight, 0, 100) -- 0 = never rolled (row kept, off)
 	end
 	if not (hasHigh and hasMid and hasLow) then
 		fail("Hallucinations", nil, nil, `needs effects below {bands.High}, below {bands.Mid} and lower (FEAT-019)`)
@@ -2106,26 +2110,6 @@ local function checkPrep()
 	end
 end
 
--- Tip jar (DEC-239): FullAt scales the jar pieces; MapIds are what TipJarService and EconomyController look for
-local function checkTipJar()
-	inRange("TipJar", nil, nil, "FullAt", TipJar.FullAt, 1, 100000)
-	inRange("TipJar", nil, nil, "MaxBills", TipJar.MaxBills, 1, 60)
-	if TipJar.MaxBills ~= math.floor(TipJar.MaxBills) then
-		fail("TipJar", nil, nil, "MaxBills must be a whole number")
-	end
-	if type(TipJar.MapId) ~= "string" or TipJar.MapId == "" then
-		fail("TipJar", nil, nil, "MapId must be a non-empty string")
-	end
-	for index, id in TipJar.LegacyMapIds do
-		if type(id) ~= "string" or id == "" or id == TipJar.MapId then
-			fail("TipJar", index, id, "LegacyMapIds must be non-empty strings other than MapId")
-		end
-	end
-	if Actions.ByKey.collect_tips == nil then
-		fail("TipJar", nil, nil, "Actions.collect_tips is required")
-	end
-end
-
 -- Restaurant (tech/restaurant-flow.md rev. 2 §4.2; design/restaurant-flow.md): ranges against the wire (Net Plates, Tablets,
 -- DriveCars, Hatch, Customers.Pickup / Drive), Dialog covers every ingredient of an order, the actions and stations exist
 const RESTAURANT_ACTIONS: { string } = {
@@ -2289,7 +2273,8 @@ end
 local function checkHorrorScenes()
 	checkKeys("HorrorScenes", HorrorScenes, KEY_PATTERN)
 	const rules = HorrorScenes.Rules
-	const phases = setOf({ "Signal", "Active", "Resolved", "Failed" })
+	-- Queue (owner 2026-10-22): a customer anomaly waiting for its order (the loader moves its arrival there)
+	const phases = setOf({ "Signal", "Active", "Queue", "Resolved", "Failed" })
 	const whos = setOf({ "All", "Caught", "Safe" })
 	const lights = setOf({ "Off", "On", "Flicker", "Cascade" })
 	const doors = setOf({ "Rattle", "Push", "Hold", "Lock", "Bulge" }) -- Bulge: TASK-592
@@ -2507,9 +2492,357 @@ local function checkHorrorScenes()
 	end
 end
 
+-- Anomaly tics in the order talk (design/anomaly-tics-proposal.md §5.1, §4.2, §4.3, §4.4): every row an odd customer,
+-- one row per Variant, the body's own fields, the last beat (an echo: its pause, with the longest hi and name) inside
+-- Rules.TicMax, the taker's steps known kinds inside the §2.2 ceilings (a Clue: only Step shakes, one per beat at most,
+-- no blur; owner 2026-10-22: the "paradinha" silence is in every tic now), the tension's numbers sane and its built layer
+-- naming real words and sounds, the beat sounds real Content.Sounds rows, never a Scare on the Raincoat Lady (she is
+-- served)
+local function checkTics()
+	checkKeys("Tics", Tics, "^anm_%d%d%d_[a-z0-9_]+$")
+	const rules = Tics.Rules
+	inRange("Tics.Rules", nil, nil, "TicMax", rules.TicMax, 0.5, 6)
+	inRange("Tics.Rules", nil, nil, "TypeRate", rules.TypeRate, 2, 120)
+	inRange("Tics.Rules", nil, nil, "PauseStop", rules.PauseStop, 0, 1)
+	inRange("Tics.Rules", nil, nil, "PauseComma", rules.PauseComma, 0, 1)
+	inRange("Tics.Rules", nil, nil, "HearRange", rules.HearRange, 1, 200)
+	inRange("Tics.Rules", nil, nil, "NameMax", rules.NameMax, 1, 40)
+	if #rules.Trail > 6 then
+		fail("Tics.Rules", nil, "Trail", `Trail '{rules.Trail}' is longer than 6 chars`)
+	end
+	const known: { [string]: boolean } = {}
+	for _, kind in
+		{ "Sound", "Music", "Lights", "Lightning", "Whispers", "Heartbeat", "Cinema", "Vignette", "Shake", "Fov", "Nudge", "Text" }
+	do
+		known[kind] = true
+	end
+	for _, kind in
+		{ "Actor", "Door", "Shadow", "Roof", "HeadDown", "Grade", "Blur", "Silence", "Pose", "Prop", "Glass", "Glare", "Silhouette", "Lantern" }
+	do
+		known[kind] = true
+	end
+	for _, kind in rules.Carry do
+		if not known[kind] then
+			fail("Tics.Rules", nil, "Carry", `'{kind}' is not a HorrorScenes step Kind`)
+		end
+	end
+	for _, sound in rules.CarrySounds do
+		if Sounds.ByKey[sound] == nil then
+			fail("Tics.Rules", nil, "CarrySounds", `'{sound}' is not a Content.Sounds key`)
+		end
+	end
+	const horror = HorrorScenes.Rules
+	const variants: { [string]: string } = {}
+	for index, row in Tics.List do
+		const key = row.Key
+		const anomaly = Anomalies.ByKey[key]
+		if anomaly == nil then
+			fail("Tics", index, key, "Key is not a Content.Anomalies key")
+		elseif anomaly.Actor ~= "Customer" then
+			fail("Tics", index, key, `the anomaly's Actor is {anomaly.Actor}: a tic needs an odd customer (Customer)`)
+		end
+		if row.Variant == "" or variants[row.Variant] ~= nil then
+			fail("Tics", index, key, `Variant '{row.Variant}' empty or already used by {variants[row.Variant] or "?"}`)
+		end
+		variants[row.Variant] = key
+		if row.Kind ~= "Clue" and row.Kind ~= "Scare" then
+			fail("Tics", index, key, `Kind '{row.Kind}' is not Clue or Scare`)
+		end
+		if row.Kind == "Scare" and key == "anm_005_raincoat_lady" then
+			fail("Tics", index, key, "the Raincoat Lady is served: her tic is never a Scare")
+		end
+		if row.Line.Text == "" then
+			fail("Tics", index, key, "Line.Text is empty")
+		end
+		inRange("Tics", index, key, "Line.Freeze", row.Line.Freeze, 0, 1)
+		-- owner 2026-10-22: the typing stops 1-2 s on "..." while the tension builds (was <= 0.6, §2.2)
+		inRange("Tics", index, key, "Hold", row.Hold, 0.5, 2.5)
+		inRange("Tics", index, key, "After", row.After, 0, 2)
+		const beats = row.Beats
+		if beats ~= nil then
+			inRange("Tics", index, key, "Beats.Count", beats.Count, 0, 6)
+			inRange("Tics", index, key, "Beats.Time", beats.Time, 0, 1)
+			inRange("Tics", index, key, "Beats.Gap", beats.Gap, 0, 1)
+			inRange("Tics", index, key, "Beats.Volume", beats.Volume, 0, 0.8) -- §2.2: the scare ceiling (DEC-173)
+			if Sounds.ByKey[beats.Sound] == nil then
+				fail("Tics", index, key, `Beats.Sound '{beats.Sound}' is not a Content.Sounds key`)
+			end
+		end
+		const count = if beats ~= nil then beats.Count else 0
+		-- the body's own fields
+		const body = row.Body
+		if body == "Neck" then
+			if count < 1 or row.Turn == nil then
+				fail("Tics", index, key, "a Neck tic needs Beats (the cracks) and Turn")
+			end
+			inRange("Tics", index, key, "Turn", row.Turn or 0, 0, 180)
+			if row.Residue ~= "Reversed" then
+				fail("Tics", index, key, `a Neck tic leaves Residue "Reversed" (got {row.Residue})`)
+			end
+		elseif body == "Eyes" then
+			const light = row.Light
+			if count ~= 1 or light == nil then
+				fail("Tics", index, key, "an Eyes tic needs one beat (the eyes opening) and Light")
+			else
+				inRange("Tics", index, key, "Light.Brightness", light.Brightness, 0, 6)
+				inRange("Tics", index, key, "Light.Residue", light.Residue, 0, light.Brightness)
+				inRange("Tics", index, key, "Light.Range", light.Range, 1, 16)
+				inRange("Tics", index, key, "Light.Angle", light.Angle, 10, 120)
+			end
+			if row.Residue ~= "White" then
+				fail("Tics", index, key, `an Eyes tic leaves Residue "White" (got {row.Residue})`)
+			end
+		elseif body == "Head" then
+			const scales = row.Scales
+			if scales == nil or #scales ~= count or count < 1 then
+				fail("Tics", index, key, "a Head tic needs one Scales entry per beat")
+			else
+				local last = 1
+				for step, scale in scales do
+					inRange("Tics", index, key, `Scales[{step}]`, scale, last, 2.5)
+					last = scale
+				end
+			end
+			inRange("Tics", index, key, "Cameras", row.Cameras or 1, 1, 4)
+			if row.Residue ~= "Big" then
+				fail("Tics", index, key, `a Head tic leaves Residue "Big" (got {row.Residue})`)
+			end
+		elseif body == "Echo" then
+			if row.Line.Echo ~= true or count ~= 0 then
+				fail("Tics", index, key, "an Echo tic has Line.Echo = true and no Beats (the pause is Hold)")
+			end
+			inRange("Tics", index, key, "Tilt", row.Tilt or 0, 0, 45)
+		elseif body == "Face" then
+			-- ANM-001 (owner 2026-10-22): the face fades over Hold and is gone at the one beat
+			if count ~= 1 or row.Face == nil or row.Face == "" then
+				fail("Tics", index, key, "a Face tic needs one beat (the face gone) and Face (the CrewExpressions face after it)")
+			end
+			if row.Residue ~= "Blank" then
+				fail("Tics", index, key, `a Face tic leaves Residue "Blank" (got {row.Residue})`)
+			end
+		else
+			fail("Tics", index, key, `Body '{tostring(body)}' is not Neck, Eyes, Head, Echo or Face`)
+		end
+		if (row.Residue == "None") ~= (row.OnLeave == "Cancel") then
+			fail("Tics", index, key, `Residue "None" goes with OnLeave "Cancel" and only with it`)
+		end
+		const pre = row.Pre
+		if pre ~= nil then
+			if #pre.Every ~= 2 or pre.Every[1] <= 0 or pre.Every[2] < pre.Every[1] then
+				fail("Tics", index, key, "Pre.Every must be { low, high } with 0 < low <= high")
+			end
+			inRange("Tics", index, key, "Pre.Value", pre.Value, 0, 45)
+			inRange("Tics", index, key, "Pre.Time", pre.Time, 0.02, 1)
+			inRange("Tics", index, key, "Pre.Volume", pre.Volume, 0, 1)
+			inRange("Tics", index, key, "Pre.Range", pre.Range, 0, 50)
+		end
+		const glint = row.Glint
+		if glint ~= nil then
+			inRange("Tics", index, key, "Glint.Brightness", glint.Brightness, 0, 3)
+			inRange("Tics", index, key, "Glint.Range", glint.Range, 0, 4)
+		end
+		-- the worst line: an echo with every hi and the longest name, else the row's own
+		local timing = Tics.Timing(row)
+		if row.Line.Echo == true then
+			for npc = 1, math.max(1, #OrderTalk.Hello) do
+				const candidate = Tics.Timing(row, Tics.Echo(npc, string.rep("W", rules.NameMax)))
+				if candidate.BeatsEnd > timing.BeatsEnd then
+					timing = candidate
+				end
+			end
+		end
+		if timing.BeatsEnd > rules.TicMax + 1e-6 then
+			fail("Tics", index, key, `the last beat ends {timing.BeatsEnd} s after the line starts, past Rules.TicMax {rules.TicMax}`)
+		end
+		if row.Caption ~= nil and row.Caption == "" then
+			fail("Tics", index, key, "Caption is empty (nil = no caption)")
+		end
+		-- the taker's tension (owner 2026-10-22, Tics header): its numbers, then the layer built from them
+		const tension = Tics.TensionOf(row)
+		inRange("Tics", index, key, "Tension.Bars", tension.Bars, 0, 0.2)
+		inRange("Tics", index, key, "Tension.BarsIn", tension.BarsIn, 0, 2)
+		inRange("Tics", index, key, "Tension.BarsFor", tension.BarsFor, 1, 30)
+		inRange("Tics", index, key, "Tension.Duck", tension.Duck, 0, 1)
+		inRange("Tics", index, key, "Tension.HeartFrom", tension.HeartFrom, 40, 200)
+		inRange("Tics", index, key, "Tension.HeartTo", tension.HeartTo, tension.HeartFrom, 200)
+		inRange("Tics", index, key, "Tension.HeartNormal", tension.HeartNormal, 40, 200)
+		inRange("Tics", index, key, "Tension.Pause", tension.Pause, 0.05, math.max(row.Hold - 0.3, 0.05))
+		inRange("Tics", index, key, "Tension.Back", tension.Back, 0, 3)
+		inRange("Tics", index, key, "Tension.Fov", tension.Fov, -3, 3) -- §2.2: FOV <= 3 degrees
+		inRange("Tics", index, key, "Tension.Blur", tension.Blur, 0, 3)
+		inRange("Tics", index, key, "Tension.Grade", tension.Grade, 0, 0.5)
+		inRange("Tics", index, key, "Tension.Vignette", tension.Vignette, 0, 0.35)
+		inRange("Tics", index, key, "Tension.Linger", tension.Linger, 0, 1)
+		inRange("Tics", index, key, "Tension.Whisper", tension.Whisper, 0, 1)
+		inRange("Tics", index, key, "Tension.Max", tension.Max, 30, 600)
+		if horror.Shakes[tension.Shake] == nil then
+			fail("Tics", index, key, `Tension.Shake '{tension.Shake}' is not in HorrorScenes.Rules.Shakes`)
+		end
+		if tension.Tint ~= "Cold" and tension.Tint ~= "Sick" and tension.Tint ~= "Red" then
+			fail("Tics", index, key, `Tension.Tint '{tension.Tint}' is not Cold, Sick or Red`)
+		end
+		if row.Kind == "Clue" and (tension.Shake ~= "Step" or tension.Blur > 0) then
+			fail("Tics", index, key, "a Clue's apex shakes with a Step and has no blur (§2.2)")
+		end
+		const layer = Tics.Layers[key]
+		if layer == nil then
+			fail("Tics", index, key, "no built layer (Tics.Layers)")
+		else
+			for stepIndex, step in layer do
+				const where = `Layers[{stepIndex}]`
+				if step.Kind == "Whispers" and step.Target ~= nil and HorrorScenes.Words[step.Target] == nil then
+					fail("Tics", index, key, `{where} Whispers '{step.Target}' is not a HorrorScenes.Words list`)
+				elseif step.Kind == "Sound" and (step.Target == nil or Sounds.ByKey[step.Target] == nil) then
+					fail("Tics", index, key, `{where} Sound '{tostring(step.Target)}' is not a Content.Sounds key`)
+				elseif step.Kind == "Text" and (step.Text == nil or step.Text == "") then
+					fail("Tics", index, key, `{where} Text is empty`)
+				end
+				if step.At < -row.Hold - 1e-6 then
+					fail("Tics", index, key, `{where} starts before the freeze (At {step.At} < -Hold)`)
+				end
+			end
+		end
+		local shakes = if tension.Shake == "Step" then 1 else 0
+		for stepIndex, step in row.Steps do
+			const where = `Steps[{stepIndex}]`
+			-- At = s from the apex (the Peak), negative = in the build-up
+			if timing.Peak + step.At > rules.TicMax + 1e-6 then
+				fail("Tics", index, key, `{where} starts past Rules.TicMax`)
+			end
+			inRange("Tics", index, key, `{where}.At`, step.At, -row.Hold, rules.TicMax)
+			if step.Kind == "Shake" then
+				if step.Target == nil or horror.Shakes[step.Target] == nil then
+					fail("Tics", index, key, `{where} Shake '{tostring(step.Target)}' is not in HorrorScenes.Rules.Shakes`)
+				end
+				if step.Target == "Step" then
+					shakes += 1
+				end
+				if row.Kind == "Clue" and (step.Target ~= "Step" or shakes > math.max(1, count)) then
+					fail("Tics", index, key, `{where}: a Clue shakes only with Steps, one per beat at most (§2.2)`)
+				end
+			elseif step.Kind == "Fov" then
+				inRange("Tics", index, key, `{where}.Value`, step.Value or 0, -3, 3) -- §2.2: FOV <= 3 degrees
+			elseif step.Kind == "Blur" then
+				inRange("Tics", index, key, `{where}.Value`, step.Value or 0, 0, 3)
+				inRange("Tics", index, key, `{where}.Duration`, step.Duration or 0, 0, 0.5)
+			elseif step.Kind == "Silence" then
+				inRange("Tics", index, key, `{where}.Value`, step.Value or 0, 0, 1)
+				inRange("Tics", index, key, `{where}.To`, (step.To :: number?) or 0, 0, 1)
+			elseif step.Kind == "Grade" then
+				inRange("Tics", index, key, `{where}.Value`, step.Value or 0, 0, 0.5)
+				inRange("Tics", index, key, `{where}.To`, (step.To :: number?) or 0, 0, 0.5)
+			elseif step.Kind == "Vignette" then
+				inRange("Tics", index, key, `{where}.Value`, step.Value or 0, 0, 0.35)
+				inRange("Tics", index, key, `{where}.To`, (step.To :: number?) or 0, 0, 0.35)
+			elseif step.Kind == "Sound" then
+				if step.Target == nil or Sounds.ByKey[step.Target] == nil then
+					fail("Tics", index, key, `{where} Sound '{tostring(step.Target)}' is not a Content.Sounds key`)
+				end
+				inRange("Tics", index, key, `{where}.Value`, step.Value or 1, 0, 0.6) -- §2.2: sting <= 0.6
+			else
+				fail("Tics", index, key, `{where} Kind '{step.Kind}' is not a tic step (Silence, Shake, Fov, Blur, Grade, Vignette, Sound)`)
+			end
+		end
+	end
+end
+
+-- The order talk (owner 2026-10-22: the speech typed letter by letter, no ACCEPT / REFUSE): the speech's times, every
+-- StyleByVariant naming a style, every style's effects inside sane bounds (px, degrees, shares 0..1)
+local function checkOrderTalk()
+	const speech = OrderTalk.Speech
+	inRange("OrderTalk.Speech", nil, nil, "Start", speech.Start, 0, 3)
+	inRange("OrderTalk.Speech", nil, nil, "Hold", speech.Hold, 0, 5)
+	inRange("OrderTalk.Speech", nil, nil, "Min", speech.Min, 0, 10)
+	inRange("OrderTalk.Speech", nil, nil, "Stressed", speech.Stressed, 0, 1)
+	inRange("OrderTalk.Speech", nil, nil, "BlipWords", speech.BlipWords, 1, 20)
+	if #OrderTalk.Hello == 0 then
+		fail("OrderTalk", nil, "Hello", "Hello is empty (an ordinary customer opens with it)")
+	end
+	if OrderTalk.Styles.Normal == nil or OrderTalk.Styles.Stressed == nil then
+		fail("OrderTalk", nil, "Styles", "Styles needs Normal and Stressed (the ordinary customers)")
+	end
+	if OrderTalk.Glitch == "" then
+		fail("OrderTalk", nil, "Glitch", "Glitch is empty")
+	end
+	for variant, key in OrderTalk.StyleByVariant do
+		if OrderTalk.Styles[key] == nil then
+			fail("OrderTalk", nil, "StyleByVariant", `'{variant}' -> '{key}' is not a Styles key`)
+		end
+	end
+	for key, style in OrderTalk.Styles do
+		for _, layer in { "Fx", "Tic", "Break" } do
+			const fx = (style :: any)[layer] :: OrderTalk.Fx?
+			if fx == nil then
+				continue
+			end
+			const where = `{key}.{layer}`
+			inRange("OrderTalk.Styles", nil, where, "Jitter", fx.Jitter or 0, 0, 8)
+			inRange("OrderTalk.Styles", nil, where, "Wave", fx.Wave or 0, 0, 8)
+			inRange("OrderTalk.Styles", nil, where, "Tilt", fx.Tilt or 0, 0, 45)
+			inRange("OrderTalk.Styles", nil, where, "Size", fx.Size or 0, 0, 10)
+			inRange("OrderTalk.Styles", nil, where, "Grow", fx.Grow or 0, 0, 12)
+			inRange("OrderTalk.Styles", nil, where, "Swap", fx.Swap or 0, 0, 1)
+			inRange("OrderTalk.Styles", nil, where, "SwapTime", fx.SwapTime or 0.1, 0.02, 2)
+			inRange("OrderTalk.Styles", nil, where, "Garble", fx.Garble or 0, 0, 1)
+			inRange("OrderTalk.Styles", nil, where, "Fade", fx.Fade or 0, 0, 0.8)
+			inRange("OrderTalk.Styles", nil, where, "Flicker", fx.Flicker or 0, 0, 1)
+			inRange("OrderTalk.Styles", nil, where, "Rate", fx.Rate or 1, 0.5, 60)
+			inRange("OrderTalk.Styles", nil, where, "Drop", fx.Drop or 0, 0, 1)
+			inRange("OrderTalk.Styles", nil, where, "DropTime", fx.DropTime or 0.5, 0, 5)
+		end
+	end
+end
+
+-- Owner 2026-10-22 (Provisional; anomalies-after-accept-proposal.md §9): the hints of the customer anomalies and the body
+-- they show in the delivery queue (Tics Queue)
+local function checkAnomalyHints()
+	checkKeys("AnomalyHints", AnomalyHints, "^anm_%d%d%d_[a-z0-9_]+$")
+	for index, row in AnomalyHints.List do
+		const key = row.Key
+		const anomaly = Anomalies.ByKey[key]
+		if anomaly == nil then
+			fail("AnomalyHints", index, key, "Key is not a Content.Anomalies key")
+		elseif anomaly.Actor ~= "Customer" then
+			fail("AnomalyHints", index, key, `the anomaly's Actor is {anomaly.Actor}: hints are for customer anomalies`)
+		end
+		if row.Hint == "" or row.Line == "" then
+			fail("AnomalyHints", index, key, "Hint and Line must not be empty")
+		end
+		if row.Title ~= nil and (row.Title == "" or #row.Title > 14) then
+			fail("AnomalyHints", index, key, "Title is a short caption title (1..14 chars; nil = Hint)")
+		end
+		if row.Title == nil and #row.Hint > 18 then
+			fail("AnomalyHints", index, key, "Hint is too long for the caption: give it a Title (<= 14 chars)")
+		end
+	end
+	const rules = AnomalyHints.Rules
+	inRange("AnomalyHints.Rules", nil, nil, "CaptionTime", rules.CaptionTime, 0.5, 8)
+	inRange("AnomalyHints.Rules", nil, nil, "SoundVolume", rules.SoundVolume, 0, 1.5)
+	inRange("AnomalyHints.Rules", nil, nil, "WhisperFor", rules.WhisperFor, 0, 10)
+	inRange("AnomalyHints.Rules", nil, nil, "WhisperRate", rules.WhisperRate, 0, 5)
+	if Sounds.ByKey[rules.Sound] == nil then
+		fail("AnomalyHints.Rules", nil, nil, `Sound '{rules.Sound}' is not a Content.Sounds key`)
+	end
+	if #rules.Generic == 0 then
+		fail("AnomalyHints.Rules", nil, nil, "Generic needs at least one word")
+	end
+	for index, row in Tics.List do
+		const queue = row.Queue
+		if queue == nil then
+			continue
+		end
+		inRange("Tics", index, row.Key, "Queue.Roll", queue.Roll or 0, 0, 90)
+		inRange("Tics", index, row.Key, "Queue.Pitch", queue.Pitch or 0, 0, 60)
+		inRange("Tics", index, row.Key, "Queue.Light", queue.Light or 0, 0, 6)
+		inRange("Tics", index, row.Key, "Queue.PerStep", queue.PerStep or 0, 0, 0.5)
+		const scales = row.Scales
+		const last = if scales ~= nil and #scales > 0 then scales[#scales] else 1
+		inRange("Tics", index, row.Key, "Queue.Scale", queue.Scale or last, last, 3.5)
+	end
+end
+
 return function()
 	checkKeySets()
-	checkTipJar()
 	checkHudReveal()
 	checkUpgrades()
 	checkIngredients()
@@ -2541,5 +2874,8 @@ return function()
 	checkPrep()
 	checkRestaurant()
 	checkHorrorScenes()
+	checkTics()
+	checkAnomalyHints()
+	checkOrderTalk()
 	checkSuspense()
 end

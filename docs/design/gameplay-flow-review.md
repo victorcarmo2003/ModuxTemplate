@@ -64,6 +64,18 @@ mundo; 1–2 novidades por noite, anunciadas; janelas de calma; erro com margem 
   noites 3, 5 e 6 (restaurante) ajustadas.
 - Não testado em Play; os números são Provisórios.
 
+### 3b.1 Evento da noite obrigatório (pedido do dono 2026-10-22, Provisório, `Q-475`)
+
+Toda noite tem **um evento de mundo garantido**, com prioridade acima de todas as outras batidas: uma anomalia B/C/D com
+verbo (apagão, névoa vermelha, batida, carro longo, perseguidor, monstros, andarilho do telhado) sorteada entre as
+abertas na noite, num minuto aleatório depois da carência e da estreia fixa e cedo o bastante para acabar antes das
+5 AM. Nas noites 1 e 2 (sem B/C aberta) o evento é o desarme do disjuntor. Em volta dele há uma **trava**
+(`NightLead` 20 s antes até o fim + `NightTail` 10 s): `BeatClear` recusa tudo que não seja `night`, e a agenda
+regular, a estreia fixa, os sustos D, os sustos pessoais, os desarmes, as tarefas, o suspense e o "pelas costas"
+esperam. O evento ignora carência, intervalo, tetos, janela fechada e o fim da janela; se há anomalia rodando, espera
+no máximo `NightMaxWait` 25 s e começa mesmo assim. Se o sorteado é a estreia da noite, ela vira o evento. Igual solo ou
+em squad; o tutorial e o hold de dev ainda seguram. `/dev nightevent [now]` e `/dev beats`. Números Provisórios.
+
 ## 3c. Sons pelas costas (pedido do dono 2026-10-21, Provisório)
 
 O jogador prepara o lanche de costas para a janela. Numa calmaria (nenhuma anomalia rodando, nenhuma batida ativa,

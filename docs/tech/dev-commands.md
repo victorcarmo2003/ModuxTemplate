@@ -35,11 +35,14 @@ Anomalia = key, `ANM-###`, número (o do ANM) ou parte do nome (`blackout`, `kno
 | `pressure [now]` | escada de sanidade (DEC-352): faixa de cada jogador, próximo susto pessoal, extras da noite; `now` = rolagem/sustos já |
 | `atm <ATM-#\|n\|nome\|off\|auto>` | atmosfera da noite (era `atmosphere`) |
 | `bolt [near\|far]` | relâmpago forçado em todos (Q-453): `far` = flash + trovão atrasado; `near` = o susto (flash forte, trovão na hora, tranco de câmera). Precisa de atmosfera ligada (noite ou `atm <key>`) |
+| `shower [segundos\|off]` | força uma pancada de chuva agora em todos (padrão 45 s), abrindo com trovão alto + flash (Q-453); `off` para. Precisa de atmosfera ligada |
 | `suspense [list\|status\|<spot>\|<event> [spot]]` | evento de suspense agora |
 | `trip [now]` | disjuntor desarma sozinho (Q-435): contagem da noite e o próximo; `now` = desarma assim que estiver calmo |
-| `beats` | diretor de batidas (2026-10-21): última batida, o que conta como ativo agora (anomalias, tarefas, desarme), intervalo e a próxima anomalia |
+| `beats` | diretor de batidas (2026-10-21): última batida, o que conta como ativo agora (anomalias, tarefas, desarme), intervalo e a próxima anomalia; desde 2026-10-22 também a linha do evento da noite (chave, hora, estado, trava, pool) |
+| `nightevent [now]` | evento da noite obrigatório (2026-10-22, Q-475): chave, hora, estado (`pending`/`running`/`done`), se a trava está ligada e o pool; `now` = vence agora (espera `NightMaxWait` se há anomalia rodando). `anomaly agenda` marca a entrada com ` night` |
 | `behind [now]` | som pelas costas (2026-10-21): contagem da noite, próxima tentativa, se está calmo e quem está de costas para a janela; `now` = assim que estiver calmo |
 | `chore [<key>\|now\|end [<key>\|all]]` | tarefas da noite (Q-436): `grill_fire`, `back_door`, `rats`, `camera_static`; sem args = estado; `<key>` liga agora |
+| `window [open\|close\|status]` | janela de serviço (2026-10-21, Q-454): estado da janela, fase e se a loja está pausada; `open`/`close` força agora (sem isso, a janela abre sozinha quando a noite começa: `ShopWindow.AutoOpenAfter` = 0) |
 | `sanity [<n>\|hint\|dark on\|off\|auto] [player]` | sanidade |
 | `god [on\|off]` · `god me [on\|off] [player]` | ninguém desmaia (party) · sanidade infinita de um jogador |
 | `revive [player\|all]` · `revive auto [on\|off] [player]` | volta Active (um jogador, ou `all` = todos Down/Spectator) · levanta 2 s após desmaio |
@@ -47,9 +50,12 @@ Anomalia = key, `ANM-###`, número (o do ANM) ou parte do nome (`blackout`, `kno
 | `coffee [n \| give \| take \| cup fill\|empty\|sip\|give\|auto]` | doses da máquina, café na mão, pegar o pronto, copo do balcão |
 | `kitchen rail [n] \| gift [topping\|all] \| stock [state\|take <pkg>\|test]` | trilho, potes de brinde, estoque |
 | `prep grade\|ray\|kitchen\|plate\|seats\|ui\|enter\|leave\|finish` | modo focado (inalterado; `/dev prep grade` segue valendo) |
-| `plate` · `tablet` · `pickup` | pratos, tablet, retirada (inalterados) |
+| `plate` · `tablet` · `pickup` | pratos, tablet, retirada. 2026-10-22 (sem ACCEPT/REFUSE): `tablet finish` termina a conversa e anota o pedido; `tablet time <k> [k2]` = duração da fala digitada de um cliente comum (`Content.OrderSpeech`) |
+| `tic [state [n] \| reset [n]]` | tiques das anomalias no diálogo (2026-10-21, piloto ANM-012, `anomaly-tics-proposal.md`): estado do TAB-n, quando a fala começou e quando o pedido será anotado (`EndsAt`), atributos do rig da cabeça da fila; `reset` = tira o resíduo para o tique tocar inteiro de novo. Spawn: `trigger ANM-012`. Desde 2026-10-22 também ANM-013 (olhos brancos), ANM-004 (eco da cópia: atenda o original antes, depois a cópia) e ANM-014 (cabeça cresce): o estado mostra o `Body` da linha, o relógio da fala (freeze / pico / última batida / fim, a partir do início da fala), o texto dito e os atributos `TicEnd` / `TicEcho`. `tic early` saiu com a escolha (2026-10-22) |
+| `cond [run <anomalia> \| take \| look \| hurry <s> \| serve [coberturas] \| win \| fail] [anomalia]` | condições das anomalias de cliente na fila de entrega (2026-10-22, `anomalies-after-accept-proposal.md` §9; pilotos 014 Hurry, 012 NoLook, 011 Plain). Sem args = estado (fase, condição, relógio, quem anotou, pratos arremessados). `run` = dispara e anota o pedido por você quando ela chega ao balcão (sem conversa) → direto para a fila; `take` = anota agora; `look` = NoLook: seu serve agora seria o erro?; `hurry <s>` = segundos restantes do Hurry; `serve [coberturas]` = põe na sua mão um hot dog com essas coberturas (`mustard`, `mustard onion`; nada ou `plain` = puro) e entrega à anomalia de cliente mais nova pelo caminho real (`ServeFor`: o juiz da condição, a venda); na 011 uma cobertura = o arremesso do prato (§9.9); `win` / `fail` = força o fim certo / errado (você paga o errado; na 011 o `fail` é o último arremesso, −5 e ele sai) |
 | `customer pair\|group\|sit\|quality \| on\|off \| spawns \| tables [buy\|sit]` | clientes |
-| `money cash <n> \| gems <n> [player] \| tips ... \| ledger` | dinheiro |
+| `money cash <n> \| gems <n> [player] \| tips [state\|add <n>] \| ledger` | dinheiro. Desde 2026-10-22 não há pote de gorjetas: `tips add <n>` põe a gorjeta direto no `Cash` (`tips collect` saiu) |
+| `hint [state \| write [n] \| reset \| open \| scare]` | papel de dicas do Walt (2026-10-22, `Content.Hints`, `HintService`): sem args = escrito até qual noite, fase, se a ligação do Walt ainda segura a dica; `write [n]` = escreve a dica da noite n agora (padrão: a noite atual ou a próxima; lápis + "NEW!"); `reset` = papel em branco; `open` = abre o close do papel para você; `scare` = abre o papel e, ao sair (andar / Back), toca o susto do cliente que chegou enquanto você lia (no cliente do balcão/janela, ou em Q1 se não houver) |
 | `shop receipt\|code\|reward\|market\|gear ...` | loja, códigos, recompensas, Gear Stand |
 | `upgrade [key] [level]` | upgrade grátis (inalterado) |
 | `call [<key>\|answer\|stop\|list]` · `cutscene [play\|vote\|skip\|stop]` | telefone do chefe · cutscenes |
@@ -148,7 +154,7 @@ duplicado ou debug de uma TASK). "Chamado por código" = Admin / Showcase / DevT
 | trash | `trash [table]` | (mapa) | remover (mesas não sujam no restaurante) |
 | cash | `cash <n>` | EconomyService | fundir → `money cash`; alias oculto (Admin) |
 | gems | `gems <n> [player]` | ClassService/EconomyService | fundir → `money gems`; alias oculto (Admin) |
-| tips | `tips [state\|add <n>\|collect]` | TipJarService | fundir → `money tips` |
+| tips | `tips [state\|add <n>]` (`collect` saiu com o pote, 2026-10-22) | EconomyService | fundir → `money tips` |
 | economy | `economy ledger` | EconomyService | fundir → `money ledger` |
 | receipt | `receipt <key> [id]` | ShopService | fundir → `shop receipt` |
 | code | `code <text>` | CodesService | fundir → `shop code` |

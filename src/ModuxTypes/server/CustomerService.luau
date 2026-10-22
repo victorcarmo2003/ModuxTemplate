@@ -28,6 +28,8 @@ export type Customer = {
 	LeftAt: number, -- server time it started leaving (0 = not leaving)
 	Move: number, -- walk order counter: a newer order cancels the callback of the older one
 	Variant: Variant?, -- customer anomaly (SpawnActor); nil = ordinary customer
+	-- owner 2026-10-22 (Provisional): patience clocks (Queue and Order) x this, on top of the type's PatienceMult (nil = 1)
+	PatienceScale: number?,
 	-- Pairs (TASK-146)
 	Order2: { [string]: boolean }?, -- leader: the 2nd pending hot dog on the wire (nil = none)
 	Partner: number?, -- leader: NpcId of its partner
@@ -102,9 +104,14 @@ export type CustomerActorSpec = {
 	Outfit: string?,
 	CopyOf: number?,
 	From: string?,
+	-- owner 2026-10-22 (Provisional): scale (0, 1] of both patience clocks (Content.OrderRules.UnservablePatienceScale,
+	-- sent by the anomalies the player must not serve); nil = 1
+	PatienceScale: number?,
 }
-export type ActedAction = "take_order" | "serve" | "refuse" | "give_up"
+export type ActedAction = "take_order" | "serve" | "refuse" | "give_up" | "return"
 export type ServeRule = (customer: Customer, tool: Tool, player: Player) -> SaleResult?
+export type ActorVerdict = "Return" | "Wrong"
+export type ActorJudge = (id: number, toppings: { string }, player: Player) -> ActorVerdict?
 export type SeatParty = {
 	Leader: number,
 	Partner: number?,
@@ -114,6 +121,7 @@ export type SeatParty = {
 
 export type Public = {
 	Acted: SignalLib.Signal<number, ActedAction, Player?, SaleResult?>,
+	ActorJudges: { ActorJudge },
 	ActorRng: Random,
 	CounterFreeAt: number,
 	CounterSlots: { [number]: number },
@@ -211,9 +219,11 @@ export type Public = {
 	Attempt: (self: Public) -> (Outcome, number?),
 	RollPair: (self: Public) -> Group.Pair?,
 	SpawnPair: (self: Public, pair: Group.Pair) -> number?,
-	Create: (self: Public, id: number, variant: Variant?, leader: number?, tutorial: boolean?, drive: number?) -> (),
+	Create: (self: Public, id: number, variant: Variant?, leader: number?, tutorial: boolean?, drive: number?, patienceScale: number?) -> (),
 	SpawnActor: (self: Public, spec: CustomerActorSpec) -> number?,
 	AddServeRule: (self: Public, rule: ServeRule) -> () -> (),
+	AddActorJudge: (self: Public, judge: ActorJudge) -> () -> (),
+	JudgeActor: (self: Public, customer: Customer, tool: Tool, player: Player) -> ActorVerdict?,
 	ServeOverride: (self: Public, customer: Customer, tool: Tool, player: Player) -> SaleResult?,
 	SetPrompts: (self: Public, id: number, enabled: boolean) -> (),
 	ExitRoute: (self: Public, node: string) -> (string?, boolean),

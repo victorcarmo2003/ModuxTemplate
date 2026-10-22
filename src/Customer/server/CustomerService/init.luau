@@ -49,6 +49,12 @@
 -- AddServeRule(fn) lets a system override the verdict of "Serve" (any customer): the first rule that returns a result
 -- wins (Complete/Perfect pay as Complete, Incomplete as Incomplete, anything else = Wrong: $0, the hot dog stays in
 -- the server's hand).
+-- Owner 2026-10-22 (Provisional; design/anomalies-after-accept-proposal.md §9): no ACCEPT / REFUSE any more. The tablet
+-- takes EVERY order at the end of the talk (TakeOrderFor), anomaly actors included: "take_order" on an actor is no error,
+-- its order goes to the delivery line like anyone's and its module runs a condition (Anomaly/Kit/CustomerActor).
+-- AddActorJudge(fn): asked before the sale of a serve on an actor, with the hot dog's toppings: "Return" = the plate comes
+-- back (ANM-011: a topping on the shaker's plain order; the hot dog is lost, $0, nothing settled, Acted "return", it keeps
+-- waiting with its clock running); "Wrong" = the condition's error ($0 as a serve rule's Wrong; the module scares).
 --
 -- Pairs (TASK-146; FEAT-038; Content.Flow.Groups; Group.luau; Q-182 A): an attempt may bring a leader + partner. Both
 -- are records of the Customers set (they count 2 in every cap and 2 on the grade) but only the leader is in the
@@ -152,6 +158,8 @@ export type Customer = {
 	LeftAt: number, -- server time it started leaving (0 = not leaving)
 	Move: number, -- walk order counter: a newer order cancels the callback of the older one
 	Variant: Variant?, -- customer anomaly (SpawnActor); nil = ordinary customer
+	-- owner 2026-10-22 (Provisional): patience clocks (Queue and Order) x this, on top of the type's PatienceMult (nil = 1)
+	PatienceScale: number?,
 	-- Pairs (TASK-146)
 	Order2: { [string]: boolean }?, -- leader: the 2nd pending hot dog on the wire (nil = none)
 	Partner: number?, -- leader: NpcId of its partner
@@ -195,7 +203,6 @@ export type Driver = {
 	Left: (id: number) -> (),
 }
 
--- What SeatingService gets when a customer or pair takes its order (Seater.Offer). Leader = the customer with the ticket.
 -- TabletService hook (SetTalker): the car's "Take Order" runs the tablet talk (TabletDialog, lines, sounds) on the DT-PC
 -- record instead of taking the order at once. Start = talk started; Talking = that car's talk is running.
 export type Talker = {
@@ -203,6 +210,7 @@ export type Talker = {
 	Talking: (id: number) -> boolean,
 }
 
+-- What SeatingService gets when a customer or pair takes its order (Seater.Offer). Leader = the customer with the ticket.
 export type SeatParty = {
 	Leader: number,
 	Partner: number?,
@@ -259,13 +267,22 @@ export type CustomerActorSpec = {
 	Outfit: string?,
 	CopyOf: number?,
 	From: string?,
+	-- owner 2026-10-22 (Provisional): scale (0, 1] of both patience clocks (Content.OrderRules.UnservablePatienceScale,
+	-- sent by the anomalies the player must not serve); nil = 1
+	PatienceScale: number?,
 }
 
--- Acted.action (TASK-053): the three customer actions, plus give_up when patience ran out (no player)
-export type ActedAction = "take_order" | "serve" | "refuse" | "give_up"
+-- Acted.action (TASK-053): the three customer actions, plus give_up when patience ran out (no player) and return (an
+-- actor's condition sent the plate back, AddActorJudge; result nil)
+export type ActedAction = "take_order" | "serve" | "refuse" | "give_up" | "return"
 
 -- Serve override (AddServeRule): nil = no opinion, the order check decides
 export type ServeRule = (customer: Customer, tool: Tool, player: Player) -> SaleResult?
+
+-- Customer anomaly in the delivery queue (AddActorJudge; owner 2026-10-22, Provisional): asked before the sale of a serve
+-- on an actor, with the served hot dog's toppings. "Return" = the plate comes back; "Wrong" = the error; nil = a sale
+export type ActorVerdict = "Return" | "Wrong"
+export type ActorJudge = (id: number, toppings: { string }, player: Player) -> ActorVerdict?
 
 type Weighted = { Point: string, Weight: number }
 
@@ -282,6 +299,7 @@ const TAKE_ORDER = "take_order"
 const SERVE = "serve"
 const REFUSE = "refuse"
 const GIVE_UP = "give_up"
+const RETURN = "return"
 const CLOSING = "Closing"
 const NIGHT_END = "NightEnd"
 -- the 6 AM Closing is a last call (Content.Shift Closing Night.LastCall, owner 2026-10-21): NightEnd keeps the line for it
@@ -309,6 +327,9 @@ const PICKUP_FULL = "pickup_full" -- Content.Notices key
 const CARRYING = "Carrying" -- rig attribute: the customer carries its plate (Seating client, R1-J)
 -- rig attributes: the look of THE hot dog it was handed (owner 2026-10-19; Seating client Meal draws it on its dish)
 const CARRY_LOOK = { Toppings = "CarryToppings", Sauce = "CarrySauce", Altered = "CarryAltered", Dish = "CarryDish" }
+const TOPPING_ANCHOR = "Att_Topping1" -- HotDogVisual: the up axis of the stack (the counter plate lies on it)
+const ARC_SIGHT_RADIUS = 1 -- studs: half a customer's width, the straight way to the arc spot must be this clear
+const ARC_SIGHT_HITS = 8 -- rigs skipped on that way before it counts as blocked
 const TICKET = "Ticket" -- hot_dog Tool attribute written by PlateService (NpcId of the plate's order)
 -- hot_dog Tool attributes of a plate (shared/Plate/PlateTool): the sausage was flipped in the window; the plate's id
 const FLIPPED = "Flipped"
@@ -386,6 +407,8 @@ function CustomerService:Setup()
 	self.ActorRng = Random.new() :: Random
 	-- Serve overrides (AddServeRule), in registration order
 	self.ServeRules = {} :: { ServeRule }
+	-- Customer anomaly judges (AddActorJudge, AnomalyService conditions), in registration order
+	self.ActorJudges = {} :: { ActorJudge }
 	-- Server-only order of each customer in the queue, by NpcId (TASK-033)
 	self.Tickets = {} :: { [number]: Orders.Ticket }
 	-- Connected members, locked when the shop opens (DEC-185)
@@ -452,12 +475,12 @@ function CustomerService:Setup()
 	self.Ordered = self.Libs.Signal.new() :: SignalLib.Signal<number, Player>
 	-- DriveThruService hook (SetDriver, TASK-574); nil = no car ever
 	self.Driver = nil :: Driver?
+	-- TabletService hook (SetTalker); nil = the car's order is taken at once
+	self.Talker = nil :: Talker?
 end
 
 function CustomerService:WarnOnce(key: string, message: string)
 	if self.Warned[key] then
-	-- TabletService hook (SetTalker); nil = the car's order is taken at once
-	self.Talker = nil :: Talker?
 		return
 	end
 	self.Warned[key] = true
@@ -779,15 +802,15 @@ function CustomerService:SetDriver(driver: Driver?)
 	self.Driver = driver
 end
 
--- The car reached its lane spot for the first time: the customer is in line (arrival counted, ticket drawn).
-function CustomerService:JoinDrive(id: number)
-	const customer = self.Customers[id]
-	if customer == nil or customer.Drive == 0 or customer.State ~= "Arriving" then
 -- TabletService (one): the talk for the car's "Take Order", nil = off.
 function CustomerService:SetTalker(talker: Talker?)
 	self.Talker = talker
 end
 
+-- The car reached its lane spot for the first time: the customer is in line (arrival counted, ticket drawn).
+function CustomerService:JoinDrive(id: number)
+	const customer = self.Customers[id]
+	if customer == nil or customer.Drive == 0 or customer.State ~= "Arriving" then
 		return
 	end
 	customer.State = "Queued"
@@ -928,12 +951,41 @@ function CustomerService:Refresh()
 		end
 		customer.Slot = slot
 		self:Publish(customer, false)
-		self:Walk(customer, Queue.point(slot), false, function(ok: boolean)
+		-- AvoidQueue: the way in passes only the free slots behind its own (owner 2026-10-21, Q1's west way in; Graph.behind)
+		self:Walk(customer, Queue.point(slot), true, function(ok: boolean)
 			if ok then
 				self:Reached(customer, slot)
 			end
 		end)
 	end
+end
+
+-- Nothing solid between `model` and `target` at its waist (rigs and players walk aside, so they do not count): it can
+-- walk there straight. Plain function, not a method: no generated type change (ModuxTypes)
+local function inSight(model: Model?, target: Vector3?): boolean
+	const root = if model ~= nil then model.PrimaryPart else nil
+	if root == nil or target == nil then
+		return false
+	end
+	const ignore: { Instance } = { model :: Model }
+	const params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.IgnoreWater = true
+	const from = root.Position
+	const way = Vector3.new(target.X, from.Y, target.Z) - from
+	for _ = 1, ARC_SIGHT_HITS do
+		params.FilterDescendantsInstances = ignore
+		const hit = workspace:Spherecast(from, ARC_SIGHT_RADIUS, way, params)
+		if hit == nil then
+			return true
+		end
+		const body = hit.Instance:FindFirstAncestorWhichIsA("Model")
+		if body == nil or body:FindFirstChildWhichIsA("Humanoid") == nil then
+			return false
+		end
+		table.insert(ignore, body)
+	end
+	return false
 end
 
 -- Pickup line (TASK-380): sends everyone in it to the PU-k of their position (PU-1 = at the counter) and turns the
@@ -950,7 +1002,11 @@ function CustomerService:RefreshPickup()
 		customer.Pickup = spot
 		self:Publish(customer, false)
 		if arc and points > 0 then
-			-- owner 2026-10-20: to PU-1 by the graph once, then straight to its place on the arc
+			-- owner 2026-10-20: to PU-1 by the graph once, then straight to its place on the arc. Owner 2026-10-21 ("ele vai
+			-- até o prato de pickup e depois para a posição em arco"): straight to the arc when nothing stands in the way
+			if not customer.Arc and inSight(self.Dependencies.NpcService:GetModel(id), self:ArcSpot(spot)) then
+				customer.Arc = true
+			end
 			if customer.Arc then
 				self:WalkArc(customer)
 			else
@@ -1162,7 +1218,14 @@ end
 -- New record. `leader` = this is the partner of that leader: no walk of its own (StepPairs moves it). `tutorial` =
 -- the tutorial customer (RequestTutorial). `drive` = lane spot of a drive-thru car (TASK-574): no walk either, the car
 -- is DriveThruService's (JoinDrive when it reaches its spot).
-function CustomerService:Create(id: number, variant: Variant?, leader: number?, tutorial: boolean?, drive: number?)
+function CustomerService:Create(
+	id: number,
+	variant: Variant?,
+	leader: number?,
+	tutorial: boolean?,
+	drive: number?,
+	patienceScale: number?
+)
 	const customer: Customer = {
 		Id = id,
 		State = "Arriving",
@@ -1177,6 +1240,7 @@ function CustomerService:Create(id: number, variant: Variant?, leader: number?, 
 		LeftAt = 0,
 		Move = 0,
 		Variant = variant,
+		PatienceScale = patienceScale,
 		Order2 = nil,
 		Partner = nil,
 		Leader = leader,
@@ -1268,7 +1332,9 @@ function CustomerService:SpawnActor(spec: CustomerActorSpec): number?
 	if id == nil then
 		return nil
 	end
-	self:Create(id, spec.Variant)
+	-- (a bad scale is ignored: only (0, 1] shortens the clocks)
+	const scale = spec.PatienceScale
+	self:Create(id, spec.Variant, nil, nil, nil, if type(scale) == "number" and scale > 0 and scale <= 1 then scale else nil)
 	return id
 end
 
@@ -1281,6 +1347,36 @@ function CustomerService:AddServeRule(rule: ServeRule): () -> ()
 			table.remove(self.ServeRules, index)
 		end
 	end
+end
+
+-- Registers a customer anomaly judge (owner 2026-10-22, Provisional; Anomaly/Kit/CustomerActor, the conditions of the
+-- delivery queue). Returns the function that removes it.
+function CustomerService:AddActorJudge(judge: ActorJudge): () -> ()
+	table.insert(self.ActorJudges, judge)
+	return function()
+		const index = table.find(self.ActorJudges, judge)
+		if index ~= nil then
+			table.remove(self.ActorJudges, index)
+		end
+	end
+end
+
+-- First non-nil verdict of the actor judges on a serve of actor `id` (nil = an ordinary sale). A judge that errors is
+-- skipped (warned). Never asked for an ordinary customer or the tutorial one.
+function CustomerService:JudgeActor(customer: Customer, tool: Tool, player: Player): ActorVerdict?
+	if customer.Variant == nil or customer.Tutorial then
+		return nil
+	end
+	const toppings = self.Dependencies.ItemService:Toppings(tool)
+	for _, judge in table.clone(self.ActorJudges) do
+		const ok, verdict = pcall(judge, customer.Id, toppings, player)
+		if not ok then
+			warn(`[CustomerService] actor judge failed: {verdict}`)
+		elseif verdict == "Return" or verdict == "Wrong" then
+			return verdict
+		end
+	end
+	return nil
 end
 
 -- First non-nil result of the Serve rules, or nil. A rule that errors is skipped (warned).
@@ -1605,10 +1701,6 @@ function CustomerService:ComplainLineAway(player: Player?, waiting: boolean?)
 	end
 end
 
--- The window must stay shut ShutGrace s before the line reacts; a reopening cancels it. Owner 2026-10-20 (Provisional): only
--- the line (not ordered yet) goes then; the customers whose order was taken keep waiting and go only if the window stays
--- shut WaitShutGrace s (twice the line's time to leave), complaining the same way. An anomaly that slams it clears the line
--- at once and starts the same WaitShutGrace wait for the others.
 -- REFUSE at the end of the order talk (owner 2026-10-21, DEC-353; TabletService): only this customer goes. An anomaly
 -- customer is answered by its module (Kit/CustomerActor reads Acted "refuse": the right verb resolves it, the wrong one
 -- scares). An ordinary one walks off at once (it must not stay at the tablet to be talked to again) saying one of
@@ -1643,6 +1735,10 @@ function CustomerService:RefuseOne(player: Player, id: number): boolean
 	return true
 end
 
+-- The window must stay shut ShutGrace s before the line reacts; a reopening cancels it. Owner 2026-10-20 (Provisional): only
+-- the line (not ordered yet) goes then; the customers whose order was taken keep waiting and go only if the window stays
+-- shut WaitShutGrace s (twice the line's time to leave), complaining the same way. An anomaly that slams it clears the line
+-- at once and starts the same WaitShutGrace wait for the others.
 function CustomerService:OnShutter(closed: boolean, player: Player?)
 	self:CancelShutWait()
 	if not closed then
@@ -1825,7 +1921,16 @@ function CustomerService:OpenTicket(id: number)
 	end
 	const arrivedAt = if customer.JoinedAt > 0 then customer.JoinedAt else now()
 	const typeRow = Content.CustomerTypes.ByKey[npc.CustomerType]
-	self.Tickets[id] = Orders.Ticket(lines, arrivedAt, bonus, pairBonus, if typeRow then typeRow.PatienceMult else nil)
+	local mult = if typeRow then typeRow.PatienceMult else nil
+	-- owner 2026-10-22 (Provisional): an actor the player must not serve waits a fraction of the time (both clocks)
+	const variantMult = customer.PatienceScale
+	if variantMult ~= nil then
+		mult = {
+			Queue = (if mult then mult.Queue else 1) * variantMult,
+			Order = (if mult then mult.Order else 1) * variantMult,
+		}
+	end
+	self.Tickets[id] = Orders.Ticket(lines, arrivedAt, bonus, pairBonus, mult)
 end
 
 -- NpcId that owns line `index` of a leader's ticket: line 2 = the partner (while alive), else the leader.
@@ -2309,8 +2414,16 @@ function CustomerService:ServeCustomer(
 		return nil
 	end
 	const at = now()
+	-- customer anomaly in the delivery queue (AddActorJudge, owner 2026-10-22): its condition may send the plate back (the
+	-- hot dog is lost, nothing is paid or settled, it keeps waiting) or make this serve the error (Wrong, as a serve rule)
+	const judged = self:JudgeActor(customer, tool, player)
+	if judged == "Return" then
+		self.Dependencies.ItemService:Consume(player, tool)
+		self.Acted:Fire(id, RETURN, player, nil)
+		return nil
+	end
 	-- AddServeRule (TASK-108): an override replaces the order check (on the first pending line)
-	const override = self:ServeOverride(customer, tool, player)
+	const override: SaleResult? = if judged == "Wrong" then "Wrong" else self:ServeOverride(customer, tool, player)
 	if self.Customers[id] ~= customer or customer.State == "Leaving" then
 		return nil -- a rule sent the customer away
 	end
@@ -2604,7 +2717,8 @@ function CustomerService:ArcFrame(): (Vector3?, Vector3, Vector3)
 	return base, outward, along
 end
 
--- World position of arc spot `spot` among PickupSize() spots
+-- World position of arc spot `spot` among PickupSize() spots. Spots never stand closer than Spacing: a ring holds what
+-- fits at that radius, the rest go to the next ring (Spacing farther out); the first ring fills first.
 function CustomerService:ArcSpot(spot: number): Vector3?
 	const rules = Content.Restaurant.PickupArc
 	const base, outward, along = self:ArcFrame()
@@ -2612,10 +2726,24 @@ function CustomerService:ArcSpot(spot: number): Vector3?
 		return nil
 	end
 	const count = math.max(self:PickupSize(), 1)
-	const t = if count > 1 then (math.clamp(spot, 1, count) - 1) / (count - 1) else 0.5
-	const angle = math.rad(-rules.Spread + 2 * rules.Spread * t)
-	const centre = base + along * rules.Shift
-	return centre + (outward * math.cos(angle) + along * math.sin(angle)) * rules.Radius
+	local index = math.clamp(spot, 1, count)
+	local left = count
+	local radius = rules.Radius
+	const spread = math.rad(rules.Spread)
+	while true do
+		const step = 2 * math.asin(math.min(rules.Spacing / (2 * radius), 1))
+		const fits = math.max(math.floor(2 * spread / step) + 1, 1)
+		if index <= fits or left <= fits then
+			const inRing = math.min(left, fits)
+			const t = if inRing > 1 then (index - 1) / (inRing - 1) else 0.5
+			const angle = -spread + 2 * spread * t
+			const centre = base + along * rules.Shift
+			return centre + (outward * math.cos(angle) + along * math.sin(angle)) * radius
+		end
+		index -= fits
+		left -= fits
+		radius += rules.Spacing
+	end
 end
 
 -- Straight to its arc spot, then faces the counter
@@ -2645,7 +2773,8 @@ function CustomerService:CounterSpot(slot: number): (Vector3?, Vector3?)
 	if base == nil then
 		return nil, nil
 	end
-	const offset = along * ((slot - (rules.Slots + 1) / 2) * rules.Gap)
+	const centred = slot - (rules.Slots + 1) / 2
+	const offset = along * (centred * rules.Gap)
 	local plate: Vector3? = nil
 	for _, model in CollectionService:GetTagged(Content.Restaurant.Binding.PickupTag) do
 		if model:IsA("Model") and model:IsDescendantOf(workspace) then
@@ -2658,7 +2787,7 @@ function CustomerService:CounterSpot(slot: number): (Vector3?, Vector3?)
 			break
 		end
 	end
-	return plate, base + offset
+	return plate, base + along * (centred * rules.StandGap)
 end
 
 -- A still copy of the hot dog Tool for the counter (no physics, no queries, no scripts); nil = nothing to copy
@@ -2691,6 +2820,24 @@ function CustomerService:MakeDisplay(tool: Tool): Model?
 	return model
 end
 
+-- Pivot of the counter plate `display` lying on `top`: the Handle (its pivot) is turned against the stack axis on the
+-- kit hot dog, so an unrotated pivot stood the plate on its edge (same rule as Seating Meal's lay)
+local function layOnCounter(display: Model, top: Vector3): CFrame
+	const handle = display.PrimaryPart
+	if handle == nil then
+		return CFrame.new(top)
+	end
+	const anchor = handle:FindFirstChild(TOPPING_ANCHOR)
+	const turn = if anchor ~= nil and anchor:IsA("Attachment") then anchor.CFrame.Rotation else CFrame.identity
+	const up = turn.UpVector -- handle space
+	const size = handle.Size
+	const half = 0.5 * (math.abs(up.X) * size.X + math.abs(up.Y) * size.Y + math.abs(up.Z) * size.Z)
+	-- the frame of the HANDLE, turned into the model's pivot: the kit hot dog's Handle.PivotOffset is turned (90 deg X,
+	-- 180 deg Z), so a pivot laid flat stood the plate on its edge (owner print 2026-10-22; Seating Meal placeHandle)
+	const at = CFrame.new(top + Vector3.new(0, half, 0)) * turn:Inverse()
+	return at * handle.CFrame:ToObjectSpace(display:GetPivot())
+end
+
 -- Served at the pickup in arc mode: the plate on a counter slot, the walk arc -> counter, then LeaveServed goes on
 function CustomerService:Collect(customer: Customer, mood: string?)
 	const rules = Content.Restaurant.PickupArc
@@ -2715,7 +2862,7 @@ function CustomerService:Collect(customer: Customer, mood: string?)
 			folder = made
 			self.DisplayFolder = made
 		end
-		display:PivotTo(CFrame.new(plateAt :: Vector3))
+		display:PivotTo(layOnCounter(display, plateAt :: Vector3))
 		display.Parent = folder
 		customer.Display = display
 	elseif display ~= nil then
@@ -2841,6 +2988,12 @@ function CustomerService:RegisterOrders()
 			return not self:IsTabletMode() or (customer ~= nil and customer.Drive == 1)
 		end,
 		Run = function(player: Player, anchor: Instance)
+			-- the car at the window talks first (TabletDialog), like TAB-1; the order is taken at the end of the talk
+			const id, customer = self:TicketAt(anchor)
+			const talker = self.Talker
+			if id ~= nil and customer ~= nil and customer.Drive == 1 and talker ~= nil and talker.Start(player, id) then
+				return
+			end
 			self:TakeOrder(player, anchor)
 		end,
 	})
@@ -2861,12 +3014,6 @@ function CustomerService:RegisterOrders()
 	interaction:RegisterAction(PICKUP_SERVE, {
 		Validate = function(player: Player, anchor: Instance): boolean
 			return self:IsPickupMode()
-			-- the car at the window talks first (TabletDialog), like TAB-1; the order is taken at the end of the talk
-			const id, customer = self:TicketAt(anchor)
-			const talker = self.Talker
-			if id ~= nil and customer ~= nil and customer.Drive == 1 and talker ~= nil and talker.Start(player, id) then
-				return
-			end
 				and self:IsPickupAnchor(anchor)
 				and self.Dependencies.RunStateService:IsActive(player)
 				and self.Dependencies.EconomyService:IsDrawerOpen()
@@ -2910,6 +3057,9 @@ function CustomerService:OnPhase(phase: string)
 		self.Dependencies.RunStateService:Notify("all", "last_call", 0)
 		return
 	end
+	if phase == NIGHT_END and NIGHT_LAST_CALL then
+		return
+	end
 	self:SendAllAway()
 end
 
@@ -2942,9 +3092,6 @@ function CustomerService:StepGuarantee(t: number)
 		return
 	end
 	const guarantee = Content.Flow.Guarantee
-	if phase == NIGHT_END and NIGHT_LAST_CALL then
-		return
-	end
 	if self.EmptySince <= 0 then
 		self.EmptySince = t
 		const base = if self.Dependencies.RoundService:GetDay() <= 1 then guarantee.MaxEmptyDay1 else guarantee.MaxEmpty

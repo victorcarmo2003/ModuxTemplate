@@ -72,6 +72,7 @@ local function candidates()
 			Scripted = row.Scripted,
 			Family = row.Family,
 			SkipAtmospheres = row.SkipAtmospheres,
+			Actor = row.Actor,
 		})
 	end
 	return out
@@ -183,6 +184,40 @@ for _, night in Nights.List do
 	end
 	if failures == before then
 		passes += 1
+	end
+end
+
+-- Night event (owner 2026-10-22, Provisional): one Night entry per night when a world anomaly with a verb is open, inside
+-- the safe stretch, never a Customer or Scripted row; the regular count stays Events
+for _, night in Nights.List do
+	local data = input(night)
+	data.NightEvent = { Families = { "B", "C", "D" }, Grace = Nights.Grace[night.Index], Span = Nights.Beats.NightSpan }
+	local pool = Scheduler.NightPool(data)
+	local latest = data.Window[2] - Nights.Beats.NightSpan * data.MinutesPerSecond
+	for seed = 1, SEEDS do
+		local agenda = Scheduler.Build(data, rng(seed * 104729 + night.Index))
+		local events, regular = 0, 0
+		for _, entry in agenda do
+			if entry.Night then
+				events += 1
+				local row = Anomalies.ByKey[entry.Key]
+				if table.find(pool, entry.Key) == nil or row.Actor == "Customer" or row.Scripted then
+					fail(night.Index, `seed {seed}: night event {entry.Key} is not in the pool`)
+				end
+				if entry.At < data.Window[1] or entry.At > latest + 1e-6 then
+					fail(night.Index, `seed {seed}: night event at {entry.At} outside the safe stretch`)
+				end
+			elseif not entry.Scripted then
+				regular += 1
+			end
+		end
+		if events ~= (if #pool > 0 then 1 else 0) then
+			fail(night.Index, `seed {seed}: {events} night events (pool {#pool})`)
+		end
+		-- the event is a regular entry too when it is the premiere; otherwise it comes on top
+		if regular ~= night.Events and regular ~= night.Events - 1 then
+			fail(night.Index, `seed {seed}: {regular} regular entries, Events = {night.Events}`)
+		end
 	end
 end
 

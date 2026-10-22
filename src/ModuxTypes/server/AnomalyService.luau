@@ -50,6 +50,15 @@ export type Run = {
 	Announced: boolean,
 }
 export type Due = { Entry: Scheduler.Entry, RetryAt: number, Done: boolean }
+export type NightEvent = {
+	Entry: Scheduler.Entry?,
+	Pool: { string },
+	Phase: string,
+	DueAt: number,
+	StartedAt: number,
+	RunId: number,
+	LockEndAt: number,
+}
 export type Gaze = { Yaw: number, Pitch: number, At: number }
 export type Stare = { Time: number, Away: number, Owed: number, Taken: number }
 type TrafficHook = { Hold: (self: any, reason: string, on: boolean) -> () }
@@ -72,6 +81,7 @@ export type Public = {
 	Modules: { [string]: Api.Module },
 	NextId: number,
 	NextScareAt: number,
+	NightEvent: NightEvent,
 	Opening: string,
 	Outcome: SignalLib.Signal<string, string, { Player }, number, string, Trace>,
 	Pressure: Pressure.State,
@@ -135,6 +145,8 @@ export type Public = {
 	RunningCount: (self: Public) -> number,
 	BeatDueIn: (self: Public, future: boolean?) -> number,
 	BeatClear: (self: Public, kind: string) -> boolean,
+	NightLocked: (self: Public) -> boolean,
+	SecondsPerMinute: (self: Public) -> number,
 	BeatBegin: (self: Public, key: string, hold: number?) -> (),
 	BeatEnd: (self: Public, key: string) -> (),
 	BehindWhy: (self: Public) -> string?,
@@ -147,6 +159,9 @@ export type Public = {
 	TutorialHeld: (self: Public) -> boolean,
 	InGrace: (self: Public, minutes: number) -> boolean,
 	Held: (self: Public, minutes: number) -> boolean,
+	NightLockWindow: (self: Public, t: number, minutes: number) -> (number?, number?),
+	StepNightEvent: (self: Public, t: number, minutes: number, tutorial: boolean) -> (),
+	NightEntryDone: (self: Public) -> (),
 	StepAgenda: (self: Public, t: number) -> (),
 	StepRuns: (self: Public, t: number) -> (),
 	StepRemovals: (self: Public, t: number) -> (),
@@ -169,6 +184,8 @@ export type Public = {
 	DevBehindPosture: (self: Public, player: Player) -> string,
 	DevBehind: (self: Public, arg: string?, caller: Player?) -> string,
 	DevBeats: (self: Public) -> string,
+	DescribeNightEvent: (self: Public, t: number) -> string,
+	DevNightEvent: (self: Public, nowToo: boolean) -> string,
 }
 
 return {}
