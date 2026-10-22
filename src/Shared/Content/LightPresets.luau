@@ -302,9 +302,10 @@ const presets: LightPresets = {
 		Saturation = -0.05,
 		Contrast = 0.1,
 		Tint = Color3.fromRGB(255, 255, 255),
-		BloomIntensity = 0.45,
+		-- owner 2026-10-21 (print: the white rabbit blown out): less bloom, only the real highlights glow (was 0.45 / 1.4)
+		BloomIntensity = 0.2,
 		BloomSize = 22,
-		BloomThreshold = 1.4,
+		BloomThreshold = 1.8,
 		SunRays = 0,
 		SunRaysSpread = 0.1,
 	},

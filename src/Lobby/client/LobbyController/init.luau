@@ -551,9 +551,10 @@ end
 const STAGE_LOOK_ATTRIBUTE = "ClassStage"
 const STAGE_LIGHTS = {
 	-- key far up in front, no shadow (a shadowed key put the cap's shadow over the eyes), narrow cone on the rig (2nd pass,
-	-- owner 2026-10-21: "move the light away, put it higher, the rig is too dark")
-	{ Name = "Key", Ahead = 13, Up = 14, Color = Color3.fromRGB(255, 242, 225), Brightness = 4.5, Range = 30, Angle = 32, Shadows = false },
-	{ Name = "Rim", Ahead = -4, Up = 8, Color = Color3.fromRGB(190, 200, 255), Brightness = 2.5, Range = 14, Angle = 50, Shadows = false },
+	-- owner 2026-10-21: "move the light away, put it higher, the rig is too dark"); 3rd pass (owner print, the white rabbit
+	-- blown out: "menos estourado, tá muito branco"): key 4.5 -> 3, rim 2.5 -> 1.6
+	{ Name = "Key", Ahead = 13, Up = 14, Color = Color3.fromRGB(255, 242, 225), Brightness = 3, Range = 30, Angle = 32, Shadows = false },
+	{ Name = "Rim", Ahead = -4, Up = 8, Color = Color3.fromRGB(190, 200, 255), Brightness = 1.6, Range = 14, Angle = 50, Shadows = false },
 }
 const STAGE_AIM = 3 -- studs over the stage point the lights aim at (the rig's chest)
 -- Local lights and Neon of the lobby around the stage ignore the Lighting preset: within this radius they are switched
