@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Lync = require(ReplicatedStorage.Packages.Lync)
 local quietLync = require(ReplicatedStorage.shared.Net.Log)
+local Restaurant = require(ReplicatedStorage.shared.Libs.Net.Restaurant)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Modux = require(ServerScriptService.server.Modux)
 
@@ -69,25 +70,35 @@ function NetService:Resync(player: Player)
 		end
 		return
 	end
-	local session: any = nil
-	for _, handle in self.Libs.Net :: any do
-		if type(handle) == "table" and handle.kind == "set" and type(handle.live) == "table" then
-			session = handle.live.session
-			if session ~= nil then
-				break
+	-- one Lync session per namespace: "game" (Net) and "restaurant" (Net.Restaurant: Tablets, Plates, DriveCars...). Only
+	-- "game" was resynced (owner 2026-10-22: on a reserved server the order talk never showed, the client had no Tablets
+	-- record at all)
+	const sessions: { any } = {}
+	for _, namespace in { self.Libs.Net, Restaurant } :: { any } do
+		for _, handle in namespace do
+			if type(handle) == "table" and handle.kind == "set" and type(handle.live) == "table" then
+				const session = handle.live.session
+				if session ~= nil then
+					if not table.find(sessions, session) then
+						table.insert(sessions, session)
+					end
+					break
+				end
 			end
 		end
 	end
-	if session == nil or type(session.order) ~= "table" or type(session.sets) ~= "table" then
-		return
-	end
-	const ok, problem = pcall(function()
-		for _, id in session.order do
-			sync.joined(session.sets[id], player)
+	for _, session in sessions do
+		if type(session.order) ~= "table" or type(session.sets) ~= "table" then
+			continue
 		end
-	end)
-	if not ok then
-		warn(`[NetService] resync of {player.Name} failed: {problem}`)
+		const ok, problem = pcall(function()
+			for _, id in session.order do
+				sync.joined(session.sets[id], player)
+			end
+		end)
+		if not ok then
+			warn(`[NetService] resync of {player.Name} failed: {problem}`)
+		end
 	end
 end
 

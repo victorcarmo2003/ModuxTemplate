@@ -13,7 +13,11 @@ local AdminArguments = require(ReplicatedStorage.shared.Admin.AdminArguments)
 local AdminSettings = require(ReplicatedStorage.shared.Admin.AdminSettings)
 local ConchUI = require(ReplicatedStorage.Packages.ConchUI)
 local conch = require(ReplicatedStorage.Packages.Conch)
+local Restaurant = require(ReplicatedStorage.shared.Libs.Net.Restaurant)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
+local Cinematic = require(StarterPlayer.StarterPlayerScripts.client.Interface.Cinematic)
+
+const TABLET_WATCH = 60 -- s the Tablets changes are logged after "tablet-client"
 
 const _ARGUMENTS = AdminArguments -- keeps the type registration alive
 
@@ -148,12 +152,81 @@ local function registerHelp()
 	})
 end
 
+-- What this client sees of the order talk (owner 2026-10-22: the close-up and the card never showed in the published
+-- game while the server said Talking): the Tablets records it holds, the talk card's gui, what hides it; then every
+-- Tablets change for TABLET_WATCH s
+local function tabletRecordLine(index: number, record: any): string
+	const me = Players.LocalPlayer.UserId
+	return `TAB-{index} {record.State} npc {record.Npc} user {record.User} (mine {tostring(record.User == me)}) `
+		.. `t {string.format("%.1f", record.StartedAt - workspace:GetServerTimeNow())}..{string.format(
+			"%.1f",
+			record.EndsAt - workspace:GetServerTimeNow()
+		)} s`
+end
+
+local tabletWatch: { any }? = nil
+local function tabletReport()
+	const me = Players.LocalPlayer
+	conch.log(
+		"normal",
+		`me {me.UserId}, TalkCloseUp {tostring(me:GetAttribute("TalkCloseUp"))}, cinematic {tostring(Cinematic.Active())}`
+	)
+	local any = false
+	for index, record in Restaurant.Tablets:entries() do
+		any = true
+		conch.log("normal", tabletRecordLine(index, record))
+	end
+	if not any then
+		conch.log("warn", "no Tablets record on this client")
+	end
+	const gui = me:FindFirstChildOfClass("PlayerGui")
+	const dialog = if gui ~= nil then gui:FindFirstChild("TabletDialog", true) else nil
+	if dialog == nil then
+		conch.log("warn", "no TabletDialog gui (TabletController did not mount it)")
+	else
+		local shown = 0
+		for _, item in dialog:GetDescendants() do
+			if item:IsA("GuiObject") and item.Visible then
+				shown += 1
+			end
+		end
+		const enabled = if dialog:IsA("ScreenGui") then tostring(dialog.Enabled) else dialog.ClassName
+		conch.log("normal", `TabletDialog in {dialog.Parent and dialog.Parent.Name}, enabled {enabled}, {shown} visible objects`)
+	end
+	if tabletWatch ~= nil then
+		return
+	end
+	const watch = {
+		Restaurant.Tablets:onAdded(function(index, record)
+			conch.log("info", `+ {tabletRecordLine(index, record)}`)
+		end),
+		Restaurant.Tablets:onChanged(function(index, record)
+			conch.log("info", `~ {tabletRecordLine(index, record)}`)
+		end),
+	}
+	tabletWatch = watch
+	conch.log("normal", `logging Tablets changes for {TABLET_WATCH} s`)
+	task.delay(TABLET_WATCH, function()
+		for _, connection in watch do
+			connection:disconnect()
+		end
+		tabletWatch = nil
+		conch.log("normal", "Tablets log over")
+	end)
+end
+
 AdminController:OnStart(function(_self)
 	if not AdminSettings.IsAllowed(Players.LocalPlayer) then
 		return
 	end
 	conch.initiate_default_lifecycle()
 	registerHelp()
+	conch.register("tablet-client", {
+		permissions = {},
+		description = "What this client sees of the order talk (Tablets records, the talk card); logs changes for 60 s",
+		arguments = function() end,
+		callback = tabletReport,
+	})
 	ConchUI.bind_to(AdminSettings.ToggleKey) -- mounts the UI (sets conch.console.output)
 	conch.log("info", "Admin console ready. Type help to list the commands.")
 end)

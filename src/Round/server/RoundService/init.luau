@@ -14,7 +14,7 @@
 -- Lost night: NightLost (6 s) -> SpendChance -> Restore("RepeatNight") (Sh comes back with Attempt + 1 and a new
 -- capture) or RunEnd + RunEnded("Failed"). Night 10 won: NightEnd -> Finale -> RunEnd + RunEnded("Success").
 -- End of RunEnd: waves 2-3 go back to the first capture (RunStateService:ResetDev, T56) through the Resume phase;
--- wave 4 hands over to SessionService:EndRun instead.
+-- wave 4 hands over to SessionService:EndRun instead. A squad server (HoldRunEnd) stays in RunEnd: no new run there.
 -- Clock hold (user decision 2026-10-12, Provisional): while TutorialService's hook (SetClockHold) says so, Prep and Open
 -- of Day 1 do not run out: HoldAt (server time the hold began) freezes the clock (Record publishes ClockFrom = ClockTo =
 -- the clock at HoldAt), the deadline never comes and the tutorial customer is the only one around; on release
@@ -142,6 +142,8 @@ function RoundService:Setup()
 	self.StartGate = nil :: (() -> boolean)?
 	-- Resume boot (SessionService, DEC-080): no run start while the session reads its Runs record
 	self.ResumeHold = false :: boolean
+	-- Squad server (PartyRunService:HoldRunEnd): the end of RunEnd starts no new run, the crew goes to the lobby
+	self.RunOver = false :: boolean
 	-- Signals are created here so lower-priority services connect in their OnInit (architecture.md §3.1)
 	self.PhaseChanged = self.Libs.Signal.new() :: SignalLib.Signal<Phase, number, number>
 	self.ShiftStarted = self.Libs.Signal.new() :: SignalLib.Signal<ShiftInfo>
@@ -175,16 +177,22 @@ end
 
 -- The morning of a night shift (owner 2026-10-21; Content.Shift.Morning): Call and Prep before the dusk minute
 function RoundService:IsMorning(): boolean
-	if not self.Started or not self.NightShift() then
+	const morning = Content.Shift.Morning
+	if not morning.Enabled or not self.Started or not self.NightShift() or self.Night() < morning.FromNight then
 		return false
 	end
 	const phase = self.Phase()
-	return (phase == "Call" or phase == "Prep") and self:Minutes() < Content.Shift.Morning.DuskFrom
+	return (phase == "Call" or phase == "Prep") and self:Minutes() < morning.DuskFrom
 end
 
 -- The last seconds of that morning: it darkens, no new walker or car
 function RoundService:IsDusk(): boolean
-	return self.Started and self.NightShift() and self.Phase() == "Prep" and self:Minutes() >= Content.Shift.Morning.DuskFrom
+	return Content.Shift.Morning.Enabled
+		and self.Started
+		and self.NightShift()
+		and self.Night() >= Content.Shift.Morning.FromNight
+		and self.Phase() == "Prep"
+		and self:Minutes() >= Content.Shift.Morning.DuskFrom
 end
 
 -- Dark out: a night shift outside its morning (the look, the fog, the night walkers). IsNight stays the shift's.
@@ -244,6 +252,15 @@ function RoundService:OpenShop(): boolean
 		return false
 	end
 	const phase = self.Phase()
+	-- the night's report break (owner 2026-10-21: the upgrade lesson ends at the lever there): over to the next shift,
+	-- then on from its Call as below
+	if phase == "Summary" and self.NightShift() then
+		self:Advance(workspace:GetServerTimeNow())
+		if self.Phase() == "Summary" or self.Busy then
+			return false
+		end
+		return self:OpenShop()
+	end
 	if phase == "Call" and self.NightShift() then
 		-- the night call no longer blocks (owner decision 2026-10-17, Provisional): Call -> Prep -> Night at once, the call
 		-- keeps talking (BossService does not hang up on Prep / Night)
@@ -423,6 +440,11 @@ function RoundService:SetWipe(endsAt: number, frozen: boolean)
 		self.WipeEndsAt(endsAt)
 		self.WipeFrozen(frozen)
 	end)
+end
+
+-- PartyRunService on a squad server, on RunEnded: no new run after RunEnd (the crew goes back to the lobby).
+function RoundService:HoldRunEnd()
+	self.RunOver = true
 end
 
 -- RewardService (T59): fills RunReport fields per player. Runs in registration order, in pcall, no yield.
@@ -636,6 +658,10 @@ end
 -- End of RunEnd. Waves 2-3: back to the first capture of the run (T56); wave 4: SessionService:EndRun.
 function RoundService:EndRun(startedAt: number)
 	self.Busy = true
+	if self.RunOver then
+		-- squad server: the run is over for good; RunEnd stays on screen while PartyRunService sends everyone back
+		return
+	end
 	if not self.Dependencies.RunStateService:ResetDev() then
 		self.Busy = false
 		warn("[RoundService] RunEnd: no first capture to go back to; starting a new run again")

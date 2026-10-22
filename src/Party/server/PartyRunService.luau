@@ -11,7 +11,8 @@
 -- No launch (Studio, Team Test, a reserved server whose first player brought no TeleportData) = solo/dev behaviour:
 -- whoever joins is a member (RunStateService dev roster) and the run starts with the first one, as before.
 -- Back to the lobby: RunEnded -> after PartyRules.Rules.ReturnDelay s every player goes to a public server of this
--- place (TeleportAsync(game.PlaceId, players), no reserved code = Lobby role). LobbyReturn sends one player at any
+-- place (TeleportAsync(game.PlaceId, players), no reserved code = Lobby role); RoundService holds RunEnd (no new run on
+-- this server) and whoever is still here is sent again until the server is empty. LobbyReturn sends one player at any
 -- time. Only on reserved servers: a published public server forced to "Game" (ServerRoleOverride) has no lobby to
 -- go back to, and Studio cannot teleport ("StudioNoTeleport").
 local Players = game:GetService("Players")
@@ -26,6 +27,7 @@ local Modux = require(ServerScriptService.server.Modux)
 const RULES = PartyRules.Rules
 const RETURN_RATE = 2 -- s between two LobbyReturn of one player
 const OUTSIDER_DELAY = 3 -- s before an outsider is sent back (lets the client show the notice)
+const RESEND_GAP = 20 -- s between two sends of the players still here after the run ended (past every retry)
 
 const PartyRunService = Modux.Service("PartyRunService", {
 	Require = { "RoleService", "PlayerService", "NetService", "RunStateService", "RoundService" },
@@ -233,10 +235,20 @@ PartyRunService:OnInit(function(self)
 	end)
 	self.Dependencies.RoundService.RunEnded:Connect(function()
 		if not self:CanReturn(nil) then
+			-- Studio / public server: the run restarts here (dev); say why nobody is sent back
+			for _, player in Players:GetPlayers() do
+				self:CanReturn(player)
+			end
 			return
 		end
+		-- the run is over for good: no new run on this server, and whoever is still here (a failed teleport, a late
+		-- rejoin) is sent again every RESEND_GAP s until the server is empty
+		self.Dependencies.RoundService:HoldRunEnd()
 		task.delay(RULES.ReturnDelay, function()
-			self:SendToLobby(Players:GetPlayers())
+			while #Players:GetPlayers() > 0 do
+				self:SendToLobby(Players:GetPlayers())
+				task.wait(RESEND_GAP)
+			end
 		end)
 	end)
 	TeleportService.TeleportInitFailed:Connect(function(player, result, message)
