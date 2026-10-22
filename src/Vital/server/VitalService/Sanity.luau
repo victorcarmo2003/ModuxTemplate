@@ -4,6 +4,7 @@
 --   band(value, max, rows)          look pack of a value: "Day" (>= High), "Mid" (>= Mid), "Night"; max 0 (day) = Day
 --   clamp(value, max)               whole value in [0, max]
 --   darkLoss(entry, now, rows)      what one dark tick takes (0 while within DarkDelay or protected)
+--   passiveLoss(...)                what one tick takes in all: the higher of the dark rate and the Night idle rate
 --   start(startValue, maxValue)     night start: whole, max >= start, both inside the wire range
 --   restore(value, max, amount)     coffee: never above max (FEAT-021)
 
@@ -15,6 +16,7 @@ export type Rows = {
 	DarkPerSecond: number,
 	DreadAfter: number,
 	DreadPerSecond: number,
+	Idle: { PerSecond: number, NightScale: { [number]: number } },
 }
 
 -- Sanity packet wire range (network.md §13.1: Lync.int(0, 200)).
@@ -64,6 +66,32 @@ function Sanity.darkLoss(darkSince: number?, protectUntil: number, now: number, 
 		return rows.DreadPerSecond
 	end
 	return rows.DarkPerSecond
+end
+
+-- Idle drain (owner 2026-10-22, Q-477): per second, only in the exact phase "Night", scaled by the night number.
+function Sanity.idleRate(phase: string, night: number, rows: Rows): number
+	if phase ~= "Night" then
+		return 0
+	end
+	return rows.Idle.PerSecond * (rows.Idle.NightScale[night] or 1)
+end
+
+-- Loss of one tick in all: the dark and the idle drain do not add up, the higher rate applies. darkSince nil = lit (or the
+-- dark does not count in this phase). protectUntil covers both. Returns (loss, darkLoss): the second one is what the dark
+-- alone took, for the client's dark look.
+function Sanity.passiveLoss(
+	darkSince: number?,
+	protectUntil: number,
+	now: number,
+	phase: string,
+	night: number,
+	rows: Rows
+): (number, number)
+	if now < protectUntil then
+		return 0, 0
+	end
+	const dark = Sanity.darkLoss(darkSince, protectUntil, now, rows)
+	return math.max(dark, Sanity.idleRate(phase, night, rows)), dark
 end
 
 -- Coffee (FEAT-021): +amount, never above max.

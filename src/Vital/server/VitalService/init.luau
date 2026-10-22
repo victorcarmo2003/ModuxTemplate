@@ -755,11 +755,17 @@ function VitalService:SetDread(player: Player, on: boolean)
 	end
 end
 
+-- Dark and idle drain, one tick (1 Hz). The dark counts in Sanity.DarkPhases; the idle drain (owner 2026-10-22, Provisional,
+-- Q-477) only in the phase "Night" and lit or not. They do not add up: Sanity.passiveLoss takes the higher rate. Dev
+-- "sanity dark on|off" (DevLit) forces the dark probe only; the idle drain stays.
 function VitalService:DarkTick(t: number)
 	const round = self.Dependencies.RoundService
-	const counts = round:IsNight() and isDarkPhase(round:GetPhase())
+	const phase = round:GetPhase()
+	const night = round:GetNight()
+	const counts = round:IsNight() and isDarkPhase(phase)
 	const runState = self.Dependencies.RunStateService
 	const characters = self.Dependencies.CharacterService
+	const darkAtAttribute = Content.Sanity.DarkAtAttribute
 	for _, player in Players:GetPlayers() do
 		if not runState:IsActive(player) then
 			self:SetDread(player, false)
@@ -768,24 +774,30 @@ function VitalService:DarkTick(t: number)
 		const entry = self:Ensure(player)
 		const character = characters:CharacterOf(player)
 		const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
-		if not counts or entry.Max <= 0 or root == nil or not root:IsA("BasePart") or characters:IsFainted(player) then
+		if entry.Max <= 0 or root == nil or not root:IsA("BasePart") or characters:IsFainted(player) then
 			entry.DarkSince = nil
 			self:SetDread(player, false)
 			continue
 		end
-		if self:IsLit(root.Position) then
+		if counts and not self:IsLit(root.Position) then
+			const darkSince = entry.DarkSince or t
+			entry.DarkSince = darkSince
+			self:SetDread(player, t - darkSince >= Content.Sanity.DreadAfter and not self:Held())
+		else
 			entry.DarkSince = nil
 			self:SetDread(player, false)
-			continue
 		end
-		const darkSince = entry.DarkSince or t
-		entry.DarkSince = darkSince
-		self:SetDread(player, t - darkSince >= Content.Sanity.DreadAfter and not self:Held())
-		entry.DarkOwed += Sanity.darkLoss(entry.DarkSince, entry.ProtectUntil, t, Content.Sanity)
+		const loss, darkLoss =
+			Sanity.passiveLoss(entry.DarkSince, entry.ProtectUntil, t, phase, night, Content.Sanity)
+		if darkLoss > 0 then
+			-- the client's dark look follows this, not the size of the drop (the idle drain falls in the light too)
+			player:SetAttribute(darkAtAttribute, t)
+		end
+		entry.DarkOwed += loss
 		const whole = math.floor(entry.DarkOwed)
 		if whole > 0 then
 			entry.DarkOwed -= whole
-			self:AddSanity(player, -whole, "dark")
+			self:AddSanity(player, -whole, if darkLoss >= loss then "dark" else "idle")
 		end
 	end
 end

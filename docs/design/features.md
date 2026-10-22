@@ -914,7 +914,8 @@ A antiga `call_finale` sai: o final é cutscene com Walt em pessoa (FEAT-027).
 | Início de cada noite | 100 (Runner 90; Night Owl 120 e máximo 120) | DEC-056, DEC-069 |
 | Ver anomalia (FEAT-022) | −5 (Barista −8), **1× por anomalia (`ANM-###`), por jogador, por noite** (vale também para as de "não olhar": relance custa o −5, não é erro). Confirma **Q-114**: "por jogador" (DEC-056) e "por noite" coincidem porque a sanidade reinicia a cada noite | DEC-056, DEC-069, `anomalies.md` §0 |
 | Quebrar regra comum | −35 | DEC-056 |
-| Escuro (FEAT-020) | −1/s após 3 s contínuos | DEC-056 |
+| Escuro (FEAT-020) | −0,5/s após 5 s contínuos (−1,5/s após 25 s: o pavor). Valores atuais do código; o −1/s após 3 s da DEC-056 foi suavizado a pedido do dono (2026-10-18) | DEC-056, `Content.Sanity` |
+| Queda ambiente (FEAT-020) | −1 a cada 3 s (`Idle.PerSecond` = 1/3) só na fase `Night`, em qualquer lugar (aceso ou não); Noite 1 ×0,5. **Provisório** (Q-477) | pedido do dono, 2026-10-22 |
 | Café (FEAT-021) | +25 (+35 se feito por Barista) | DEC-055, DEC-069 |
 | Atropelamento (FEAT-033) | **0** | DEC-103 |
 | Reviver (FEAT-034) | volta com 50% do máximo da classe (Rookie 50, Night Owl 60) | proposta (FEAT-034) |
@@ -968,7 +969,8 @@ Dados (tabela `Sanity`, `content-data.md` §3.16 + §6.5; conferidos e completad
 | `SeeAnomaly` | 5 (Barista 8 por `SeeAnomalyLoss`) | DEC-056, DEC-069 |
 | `SeeAngle`, `SeeRange`, `SeeTime` | 40° (cone total), 60 studs (padrão; por anomalia em `Anomalies.ViewRange`), 1 s acumulado | FEAT-019 |
 | `RuleBroken` | 35 (nenhuma classe altera) | DEC-056, DEC-069 |
-| `DarkDelay`, `DarkPerSecond` | 3 s, 1/s | DEC-056 |
+| `DarkDelay`, `DarkPerSecond` | 5 s, 0,5/s (a DEC-056 dizia 3 s, 1/s; baixado a pedido do dono em 2026-10-18) | DEC-056 |
+| `Idle.PerSecond`, `Idle.NightScale` | 1/3 por s, `{ [1] = 0.5 }` (demais noites ×1). Só a fase `Night`; no escuro vale o maior entre escuro e ambiente, nunca a soma. **Provisório** (Q-477) | pedido do dono, 2026-10-22 |
 | `DarkPhases` | `Call`, `Prep`, `Night` (**sem `NightEnd`**: a noite já foi vencida, escuro ali só puniria depois da vitória; L2-03, **Provisório**) | §19.7, TASK-047 |
 | `Coffee`, `CoffeeCooldown`, `CoffeeDrinkTime` | 25, 60 s, 1,5 s | DEC-055 |
 | Preparo do café | 6 s, em `Stations.coffee_machine.Params.BrewTime` (não repete em `Sanity`) | DEC-055 |
@@ -1016,7 +1018,8 @@ noite, irrelevante perto dos $120+ da gaveta; o limite real do café é atençã
 |---|---|
 | Luz | o jogador está "na luz" se está dentro de qualquer `LightZone` **ativa** |
 | `LightZone` do MVP | interior do trailer (ativa se o interruptor está ligado); Trailer Lights, raio 18 studs (UPG-005, ligada com o interruptor); interior do Ninth Street Mart e área sob o letreiro "OPEN 24 HOURS" (**sempre**, nem o Hush apaga); postes da Juniper Street e da Ninth Avenue (marcados pelo level-designer; o Hush apaga) |
-| Escuro | fora de toda zona ativa por > 3 s → −1/s **[DEC-056]** |
+| Escuro | fora de toda zona ativa por > 5 s → −0,5/s (> 25 s: −1,5/s) **[DEC-056, valores do código]** |
+| Queda ambiente | à parte do escuro, só na fase `Night`: −1 a cada 3 s em **qualquer** lugar, aceso ou não (Noite 1 ×0,5). No escuro não soma: vale o maior entre as duas taxas. `sanity dark on\|off` desliga só o escuro. **Provisório, Q-477** (pedido do dono, 2026-10-22) |
 | Interruptor | prompt "Lights", toque, dentro do trailer ao alcance do balcão e com o relógio do Bellmoor Savings à vista; liga/desliga interior + Trailer Lights juntos; estado da party; cooldown 0,5 s contra spam; começa ligado em toda noite e entra no snapshot (FEAT-026) |
 | Interruptor sem UPG-005 | existe desde a compra do trailer e controla a lâmpada interna; a N3 ("flip the trailer lights off") funciona igual **com ou sem** Trailer Lights |
 | Durante o Hush (N10) | do poste da esquina apagar até os postes voltarem, as zonas do trailer ficam apagadas e o interruptor não tem efeito |
@@ -1025,8 +1028,8 @@ noite, irrelevante perto dos $120+ da gaveta; o limite real do café é atençã
 Meta para o level-designer: o trajeto trailer → Mart segue a Ninth Avenue (sem obrigar a olhar a Juniper, por causa da N7) e tem ≤ 40 studs de escuro contínuo (≈ 2,5 s andando, abaixo do limite de 3 s) com postes acesos.
 
 - Critérios de aceite:
-  - Com a luz ligada, jogador parado no raio não perde sanidade.
-  - Apagar o interruptor faz quem está no interior entrar em escuro (perda começa após 3 s).
+  - Com a luz ligada, jogador parado no raio não perde sanidade **por escuro** (a queda ambiente da fase `Night`, Q-477, continua: ~1 a cada 3 s, metade na Noite 1).
+  - Apagar o interruptor faz quem está no interior entrar em escuro (perda começa após 5 s).
   - O interruptor tem o mesmo estado para todos os jogadores.
   - Sem UPG-005, o prompt "Lights" existe no trailer e apaga/acende a lâmpada interna.
   - Durante um Hush, quem está sob o letreiro do Mart não perde sanidade por escuro.

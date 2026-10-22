@@ -43,7 +43,7 @@ Anomalia = key, `ANM-###`, número (o do ANM) ou parte do nome (`blackout`, `kno
 | `behind [now]` | som pelas costas (2026-10-21): contagem da noite, próxima tentativa, se está calmo e quem está de costas para a janela; `now` = assim que estiver calmo |
 | `chore [<key>\|now\|end [<key>\|all]]` | tarefas da noite (Q-436): `grill_fire`, `back_door`, `rats`, `camera_static`; sem args = estado; `<key>` liga agora |
 | `window [open\|close\|status]` | janela de serviço (2026-10-21, Q-454): estado da janela, fase e se a loja está pausada; `open`/`close` força agora (sem isso, a janela abre sozinha quando a noite começa: `ShopWindow.AutoOpenAfter` = 0) |
-| `sanity [<n>\|hint\|dark on\|off\|auto] [player]` | sanidade |
+| `sanity [<n>\|hint\|dark on\|off\|auto] [player]` | sanidade; `dark on\|off` força só o escuro: a queda ambiente da fase `Night` (1 a cada 3 s, Q-477) segue valendo |
 | `god [on\|off]` · `god me [on\|off] [player]` | ninguém desmaia (party) · sanidade infinita de um jogador |
 | `revive [player\|all]` · `revive auto [on\|off] [player]` | volta Active (um jogador, ou `all` = todos Down/Spectator) · levanta 2 s após desmaio |
 | `faint [spectator] [player]` | cai agora como Down (ou Spectator) |

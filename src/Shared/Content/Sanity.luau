@@ -6,6 +6,14 @@
 -- effect LightRadius. Neither is repeated here (one source per number).
 local Table = require(script.Parent.Table)
 
+-- Idle drain (owner 2026-10-22 "dentro do trailer a sanidade não cai ... 1 a cada 3 segundos"; Provisional, Q-477): sanity
+-- falls by itself during the Night phase anywhere, lit or not. In the dark it does not add to DarkPerSecond: the higher
+-- of the two rates applies (Sanity.passiveLoss).
+export type Idle = {
+	PerSecond: number, -- lost per second in the Night phase (1/3 = one point every 3 s)
+	NightScale: { [number]: number }, -- multiplier by night number; a night not listed uses 1
+}
+
 export type Bands = {
 	High: number, -- >= High -> look pack "Day"
 	Mid: number, -- >= Mid -> "Mid"; below -> "Night" (absolute points, DEC-167)
@@ -75,6 +83,8 @@ export type Sanity = {
 	DreadAfter: number, -- seconds in the dark before the dread (the punishment of the lights left off)
 	DreadPerSecond: number, -- lost per second in the dark once the dread is on (instead of DarkPerSecond)
 	DreadAttribute: string, -- Player attribute (true while the dread is on): the client turns the place terrifying
+	DarkAtAttribute: string, -- Player attribute: server time of the last tick that took dark loss (the client's dark look)
+	Idle: Idle,
 	Coffee: number, -- restored by a coffee (25; Barista 35 by CoffeeRestore)
 	CoffeeDrinkTime: number, -- seconds of the drink animation
 	CoffeeNightOnly: boolean, -- Provisional (Q-170)
@@ -106,6 +116,10 @@ const sanity: Sanity = {
 	DreadAfter = 25,
 	DreadPerSecond = 1.5,
 	DreadAttribute = "DarkDread",
+	DarkAtAttribute = "SanityDarkAt",
+	-- owner 2026-10-22 (Provisional, Q-477): inside the lit trailer sanity did not fall; now 1 point per 3 s in the Night
+	-- phase. Night 1 halved (the tutorial night). Fractions add up in VitalService (DarkOwed)
+	Idle = { PerSecond = 1 / 3, NightScale = { [1] = 0.5 } },
 	Coffee = 25, -- FEAT-021
 	CoffeeDrinkTime = 1.5, -- FEAT-021
 	CoffeeNightOnly = true, -- Q-170 option A (Provisional): brewed by day, drunk only at night

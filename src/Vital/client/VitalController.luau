@@ -23,13 +23,12 @@
 	Effects only while the owner is `Active` (the faint is the only exception). The skin change by band is the
 	server's `LookPack` (instant, no VFX) and is not touched here.
 
-	Dark prediction (Provisional): the client has no `Zones` yet (TASK-059). The server sends `Sanity` at most once a
-	second and only on change; a drop of up to 2 x DarkPerSecond counts as a dark tick, and the dark holds for
-	DARK_HOLD seconds after the last one. Bigger drops (anomaly, broken rule) do not light the dark vignette.
-	Swap for `Zones.IsLit(HRP)` over the `Lights` set when TASK-059 lands.
+	Dark look (Provisional): the client has no `Zones`. The server stamps the local Player with the attribute
+	Content.Sanity.DarkAtAttribute (server time of its last tick that took dark loss) and the dark holds for DARK_HOLD
+	seconds after it. The size of a sanity drop is no longer read: the Night idle drain (Q-477) falls in the light too.
 
 	Anomaly seen (user request 2026-10-10): the server sends no event for VitalService:SeeAnomaly, so a single drop of
-	at least Sanity.SeeAnomaly and below Sanity.RuleBroken (dark ticks are <= 2 x DarkPerSecond) plays
+	at least Sanity.SeeAnomaly and below Sanity.RuleBroken (dark and idle ticks are smaller) plays
 	SoundRules.Stings.AnomalySeen (anomaly_see) on screen with the DEC-173 cap. Provisional: a packet would be exact.
 
 	Sounds (user request 2026-10-10), never for the first record of a member (join / admission):
@@ -200,11 +199,6 @@ end
 function VitalController:ApplySanity(value: number, max: number)
 	const previous = Vide.untrack(self.Sanity)
 	const previousMax = Vide.untrack(self.Max)
-	if max > 0 and previousMax > 0 and value < previous then
-		if previous - value <= Content.Sanity.DarkPerSecond * 2 then
-			self.DarkTickAt = os.clock()
-		end
-	end
 	if max > 0 and previousMax > 0 then
 		const drop = previous - value
 		if drop >= Content.Sanity.SeeAnomaly and drop < Content.Sanity.RuleBroken then
@@ -541,6 +535,12 @@ function VitalController:Step(dt: number)
 	const active = Vide.untrack(self.LocalState) == "Active"
 	const night = max > 0
 
+	-- the server stamps the player with the time of its last dark tick (Content.Sanity.DarkAtAttribute); the idle drain
+	-- (owner 2026-10-22, Q-477) falls in the light too, so the size of a drop says nothing about the dark any more
+	const darkAt = Players.LocalPlayer:GetAttribute(Content.Sanity.DarkAtAttribute)
+	if type(darkAt) == "number" then
+		self.DarkTickAt = now - (workspace:GetServerTimeNow() - darkAt)
+	end
 	const dark = night and active and now - self.DarkTickAt <= DARK_HOLD
 	if Vide.untrack(self.Dark) ~= dark then
 		self.Dark(dark)

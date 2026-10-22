@@ -944,6 +944,10 @@ local function checkLightsAndSanity()
 	inRange("Sanity", nil, nil, "Bands.Mid", Sanity.Bands.Mid, 1, Sanity.Bands.High)
 	inRange("Sanity", nil, nil, "SeeAngle", Sanity.SeeAngle, 1, 180)
 	inRange("Sanity", nil, nil, "BasicLampRadius", Sanity.BasicLampRadius, 0, 100)
+	inRange("Sanity", nil, nil, "Idle.PerSecond", Sanity.Idle.PerSecond, 0, 10)
+	for night, scale in Sanity.Idle.NightScale do
+		inRange("Sanity", nil, nil, `Idle.NightScale[{night}]`, scale, 0, 10)
+	end
 	-- TASK-482 stare pressure: a narrower cone than the sight, the drain after the pressure and after the sight
 	const stare = Sanity.Stare
 	inRange("Sanity", nil, nil, "Stare.Angle", stare.Angle, 1, Sanity.SeeAngle)

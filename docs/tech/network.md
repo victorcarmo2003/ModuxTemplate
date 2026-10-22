@@ -571,7 +571,7 @@ Vitals = Lync.replicate(Lync.struct({
 	KnockedUntil = Lync.f64(),      -- atropelado até (ragdoll); 0 = de pé
 	Class = Lync.enum(Content.Classes.Keys),
 }))
-Sanity = Lync.packet(Lync.struct({  -- s → dono; enviado na mudança (≤ 1 Hz no escuro) e no Ready/respawn
+Sanity = Lync.packet(Lync.struct({  -- s → dono; enviado na mudança (≤ 1 Hz no escuro e na queda ambiente da fase Night) e no Ready/respawn
 	Value = Lync.int(0, 200),
 	Max = Lync.int(0, 200),
 }))
@@ -587,6 +587,7 @@ Sanity = Lync.packet(Lync.struct({  -- s → dono; enviado na mudança (≤ 1 Hz
 ### 6.2 Demais entradas (sem mudança de schema desde a v3.1)
 
 ```lua
+| Escuro no cliente | o pacote não diz a causa da queda. O servidor marca o `Player` com o atributo `SanityDarkAt` (`Content.Sanity.DarkAtAttribute`, hora do servidor do último tick que tirou sanidade por escuro) e o `VitalController` liga o visual de escuro até `DARK_HOLD` depois dele (Q-477; antes era a heurística "queda ≤ 2 × DarkPerSecond") |
 Switches = Lync.replicate(Lync.struct({ On = Lync.bool() })), -- interruptor do trailer (DEC-189: vem de fábrica)
 Bench = Lync.replicate(Lync.struct({
 	Item = Lync.enum(Content.BenchItems.Keys),  -- inclui "none"
