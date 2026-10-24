@@ -1,11 +1,14 @@
 --!strict
 -- ANM-022 The head banger (V2 family A, odd customer; TASK-591; owner 2026-10-19, Provisional Q-399).
 -- Sign: it stands at the window with its head hanging forward (actor Variant "banger", Effects/Kit/OddCustomer).
--- The window does NOT send it away (Params.WindowRefuses = false in Kit/CustomerActor). Shut it and it beats its head
+-- The window does NOT send it away (OnEvent drops the Shutter event the Kit would answer). Shut it and it beats its head
 -- on it: cue head_bang every BangEvery s (BangFaster after BangRamp blows) while the window stays shut and it is still
 -- at the counter - thud, camera shake, the shutter jumping (Effects/ANM-022). The answer: turn the shop's lights off
 -- (ctx.Light.IsSwitchOn false) while it stands there: Resolved, and it walks off LeaveAfterDark s later. "Take Order"
--- on it = jumpscare + faint of who took it (Kit Scare, the Kit's Wrong). Left waiting = it gives up, no penalty.
+-- on it was the error (Kit Scare). Left waiting = it gives up, no penalty.
+-- Owner 2026-10-22 (Provisional; anomalies-after-accept-proposal.md §9): no REFUSE; its order is taken at the end of the
+-- talk and it waits in the delivery queue (Kit/CustomerActor). Not migrated yet: condition "Serve" (interim,
+-- no error); planned Hurry by blows (proposal §2.8). The lights still resolve it while it stands at the counter.
 -- Verb and numbers: Rules/ANM-022.luau. Body: Kit/CustomerActor (spawn, seen, Take Order, Stop).
 local Api = require(script.Parent.Parent.Api)
 local Kit = require(script.Parent.Kit.CustomerActor)
@@ -100,7 +103,8 @@ const HeadBanger: Api.Module = {
 	end,
 
 	OnEvent = function(ctx: Api.Context, occ: Api.Occurrence, event: Api.Event)
-		if extraOf(occ).Darkened then
+		-- the closed window is what makes it bang, never what sends it away (unlike the Kit's other actors)
+		if extraOf(occ).Darkened or event.Kind == "Shutter" then
 			return
 		end
 		const handler = base.OnEvent

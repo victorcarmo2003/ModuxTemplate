@@ -36,6 +36,7 @@ local RunParams = require(script.Parent.RunParams)
 local Sanity = require(script.Parent.Sanity)
 local Seating = require(script.Parent.Seating)
 local Shift = require(script.Parent.Shift)
+local Skins = require(script.Parent.Skins)
 local ShopWindow = require(script.Parent.ShopWindow)
 local Sounds = require(script.Parent.Sounds)
 local Species = require(script.Parent.Species)
@@ -48,6 +49,9 @@ local Traffic = require(script.Parent.Traffic)
 local Upgrades = require(script.Parent.Upgrades)
 local Vehicles = require(script.Parent.Vehicles)
 local WalkPaths = require(script.Parent.WalkPaths)
+-- texture tables of the crew look (data only, no require back into Content): DEC-370 needs Day / Mid / Night everywhere
+local CrewLooks = require(script.Parent.Parent.Crew.CrewLooks)
+local SkinLooks = require(script.Parent.Parent.Crew.SkinLooks)
 
 const KEY_PATTERN = "^[a-z][a-z0-9_]*$"
 -- Wire enum values (rule §1.3 exception): Shift phases and mood names.
@@ -1450,15 +1454,17 @@ local function checkSuspense()
 end
 
 const BEAT_KINDS: { [string]: boolean } =
-	{ Fade = true, Text = true, MoveTo = true, LookAt = true, Focus = true, Prompt = true, Line = true, Actor = true }
+	{ Fade = true, Text = true, MoveTo = true, LookAt = true, Focus = true, Prompt = true, Line = true, Actor = true, Mash = true, Sound = true }
 const BEAT_TEXT: { [string]: boolean } = { Text = true, Prompt = true, Line = true }
+const FX_KINDS: { [string]: boolean } = { Blur = true, Grade = true, Flash = true, Quake = true, Duck = true }
+const LOOKS: { [string]: boolean } = { Cinematic = true, Dawn = true, Night = true } -- LightController
 
 local function checkCutscenes()
 	checkKeys("Cutscenes", Cutscenes, KEY_PATTERN)
 	if Cutscenes.Keys[1] ~= "none" then
 		fail("Cutscenes", 1, Cutscenes.Keys[1], "first row must be the sentinel 'none'")
 	end
-	for _, required in { "finale", "credits" } do
+	for _, required in { "finale", "credits", Cutscenes.Rules.Finale } do
 		if not Cutscenes.ByKey[required] then
 			fail("Cutscenes", nil, nil, `scene '{required}' is required (FEAT-004, FEAT-027)`)
 		end
@@ -1483,6 +1489,37 @@ local function checkCutscenes()
 		if nextKey ~= nil and (nextKey == key or nextKey == "none" or not Cutscenes.ByKey[nextKey]) then
 			fail("Cutscenes", index, key, `Next '{nextKey}' is not another scene`)
 		end
+		const regress = row.Regress
+		if regress ~= nil then
+			inRange("Cutscenes", index, key, "Regress.At", regress.At, 0, row.Duration)
+			inRange("Cutscenes", index, key, "Regress.Time", regress.Time, 0.1, 30)
+			if row.Look ~= "Dawn" then
+				fail("Cutscenes", index, key, "Regress needs Look = 'Dawn'")
+			end
+		end
+		if row.Look ~= nil and not LOOKS[row.Look] then
+			fail("Cutscenes", index, key, `Look '{row.Look}' unknown`)
+		end
+		local fxAt = 0
+		for position, fx in row.Fx or {} do
+			if not FX_KINDS[fx.Kind] then
+				fail("Cutscenes", index, key, `Fx[{position}].Kind '{fx.Kind}' unknown`)
+			end
+			if fx.At < fxAt or fx.At > row.Duration then
+				fail("Cutscenes", index, key, `Fx[{position}].At = {fx.At} out of order or after Duration`)
+			end
+			fxAt = fx.At
+			inRange("Cutscenes", index, key, `Fx[{position}].Duration`, fx.Duration, 0, row.Duration)
+			if fx.Kind == "Flash" and (fx.Value < 0 or fx.Value > 0.9) then
+				fail("Cutscenes", index, key, `Fx[{position}] Flash Value {fx.Value} out of 0..0.9 (photosensitivity)`)
+			end
+			if fx.Kind == "Quake" and (fx.Value < 0 or fx.Value > 1.5) then
+				fail("Cutscenes", index, key, `Fx[{position}] Quake Value {fx.Value} out of 0..1.5`)
+			end
+			if fx.Kind == "Duck" and (fx.Value < 0 or fx.Value > 1 or (fx.To ~= nil and (fx.To < 0 or fx.To > 1))) then
+				fail("Cutscenes", index, key, `Fx[{position}] Duck needs Value and To in 0..1`)
+			end
+		end
 		local previous = 0
 		for position, beat in row.Beats do
 			if not BEAT_KINDS[beat.Kind] then
@@ -1505,6 +1542,18 @@ local function checkCutscenes()
 			const fov = beat.Fov
 			if fov ~= nil and ((beat.Kind ~= "LookAt" and beat.Kind ~= "Focus") or fov < 20 or fov > 100) then
 				fail("Cutscenes", index, key, `Beats[{position}].Fov = {fov}: LookAt/Focus only, 20..100`)
+			end
+			if beat.Kind == "Sound" and not Sounds.ByKey[beat.Target] then
+				fail("Cutscenes", index, key, `Beats[{position}] Sound '{beat.Target}' is not a sound`)
+			end
+			if beat.Kind == "Mash" then
+				const cap, window = beat.Value, beat.Duration
+				if cap == nil or cap <= 0 or cap > 1 or window == nil or window <= 0 or beat.At + window > row.Duration then
+					fail("Cutscenes", index, key, `Beats[{position}] Mash needs Value in (0, 1] and a Duration inside the scene`)
+				end
+			end
+			if beat.Kind == "Line" and Cutscenes.Rules.Voices[beat.Speaker or "walt"] == nil then
+				fail("Cutscenes", index, key, `Beats[{position}] Line speaker '{beat.Speaker}' has no Rules.Voices row`)
 			end
 		end
 		local shotAt = -1
@@ -1536,7 +1585,8 @@ local function checkCutscenes()
 	inRange("Cutscenes.Rules", nil, "Walk", "MinSpeed", rules.Walk.MinSpeed, 1, rules.Walk.MaxSpeed)
 	inRange("Cutscenes.Rules", nil, "Walk", "Accel", rules.Walk.Accel, 1, 100)
 	for speaker, voice in rules.Voices do
-		inRange("Cutscenes.Rules", nil, speaker, "Voices.Volume", voice.Volume, 0, 1)
+		-- owner 2026-10-23: the voices x2.24 louder; the Sound clamps at 10, text-to-speech at 3
+		inRange("Cutscenes.Rules", nil, speaker, "Voices.Volume", voice.Volume, 0, 3)
 	end
 	for car, row in rules.Cars do
 		if Traffic.Routes.ByKey[row.Route] == nil then
@@ -1547,20 +1597,23 @@ local function checkCutscenes()
 		end
 		inRange("Cutscenes.Rules", nil, car, "Cars.Look", row.Look, 1, #Traffic.Looks.Shapes * #Traffic.Looks.Paints)
 	end
-	-- finale and its Next chain play inside the Finale phase
-	local total, hops = 0, 0
-	local scene: string? = "finale"
-	while scene ~= nil do
-		const row = Cutscenes.ByKey[scene]
-		total += row.Cap
-		hops += 1
-		if hops > #Cutscenes.List then
-			fail("Cutscenes", nil, "finale", "Next chain loops")
+	-- the finale (Rules.Finale; and the older "finale" fallback) and its Next chain play inside the Finale phase
+	for _, start in { rules.Finale, "finale" } do
+		local total, hops = 0, 0
+		local scene: string? = start
+		while scene ~= nil do
+			const row = Cutscenes.ByKey[scene]
+			total += row.Cap
+			hops += 1
+			if hops > #Cutscenes.List then
+				fail("Cutscenes", nil, start, "Next chain loops")
+				break
+			end
+			scene = row.Next
 		end
-		scene = row.Next
-	end
-	if total > Shift.ByKey.Finale.Duration then
-		fail("Cutscenes", nil, "finale", `finale chain caps sum {total} s, Finale phase cap is {Shift.ByKey.Finale.Duration} s`)
+		if total > Shift.ByKey.Finale.Duration then
+			fail("Cutscenes", nil, start, `{start} chain caps sum {total} s, Finale phase cap is {Shift.ByKey.Finale.Duration} s`)
+		end
 	end
 end
 
@@ -2845,6 +2898,74 @@ local function checkAnomalyHints()
 	end
 end
 
+-- DEC-370 (TASK-643): the crew look follows the night (Skins.LookByNight), so every crew outfit, playable species and class
+-- skin (Halloween included) needs a Day, Mid and Night texture.
+local function hasPacks(sheets: any): boolean
+	if type(sheets) ~= "table" then
+		return false
+	end
+	for _, pack in Outfits.Looks.Packs do
+		const id = sheets[pack]
+		if type(id) ~= "string" or id == "" then
+			return false
+		end
+	end
+	return true
+end
+
+local function checkNightLooks()
+	const packs = setOf(Outfits.Looks.Packs :: { string })
+	local last = 0
+	for index, row in Skins.LookByNight do
+		if row.From <= last then
+			fail("Skins.LookByNight", index, row.Pack, "From must go up")
+		end
+		if not packs[row.Pack] then
+			fail("Skins.LookByNight", index, row.Pack, "Pack not in Looks.Packs")
+		end
+		last = row.From
+	end
+	if #Skins.LookByNight == 0 or Skins.LookByNight[1].From ~= 1 then
+		fail("Skins.LookByNight", nil, nil, "the first row starts at night 1")
+	end
+	for index, row in Outfits.List do
+		if row.Use == "Reserved" then
+			continue
+		end
+		for pack in packs do
+			if table.find(row.Packs, pack :: any) == nil then
+				fail("Outfits", index, row.Key, `missing Pack '{pack}' (DEC-370)`)
+			end
+		end
+		if not hasPacks(CrewLooks.Outfits[row.Key]) then
+			fail("Outfits", index, row.Key, "CrewLooks.Outfits needs Day, Mid and Night (DEC-370)")
+		end
+	end
+	for index, row in Species.List do
+		if row.Class == nil then
+			continue
+		end
+		const look = CrewLooks.Species[row.Key]
+		if look == nil then
+			fail("Species", index, row.Key, "no CrewLooks.Species row (DEC-370)")
+		elseif not hasPacks(look.Head) then
+			fail("Species", index, row.Key, "CrewLooks.Species Head needs Day, Mid and Night (DEC-370)")
+		elseif look.Blank ~= nil and not hasPacks(look.Blank.Atlas) then
+			fail("Species", index, row.Key, "CrewLooks.Species Blank.Atlas needs Day, Mid and Night (DEC-370)")
+		end
+	end
+	for index, row in Skins.List do
+		const look = SkinLooks.BySkin[row.Key]
+		if look == nil then
+			fail("Skins", index, row.Key, "no SkinLooks row (DEC-370)")
+		elseif not hasPacks(look) or not hasPacks(look.Atlas) then
+			fail("Skins", index, row.Key, "SkinLooks needs Day, Mid and Night (sheet and Atlas; DEC-370)")
+		elseif look.Head ~= nil and not hasPacks(look.Head) then
+			fail("Skins", index, row.Key, "SkinLooks Head needs Day, Mid and Night (DEC-370)")
+		end
+	end
+end
+
 return function()
 	checkKeySets()
 	checkHudReveal()
@@ -2857,6 +2978,7 @@ return function()
 	checkNotices()
 	checkClassesAndSpecies()
 	checkLooks()
+	checkNightLooks()
 	checkCustomerTypes()
 	checkOrders()
 	checkRecords()

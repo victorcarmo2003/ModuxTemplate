@@ -5,6 +5,7 @@ local Charm = require(ReplicatedStorage.Packages.Charm)
 local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 
 export type Public = {
+	AutoOpenToken: number,
 	InteriorPart: BasePart?,
 	MissingPoints: { [string]: boolean },
 	NoticeAt: { [Player]: number },
@@ -33,6 +34,8 @@ export type Public = {
 	Restore: (self: Public, _data: any) -> (),
 	DevCheck: (self: Public, name: string) -> (),
 	DevReset: (self: Public) -> (),
+	DevWindow: (self: Public, arg: string?) -> string,
+	ScheduleAutoOpen: (self: Public, phase: string) -> (),
 	DevStatus: (self: Public) -> string,
 }
 

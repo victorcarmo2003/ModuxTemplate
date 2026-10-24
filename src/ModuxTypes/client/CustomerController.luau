@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Content = require(ReplicatedStorage.shared.Content)
 local OrderBubble = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.OrderBubble)
 local Reactions = require(StarterPlayer.StarterPlayerScripts.client.Customer.CustomerController.Reactions)
 
@@ -17,6 +18,7 @@ export type Record = {
 	Order2: { [string]: boolean }?, -- pair leader: 2nd pending hot dog (network.md §14.2)
 	Leader: number?, -- pair partner: NpcId of its leader (no bubble)
 	Pickup: number?, -- restaurant: place in the pickup line PU-1..n (nil = not in it)
+	Bread: boolean?, -- the order is a bun alone (Content.OrderRules.BreadOnly, ANM-011)
 }
 type Talk = { Npc: number, Items: { string }, Reveal: number }
 type Entry = {

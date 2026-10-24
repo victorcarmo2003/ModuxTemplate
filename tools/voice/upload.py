@@ -72,6 +72,8 @@ def main():
     key = api_key()
     meta = json.load(open(META))
     todo = [k for k, m in meta.items() if (not a.only or k == a.only) and not m.get("assetId") and m.get("status") not in ("rejected",)]
+    # lines removed or unused (owner 2026-10-23 cleanup: their ogg was deleted) have nothing to send
+    todo = [k for k in todo if os.path.exists(os.path.join(ROOT, "Assets", "audio", "voice", meta[k]["speaker"], k + ".ogg"))]
     print(f"{len(todo)} to upload", flush=True)
     for n, k in enumerate(todo, 1):
         m = meta[k]

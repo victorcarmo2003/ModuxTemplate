@@ -1,25 +1,25 @@
 --!strict
--- Party money, tip jar, shift ledger, grade and summary (FEAT-012, FEAT-014; DEC-045, DEC-050, DEC-051, DEC-072,
+-- Party money, shift ledger, grade and summary (FEAT-012, FEAT-014; DEC-045, DEC-050, DEC-051, DEC-072,
 -- DEC-083, DEC-238, DEC-239; architecture.md §2.3, §3.1, §4, §19.3, §19.26 A1, T48; network.md §3.3, §4.4; data.md §2.2;
 -- TASK-021, TASK-050, TASK-242). Run place only.
--- Single writer of Cash and Drawer (Economy set, record 1). Since 2026-10-13 (DEC-238, DEC-239) SALES go straight to the
--- shared Cash and the cash drawer became a TIP JAR: the set field `Drawer` is kept for the wire and now means "tips in the
--- jar" (renaming it would break the client and Net; TipJarService and EconomyController read it as the jar). Others call:
+-- Single writer of Cash and Drawer (Economy set, record 1). Since 2026-10-13 (DEC-238) SALES go straight to the shared
+-- Cash; since 2026-10-22 (owner: "a gente não precisa mais de caixa de gorjetas", Provisional) TIPS do too: the tip jar of
+-- DEC-239 left the map with its prompt (collect_tips). The set field `Drawer` stays on the wire (Net, Market and the
+-- report read it) and is always 0 now. Others call:
 --   Spend(amount, player?)        purchases (Mart, bench, trailer); atomic check-and-debit, never below 0
 --   AddSale(amount, kind)         order price ("Sale"): straight into Cash; while the shop takes entries
---   AddTip(amount)                customer tip or table tip: into the tip jar (AddToDrawer(amount, "Tip") is the same call)
+--   AddTip(amount)                customer tip or table tip: straight into Cash too (the ledger keeps it apart as Tips)
 --   CountArrival(), CountResult() ledger for the grade (CustomerService, TASK-032/033)
 --   AddReportStep(name, fn)       fills ShiftReport fields of other features before it is sent (T48)
---   CollectTips()                 prompt on the jar (collect_tips): jar -> Cash now; the ledger remembers it for the report
 --   TopUp(amount)                 first-run tutorial: Cash up to at least amount (TutorialService, Provisional)
 --   PromptCashPack(player, missing) not enough Cash for a player's buy: OFFERS the Cash pack covering the difference
 --                                 (Shop TopUp; owner request 2026-10-15) in the HUD note (ShopOffer, TASK-364; owner
 --                                 request 2026-10-17: never opens the Roblox prompt by itself). Spend calls it on
 --                                 failure with `player`
--- Cash changes by Spend, AddSale, CollectTips, the deposit, TopUp and DevAddCash.
+-- Cash changes by Spend, AddSale, AddTip, the deposit, TopUp and DevAddCash.
 -- Deposit on RoundService.ShiftEnded (start of Summary): grade A-D, bonus floor(day take x %) where the day take = Sales +
--- Tips (DEC-051 parity), Cash += tips left in the jar + bonus, Drawer = 0, report steps, ShiftReport to
--- the group (Drawer = the day take), Reported(info, report).
+-- Tips (DEC-051 parity), Cash += bonus, report steps, ShiftReport to the group (Drawer = the day take), Reported(info,
+-- report).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -47,7 +47,7 @@ type Step = { Name: string, Run: ReportStep }
 
 const RECORD = 1 -- Economy is a single record (network.md §3.3)
 const CASH_MAX = 2147483647 -- Economy.Cash wire range
-const DRAWER_MAX = 1000000 -- Economy.Drawer (the tip jar) / ShiftReport.Drawer (the day take) wire range
+const DRAWER_MAX = 1000000 -- Economy.Drawer (always 0 since the tip jar left) / ShiftReport.Drawer (the day take) wire range
 const COUNT_MAX = 999 -- ShiftReport.Arrived/Completed wire range
 const TIPS_MAX = 100000 -- ShiftReport.Tips wire range
 const GEMS_MAX = 1000 -- ShiftReport.Gems wire range
@@ -111,7 +111,7 @@ function EconomyService:GetCash(): number
 	return self.Cash()
 end
 
--- Tips in the jar (the wire field is still called Drawer, DEC-239)
+-- The old drawer / tip jar (wire field Drawer): always 0 since the tip jar left (owner 2026-10-22). Kept for its callers
 function EconomyService:GetDrawer(): number
 	return self.Drawer()
 end
@@ -141,7 +141,7 @@ function EconomyService:IsShopOpen(): boolean
 	return phase ~= nil and phase.Selling
 end
 
--- Sales, jar and ledger take entries: a selling phase or Closing (queue still served)
+-- Sales, tips and ledger take entries: a selling phase or Closing (queue still served)
 function EconomyService:IsDrawerOpen(): boolean
 	const round = self.Dependencies.RoundService
 	return self:IsShopOpen() or (round:IsStarted() and round:GetPhase() == CLOSING)
@@ -222,8 +222,10 @@ function EconomyService:AddSale(amount: number, kind: SaleKind): number
 	return added
 end
 
--- A tip into the tip jar (DEC-239): customer tip (DEC-072) or the tip left on a table (SeatingService). The crew moves it
--- to Cash with CollectTips; what stays in the jar is deposited at the Summary. Returns what went in.
+-- A tip straight into the shared Cash (owner 2026-10-22, Provisional: the tip jar of DEC-239 and its "Collect Tips" left):
+-- customer tip (DEC-072, CustomerService adds it to the Sale amount, so the "+$N" of the sale already shows it) or the tip
+-- left on a table (SeatingService). Same window as AddSale; the ledger keeps it as Tips for the report and the bonus.
+-- Returns what went in (0 when refused or Cash is at its cap).
 function EconomyService:AddTip(amount: number): number
 	const value = amountOf(amount)
 	if value == nil then
@@ -234,46 +236,15 @@ function EconomyService:AddTip(amount: number): number
 		warn(`[EconomyService] AddTip({value}) outside a selling phase or Closing ignored`)
 		return 0
 	end
-	const jar = self.Drawer()
-	const added = math.min(value, DRAWER_MAX - jar)
+	const cash = self.Cash()
+	const added = math.min(value, CASH_MAX - cash)
 	if added <= 0 then
 		return 0
 	end
-	self.Drawer(jar + added)
+	self.Cash(cash + added)
 	Ledger.credit(self.Shift, "Tip", added)
-	MetricsLog.server("tip", added, { jar = jar + added })
+	MetricsLog.cash("Source", added, cash + added, "Tip")
 	return added
-end
-
--- For callers written against the drawer: only "Tip" goes to the jar (DEC-239); prices and rewards use AddSale.
-function EconomyService:AddToDrawer(amount: number, kind: DrawerKind): number
-	if kind ~= "Tip" then
-		fail(`[EconomyService] AddToDrawer only takes "Tip" now (DEC-238); use AddSale for {kind}`)
-		return 0
-	end
-	return self:AddTip(amount)
-end
-
--- "Collect Tips" (DEC-239; it was "Collect Cash", Q-201): everything in the tip jar goes to Cash right now. Same rules
--- as AddTip (selling phase or Closing). The ledger keeps the amount (Collected). Returns what moved (0 = nothing: empty
--- jar, shop closed, Cash at its cap).
-function EconomyService:CollectTips(): number
-	if not self:IsDrawerOpen() then
-		return 0
-	end
-	const jar = self.Drawer()
-	const cash = self.Cash()
-	const moved = math.min(jar, CASH_MAX - cash)
-	if moved <= 0 then
-		return 0
-	end
-	self.Libs.Charm.batch(function()
-		self.Cash(cash + moved)
-		self.Drawer(jar - moved)
-	end)
-	self.Shift.Collected += moved
-	MetricsLog.cash("Source", moved, cash + moved, "TipsCollected")
-	return moved
 end
 
 -- A customer reached the counter (FEAT-014 denominator). Called once per customer by CustomerService.
@@ -351,9 +322,9 @@ function EconomyService:BossPoints(): number
 	return best
 end
 
--- Start of Summary (RoundService.ShiftEnded): grade, bonus, deposit, report. Jar and ledger end at zero. Sales are in
--- Cash already (DEC-238) and so are the tips collected during the shift: the deposit adds the grade bonus and the tips
--- nobody collected (DEC-239, auto-deposit).
+-- Start of Summary (RoundService.ShiftEnded): grade, bonus, deposit, report. Drawer and ledger end at zero. Sales and tips
+-- are in Cash already (DEC-238; tips since the jar left, owner 2026-10-22): the deposit adds the grade bonus (and a Drawer
+-- left over, always 0 now).
 function EconomyService:Deposit(info: ShiftInfo): Report
 	const ledger = self.Shift
 	const jar = self.Drawer()

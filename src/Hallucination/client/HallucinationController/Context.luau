@@ -412,8 +412,9 @@ function Context.Pick<T>(random: Random, rows: { T }, weight: (T) -> number): T?
 	end
 	local roll = random:NextNumber(0, total)
 	for _, row in rows do
-		roll -= math.max(weight(row), 0)
-		if roll <= 0 then
+		const share = math.max(weight(row), 0)
+		roll -= share
+		if share > 0 and roll <= 0 then -- a 0-weight row is never picked, even on a roll of exactly 0
 			return row
 		end
 	end

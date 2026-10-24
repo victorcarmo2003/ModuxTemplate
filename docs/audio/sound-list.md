@@ -520,9 +520,22 @@ constante no topo de cada arquivo). Mild (DEC-172).
 | SFX-259 | `rat_squeak` | Guinchos de rato | `rats` chegam e cada rato espantado | ~1 s | — | Sfx 0,7, 3D 40 studs | P1 |
 | SFX-260 | `camera_static` | Rajada de estática | `camera_static` (reserva; o feed mostra o chiado) | ~3 s | — | Sfx 0,5, tela | P3 |
 | SFX-261 | `camera_fixed` | Estática de rádio que liga e corta | `camera_static` consertada, na câmera | ~2,7 s | — | Sfx 0,6, 3D 40 studs | P2 |
+| SFX-262 | `pencil_write` | Lápis rabiscando papel | o Walt escreve a dica da noite no papel do balcão (`Content.Hints`, depois da ligação da noite; 2026-10-22) | ~4,2 s | — | Sfx 0,7, tela (2D: o jogador ouve no telefone, ~32 studs do papel; era 3D 30 studs e não chegava, 2026-10-22) | P1 |
+| SFX-266 | `phone_line` | Ruído de linha telefônica (chiado + estalos, loop 12 s) | sob a voz do Walt enquanto a ligação fala, saindo do telefone (`BossController:SetLineNoise`; dono 2026-10-23) | loop | — | Sfx 0,8, 3D 140 studs (do telefone) | P1 |
 
 Sem pedido novo: `puddle_rush` (a água correndo de ANM-005 usa `splash`) e a pancada na persiana (ANM-011 usa `window_slam`).
 `clock_tick` só desacelera de verdade se a cena tocar um tique por passo (hoje ela toca o clipe do `amb_clock_tick` uma vez e o corta aos 9 s).
+
+### 5.23 Birra do ANM-011 (condição Plain, 2026-10-22; `design/anomalies-after-accept-proposal.md` §9.9; Provisório)
+
+Cue `plate_throw` (cliente `Effects/Kit/Tantrum`, números em `Content.PlateThrow`). Creator Store, conta `ProSoundEffects`
+(`art/credits.md`); Provisório até o dono ouvir. Os pés batendo quando ele sai com raiva reusam `steps_stop` (SFX-237).
+
+| ID | Chave | Nome curto | Quando toca | Duração | Asset | Grupo / volume / espaço | Prioridade |
+|---|---|---|---|---|---|---|---|
+| SFX-263 | `plate_smash` | Prato quebrando ao bater | o prato arremessado bate na parede atrás do balcão | ~1,2 s | `9117653536` Plate Break Concrete Floor 8 | Sfx 0,9, 3D 70 studs (na parede) | P1 |
+| SFX-264 | `plate_drop` | Prato caindo no chão (mais baixo) | o prato desce a parede e cai no chão | ~1,7 s | `9117653229` Plate Break Concrete Floor 7 | Sfx 0,45, 3D 50 studs | P2 |
+| SFX-265 | `anger_thud` | "TUM": batida grave e seca | logo depois do impacto, junto com a fala "I ONLY WANT BREAD." e o rosto de raiva | ~0,5 s | `9113480917` Body Fall Thud 1 | Sfx 1, 3D 70 studs (na cabeça dele) | P1 |
 
 ---
 

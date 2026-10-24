@@ -1,5 +1,8 @@
 --!strict
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Content = require(ReplicatedStorage.shared.Content)
+
 export type Tablet = {
 	Index: number,
 	Anchor: Instance?,
@@ -11,9 +14,10 @@ export type Tablet = {
 	Order: { string }, -- topping keys of the 1st hot dog
 	Order2: { string }?, -- pair (FEAT-038)
 	PromptOn: boolean?, -- last state written to the prompt (owner 2026-10-18: it showed with nobody at the counter)
-	OrderTime: number?, -- s of the order talk after Accept (DEC-353), set at Start
+	Tic: TicTalk?, -- the tic playing in this talk (Content.Tics), nil = none
 }
-export type TabletState = "Idle" | "Talking" | "Full" | "Deciding" | "Greeting"
+export type TicTalk = { Rig: Model, Npc: number, Row: Content.Tic, PeakAt: number, EndAt: number }
+export type TabletState = "Idle" | "Talking" | "Full"
 
 export type Public = {
 	AnchorTablet: { [Instance]: number },
@@ -35,9 +39,8 @@ export type Public = {
 	Reset: (self: Public, tablet: Tablet) -> (),
 	StartDrive: (self: Public, player: Player, npc: number) -> boolean,
 	DriveTalking: (self: Public, npc: number) -> boolean,
-	Ask: (self: Public, tablet: Tablet) -> (),
 	Finish: (self: Public, tablet: Tablet) -> (),
-	Decide: (self: Public, tablet: Tablet, player: Player, serve: boolean) -> (),
+	Leave: (self: Public, tablet: Tablet, player: Player) -> (),
 	UserGone: (self: Public, tablet: Tablet) -> boolean,
 	Cancel: (self: Public, tablet: Tablet, why: string) -> (),
 	StillThere: (self: Public, tablet: Tablet) -> boolean,

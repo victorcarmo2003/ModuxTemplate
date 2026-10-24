@@ -7,6 +7,7 @@ local Achievements = require(script.Achievements)
 local Actions = require(script.Actions)
 local Animations = require(script.Animations)
 local Anomalies = require(script.Anomalies)
+local AnomalyHints = require(script.AnomalyHints)
 local Atmospheres = require(script.Atmospheres)
 local BossCalls = require(script.BossCalls)
 local Breaker = require(script.Breaker)
@@ -21,6 +22,7 @@ local GemRewards = require(script.GemRewards)
 local Hallucinations = require(script.Hallucinations)
 local HorrorScenes = require(script.HorrorScenes)
 local Haptics = require(script.Haptics)
+local Hints = require(script.Hints)
 local HudReveal = require(script.HudReveal)
 local Ingredients = require(script.Ingredients)
 local Journal = require(script.Journal)
@@ -42,9 +44,11 @@ local OpalLines = require(script.OpalLines)
 local Orders = require(script.Orders)
 local Outfits = require(script.Outfits)
 local Packages = require(script.Packages)
+local PlateThrow = require(script.PlateThrow)
 local Prep = require(script.Prep)
 local Restaurant = require(script.Restaurant)
 local OrderTalk = require(script.OrderTalk)
+local OrderSpeech = require(script.OrderSpeech)
 local Revive = require(script.Revive)
 local RunParams = require(script.RunParams)
 local RunZones = require(script.RunZones)
@@ -62,7 +66,7 @@ local Stations = require(script.Stations)
 local Stats = require(script.Stats)
 local Suspense = require(script.Suspense)
 local Table = require(script.Table)
-local TipJar = require(script.TipJar)
+local Tics = require(script.Tics)
 local Metrics = require(script.Metrics)
 local Traffic = require(script.Traffic)
 local TrafficLights = require(script.TrafficLights)
@@ -71,6 +75,8 @@ local VoiceLines = require(script.VoiceLines)
 local Validate = require(script.Validate)
 local Trailer = require(script.Trailer)
 local Vehicles = require(script.Vehicles)
+local WaltReactions = require(script.WaltReactions)
+local WaltWatch = require(script.WaltWatch)
 local WalkPaths = require(script.WalkPaths)
 
 export type Table<T> = Table.Table<T>
@@ -93,6 +99,7 @@ export type CustomerType = CustomerTypes.CustomerType
 export type Cutscene = Cutscenes.Cutscene
 export type CutsceneBeat = Cutscenes.Beat
 export type CutsceneShot = Cutscenes.Shot
+export type CutsceneFx = Cutscenes.Fx
 export type CutsceneCinema = Cutscenes.Cinema
 export type CutsceneExtra = Cutscenes.Extra
 export type CutsceneFlock = Cutscenes.Flock
@@ -109,6 +116,8 @@ export type SuspenseSpot = Suspense.Spot
 export type SuspenseRules = Suspense.Rules
 export type GemRewards = GemRewards.GemRewards
 export type Hallucination = Hallucinations.Hallucination
+export type Hint = Hints.Hint
+export type HintRules = Hints.Rules
 export type HudRevealElement = HudReveal.Element
 export type HudRevealTrigger = HudReveal.Trigger
 export type HallucinationRules = Hallucinations.Rules
@@ -164,6 +173,19 @@ export type RestaurantDrive = Restaurant.Drive
 export type RestaurantSupply = Restaurant.Supply
 export type RestaurantDialog = Restaurant.Dialog
 export type OrderTalkKind = OrderTalk.Kind
+export type TalkStyle = OrderTalk.Style
+export type TalkFx = OrderTalk.Fx
+export type Speech = OrderSpeech.Speech
+export type SpeechAt = OrderSpeech.At
+export type SpeechPhase = OrderSpeech.Phase
+export type Tic = Tics.Tic
+export type TicTiming = Tics.Timing
+export type TicQueue = Tics.Queue
+export type AnomalyHint = AnomalyHints.Hint
+export type AnomalyHintRules = AnomalyHints.Rules
+export type PlateThrow = PlateThrow.PlateThrow
+export type TicSaid = Tics.Said
+export type TicTension = Tics.Tension
 export type RestaurantBinding = Restaurant.Binding
 export type HapticProfile = Haptics.Profile
 export type HapticKey = Haptics.Key
@@ -197,7 +219,6 @@ export type Skin = Skins.Skin
 export type HalloweenEvent = Events.Halloween
 export type Stat = Stats.Stat
 export type Station = Stations.Station
-export type TipJar = TipJar.TipJar
 export type Metrics = Metrics.Metrics
 export type Traffic = Traffic.Traffic
 export type TrafficDensity = Traffic.Density
@@ -210,6 +231,9 @@ export type AnomalyWindow = ShopWindow.AnomalyWindow
 export type Vehicle = Vehicles.Vehicle
 export type WalkPath = WalkPaths.WalkPath
 export type WalkPathRules = WalkPaths.Rules
+export type WaltReaction = WaltReactions.Reaction
+export type WaltReactionRules = WaltReactions.Rules
+export type WaltWatchRules = WaltWatch.Rules
 
 Validate()
 
@@ -324,8 +348,9 @@ return table.freeze({
 	CoffeeCup = CoffeeCup,
 
 
-	-- Tip jar that replaced the cash drawer (DEC-239, user decision 2026-10-13; TipJarService, EconomyController). Provisional
-	TipJar = TipJar,
+	-- Walt's notes on the paper of the front counter, one tip per night (owner request 2026-10-22; HintService,
+	-- HintController). The tip jar left (owner 2026-10-22): tips go straight to Cash (EconomyService:AddTip). Provisional
+	Hints = Hints,
 	-- RoMetrics analytics: the client-reported wire lists (owner request 2026-10-16; MetricsService). Provisional
 	Metrics = Metrics,
 	-- Run hot zones for RoMetrics: boxes measured in world space (owner request 2026-10-21; MetricsService/Zones). Provisional
@@ -356,10 +381,27 @@ return table.freeze({
 	-- Restaurant.Rules.Enabled is THE single switch (TASK-390): Prep, Seating, Vehicles, Anomalies and Nights derive their
 	-- restaurant values from Restaurant.Switch at require time (see the header of Restaurant.luau); false = published game
 	Restaurant = Restaurant,
-	-- owner 2026-10-21 (DEC-353): SERVE / REFUSE after the order talk, odd lines of the anomaly customers
+	-- the order talk's words, timing and text styles (owner 2026-10-22: no ACCEPT / REFUSE, the talk ends by itself)
 	OrderTalk = OrderTalk,
+	-- the customer's speech typed letter by letter (pure: TabletService's EndsAt, TabletController's card)
+	OrderSpeech = OrderSpeech,
+	-- anomaly tics in the order talk (design/anomaly-tics-proposal.md; pilot ANM-012)
+	Tics = Tics,
+	-- hints of the customer anomalies in the delivery queue: caption, whisper, Walt's hints paper (owner 2026-10-22;
+	-- design/anomalies-after-accept-proposal.md §9). Provisional
+	AnomalyHints = AnomalyHints,
+	-- ANM-011's tantrum: the plate thrown at the wall, the TUM, the line, the face and the bugged body; sanity of each throw
+	-- (owner 2026-10-22; design/anomalies-after-accept-proposal.md §9.9). Provisional
+	PlateThrow = PlateThrow,
 
 	-- Horror score in steps Calm / Uneasy / Tension / Climax / Release and the on-screen warnings (TASK-443, TASK-444;
 	-- owner request 2026-10-17; AnomalyController/Score). Provisional
 	Score = Score,
+
+	-- Walt with no phone: short reactions the first time something happens in the run, no ring, no filter (DEC-372,
+	-- TASK-638; ReactionService, ReactionController). Provisional
+	WaltReactions = WaltReactions,
+	-- The dark Walt standing in the parking lot every night, fades when a player gets close (DEC-371, TASK-638;
+	-- WaltWatchService, WaltWatchController). Provisional
+	WaltWatch = WaltWatch,
 })

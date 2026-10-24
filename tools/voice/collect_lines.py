@@ -104,7 +104,7 @@ def main():
         if kind == "str" and sentence_like(val):
             add("walt", val, f"BossCalls.luau:{line}")
 
-    # tutorial steps: Say / Done / Remind fields + GREETING / GOODBYE / SKIP_GOODBYE tables
+    # tutorial steps: Say / SayAgain / Done / Remind fields + GREETING / GOODBYE / SKIP_GOODBYE tables
     t = toks["steps"]
     field = None
     depth_field = 0
@@ -112,7 +112,7 @@ def main():
     for i, (kind, val, line) in enumerate(t):
         if i < skip_to:
             continue
-        if kind == "id" and val in ("Say", "Done", "Remind", "GREETING", "GOODBYE", "SKIP_GOODBYE"):
+        if kind == "id" and val in ("Say", "SayAgain", "Done", "Remind", "GREETING", "GOODBYE", "SKIP_GOODBYE"):
             field = val; depth_field = 0
             if val in ("GREETING", "GOODBYE", "SKIP_GOODBYE"):
                 # `const X: { string } = { ... }`: skip the type annotation, start at the "=" (before, its braces closed the field)
@@ -122,13 +122,13 @@ def main():
                 skip_to = j
         elif kind == "id" and val in ("Text", "Hint", "Key", "Action"):
             field = None
-        elif kind == "sym" and val == "{" and field in ("Say", "GREETING", "GOODBYE", "SKIP_GOODBYE"):
+        elif kind == "sym" and val == "{" and field in ("Say", "SayAgain", "GREETING", "GOODBYE", "SKIP_GOODBYE"):
             depth_field += 1
         elif kind == "sym" and val == "}" and depth_field:
             depth_field -= 1
             if depth_field == 0:
                 field = None
-        elif kind == "str" and field and (sentence_like(val) or (field in ("Done", "Remind", "Say") and re.search(r"[A-Za-z]", val))):
+        elif kind == "str" and field and (sentence_like(val) or (field in ("Done", "Remind", "Say", "SayAgain") and re.search(r"[A-Za-z]", val))):
             add("walt", val, f"Steps.luau:{line} ({field})")
             if field in ("Done", "Remind"):
                 field = None

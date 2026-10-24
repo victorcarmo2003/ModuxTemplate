@@ -189,18 +189,20 @@ local function call(env: Context.Env, run: Context.Run)
 	run:Cleanup(function()
 		env.Subtitle(SPEAKER, "")
 	end)
-	for _, line in LINES do
+	-- owner 2026-10-22 ("o áudio do phone glitch toca parece que duas vezes, deixa somente uma vez"): ONE glitch as
+	-- the line opens (Context.Glitch, cut in the middle); it played before each line and again at the end
+	for index, line in LINES do
 		if not env.CallIdle() then
 			break
 		end
-		-- owner 2026-10-21: one glitch at a time, cut in the middle (Context.Glitch)
-		Context.Glitch(env, host, { Volume = 0.5 })
+		if index == 1 then
+			Context.Glitch(env, host, { Volume = 0.5 })
+		end
 		env.Subtitle(SPEAKER, line.Text)
 		if not run:Wait(line.Time) then
 			return
 		end
 	end
-	Context.Glitch(env, host, { Volume = 0.7, Speed = 0.85 })
 	env.Subtitle(SPEAKER, "")
 end
 

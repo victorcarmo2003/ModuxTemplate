@@ -13,7 +13,7 @@
 	           its feet, every tick. Inside = escaped (stage cleared). Within Rules.Catch studs (flat) = caught.
 	  Caught   OutsideStage = "Caught" (the client shows the face), Rules.Faint s later VitalService:Fall; the stage
 	           clears after Rules.Linger s.
-	Down / Spectator / not Active = cleared. Never in the lobby.
+	Down / Spectator / not Active / a cutscene holding the screen (CutsceneService:IsHolding) = cleared. Never in the lobby.
 	Safe = inside the vehicle, a Content.Restaurant.SafeBoxes box, or (owner 2026-10-20) the Gear Stand region while the
 	stand is OPEN (GearStandService:IsOpen): the stand's bounding box grown by Rules.GearMargin studs on every side
 	(flat), found from the pedestals (Content.Mart.Tags.Pedestal) inside the GEAR_STAND model. Closed = the street again.
@@ -101,6 +101,7 @@ const OutsideService = Modux.Service("OutsideService", {
 		"VitalService",
 		"AnomalyService",
 		"GearStandService",
+		"CutsceneService",
 	},
 	Priority = 545,
 })
@@ -211,7 +212,10 @@ end
 function OutsideService:Step(dt: number)
 	const t = now()
 	const round = self.Dependencies.RoundService
-	const night = round:IsStarted() and round:GetPhase() == NIGHT_PHASE
+	-- a cutscene (the Finale, a dev play) clears every chase: the street is the scene's
+	const night = round:IsStarted()
+		and round:GetPhase() == NIGHT_PHASE
+		and not self.Dependencies.CutsceneService:IsHolding()
 	const tension = self.Dependencies.AnomalyService:IsTension()
 	const vehicles = self.Dependencies.VehicleService
 	for _, player in Players:GetPlayers() do
@@ -255,7 +259,7 @@ function OutsideService:Step(dt: number)
 			if flat <= RULES.Catch then
 				self:SetStage(player, tr, "Caught", t)
 				task.delay(RULES.Faint, function()
-					if player.Parent ~= nil then
+					if player.Parent ~= nil and not self.Dependencies.CutsceneService:IsHolding() then
 						self.Dependencies.VitalService:Fall(player)
 					end
 				end)

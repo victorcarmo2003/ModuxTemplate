@@ -27,6 +27,7 @@ passos, mesma ordem, mesma lição de upgrade desligada).
 | 2 | `open` | fase Prep | alavanca `shutter_toggle` | "Open the window." |
 | 3 | `wait_customer` | cliente chegando / na fila | o rig | "Your first customer's coming." |
 | 3 | `r_tablet` | cliente em `Ordering` no `Q1`, `TAB-1` livre | `tablet_take` do `TAB-1` | "Take their order at the tablet." |
+| 3 | `r_accept` | `Tablets[n].Npc` = cliente, `Greeting` ou `Deciding` (close-up, DEC-353) | nenhuma (botão ACCEPT do card; REFUSE não faz nada no cliente do tutorial) | "Look them in the eye. If they seem okay, accept." |
 | 3 | `r_listen` | `Tablets[n].Npc` = cliente, `Talking` | nenhuma (a nota abre) | "Listen. It's on your note." |
 | 4 | `r_cut` | prato de trabalho sem pão, mão sem `bun_sliced` | `bun_slice` do `CUT` | "Slice a bun at the board." |
 | 4 | `r_bun_plate` | mão com `bun_sliced`, prato sem pão | `plate_put` do prato de trabalho | "Bun on the plate." |

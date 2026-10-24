@@ -26,6 +26,7 @@ export type Source = {
 	Number: (npc: number) -> number?, -- reactive
 	Order: (npc: number, line: number) -> { string }?, -- reactive
 	Drive: (npc: number) -> boolean, -- reactive
+	Bread: (npc: number) -> boolean, -- reactive: the order is a bun alone (ANM-011)
 	Patience: (npc: number) -> number?, -- reactive (ticks with the clock)
 }
 
@@ -122,6 +123,9 @@ local function watchSlot(part: BasePart, source: Source, folder: Instance): () -
 						return source.Number(ticket())
 					end,
 					Toppings = toppings,
+					Bread = function(): boolean
+						return source.Bread(ticket())
+					end,
 					Drive = function(): boolean
 						return source.Drive(ticket())
 					end,

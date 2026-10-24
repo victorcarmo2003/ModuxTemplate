@@ -134,6 +134,7 @@ function Prompt.Refresh(self: Prompt)
 		Slot = numberAttribute(anchor, "Slot"),
 		NpcId = numberAttribute(self.Rig, "NpcId"),
 		MemberId = self.MemberId,
+		OutsideOnly = anchor:GetAttribute("OutsideOnly") == true,
 	}
 
 	if action == nil then

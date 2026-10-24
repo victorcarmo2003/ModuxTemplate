@@ -33,6 +33,7 @@ export type Public = {
 	Written: boolean,
 	Setup: (self: Public) -> (),
 	IsPlaying: (self: Public) -> boolean,
+	IsHolding: (self: Public) -> boolean,
 	IsParticipant: (self: Public, player: Player) -> boolean,
 	IsWaiting: (self: Public) -> boolean,
 	AllLoaded: (self: Public) -> boolean,

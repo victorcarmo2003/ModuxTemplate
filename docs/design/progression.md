@@ -2,12 +2,105 @@ Status: Rascunho
 
 # Progressão
 
+> **Nota 2026-10-23 (secretário): DEC-360 (Aprovado):** a run é 100% noite e começa de noite; não há turno de dia, Last call de dia, ligação da manhã nem modo dia infinito. Tudo abaixo que depende de "dia N" (desbloqueio de ingrediente por dia, gemas de dia concluído, "Day 100", trailer no dia 5) está sem gatilho e precisa de revisão do game-designer (Provisório: o contador `Day` do código sobe um por noite; a noite k = Dia k + 1). Fim da run: 1ª noite perdida (`Chances = 0`, DEC-319).
+> **DEC-370 (Aprovado):** a progressão também é **visual**: N1–N3 skin normal, N4–N6 cansada, N7–N10 da noite ("consumidos pela noite"); a tela de fim da vitória é "You Took the Shift" (DEC-369).
+> **TASK-660 (game-designer, 2026-10-23, Provisório):** o destino de cada ganho/desbloqueio que era "por dia" está no **§R** logo abaixo. Ele vale sobre os §0–§9 onde discordarem; os §0–§8 ficam como histórico do fluxo com dias.
+
+## R. Run só de noite (DEC-360): destino do que era "por dia" — TASK-660, **Provisório**
+
+Tudo aqui é Rascunho/Provisório: vira Aprovado só com DEC do dono. Convenção: o design fala em **Noite k**; o código
+continua com o contador `Day` (DEC-360), e **Noite k = `Day` k + 1** (a run abre na Noite 1 com `Day = 2`). Campo de
+dados `UnlockDay = d` significa "a partir da Noite d − 1".
+
+### R.1 Linha do tempo da run (solo mediano, sem noite perdida)
+
+Noite k = 540 + 40 × (k − 1) s de noite + ~2,8 min fora dela (ligação ~35 s, Prep 90 s, NightEnd 3 s, Closing ≤ 30 s,
+Summary 10 s; a lição de upgrade cabe no Summary da N1). Sem intro (DEC-309) e sem dias.
+
+| Noite | Duração (min) | Termina em (min) | Desbloqueio no início dela |
+|---|---|---|---|
+| 1 | 11,9 | 11,9 | Ketchup, Mustard (iniciais); Gear Stand abre no Summary (lição de upgrade) |
+| 2 | 12,6 | 24,5 | **Cheese** (+ 1 pote fechado grátis) |
+| 3 | 13,2 | 37,7 | — |
+| 4 | 13,9 | 51,6 | **Bacon** (+ pote grátis) |
+| 5 | 14,6 | 66,2 | — |
+| 6 | 15,2 | 81,4 | **Potato Sticks** (+ pote grátis) |
+| 7 | 15,9 | 97,3 | — |
+| 8 | 16,6 | 113,9 | **Cream Cheese** (+ pote grátis) |
+| 9 | 17,2 | 131,1 | — |
+| 10 + final (Segundo Café, créditos, pós-créditos) | 17,9 + ~4 | ~153 | — |
+
+Run perfeita ≈ **2 h 33 min** (era ≈ 3,4 h com os dias do §0). Fim da run: 1ª noite perdida (`Chances = 0`, DEC-319).
+
+### R.2 Tabela de destino (aceite da TASK-660: todo item tem destino)
+
+| # | Ganho/desbloqueio antigo | Origem | Destino (Provisório) | Tipo |
+|---|---|---|---|---|
+| 1 | Gemas de turno de dia concluído (2 → **150**) com anti-AFK | DEC-070, DEC-083 | **vira "turno trabalhado" de cada noite**: +150 no fim de cada noite jogada (vencida **ou** perdida), com o mesmo anti-AFK (≥ 3 pedidos completos da party, DEC-083, e trabalho do próprio jogador, DEC-320) | noite k (todas) |
+| 2 | Gemas de nota A no dia (1 → **75**) | DEC-070, DEC-083 | **nota A da noite**: +75 quando o Summary da noite dá A, com o mesmo anti-AFK | noite k (todas) |
+| 3 | Desbloqueio de ingrediente por dia (Cheese D2, Bacon D3, Potato D4, Cream D6) | DEC-071 | **mantém o que o dono já fixou em 2026-10-18**: Cheese **N2**, Bacon **N4**, Potato Sticks **N6**, Cream Cheese **N8** (dados já em `Content.Ingredients.UnlockDay` 3/5/7/9). Texto ao jogador passa a "Night k" | noite 2/4/6/8 |
+| 4 | Achievement "Day 100" (`day_100`, "Never Clocked Out", +22.500, secreto) | DEC-084, DEC-315 #15 | **rebase para 100 noites vencidas** somadas entre runs (contador já persistido `Stats.NightsWon`); key, nome, gemas e segredo iguais | Q nova (badge) |
+| 5 | Contador `EndlessDays` e o +1 por dia infinito | DEC-084 | **removido** (o campo do perfil fica, sem uso, até o architect decidir; não apagar dado salvo) | removido |
+| 6 | Modo dia infinito (FEAT-017) | DEC-028, DEC-048 | **removido de vez** (já não rodava desde 2026-10-12); código morto sai. Ideia "noites sem fim depois do final" vai para Q nova, pós-lançamento | removido + Q nova |
+| 7 | Trailer à venda no Day 5 (placa "Available on Day 5") | DEC-047, DEC-107 | **removido** (já obsoleto pela DEC-224: trailer único desde o início); sobra o componente `SaleSign` sem uso | removido |
+| 8 | Party de preço fixa "no fim do Day 1" | DEC-121 | **fim do 1º turno da run = Summary da Noite 1** (o código já faz por `Flow.IsFirst`); só muda o texto | noite 1 |
+| 9 | Fases de pedido do dia (`day_1` … `day_6_plus`), crescimento por dia, tipos de cliente só de dia, duplas/adoção "de dia" | DEC-045, FEAT-010, FEAT-038 | **sem gatilho, sem efeito no jogo**; a noite usa a fase `night` e `UnlockNight`. Limpeza opcional, fora desta task (alguns valores podem servir à "manhã" visual de Call/Prep: conferir antes de apagar) | removido (dado morto) |
+| 10 | Patio Lights / mesas `UnlockDay = 2` | FEAT-037 | equivale a **N1**; sem mudança | noite 1 |
+
+### R.3 Gemas: opções (item 1 e 2 da tabela)
+
+Hoje, com a run só de noite, o código **nunca** paga `DayShift`/`DayGradeA`: run perfeita = noites 18.000 + final 7.500
+= **25.500**, abaixo das **27.000** das 5 classes pagas do MVP (regra da TASK-308: "uma run completa compra as classes
+do MVP"). E quem perde a N1 sai com **0** gemas (antes levava 150–225 do Day 1).
+
+| Opção | O que é | Run perfeita | Perdeu na N1 | Prós | Contras | Escopo |
+|---|---|---|---|---|---|---|
+| **A. Turno trabalhado por noite (recomendada)** | +150 no fim de cada noite jogada (vencida ou perdida) + 75 com nota A; anti-AFK igual ao do dia | **27.000** (27.750 com A em todas) | 150 (+75) | mantém as duas recompensas de DEC-070 com o mesmo sentido; consolo para quem perde cedo (retenção do 1º jogo); nota A volta a valer algo | um evento de gema a mais por noite (vencida e perdida) | 1 task de servidor (RewardService + GemRewards), sem rede nova |
+| B. Subir a noite vencida | `NightBase` 1.125 → **1.275**; some o turno e a nota A | 27.000 | 0 | só um número em dados | quem perde a N1 continua sem nada; nota A sem valor | dados apenas |
+| C. Só remover | nada no lugar | 25.500 | 0 | zero trabalho | quebra a regra da TASK-308 (falta 1.500 para as 5 classes); 1ª run frustrada sem gema | código morto sai |
+
+**Recomendação: A.** Marcos com A (solo mediano, sem nota A): fim da N2 **2.700** (1ª classe de 2.000, ~25 min);
+fim da N3 **4.275** (Urso 3.000 ou 2 de 2.000, ~38 min); fim da N5 **7.875** (as três tier 1, ~66 min); run completa
+**27.000** (as 5 pagas do MVP, ~2,5 h). Coleção das 7 pagas (62.000) ≈ 2,3 runs. Taxa ≈ **10.600 gemas/h** (antes, com
+os dias, ≈ 8.400/h).
+
+### R.4 "Day 100": opções (item 4)
+
+| Opção | O que é | Tempo até o badge | Prós | Contras |
+|---|---|---|---|---|
+| **A. 100 noites vencidas (recomendada)** | `day_100` passa a contar `Stats.NightsWon` (já persistido); alvo 100; +22.500 e badge iguais | ~10 runs perfeitas ≈ 25 h | contador já existe e já tem o progresso de quem jogou; sem dado novo no perfil; continua um badge secreto de longo prazo | descrição muda ("Work 100 days" → noites); key `day_100` fica (é o que o perfil guarda) |
+| B. 50 noites vencidas | igual, alvo 50 | ≈ 12,5 h (o mesmo tempo do DEC-084) | mantém o tempo original | o nome "Day 100"/"100" deixa de bater com o número |
+| C. Remover o badge | lista de badges cai para 14 | — | zero código | mexe na lista aprovada (DEC-315) e na única gema de achievement (DEC-084) |
+
+**Recomendação: A.** Texto do badge (para o narrative-writer, Provisório): "Survive 100 nights on the corner. Any run counts."
+
+### R.5 Modo dia infinito (item 6)
+
+Opções: **(a) remover do código, recomendada** (RunState `Endless`, campo `Endless` da rede, ramo do `BossService`,
+`RunParams.EndlessFromDay`/`EndlessRequiresNoTrailer`, `/dev reward endless`); (b) deixar dormente (custa leitura e
+testes sem dar nada); (c) virar "noites sem fim" depois do final (N10 repetida com gemas por noite): é feature nova,
+escopo grande, pós-lançamento — vai como pergunta, não entra agora.
+
+### R.6 Tasks de código que saem (para o task-planner; IDs a criar)
+
+1. **Gemas por noite (backend).** `Content.GemRewards`: `DayShift` → `ShiftWorked` 150, `DayGradeA` → `ShiftGradeA` 75 (só nome; valores iguais). `RewardService`: credita no fim de cada noite (6:00 vencida ou noite perdida), chaves `N{n}:shift` e `N{n}:gradeA`, anti-AFK DEC-083 + DEC-320; sai o ramo de dia e o de `Endless`. **Aceite:** `/dev` pulando a run inteira com A em todas soma 27.750 (sem A: 27.000); noite perdida credita só turno (+A); noite com < 3 completos credita 0 de turno e de A; mesma chave não paga 2× (retomada pelo snapshot).
+2. **"Day 100" sobre noites vencidas (backend).** `Content.Achievements.day_100`: contador `Stats.NightsWon` (ou o caminho que o `CheckAchievements` aceitar; architect decide se precisa de campo de topo), alvo 100; checagem no `NightWon`; `/dev reward endless` vira `/dev reward nights <n>`. `EndlessDays` fica no perfil, sem uso. **Aceite:** com `NightsWon = 99`, vencer uma noite dá o badge e +22.500 uma vez; 100 → 101 não paga de novo.
+3. **Limpeza do modo infinito (backend + rede).** Sai `RunState.Endless`, `SetEndless`, o campo `Endless` do set (`network.md`), o `Endless` das ligações (depois da TASK-652, mesmo arquivo `Calls.luau`), `RunParams.Endless*`; snapshot antigo com `End` continua carregando. **Aceite:** `Endless` = 0 em `src/` fora de compat de snapshot; `modux check` ok.
+4. **Textos "Day" ao jogador (frontend).** `MarketController/Labels.UnlockDay` → "Night k" (k = `UnlockDay` − 1); `RejoinPopup` → "Night k"; stories de `HudPill`/`HudScreen`/`ShelfTag` sem "Day N"; `SaleSign` e story removidos se não houver uso. **Aceite:** nenhum "Day " visível em Play numa run inteira (HUD, Mart, resumo, rejoin).
+5. **Docs (secretário / narrative-writer):** `badges.md` #15 (texto e regra), `features.md` FEAT-017/029/031, FEAT-013/014 onde citam dia, `vision.md` linha do Mart ("trailer fixo a partir do dia 5"), `ui-text.md` do badge.
+
+### R.7 Critérios de aceite (design)
+
+- Toda linha da tabela R.2 tem destino (noite k, removido ou Q). Nenhum ganho de gema depende de "dia".
+- Simulação/planilha: run perfeita solo = 27.000 gemas (opção A, sem nota A) ≥ preço das 5 classes pagas do MVP.
+- Desbloqueios de ingrediente nas Noites 2/4/6/8 e nenhum texto ao jogador com "Day N".
+
 Autor: game-designer, 2026-10-08. Consolida **[DEC-024, DEC-025, DEC-027, DEC-028, DEC-036, DEC-037, DEC-047, DEC-048, DEC-052, DEC-053, DEC-057, DEC-058, DEC-060, DEC-065, DEC-067, DEC-069, DEC-070, DEC-071]**.
 Conciliado até a rodada 15: **[DEC-080 a DEC-084, DEC-086, DEC-091 a DEC-094, DEC-098, DEC-101, DEC-102, DEC-104, DEC-106, DEC-107, DEC-110 a DEC-113, DEC-115, DEC-121, DEC-127, DEC-129]**. Anomalias por `ANM-###` (DEC-096; Nk = ANM-00k).
 Sistemas: FEAT-002 (run), FEAT-003 (relógio), FEAT-022 a FEAT-026 e FEAT-034 (noite), FEAT-015/035 (bancada), FEAT-028/029 (meta). Números = tabela `RunConfig`; os marcados **(proposta)** dependem de aprovação.
 Chances do chefe: **1 por run inteira** **[DEC-110, DEC-112]**. Noite repetida: todos voltam, inclusive espectadores **[DEC-111, DEC-113]**.
 
-## 0. Fluxo da run — NOVO (pedido do dono 2026-10-12, **Provisório**, Q-207)
+## 0. Fluxo da run — HISTÓRICO desde a DEC-360 (era o pedido do dono 2026-10-12, Q-207); vale o §R
 
 > **DEC-224 (2026-10-12, dono): o trailer é o veículo ÚNICO desde o Day 1; o carrinho saiu; a compra/oferta do trailer acabou.** Nas linhas "Night k", "Day k + 2", "Trailer (opcional, depois)" e na tabela "Anomalias no carrinho" abaixo, **leia sempre "trailer"**: as colunas "No carrinho" e `Trailer = None/Helps/Needs` ficam como **histórico** (todas as noites no trailer; **N3 acontece normalmente**, sem "reserva ANM-002"; N8/N9 = fechar a janela; `OfferAfterNight` sem uso; "Day 4 (oferta do trailer)" é um dia comum). A camada "Veículo" do §1 (carrinho → trailer, Day 5) e os marcos de "trailer comprado" dos §3 e §9 ficam **obsoletos**. Fluxo D1, D2, N1 ... D11, N10 e as durações **seguem** (Q-207 a, b, d, e). Perguntas novas: `Q-224`, `Q-225`.
 > Este bloco **substitui** o que os §1–§3, §4.1, §6 e §8 dizem sobre "nights só com trailer", "trailer no Day 5" e "modo dia infinito".
@@ -85,13 +178,13 @@ Regra de conteúdo (`Validate`): as noites até `OfferAfterNight` (1 e 2) têm d
 
 | Camada | O que cresce | Dura | Fonte |
 |---|---|---|---|
-| Ingredientes | 2 → 6 complementos, automático por dia | Day 1–6 | DEC-071 |
+| Ingredientes | 2 → 6 complementos, automático por noite (§R: N2, N4, N6, N8) | Noite 1–8 | DEC-071, dono 2026-10-18 |
 | Equipamentos | Grill, Cooler, Counter, Lock, Lights — bancada do Mart, sempre à venda | Day 2 → ~Day 8 (solo) | DEC-046, DEC-101, DEC-106 |
 | ~~Veículo~~ | ~~carrinho → trailer (compra fixa...)~~ **OBSOLETO (DEC-224): trailer único desde o Day 1** | — | ~~DEC-047, DEC-052, DEC-086, DEC-107~~ |
 | Seguro (opcional) | Rescue Whistle (ITM-021) no slot especial da bancada, 15%/turno | Night 1 → fim da run | DEC-100, DEC-108, DEC-129 |
 | Noites | 1 anomalia nova por noite, cumulativo | Night 1–10 | DEC-025, DEC-060 |
 | Mistério | ligações de Walt Bramble → pistas (`ending.md` §3) → Walt em pessoa no final | Night 1–10 | DEC-065, rodada 7 |
-| Meta (entre runs) | gemas → classes | contas | DEC-069, DEC-070 |
+| Meta (entre runs) | gemas → classes; gemas por noite (§R.3) | contas | DEC-069, DEC-070 |
 
 ## 2. Linha do tempo da run (solo mediano, cenário L) — HISTÓRICO, substituída pelo §0 (2026-10-12)
 
@@ -129,7 +222,7 @@ Run perfeita ≈ **6,4 h** (o "~6 h" de DEC-057 inclui esta margem). A única no
 Queda de todos com retomada pelo snapshot (DEC-080) acrescenta o tempo já jogado do turno interrompido (até ~35 min no pior caso).
 Membro atrasado (DEC-098): a run começa no máximo 60 s depois do 1º a chegar; a linha do tempo não muda.
 
-## 3. Tempo até cada desbloqueio (solo mediano) — HISTÓRICO nas linhas de trailer/noites (§0 vale); o resto fica
+## 3. Tempo até cada desbloqueio (solo mediano) — HISTÓRICO (fluxo com dias); o vigente é o §R.1
 
 | Desbloqueio | Quando | Min. de jogo | Como |
 |---|---|---|---|
@@ -225,11 +318,11 @@ Mudar **regra** (ex.: regra crítica antes da Night 7) volta ao usuário (Q-115)
 
 ## 5. XP e níveis **[DEC-081]**
 
-Decidido: **sem XP e sem níveis no MVP** (opção A). Recursos do MVP: Money, Stock, Gems. Desbloqueios seguem por dia (ingredientes, DEC-071), dinheiro (upgrades, DEC-046), dia + dinheiro (trailer, DEC-047) e gemas (classes, DEC-069). As opções B e C ficam só como histórico.
+Decidido: **sem XP e sem níveis no MVP** (opção A). Recursos do MVP: Money, Stock, Gems. Desbloqueios seguem por noite desde a DEC-360 (ingredientes, DEC-071; §R), dinheiro (upgrades, DEC-046), dia + dinheiro (trailer, DEC-047) e gemas (classes, DEC-069). As opções B e C ficam só como histórico.
 
 ## 6. Achievement "Day 100" e queda de sessão **[DEC-080, DEC-084]**
 
-### 6.1 Meta do achievement — decidido: opção C **[DEC-084]** (sem dia infinito desde 2026-10-12: o contador não anda, Q-207)
+### 6.1 Meta do achievement — decidido: opção C **[DEC-084]** (sem dia infinito desde 2026-10-12: o contador não anda, Q-207). **Proposta TASK-660 (Provisório): rebase para 100 noites vencidas, §R.4**
 
 Contador **por jogador, persistido** junto das gemas; +1 por **dia de modo infinito concluído** (sem trailer, a partir do Day 6) que passou no anti-AFK (DEC-083), em qualquer run, somando sessões. Chegou a 100: +300 gemas e badge, 1× por conta (FEAT-031).
 
@@ -245,6 +338,7 @@ Snapshot no início de cada turno, TTL 15 min, mesmo roster. Se todos saem e alg
 ## 7. Meta-progressão (classes)
 
 > **2026-10-15 (TASK-308, Provisório):** gemas e preços de classe ×75 (`economy.md` §6 e §9). Os marcos abaixo valem na proporção: multiplique as gemas por ~75.
+> **TASK-660 (Provisório):** a tabela abaixo é do fluxo com dias; os marcos da run só de noite estão no §R.3.
 
 | Marco | Tempo (solo mediano, 1ª run) | Gemas | Classe possível |
 |---|---|---|---|
@@ -265,7 +359,8 @@ Snapshot no início de cada turno, TTL 15 min, mesmo roster. Se todos saem e alg
 ## 9. Critérios de aceite
 
 - `RunConfig` troca nº de noites, durações e agendador sem código novo.
-- Simulação solo mediano: a run perfeita fica entre 6 h e 6 h 45 min.
+- ~~Simulação solo mediano: a run perfeita fica entre 6 h e 6 h 45 min.~~ Run só de noite (§R.1, Provisório): run perfeita entre 2 h 20 min e 2 h 45 min.
+- Critérios do §R.7. Os critérios de trailer e de "Day 8" abaixo são histórico.
 - Night N tem exatamente as ocorrências e a regra crítica da tabela 4.2 (crítica só nas Nights 7–10, sempre ANM-007).
 - Simulação solo: trailer comprado até o fim do Day 6 em ≥ 90% das execuções.
 - Simulação solo com compras na bancada do Mart: tudo comprado até o fim do Day 8 em ≥ 80% das execuções.

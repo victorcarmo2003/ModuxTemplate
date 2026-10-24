@@ -40,8 +40,9 @@ end
 
 local function restaurantTablets()
 	return Lync.struct({
-		-- DEC-353: Greeting (hi + the answer) -> Deciding (the user picks ACCEPT / REFUSE, TabletDecide) -> Talking (the order)
-		State = Lync.enum({ "Idle", "Talking", "Full", "Deciding", "Greeting" }),
+		-- owner 2026-10-22: Talking = the customer says its line (typed on StartedAt..EndsAt), the order is taken at EndsAt.
+		-- DEC-353's Greeting / Deciding (ACCEPT / REFUSE) went with the choice
+		State = Lync.enum({ "Idle", "Talking", "Full" }),
 		Npc = Lync.int(0, 65535), -- customer at this tablet, 0 = none
 		User = Lync.f64(), -- UserId taking the order, 0 = nobody
 		StartedAt = Lync.f64(),
@@ -93,16 +94,16 @@ return Lync.define("restaurant", {
 	CookOpen = Lync.packet(restaurantCookOpen()),
 
 	-- §2.4, record 1 = TAB-1 (always), 2 = TAB-2 (UPG-027 bought and bound), Content.Restaurant.Rules.DrivePcIndex = DT-PC
-	-- (wave R3). Writer: TabletService. Full = no free plate or pickup spot ("Kitchen full" lamp for everyone). The client
-	-- reveals item i of Order at StartedAt + Talk.Open + Talk.Lead + Talk.PerItem * i (bun, sausage, then ToppingKeys order);
-	-- EndsAt is the server's end of the talk (hurry / veteran speed already applied)
+	-- (wave R3). Writer: TabletService. Full = no free plate or pickup spot ("Kitchen full" lamp for everyone). Every
+	-- client builds the customer's speech from the record (Content.OrderSpeech: Npc, Order, Order2, the rig's Variant and
+	-- tic attributes) and types it on the server clock from StartedAt; item i of the order pops when the words naming it
+	-- are typed. EndsAt is the server's end of the talk (the order is taken then). TabletDecide (DEC-353's ACCEPT /
+	-- REFUSE) was removed with the choice (owner 2026-10-22)
 	Tablets = Lync.replicate(restaurantTablets()),
-	-- c -> s (owner 2026-10-21, DEC-353): the user of a Deciding tablet picks. Serve = the order is taken (TakeOrderFor),
-	-- false = REFUSE (only that customer leaves). Responder TabletService (OnInit); anyone else / another state = ignored
-	TabletDecide = Lync.packet(Lync.struct({
-		Index = Lync.int(1, 255),
-		Serve = Lync.bool(),
-	})),
+	-- c -> s (owner 2026-10-21): the user walked off the talk or pressed Back (FocusExit / BackButton). Index = the tablet.
+	-- Any busy state = Cancel (no order, the customer keeps its place, the patience runs again, it can be talked to again).
+	-- Responder TabletService (OnInit); anyone else / an idle tablet = ignored
+	TabletLeave = Lync.packet(Lync.int(1, 255)),
 
 	-- §3.4 (wave R3), record = drive lane spot 1..Content.Restaurant.Drive.Lanes (1 = at the window, 2..3 = waiting behind).
 	-- Writer: DriveThruService. The client moves the car DT-IN -> DT-STOP -> DT-OUT from State + At

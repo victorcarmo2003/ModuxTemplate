@@ -17,6 +17,7 @@ type Active = {
 	Gui: Instance,
 	Folder: Folder,
 	Heartbeat: RBXScriptConnection,
+	Exit: () -> (), -- unbinds the walk / leave keys (FocusExit)
 }
 
 export type Public = {

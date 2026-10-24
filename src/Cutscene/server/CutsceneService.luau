@@ -3,8 +3,8 @@
 -- script.md §1; ending.md §2; DEC-078, DEC-088, DEC-194, DEC-205, DEC-309; TASK-120). Run place only. Single writer of the
 -- Cutscene set (record 1; Scene = "none" when idle).
 --
--- Trigger: RoundService phase probes. PhaseChanged("Finale") plays "finale"
--- and then its Next ("credits") as a new segment with 0 votes. The probe says "can end" once the chain is over, so
+-- Trigger: RoundService phase probes. PhaseChanged("Finale") plays Content.Cutscenes.Rules.Finale ("second_coffee")
+-- and then its Next chain (second_coffee_in, second_coffee_out, credits), each a new segment with 0 votes. The probe says "can end" once the chain is over, so
 -- the phase ends early; the phase cap still wins (leaving the phase stops the scene).
 -- Participants: members connected (not Away) when the chain starts, in roster order (slot 1..4). A late member is
 -- not one: no vote, no freeze; it spawns normally.
@@ -54,7 +54,8 @@ const VOTE_SHARE = 0.5 -- DEC-194
 const TICK_RATE = 10 -- Hz: beat timing and late bodies
 const SPAWN_LIFT = Vector3.new(0, 3, 0) -- architecture.md §18.5
 const RULES = Content.Cutscenes.Rules
-const PHASE_SCENES: { [string]: string } = { Finale = "finale" }
+-- the Finale phase plays Rules.Finale ("The Second Coffee", owner request 2026-10-22; "finale" is the kept fallback)
+const PHASE_SCENES: { [string]: string } = { Finale = RULES.Finale }
 -- Help Wanted flyer dressing (Rules.Poster; PROVISIONAL look, frontend-coder 2026-10-11)
 const DRESSED_ATTRIBUTE = "CutsceneDressed"
 const POSTER_PPS = 200
@@ -200,6 +201,12 @@ end
 
 function CutsceneService:IsPlaying(): boolean
 	return self.Scene ~= NONE
+end
+
+-- A chain owns the screen: playing, or held for the participants' ClientReady. The night's hazards stand down under it
+-- (BossService rings nothing, OutsideService sends no chaser), in the Finale and in a dev play (owner 2026-10-23)
+function CutsceneService:IsHolding(): boolean
+	return self.Scene ~= NONE or self.Pending ~= nil
 end
 
 function CutsceneService:IsParticipant(player: Player): boolean

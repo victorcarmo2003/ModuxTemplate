@@ -20,6 +20,8 @@ const createRaw = (Vide.create :: any) :: (className: string) -> ({ [any]: any }
 export type Props = {
 	Number: () -> number?,
 	Toppings: () -> { string },
+	-- a bun alone, no sausage (Content.OrderRules.BreadOnly; OrderStack Bread). Default false
+	Bread: (() -> boolean)?,
 	Drive: (() -> boolean)?,
 	-- 0..1 of the patience left, nil = no clock running (the bar hides)
 	Patience: (() -> number?)?,
@@ -70,6 +72,7 @@ local function card(props: Props): Frame
 				BackgroundTransparency = 1,
 				OrderStack({
 					Toppings = props.Toppings,
+					Bread = props.Bread,
 					Direction = "Vertical",
 					Pitch = PITCH,
 					Sprite = SPRITE,

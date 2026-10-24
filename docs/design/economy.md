@@ -102,6 +102,12 @@ Custo = $1,25 (pão + salsicha) + Σ custo por uso. Tabela por ingrediente: `ite
 > As N1–N5 voltam ao que a tabela abaixo já supunha; as N6–N10 ficam mais cheias. Run solo: ~$30 + $56 + ~$850 ≈
 > **~$935** contra $850 à venda, compra tudo e sobra ~$85 (antes da mudança faltava bem mais que 1 nível). Pausas de
 > Tension (rua vazia durante anomalia) não estão na conta; conferir no playtest.
+>
+> **TASK-660 (Provisório, DEC-360):** sem o Day 1 os ~$56 do dia somem: run solo ≈ $30 + ~$850 = **~$880** contra
+> $850 à venda; ainda compra tudo, sobra ~$30 (aperta o fim). A lição de upgrade completa o caixa no Summary da Noite 1
+> (não mais às 18h). Se o playtest mostrar que falta, a alavanca é `StartCash` $30 → $80 (devolve o dia), sem DEC.
+> Ingredientes: K máximo 2 na N1 (só molhos), Cheese na N2, Bacon N4, Potato N6, Cream N8 (`progression.md` §R.1):
+> o preço médio das N1–N3 fica abaixo dos $7,67 da premissa; conferir no playtest.
 
 Premissas por noite: chegadas ≈ duração ÷ (intervalo + ~4 s perdidos na tentativa com o balcão cheio); ~40% das
 ocorrências de anomalia (`Nights[k].Events`, família A) ocupam o balcão sem pagar; 85% dos clientes reais completos,
@@ -213,6 +219,30 @@ Leitura: "bem caro" (DEC-092) = quase um ciclo inteiro de lucro. Antes de ~Day 8
 Reviver por Robux (developer product, DEC-092): só o próprio caído compra, para si **[DEC-116]**; preço **adiado** com a monetização (**Q-098**). Não entra no balanço de Money. Recibo que não pode ser aplicado vira 1 crédito de reviver no perfil **[DEC-117]**.
 
 ## 6. Gemas **[DEC-070, DEC-083, DEC-084, DEC-104]**
+
+> **TASK-660 (game-designer, 2026-10-23, Provisório) — gemas na run só de noite (DEC-360).** Opções e conta completas
+> em `progression.md` §R.3. **Recomendação (opção A):** o "turno de dia concluído" e a "nota A no dia" passam para
+> **cada noite jogada**, com os mesmos valores e o mesmo anti-AFK (DEC-083 + DEC-320):
+>
+> | Evento (vigente proposto) | Gemas | Quando |
+> |---|---|---|
+> | Turno trabalhado (`ShiftWorked`, era `DayShift`) | **150** | fim de cada noite, vencida **ou** perdida, se a party entregou ≥ 3 completos e o jogador trabalhou |
+> | Nota A da noite (`ShiftGradeA`, era `DayGradeA`) | **+75** | Summary da noite com nota A, mesmo mínimo |
+> | Noite N vencida | 1.125 + 150 × (N − 1) | sem mudança |
+> | Final | +7.500 | sem mudança |
+> | "Day 100" (`day_100`) | +22.500 | **100 noites vencidas** somadas entre runs (`Stats.NightsWon`), §R.4 |
+> | Dia infinito | — | **removido** |
+>
+> | Momento (solo mediano, sem nota A) | Tempo | Gemas acumuladas | Compra possível |
+> |---|---|---|---|
+> | Perdeu na Noite 1 | ~12 min | 150 (225 com A) | — |
+> | Fim da Noite 2 | ~25 min | 2.700 | 1ª classe de 2.000 |
+> | Fim da Noite 3 | ~38 min | 4.275 | Urso (3.000) ou 2 de 2.000 |
+> | Fim da Noite 5 | ~66 min | 7.875 | as 3 de tier 1 (7.000) |
+> | Run completa | ~2,5 h | **27.000** (27.750 com A em todas) | as 5 pagas do MVP (27.000) |
+>
+> Sem a mudança (código de hoje, opção C) a run perfeita dá 25.500 (< 27.000) e quem perde a N1 sai com 0. A tabela
+> de DEC-070 abaixo e os critérios de "dia" do §10 ficam como histórico.
 
 > **2026-10-15 — economia de gemas ×75 (pedido do dono, Provisório; TASK-308, `Q-274`).** O dono quer números grandes
 > ("ganhar muito pagando pouco"): pacotes de 1.000 a 10.000 gemas e classes de 2.000 a 20.000. Para o progresso
@@ -354,8 +384,9 @@ Guardas de design: classe sempre comprável com gemas de jogo; teto ±12%; nenhu
 - Simulação solo Rookie, dias 1–5: acumulado entre $360 e $420 **[DEC-071]**.
 - Simulação solo: Night 1 rende entre $100 e $140; Night 10 entre $150 e $200.
 - A party nunca tem saldo negativo; toda transação é do servidor.
-- Soma de gemas de uma run perfeita = 382 **[DEC-070]** → **28.650** com a economia ×75 (TASK-308, Provisório).
-- Dia com < 3 pedidos completos credita 0 gemas.
+- Soma de gemas de uma run perfeita = 382 **[DEC-070]** → **28.650** com a economia ×75 (TASK-308, Provisório). Run só de noite (TASK-660, Provisório, opção A): **27.000** sem nota A, **27.750** com A em todas as noites.
+- ~~Dia com < 3 pedidos completos credita 0 gemas.~~ Noite com < 3 pedidos completos da party credita 0 de turno trabalhado e de nota A (a noite vencida segue a DEC-320).
+- Nenhuma gema depende de "dia" nem de modo infinito (TASK-660).
 - Rescue Whistle custa exatamente $200 × multiplicador (party do fim do Day 1); aparece em 15% ± 1 p.p. dos turnos elegíveis (simulação).
 
 ## 11. Propostas pendentes (economia)

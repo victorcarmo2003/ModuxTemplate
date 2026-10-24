@@ -1,7 +1,7 @@
 --!strict
 
 export type Public = {
-	RunDev: (self: Public, name: string, args: { string }) -> (),
+	RunDev: (self: Public, name: string?, args: { string }) -> (),
 	CommandDevHelp: (self: Public) -> string,
 	RunShowcase: (self: Public, action: string, id: string, arg: string) -> (),
 	CommandShowcase: (self: Public) -> (),

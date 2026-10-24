@@ -101,6 +101,8 @@ Nomes de rua: `story/world.md` (Ninth Avenue, Juniper Street), os mesmos do `lev
 
 ### 2.3 Noite
 
+> **Nota 2026-10-23 (secretário), DEC-370 (Aprovado):** o pack do **jogador** (Day / Mid / Night) passa a seguir **a noite da run**: N1–N3 Day + rosto `Normal`, N4–N6 Mid + `Exhausted`, N7–N10 Night + `Normal_Night`. Substitui a troca por faixa de sanidade (DEC-166/167) para o jogador. Regra para o art-director: **toda skin nova precisa dos 3 packs** (roupa, atlas e, se tiver pelagem própria, cabeça). Sanidade baixa (DEC-373): só **clientes e pedestres** viram Night no client de quem está mal (alucinação); o corpo do jogador não muda pela sanidade.
+
 A noite **não troca o modelo nem a textura**. A mesma cidade muda por iluminação e pós-processo (DEC-010: "a cidade continua a mesma").
 
 > **DEC-150 (2026-10-10):** a regra acima vale para **cidade, cenário e props**. **Personagens** animais trocam de **textura** à noite (mesma malha): dia fofo, noite um pouco assustadora. Intensidade e quem troca: `Q-148`; convivência com os traços reservados de §2.4: `Q-147`.

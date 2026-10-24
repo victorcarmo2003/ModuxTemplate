@@ -49,6 +49,7 @@ export type Target = {
 	Slot: number?,
 	NpcId: number?,
 	MemberId: number?, -- UserId of the character the anchor sits on (Prompt_Give, architecture.md §19.8)
+	OutsideOnly: boolean?, -- anchor attribute: no prompt from inside the trailer (camera_static chore, Q-436)
 }
 
 -- Read side of the `Shutter` attribute (network.md §13.6), given by VehicleController.
@@ -59,7 +60,8 @@ export type ShutterProbe = {
 
 -- The plate / hot dog Tool the local player has equipped (attributes of shared/Plate/PlateTool). AtPickup: its ticket customer
 -- is Waiting in the pickup line; nil = not known (no ticket, no Customers record): the server decides.
-export type HeldPlate = { Item: string, Ticket: number, Bun: boolean, Sausage: boolean, AtPickup: boolean? }
+-- Bread = a plate with the bun alone and a bread-only order (ANM-011) waiting for it at the pickup
+export type HeldPlate = { Item: string, Ticket: number, Bun: boolean, Sausage: boolean, AtPickup: boolean?, Bread: boolean? }
 export type PlateProbe = {
 	-- plates + hot dogs carried (equipped and in the backpack); nil = not known
 	Hands: (() -> number)?,
@@ -110,6 +112,9 @@ local function plateAllows(action: string, probe: PlateProbe): boolean
 		end
 		return if action == "plate_add_bun" then not equipped.Bun else not equipped.Sausage
 	elseif action == PICKUP_ACTION then
+		if equipped ~= nil and equipped.Item == PLATE_ITEM and equipped.Bread == true then
+			return true -- owner 2026-10-22: the bun alone for a bread-only order (ANM-011)
+		end
 		if equipped == nil or equipped.Item ~= ASSEMBLED_ITEM then
 			return false
 		end
@@ -179,6 +184,10 @@ function Rules.Allows(target: Target, context: Context): boolean
 
 	-- ANM-020: the breaker sits on the outer wall; from inside the trailer the prompt would reach through it.
 	if target.Action == "breaker_reset" and shutterProbe and shutterProbe.IsInside and shutterProbe.IsInside() then
+		return false
+	end
+	-- Q-436: a broken camera outside the trailer is fixed from outside (Security.Cams[i].FixInside lifts it, CAM3)
+	if target.OutsideOnly and shutterProbe and shutterProbe.IsInside and shutterProbe.IsInside() then
 		return false
 	end
 	-- Security cameras (TASK-473): no "inside the trailer" rule any more. The CCTV moved to the pantry south wall, outside

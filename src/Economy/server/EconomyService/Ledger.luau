@@ -7,8 +7,8 @@ local Content = require(ReplicatedStorage.shared.Content)
 
 export type Grade = "A" | "B" | "C" | "D"
 export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused" | "Slow"
--- Where shift money comes from: order price and tip. Sale goes straight to Cash (DEC-238, EconomyService:AddSale); Tip
--- goes to the tip jar (DEC-239, AddTip)
+-- Where shift money comes from: order price and tip. Both go straight to Cash (DEC-238, EconomyService:AddSale; the tip
+-- since the tip jar left, owner 2026-10-22, EconomyService:AddTip); the ledger keeps them apart
 export type SaleKind = "Sale"
 export type DrawerKind = "Sale" | "Tip"
 
@@ -19,7 +19,7 @@ export type Ledger = {
 	Completed: number, -- Perfect + Complete (= satisfied, DEC-051); anti-AFK base (DEC-083)
 	Sales: number, -- $ from orders
 	Tips: number, -- $ from tips (DEC-072)
-	Collected: number, -- $ of tips moved from the jar to Cash during the shift ("Collect Tips", DEC-239); informative
+	Collected: number, -- was "Collect Tips" of the tip jar (DEC-239); always 0 since the jar left (owner 2026-10-22)
 }
 
 -- ShiftReport packet (network.md §4.4)

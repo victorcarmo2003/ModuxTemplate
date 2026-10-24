@@ -1,0 +1,9 @@
+[
+ {"cat": "market", "name": "AST-029_GondolaBoxes", "path": "MiniMarket/Models/GLB format/shelf-boxes.glb", "mode": "box", "target": [4.5, 6, 2.5]},
+ {"cat": "market", "name": "AST-028_MartWall", "path": "MiniMarket/Models/GLB format/wall.glb", "mode": "box", "target": [8, 12, null]},
+ {"cat": "equipment", "name": "AST-019_CounterStraight", "path": "KitchenPack/Assets/gltf/kitchencounter_straight_A.gltf", "mode": "box", "target": [3, 3.5, 3]},
+ {"cat": "food", "name": "AST-011_Can", "path": "FoodPack/Models/GLB format/can.glb", "mode": "y", "target": 0.5},
+ {"cat": "street", "name": "AST-032_RoadStraight", "path": "CityKitRoads/Models/GLB format/road-straight.glb", "mode": "x", "target": 24},
+ {"cat": "street", "name": "AST-036_StreetLightCurved", "path": "CityKitRoads/Models/GLB format/light-curved.glb", "mode": "y", "target": 14},
+ {"cat": "building", "name": "AST-033_BuildingA", "path": "CityKitCommercial/Models/GLB format/building-a.glb", "mode": "y", "target": 24}
+]

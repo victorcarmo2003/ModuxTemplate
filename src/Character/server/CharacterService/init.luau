@@ -18,7 +18,8 @@
 -- Wave 2 (TASK-061; architecture.md §19.3, §19.7, §19.20, T47, T54; FEAT-025; DEC-122, DEC-167, DEC-216):
 --   SpawnPointFor(player, info)  PS-<seat> by day, PS-N<seat> by night, REV-<seat> on a repeated night (DEC-122)
 --   CanSpawn                     only Active members: Down / Reviving / Spectator / Away get no character
---   SetLookPack(player, pack)    LookPack attribute (VitalService, by band); kept per UserId, applied on respawn
+--   SetLookPack(player, pack)    LookPack attribute (VitalService, by run night: DEC-370, TASK-643; never by sanity,
+--                                DEC-373); kept per UserId, applied on respawn and on the skin (Halloween too)
 --   Faint(player)                ragdoll in place, no throw (DEC-216); the body stays down. The Fainted face is
 --                                derived on every client from Vitals.State = Down (network.md §5.2)
 --   RemoveBody(player, instant?) fade, then the character goes away (PickupHandler fallback T54; ambulance, wave 4)
@@ -64,6 +65,7 @@ const AVATAR_CLASSES = { "Accessory", "Clothing", "ShirtGraphic", "BodyColors", 
 const GIVE_ANCHOR = "Prompt_Give"
 const GIVE_ACTION = "give_coffee"
 const INTERACTABLE_TAG = "Interactable"
+const PHONE_ACTION = "answer_phone" -- the trailer phone's Prompt_Answer: the spawn looks at it
 -- Character attribute read by CharacterController (TASK-063: controls locked while frozen). Provisional: attribute
 -- name proposed to the architect for network.md §5.2 (TASK-061 note on the board).
 const FROZEN_ATTRIBUTE = "Frozen"
@@ -87,7 +89,7 @@ function CharacterService:Setup()
 	self.ForcedPoint = {} :: { [Player]: string }
 	-- per character life: Died, tool and descendant listeners
 	self.Connections = {} :: { [Player]: { RBXScriptConnection } }
-	-- LookPack per UserId (survives Away and respawn; VitalService writes the band, DEC-167)
+	-- LookPack per UserId (survives Away and respawn; VitalService writes the pack of the run night, DEC-370)
 	self.Packs = {} :: { [number]: Pack }
 	-- Freeze reasons per player (all must be released)
 	self.Frozen = {} :: { [Player]: { [string]: boolean } }
@@ -214,6 +216,30 @@ function CharacterService:SpawnPrefix(info: ShiftInfo): string
 	return SPAWN_DAY
 end
 
+-- `point` turned to look at the trailer phone (owner 2026-10-22: "spawnarem olhando para o telefone, em vez do papel");
+-- the spawn points face the counter. No phone in the map = the point as it is
+local function facePhone(point: CFrame): CFrame
+	local phone: Vector3? = nil
+	for _, anchor in CollectionService:GetTagged(INTERACTABLE_TAG) do
+		if anchor:GetAttribute("PromptAction") == PHONE_ACTION and anchor:IsDescendantOf(workspace) then
+			phone = if anchor:IsA("Attachment")
+				then anchor.WorldPosition
+				elseif anchor:IsA("BasePart") then anchor.Position
+				elseif anchor:IsA("Model") then anchor:GetPivot().Position
+				else nil
+			break
+		end
+	end
+	if phone == nil then
+		return point
+	end
+	const flat = Vector3.new(phone.X - point.Position.X, 0, phone.Z - point.Position.Z)
+	if flat.Magnitude < 1e-3 then
+		return point
+	end
+	return CFrame.lookAt(point.Position, point.Position + flat)
+end
+
 -- First point of a family: <prefix><seat>, any <prefix><n>, nil.
 local function familyPoint(prefix: string, seat: number?): CFrame?
 	if seat ~= nil then
@@ -333,7 +359,7 @@ function CharacterService:Prepare(player: Player, character: Model)
 
 	const point = self:PointFor(player)
 	if point ~= nil then
-		character:PivotTo(point + SPAWN_LIFT)
+		character:PivotTo(facePhone(point) + SPAWN_LIFT)
 	end
 
 	const bucket: { RBXScriptConnection } = {}
@@ -446,13 +472,14 @@ function CharacterService:ApplyAnimations(character: Model, bucket: { RBXScriptC
 	end)
 end
 
--- Look (DEC-167) -------------------------------------------------------------------------------------------------
+-- Look (DEC-370) -------------------------------------------------------------------------------------------------
 
 function CharacterService:PackOf(player: Player): Pack
 	return self.Packs[player.UserId] or DEFAULT_PACK
 end
 
--- VitalService writes the sanity band (day: always Day). Kept per UserId and applied again on every spawn.
+-- VitalService writes the pack of the run night (Content.Skins.LookByNight; before the run: Day). Kept per UserId and
+-- applied again on every spawn. The skin rides the same attribute: CrewRig dresses SkinLooks[pack].
 function CharacterService:SetLookPack(player: Player, pack: Pack)
 	if table.find(Content.Looks.Packs, pack) == nil then
 		warn(`[CharacterService] SetLookPack: unknown pack {tostring(pack)}`)
@@ -729,7 +756,7 @@ function CharacterService:OnShiftStarted(info: ShiftInfo)
 		end
 		const point = self:SpawnPointFor(player, info)
 		if point ~= nil then
-			character:PivotTo(point + SPAWN_LIFT)
+			character:PivotTo(facePhone(point) + SPAWN_LIFT)
 		end
 	end
 end

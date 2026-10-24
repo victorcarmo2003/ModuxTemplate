@@ -19,6 +19,9 @@
 	    every stage sets the kitchen SFX duck to its DuckKitchen (AudioController:SetKitchenDuck).
 	  - Captions (TASK-444): a record of a listed anomaly with a Caption turning Active (seen live, or arriving Active
 	    less than Rules.CaptionFresh s old) shows Content.Score.Captions[k] once (HorrorCaption, its own ScreenGui).
+	    Owner 2026-10-22: any record turning Queue (a customer anomaly whose order was taken) shows its hint on the same
+	    card, once, when Content.AnomalyHints has a Live row for it ("BE QUICK", "DON'T LOOK"...). Not for a client that
+	    carries her tension already (Scene/Carry: it saw the apex of her tic, where the title came; Effects/Kit/Tic).
 	  - Score.Scene(key) (TASK-462, horror scene Music steps): the scene owns the theme. The stage theme fades out and
 	    Content.Sounds[key] loops in its place ("Stop" = silence); Score.Scene(nil) gives the theme back to the stage.
 	    Stage hold, duck and stings go on as usual meanwhile.
@@ -38,6 +41,7 @@ local Components = StarterPlayer.StarterPlayerScripts.client.Interface.Component
 local HorrorCaption = require(Components.HorrorCaption)
 local UiScale = require(Components.UiScale)
 local Stage = require(script.Stage)
+local Carry = require(script.Parent.Scene.Carry)
 
 export type StageKey = Stage.StageKey
 
@@ -66,7 +70,7 @@ export type Live = {
 	Id: number,
 	Key: string,
 	Ref: string,
-	Record: () -> { Phase: string, StartedAt: number },
+	Record: () -> { Phase: string, StartedAt: number, Anchor: number? },
 }
 
 export type Deps = {
@@ -77,6 +81,7 @@ export type Deps = {
 
 const SCORE = Content.Score
 const RULES = SCORE.Rules
+const HINTS = Content.AnomalyHints
 const ANOMALIES = SCORE.Anomalies :: { [string]: Content.ScoreAnomaly }
 const TICK = 1 / 15 -- s: stage pick and the Tension ramp
 const DEV_RAMP = 15 -- s of the ramp of a forced Tension
@@ -90,8 +95,8 @@ const STAGE_KEYS: { [string]: StageKey } = {
 	release = "Release",
 }
 
--- What the director remembers of one record (id of the Anomalies set)
-type Mark = { Key: string, Ref: string, Phase: string, Since: number, StartedAt: number }
+-- What the director remembers of one record (id of the Anomalies set); Anchor = a customer anomaly's NpcId (Carry)
+type Mark = { Key: string, Ref: string, Phase: string, Since: number, StartedAt: number, Anchor: number }
 
 -- The theme playing: its Sound, the stage it belongs to and when it started (os.clock, for the fade-in envelope)
 type Theme = { Stage: StageKey, Sound: Sound, StartedAt: number, Layer: Sound? } -- Layer: the stage's one-shot (Stage.Layer)
@@ -135,22 +140,37 @@ end
 
 -- Caption ------------------------------------------------------------------------------------------------------------
 
+local function present(director: Director, title: string, line: string, duration: number)
+	director.CaptionTitle(title)
+	director.CaptionLine(line)
+	director.CaptionShown(true)
+	director.CaptionToken += 1
+	const token = director.CaptionToken
+	task.delay(duration, function()
+		if director.CaptionToken == token then
+			director.CaptionShown(false)
+		end
+	end)
+end
+
 local function showCaption(director: Director, key: string)
 	const row = SCORE.Captions.ByKey[key]
 	if row == nil then
 		warnOnce(director, `caption:{key}`, `unknown caption "{key}" (Content.Score.Captions)`)
 		return
 	end
-	director.CaptionTitle(row.Title)
-	director.CaptionLine(row.Line)
-	director.CaptionShown(true)
-	director.CaptionToken += 1
-	const token = director.CaptionToken
-	task.delay(row.Duration, function()
-		if director.CaptionToken == token then
-			director.CaptionShown(false)
-		end
-	end)
+	present(director, row.Title, row.Line, row.Duration)
+end
+
+-- Owner 2026-10-22 (Provisional): a customer anomaly entered the delivery queue; its hint (Content.AnomalyHints, Live)
+-- on the same card. The whisper and the words on screen are its scene's (HorrorScenes, Queue)
+local function showHint(director: Director, anomaly: string): boolean
+	const hint = HINTS.ByKey[anomaly]
+	if hint == nil or not hint.Live then
+		return false
+	end
+	present(director, hint.Title or hint.Hint, hint.Line, HINTS.Rules.CaptionTime)
+	return true
 end
 
 local function mount(director: Director, playerGui: Instance)
@@ -177,6 +197,16 @@ end
 
 -- A record entered a phase (fresh = this client saw it happen, or it is only a moment old): the caption, once
 local function onPhase(director: Director, id: number, mark: Mark, fresh: boolean)
+	if fresh and mark.Phase == "Queue" then
+		const token = `{id}:{mark.StartedAt}:queue`
+		if Carry.Has(mark.Anchor) then
+			-- this client carries her tension: the title came at the apex of her tic (Effects/Kit/Tic)
+			director.Captioned[token] = true
+		elseif not director.Captioned[token] and showHint(director, mark.Key) then
+			director.Captioned[token] = true
+		end
+		return
+	end
 	if not fresh or mark.Phase ~= "Active" then
 		return
 	end
@@ -210,12 +240,14 @@ local function read(director: Director): { Stage.Seen }
 				Phase = record.Phase,
 				Since = record.StartedAt,
 				StartedAt = record.StartedAt,
+				Anchor = record.Anchor or 0,
 			}
 			director.Marks[occ.Id] = created
 			mark = created
 			onPhase(director, occ.Id, created, t - record.StartedAt <= RULES.CaptionFresh)
 		else
 			mark = known
+			known.Anchor = record.Anchor or known.Anchor
 			if known.Phase ~= record.Phase then
 				known.Phase = record.Phase
 				known.Since = t

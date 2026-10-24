@@ -9,7 +9,7 @@
 --   Light      overrides of Content.LightPresets fields: a field present here REPLACES the night preset value,
 --              blended in over Rules.FadeIn and out over Rules.FadeOut; absent fields keep the preset (empty = ATM-1)
 --   PostScale  multiplier of the street-post lights' Brightness (StreetLight fixtures with an Order; 1 = untouched)
---   Rain       cartoon drops around the camera (none under a roof), splashes on the ground, drips off the open
+--   Rain       cartoon drop particles in cells around the camera (off under a roof), splashes on the ground, drips off the open
 --              service / drive-thru window flaps (Vehicle attribute Shutter, server)
 --   Showers    the rain is not steady: it comes in showers at random moments of the night (same on every client),
 --              each one opening with a loud thunder clap + flash (owner 2026-10-21); a row without Showers rains
@@ -52,14 +52,13 @@ export type LightOverride = {
 }
 
 export type Rain = {
-	Drops: number, -- drops alive around the camera at full blend (part pool)
-	Speed: { number }, -- min, max studs/s (straight down plus Wind)
-	Wind: Vector3, -- studs/s added to every drop (slant)
-	Length: number, -- studs, drop body (a stretched ball: the cartoon drop)
-	Width: number, -- studs
+	Rate: number, -- drops per second per 100 studs^2 of open sky
+	Speed: { number }, -- min, max studs/s straight down
+	Wind: Vector3, -- studs/s^2 of the drops' Acceleration (drift; the sprite stays upright)
+	Size: number, -- studs, drop sprite (T_VFX_RainDropCartoon)
 	Transparency: number, -- 0..1
-	Color: Color3,
-	Splash: number, -- 0..1 chance a landing drop pops a cartoon splash (disc + three droplets)
+	Color: Color3, -- tint over the texture (white = the texture's own blue)
+	Splash: number, -- splashes per second per 100 studs^2 of open ground (0 = none)
 	Drips: number, -- drips per second per stud of open window flap edge (0 = none)
 }
 
@@ -109,15 +108,15 @@ export type Rules = {
 	Fallback: { string },
 	FadeIn: number, -- s, night start (late joiner: at once)
 	FadeOut: number, -- s, back to the day
-	RainRadius: number, -- studs, drops fall inside this disc around the camera
-	RainLead: number, -- 0..1 of RainRadius the disc centre is pushed along the camera look (drops where you look)
+	RainCell: number, -- studs, side of one rain cell
+	RainCells: number, -- cells per side around the camera (odd)
 	RainHeight: number, -- studs above the camera where drops spawn
-	Splashes: number, -- splash pool size
+	DropTexture: string, -- T_VFX_RainDropCartoon (original, Assets/textures, docs/art/credits.md)
+	SplashTexture: string, -- T_VFX_RainSplashCartoon (original)
 	SplashLife: number, -- s
-	SplashSize: number, -- studs, final disc diameter
+	SplashSize: number, -- studs, splash sprite at its widest
 	DripRange: number, -- studs, window flaps farther than this from the camera do not drip
-	DripGrow: number, -- s a drip hangs and swells on the edge before it falls
-	RoofCheck: number, -- s between the camera roof raycasts (fog indoors)
+	RoofCheck: number, -- s between roof raycasts (rain cells, fog indoors)
 	Fog: LightOverride, -- Atm* fields under every row (Silent Hill grey; a row's own fields win)
 	Indoor: { Density: number, Haze: number, Fade: number }, -- multipliers under a roof, s of the blend
 	Curtain: {
@@ -132,40 +131,44 @@ export type Rules = {
 		Glow: number, -- LightEmission: the fog must read grey at night, not black
 		Color: Color3,
 	},
+	RainVolume: number, -- multiplier of the row Sound volume (amb_rain is an Ambient row at 0.4)
 	ShowerAttribute: string, -- Workspace attribute "<server time start>:<length s>" of a forced shower (/dev shower)
+	TutorialShower: number, -- s of the shower forced when a player finishes the tutorial (TutorialService:Complete)
+	-- Workspace attribute, true = no natural shower: a rookie's tutorial is still ahead (TutorialService; forced ones still play)
+	ShowersHeldAttribute: string,
 	Strike: Lightning, -- bolt of a forced strike (/dev bolt, AtmosphereService:Strike) on a row without Lightning
 	StrikeAttribute: string, -- Workspace attribute "<server time>:<0|1 near>" written by AtmosphereService:Strike
 }
 
--- cartoon drops: chunky light-blue stretched balls, slower than real rain so the shape reads
+-- cartoon drops: outlined teardrop sprites, slower than real rain so the shape reads
 const rain: Rain = {
-	Drops = 170,
-	Speed = { 46, 58 },
+	Rate = 8,
+	Speed = { 40, 50 },
 	Wind = Vector3.new(4, 0, 2),
-	Length = 1.1,
-	Width = 0.3,
-	Transparency = 0.3,
-	Color = Color3.fromRGB(170, 214, 255),
-	Splash = 0.35,
+	Size = 0.35, -- 2nd pass (owner 2026-10-21 print: "muito grandes"): was 0.7
+	Transparency = 0.1,
+	Color = Color3.new(1, 1, 1),
+	Splash = 2,
 	Drips = 1.6,
 }
 
 const storm: Rain = {
-	Drops = 250,
-	Speed = { 58, 72 },
+	Rate = 12,
+	Speed = { 50, 62 },
 	Wind = Vector3.new(14, 0, 6),
-	Length = 1.3,
-	Width = 0.32,
-	Transparency = 0.28,
-	Color = Color3.fromRGB(160, 206, 255),
-	Splash = 0.4,
+	Size = 0.4, -- was 0.8
+	Transparency = 0.08,
+	Color = Color3.fromRGB(235, 242, 255),
+	Splash = 3,
 	Drips = 2.6,
 }
 
--- showers: rare on a dry night (~1 in 2 windows of 150 s), most of the time on the rain / storm nights
-const sparse: Showers = { Every = 150, Chance = 0.45, Length = { 25, 50 }, Fade = 4, Near = true }
-const often: Showers = { Every = 80, Chance = 0.85, Length = { 35, 60 }, Fade = 4, Near = true }
-const stormy: Showers = { Every = 70, Chance = 0.9, Length = { 40, 62 }, Fade = 3, Near = true }
+-- showers: rare on a dry night (~1 in 2 windows of 150 s), most of the time on the rain / storm nights.
+-- Owner 2026-10-21 ("dobra o tempo de duração, tá muito curta"): Length x2 (was 25-50 / 35-60 / 40-62); the windows
+-- of often / stormy x2 too (was 80 / 70) so a shower still fits in one
+const sparse: Showers = { Every = 150, Chance = 0.45, Length = { 50, 100 }, Fade = 4, Near = true }
+const often: Showers = { Every = 160, Chance = 0.85, Length = { 70, 120 }, Fade = 4, Near = true }
+const stormy: Showers = { Every = 140, Chance = 0.9, Length = { 80, 124 }, Fade = 3, Near = true }
 
 -- storm bolt: a strike in ~3 of 4 windows of 16 s, 1 in 4 of them near (the scare)
 const stormBolt: Lightning = {
@@ -378,14 +381,14 @@ const rules: Rules = {
 	Fallback = { "ATM-1", "ATM-1", "ATM-4", "ATM-2", "ATM-6", "ATM-3", "ATM-5", "ATM-2", "ATM-3", "ATM-7" },
 	FadeIn = 6,
 	FadeOut = 4,
-	RainRadius = 34,
-	RainLead = 0.45,
-	RainHeight = 18,
-	Splashes = 40,
-	SplashLife = 0.32,
-	SplashSize = 1.4,
+	RainCell = 8, -- small cells: a cell touching a roof is off, so the gap along the walls stays thin
+	RainCells = 9,
+	RainHeight = 22,
+	DropTexture = "rbxassetid://76198951218203",
+	SplashTexture = "rbxassetid://94434358836628",
+	SplashLife = 0.3,
+	SplashSize = 0.22, -- owner 2026-10-21, twice "muito grandes" on the ground: 1.6 -> 0.55 -> 0.22
 	DripRange = 70,
-	DripGrow = 0.35,
 	RoofCheck = 0.25,
 	Fog = fog,
 	-- under a roof the fog thins a little (the counter is a few studs away: it stays legible); 2nd pass: was 0.55 / 0.4,
@@ -403,7 +406,11 @@ const rules: Rules = {
 		Glow = 0.25,
 		Color = Color3.fromRGB(150, 156, 166),
 	},
+	RainVolume = 2, -- owner 2026-10-21: "aonde que tá o som de chuva?" (0.4 alone was lost under the night bed)
 	ShowerAttribute = "AtmosphereShower",
+	TutorialShower = 100, -- owner 2026-10-21: "sempre que finalizar o tutorial, faz acontecer a chuva"
+	-- owner 2026-10-22: "não deixa a chuva cair em momento algum antes do tutorial ser completo"
+	ShowersHeldAttribute = "AtmosphereShowersHeld",
 	Strike = stormBolt,
 	StrikeAttribute = "AtmosphereStrike",
 }

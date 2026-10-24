@@ -1,8 +1,8 @@
 --!strict
--- Tip jar and ledger commands (TASK-242; DEC-238, DEC-239; Provisional). Thin wrappers over EconomyService / TipJarService.
---   tips                      jar, Cash and the shift ledger (same as `tips state`)
---   tips add <n>              puts n in the tip jar (needs the shop taking entries: a selling phase or the day Closing)
---   tips collect              the jar goes to Cash and the coins play (same as the "Collect Tips" prompt)
+-- Tips and ledger commands (TASK-242; DEC-238; Provisional). Thin wrappers over EconomyService. The tip jar and its
+-- "collect" left (owner 2026-10-22): a tip goes straight to Cash.
+--   tips                      Cash and the shift ledger (same as `tips state`)
+--   tips add <n>              a tip of n straight into Cash (needs the shop taking entries: a selling phase or Closing)
 --   economy ledger            pure test of Ledger.settle (day take = Sales + Tips, bonus, deposit);
 --                             prints one line per case and ends with "N/N ok"
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -11,14 +11,9 @@ local Ledger = require(ServerScriptService.server.Economy.EconomyService.Ledger)
 
 type Economy = {
 	GetCash: (self: any) -> number,
-	GetDrawer: (self: any) -> number,
 	IsDrawerOpen: (self: any) -> boolean,
 	AddTip: (self: any, amount: number) -> number,
 	GetLedger: (self: any) -> Ledger.Ledger,
-}
-
-type TipJar = {
-	CollectNow: (self: any) -> number,
 }
 
 const ADD_MAX = 100000
@@ -75,19 +70,18 @@ end
 
 const Tips: Api.Module = function(ctx: Api.Context): { Api.Command }
 	const economy = ctx.Get("EconomyService") :: Economy
-	const jar = ctx.Get("TipJarService") :: TipJar
 
 	const function state(): string
 		const ledger = economy:GetLedger()
-		return `Cash ${economy:GetCash()}, tip jar ${economy:GetDrawer()}, entries {if economy:IsDrawerOpen() then "open" else "closed"}; `
-			.. `ledger sales ${ledger.Sales} tips ${ledger.Tips} collected ${ledger.Collected}`
+		return `Cash ${economy:GetCash()}, entries {if economy:IsDrawerOpen() then "open" else "closed"}; `
+			.. `ledger sales ${ledger.Sales} tips ${ledger.Tips}`
 	end
 
 	return {
 		{
 			Name = "tips",
-			Usage = "tips [state | add <n> | collect]",
-			Help = "tip jar: state; add n (shop taking entries); collect (jar -> Cash)",
+			Usage = "tips [state | add <n>]",
+			Help = "tips: state; add n straight to Cash (shop taking entries)",
 			Run = function(args: { string }, _caller: Player?): string?
 				const sub = if args[1] then string.lower(args[1]) else "state"
 				if sub == "state" then
@@ -98,12 +92,9 @@ const Tips: Api.Module = function(ctx: Api.Context): { Api.Command }
 						error("the shop is not taking entries (open it first: a selling phase or the day Closing)", 0)
 					end
 					const added = economy:AddTip(amount)
-					return `+${added} in the jar. {state()}`
-				elseif sub == "collect" then
-					const moved = jar:CollectNow()
-					return `collected ${moved}. {state()}`
+					return `+${added} tip in Cash. {state()}`
 				end
-				error("usage: tips [state | add <n> | collect]", 0)
+				error("usage: tips [state | add <n>]", 0)
 			end,
 		},
 		{

@@ -1,0 +1,146 @@
+{
+ "_archetype": "Bright room, cute characters in a row/at a counter, ONE wrong detail. Family horror. Ref: Animal Hospital, Sell Fries.",
+ "out": "thumb.png",
+ "size": [
+  1920,
+  1080
+ ],
+ "bg": {
+  "path": "bg.jpg",
+  "blur": 2,
+  "saturation": 0.85,
+  "brightness": 0.95
+ },
+ "layers": [
+  {
+   "path": "friend_left.png",
+   "key": "green",
+   "at": [
+    0.22,
+    1.2
+   ],
+   "height": 0.95,
+   "anchor": "bottom",
+   "saturation": 1.25,
+   "outline": {
+    "color": [
+     40,
+     30,
+     40
+    ],
+    "width": 8
+   }
+  },
+  {
+   "path": "friend_right.png",
+   "key": "green",
+   "at": [
+    0.78,
+    1.2
+   ],
+   "height": 0.95,
+   "anchor": "bottom",
+   "saturation": 1.25,
+   "outline": {
+    "color": [
+     40,
+     30,
+     40
+    ],
+    "width": 8
+   }
+  },
+  {
+   "path": "wrong_one.png",
+   "key": "green",
+   "at": [
+    0.5,
+    1.18
+   ],
+   "height": 1.0,
+   "anchor": "bottom",
+   "saturation": 1.3,
+   "contrast": 1.12,
+   "sharpen": 0.5,
+   "outline": {
+    "color": [
+     40,
+     30,
+     40
+    ],
+    "width": 10
+   },
+   "outline2": {
+    "color": [
+     255,
+     255,
+     255
+    ],
+    "width": 5
+   },
+   "glow": {
+    "color": [
+     255,
+     60,
+     60
+    ],
+    "width": 45,
+    "strength": 0.35
+   }
+  }
+ ],
+ "text": [
+  {
+   "text": "WHICH ONE?",
+   "font": "LuckiestGuy-Regular.ttf",
+   "size": 0.16,
+   "at": [
+    0.5,
+    0.14
+   ],
+   "color": [
+    255,
+    255,
+    255
+   ],
+   "gradient": [
+    [
+     255,
+     240,
+     120
+    ],
+    [
+     255,
+     150,
+     30
+    ]
+   ],
+   "stroke": {
+    "color": [
+     0,
+     0,
+     0
+    ],
+    "width": 0.011
+   },
+   "shadow": {
+    "offset": [
+     0.006,
+     0.008
+    ],
+    "opacity": 0.7
+   },
+   "rotate": -4
+  }
+ ],
+ "grade": {
+  "saturation": 1.08,
+  "contrast": 1.06
+ },
+ "vignette": {
+  "strength": 0.22,
+  "bottom_bias": 0.2
+ },
+ "sharpen": 0.4,
+ "safe_bottom": 0.15
+}

@@ -2,6 +2,8 @@ Status: Rascunho
 
 # Dados de conteúdo (data-driven)
 
+> **Nota 2026-10-23 (secretário), para o architect:** **DEC-360** (run 100% noite, começa de noite) e **DEC-361** (a janela despacha as anomalias-cliente, menos a ANM-022; custo = dinheiro). Ficam sem uso: `Shift` fases de dia (Prep 7 AM, Open, Closing 6 PM) e `Shift.RunStartsAtNight = false`; `BossCalls` gatilhos `DayPrep`/`DayInfinite` e as linhas `call_day_*`; `ShopWindow` `LeaveMood`/`ShutLines`/`ShutGrace` (a fila não sai mais). Limpeza só com TASK; não editar `Shift`, `Cutscenes`, `Validate`, `LightPresets` enquanto a outra sessão mexe.
+
 Autor: architect. **Versão 5, 2026-10-10 (pós onda 1):** §3.20 Animations, §3.21 Sounds/Music, §6 tabelas das
 ondas 2–4 (Shift de noite, Nights, LightGroups, Sanity, Thief, BossCalls, Anomalies, Hallucinations, Cutscenes,
 WalkPaths, campos novos, Actions/Notices novas). Contrato de código: `architecture.md` §19.

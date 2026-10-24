@@ -20,12 +20,12 @@
 --                  on the left, START NOW (Green, bigger, leader) in the middle, FRIENDS ONLY (leader) on the right. A
 --                  toggle is grey off, Green on; each flip turns it over like a card (180 deg on a spring: it narrows to
 --                  its edge and opens again, with a slight tilt and pop), the colour blends Slate <-> Green on the way and
---                  a white shine sweeps across it. Reduced motion: the colour only. Over the bar, the room's state line
---                  ("Starting in 9...", "Teleporting...") for the players of that pad only (owner request 2026-10-21: the
---                  pad sign hides for them). Toggle labels scale down inside the card (they spilled out on phones)
---   top centre, in a pad room (owner request 2026-10-21, Provisional; `Queue`)  the queue strip (PadQueue): a circle per
---                  seat with each member's head shot, empty dashed circles for the free seats, and EXIT (OnExit). It takes
---                  the place of the players-online pill
+--                  a white shine sweeps across it. Reduced motion: the colour only. Over the buttons, the queue strip
+--                  (`Queue`, PadQueue): a circle per seat with each member's head shot, empty dashed circles for the free
+--                  seats, and EXIT (OnExit); it was top centre, moved down over the buttons (owner request 2026-10-21).
+--                  Over the strip, the room's state line ("Starting in 9...", "Teleporting...") for the players of that
+--                  pad only (owner request 2026-10-21: the pad sign hides for them). Toggle labels scale down inside the
+--                  card (they spilled out on phones). The players-online pill stays hidden in a pad room
 -- Mobile clean-up (owner request 2026-10-17, Provisional): each tile's name sits UNDER the tile (white, thin Ink
 -- stroke), never inside it (it spilled out and overlapped on phones); bigger icons; Normal outlines instead of Thick;
 -- smaller gem and online pills.
@@ -160,6 +160,7 @@ const FREE_BOTTOM = 200
 const TOPBAR_FREE = 64
 const ONLINE_PILL = 28 -- px tall (UIScale grows it)
 const STATUS_HEIGHT = 26 -- px, the state line over the pad bar
+const QUEUE_GAP = 8 -- px between the state line, the queue strip and the pad buttons
 const TOGGLE_INSET = Vector2.new(14, 10) -- px kept free around a toggle's label (its outline + lip)
 
 -- "950", "1.2K", "12K", "3.4M": one decimal under 10 of a unit, none above.
@@ -542,41 +543,6 @@ return function(props: Props): Frame
 			}),
 		}),
 
-		-- Top centre, in a pad room: the queue strip (faces + EXIT) instead of the online pill
-		create("Frame")({
-			Name = "Queue",
-			AnchorPoint = Vector2.new(0.5, 0),
-			Position = function()
-				return UDim2.new(0.5, 0, 0, if area().X < NARROW then TOPBAR_FREE else TOP)
-			end,
-			Size = UDim2.fromOffset(0, 0),
-			AutomaticSize = Enum.AutomaticSize.XY,
-			BackgroundTransparency = 1,
-			Visible = function()
-				return queue() ~= nil
-			end,
-			createRaw("UIScale")({ Scale = scaled }),
-			PadQueue({
-				Members = function()
-					const info = queue()
-					return if info then info.Members else {}
-				end,
-				Max = function()
-					const info = queue()
-					return if info then info.Max else 0
-				end,
-				Leader = function()
-					const info = queue()
-					return if info then info.Leader else 0
-				end,
-				OnExit = function()
-					if props.OnExit then
-						props.OnExit()
-					end
-				end,
-			}),
-		}),
-
 		-- Right, centred vertically: the gem pill alone (opens the shop)
 		create("Frame")({
 			Name = "Wallet",
@@ -657,22 +623,30 @@ return function(props: Props): Frame
 			tiles,
 		}),
 
-		-- Pad bar (pad room): the state line, then SKIP TUTORIAL · START NOW (big, middle) · FRIENDS ONLY
+		-- Pad bar (pad room), top to bottom: the state line, the queue strip (faces + EXIT), then SKIP TUTORIAL ·
+		-- START NOW (big, middle) · FRIENDS ONLY. A hidden piece takes no room (the list closes up)
 		create("Frame")({
 			Name = "PadBar",
 			AnchorPoint = Vector2.new(0.5, 1),
 			Position = UDim2.new(0.5, 0, 1, -MARGIN),
-			Size = UDim2.fromOffset(PAD_WIDTH, STATUS_HEIGHT + PAD_START.Y),
+			Size = UDim2.fromOffset(PAD_WIDTH, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
 			Visible = function()
-				return padBar() ~= nil
+				return padBar() ~= nil or queue() ~= nil
 			end,
 			createRaw("UIScale")({ Scale = scaled }),
-			-- "Starting in 9..." right over START NOW, only for the players of this pad
+			create("UIListLayout")({
+				FillDirection = Enum.FillDirection.Vertical,
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
+				VerticalAlignment = Enum.VerticalAlignment.Bottom,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, QUEUE_GAP),
+			}),
+			-- "Starting in 9..." over the queue strip, only for the players of this pad
 			CartoonLabel({
 				Name = "Status",
-				AnchorPoint = Vector2.new(0.5, 0),
-				Position = UDim2.fromScale(0.5, 0),
+				LayoutOrder = 1,
 				Box = UDim2.new(1, 0, 0, STATUS_HEIGHT),
 				TextSize = 20,
 				Text = padStatus,
@@ -681,11 +655,42 @@ return function(props: Props): Frame
 				end,
 			}),
 			create("Frame")({
+				Name = "Queue",
+				LayoutOrder = 2,
+				Size = UDim2.fromOffset(0, 0),
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundTransparency = 1,
+				Visible = function()
+					return queue() ~= nil
+				end,
+				PadQueue({
+					Members = function()
+						const info = queue()
+						return if info then info.Members else {}
+					end,
+					Max = function()
+						const info = queue()
+						return if info then info.Max else 0
+					end,
+					Leader = function()
+						const info = queue()
+						return if info then info.Leader else 0
+					end,
+					OnExit = function()
+						if props.OnExit then
+							props.OnExit()
+						end
+					end,
+				}),
+			}),
+			create("Frame")({
 				Name = "Row",
-				AnchorPoint = Vector2.new(0.5, 1),
-				Position = UDim2.fromScale(0.5, 1),
+				LayoutOrder = 3,
 				Size = UDim2.new(1, 0, 0, PAD_START.Y),
 				BackgroundTransparency = 1,
+				Visible = function()
+					return padBar() ~= nil
+				end,
 				create("UIListLayout")({
 					FillDirection = Enum.FillDirection.Horizontal,
 					HorizontalAlignment = Enum.HorizontalAlignment.Center,

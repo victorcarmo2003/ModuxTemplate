@@ -5,11 +5,14 @@
 -- share of the line crossed (owner 2026-10-19, like the old prep's guide). Release = the cut, scored by Gestures.Slice -> Grade.Score bun_cut, sent as Cook Cut. No plate:
 -- the server puts the cut bun on the cut-bun pile (the crate on the right, TLR_BUN_CUT); when the pile grows the bun opens and a
 -- new whole bun comes, so the player cuts a batch. The focus stays until the player leaves (Back, walking).
+-- Owner 2026-10-22: no bun in stock (Stock set) = an empty board and "No buns left" instead of a bun that the server refuses
+-- once cut; a whole bun comes back as soon as the stock does.
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Content = require(ReplicatedStorage.shared.Content)
+local Net = require(ReplicatedStorage.shared.Libs.Net)
 local Grade = require(ReplicatedStorage.shared.Prep.Grade)
 local Gestures = require(script.Parent.Gestures)
 local Kit = require(script.Parent.Kit)
@@ -28,8 +31,17 @@ const BUN_SCALE = 2 -- the bun on the board is drawn twice the kit size (owner 2
 const POP_TIME = 0.32 -- s of the cartoon pop a bun comes in with (squash, overshoot, settle)
 const TUTORIAL_ATTRIBUTE = "TutorialRunning" -- TutorialController: one bun only while it runs
 const SLOT_FACTOR = 100 -- Stations record id = StationId * 100 + slot
+const BUN = "bun" -- the ingredient a cut takes from the stock (KitchenService Cook.luau)
+const NO_BUN_HINT = "No buns left. Restock the bun box"
 
 const Board = {}
+
+-- A bun to cut in the stock. No record yet (not replicated) counts as stocked: the server still refuses with a toast
+local function hasBun(): boolean
+	const index = Content.Ingredients.IndexOf[BUN]
+	const record: { Amount: number, Blocked: boolean }? = if index ~= nil then Net.Stock:get(index) else nil
+	return record == nil or (record.Amount > 0 and not record.Blocked)
+end
 
 -- StationIds of the cut-bun piles in the world
 local function pileIds(): { [number]: boolean }
@@ -81,6 +93,7 @@ function Board.Start(session: Session.Session): Session.Handler
 	local sentAt: number? = nil
 	local sentCount = 0
 	local openedAt: number? = nil
+	local empty = false -- no bun in stock: nothing on the board
 
 	local function hint()
 		const count, places = pileCount()
@@ -181,6 +194,31 @@ function Board.Start(session: Session.Session): Session.Handler
 		openedAt = os.clock()
 	end
 
+	-- no bun in stock: the board empties and says so
+	local function noBun()
+		empty = true
+		cutting = false
+		if bunModel ~= nil then
+			bunModel:Destroy()
+			bunModel = nil
+		end
+		line:ClearAllChildren()
+		table.clear(dashes)
+		reset()
+		session.Progress(nil)
+		session.Hint(NO_BUN_HINT)
+	end
+
+	-- the next whole bun, or the empty board when the stock ran out
+	local function nextBun()
+		if hasBun() then
+			empty = false
+			newBun()
+		else
+			noBun()
+		end
+	end
+
 	local function bunPoint(position: Vector2): (number?, number?, Vector3?)
 		const world = Kit.OnPlane(position, bun.Frame.Position, up)
 		if world == nil then
@@ -190,11 +228,17 @@ function Board.Start(session: Session.Session): Session.Handler
 		return x, y, world
 	end
 
-	newBun()
+	nextBun()
 
 	return {
 		Pointer = function(kind: string, position: Vector2)
 			if sentAt ~= nil or openedAt ~= nil then
+				return
+			end
+			if empty then
+				if kind == "Down" then
+					session.Hint(NO_BUN_HINT)
+				end
 				return
 			end
 			const x, y, world = bunPoint(position)
@@ -246,8 +290,19 @@ function Board.Start(session: Session.Session): Session.Handler
 			session.Hint("Cutting...")
 		end,
 		Step = function(_dt: number)
-			-- the paw drags the knife along the line while a whole bun waits
+			-- the stock ran out (or came back) while no cut is on its way
 			if openedAt == nil and sentAt == nil then
+				const stocked = hasBun()
+				if empty and stocked then
+					nextBun()
+				elseif not empty and not stocked and not cutting then
+					noBun()
+				end
+			end
+			-- the paw drags the knife along the line while a whole bun waits
+			if empty then
+				session.Paw:Hide()
+			elseif openedAt == nil and sentAt == nil then
 				session.Paw:Show("bun_cut", {
 					Kit.BunWorld(bun, BUILD.Cut.From, BUILD.Cut.Y, LIFT),
 					Kit.BunWorld(bun, BUILD.Cut.To, BUILD.Cut.Y, LIFT),
@@ -263,7 +318,7 @@ function Board.Start(session: Session.Session): Session.Handler
 						return
 					end
 					openedAt = nil
-					newBun()
+					nextBun()
 				end
 				return
 			end

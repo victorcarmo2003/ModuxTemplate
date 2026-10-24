@@ -7,6 +7,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
+local BackButton = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.BackButton)
 
 const create = Vide.create
 -- Vide 0.4.1 types `create` for some classes only (UIStroke, UIPadding are not among them)
@@ -84,35 +85,10 @@ function Hud.Screen(props: Props): (ScreenGui, Frame)
 			create("UICorner")({ CornerRadius = Theme.Radius.Pill }),
 		}),
 
-		create("TextButton")({
-			Name = "Back",
-			AnchorPoint = Vector2.new(0, 1),
-			Position = UDim2.new(0, 18, 1, -18),
-			Size = function()
-				const scale = props.Scale()
-				return UDim2.fromOffset(math.floor(96 * scale), math.floor(Theme.MinTouch * scale))
-			end,
-			BackgroundColor3 = function(): Color3
-				return if props.BackHint ~= nil and props.BackHint() ~= nil then Theme.Color.Mustard else Theme.Color.Cream
-			end,
-			AutoButtonColor = true,
-			FontFace = Theme.Font.Title,
-			Text = "Back",
-			TextColor3 = Theme.Color.Ink,
-			TextSize = function()
-				return math.floor(20 * props.Scale())
-			end,
-			Activated = function()
-				props.OnBack()
-			end,
-			create("UICorner")({ CornerRadius = Theme.Radius.Card }),
-			createRaw("UIStroke")({ Color = Theme.Color.Ink, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
-			createRaw("UIScale")({
-				Scale = function(): number
-					const clock = if props.BackHint ~= nil then props.BackHint() else nil
-					return if clock ~= nil then 1 + 0.12 * (0.5 + 0.5 * math.sin(clock * 6)) else 1
-				end,
-			}),
+		BackButton({
+			OnBack = props.OnBack,
+			Scale = props.Scale,
+			Hint = props.BackHint,
 		}),
 
 		create("TextLabel")({

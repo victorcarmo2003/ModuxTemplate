@@ -156,7 +156,11 @@ end
 -- Dark out now: the shift is a night one and it is not its morning (Call / Prep before the dusk minute)
 function RoundController:SyncDark()
 	const phase = Vide.untrack(self.Phase)
-	const morning = (phase == "Call" or phase == "Prep") and self.Minutes ~= NO_MINUTE and self.Minutes < Content.Shift.Morning.DuskFrom
+	const morning = Content.Shift.Morning.Enabled
+		and (phase == "Call" or phase == "Prep")
+		and Vide.untrack(self.Night) >= Content.Shift.Morning.FromNight
+		and self.Minutes ~= NO_MINUTE
+		and self.Minutes < Content.Shift.Morning.DuskFrom
 	const dark = Vide.untrack(self.IsNight) and not morning
 	if Vide.untrack(self.Dark) ~= dark then
 		self.Dark(dark)

@@ -14,7 +14,12 @@
 --   Accessories / Hat   extra kit pieces (CrewRig.Build options), lot 1b (Q-305); nil = none
 --   Robux      suggested price (Creator Hub) and display fallback; the real one is GetProductInfo (Q-302)
 -- ProductIds: Creator Hub, created by the owner 2026-10-17 from docs/monetization/skins.csv.
+--
+-- LookByNight (DEC-370, DEC-373; TASK-643): the crew look follows the night of the run, never the sanity. Every skin, the
+-- crew uniform and every playable species keep Day / Mid / Night (Validate). Rows by ascending From: the last one with
+-- From <= night wins; night 0 (lobby, before the run) = Day.
 local Classes = require(script.Parent.Classes)
+local Outfits = require(script.Parent.Outfits)
 local Table = require(script.Parent.Table)
 
 export type Theme = "Halloween" | "Classic"
@@ -36,6 +41,9 @@ export type Skin = {
 	ProductId: number,
 	Robux: number,
 }
+
+export type Pack = Outfits.Pack
+export type NightLook = { From: number, Pack: Pack }
 
 export type Rules = {
 	None: string, -- wire value of "no skin" (SkinEquip / SkinState)
@@ -141,6 +149,24 @@ const rules: Rules = {
 	PerClass = 5,
 }
 
+-- DEC-370: N1-N3 normal, N4-N6 tired, N7-N10 night
+const lookByNight: { NightLook } = {
+	{ From = 1, Pack = "Day" },
+	{ From = 4, Pack = "Mid" },
+	{ From = 7, Pack = "Night" },
+}
+
+-- Crew look pack of a run night (0 or less = lobby / before the run: Day)
+local function packForNight(night: number): Pack
+	local pack: Pack = "Day"
+	for _, row in lookByNight do
+		if night >= row.From then
+			pack = row.Pack
+		end
+	end
+	return pack
+end
+
 -- Keys by class, in list order (the circles under the card)
 const byClass: { [string]: { string } } = {}
 for _, skin in list do
@@ -176,4 +202,6 @@ return Table.with(Table.new(list), {
 	Rules = Table.record(rules),
 	ByClass = Table.record(byClass),
 	Choices = Table.record(choices),
+	LookByNight = Table.record(lookByNight),
+	PackForNight = packForNight,
 })

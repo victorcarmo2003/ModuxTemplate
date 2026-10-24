@@ -14,3 +14,15 @@ sourcemap.json
 # voice tooling
 /tools/voice/.venv/
 /tools/voice/samples/
+/tools/voice/recordings/
+/tools/voice/elevenlabs/
+
+# python caches, crash dumps, big archives (GitHub limit 100 MB)
+__pycache__/
+*.pyc
+blender.crash.txt
+*.rar
+
+# local Claude Code state (each dev has their own)
+/.claude/settings.local.json
+/.claude/worktrees/

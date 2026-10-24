@@ -121,6 +121,10 @@ const cues = Table.new({
 	{ Key = "stare_front", Kind = "Both", Duration = 0 },
 	-- ANM-022 the head banger: one blow of its head on the shut window (thud, camera shake, the shutter jumps)
 	{ Key = "head_bang", Kind = "Both", Duration = 0 },
+	-- owner 2026-10-22 (Provisional; anomalies-after-accept-proposal.md §9.9, condition Plain): Entity = actor NpcId. A
+	-- topping on his plain order: he throws the plate at the wall behind the counter (it sticks, slides down, falls, fades),
+	-- a TUM, "I ONLY WANT BREAD." and his rage (Content.PlateThrow; client Effects/Kit/Tantrum). Never a jumpscare
+	{ Key = "plate_throw", Kind = "Both", Duration = 4 },
 } :: { Cue })
 
 local function anomaly(
@@ -153,7 +157,8 @@ local function anomaly(
 end
 
 -- V2 family A (DEC-254, TASK-292): an odd customer with ONE deformation (actor Variant, client modifier on the rig,
--- Effects/Kit/OddCustomer). Refuse = it leaves; Take Order = jumpscare + faint (DEC-255). Debut nights from
+-- Effects/Kit/OddCustomer). Owner 2026-10-22 (Provisional): no Refuse; the order is always taken at the end of the talk
+-- and the actor waits in the delivery queue with a condition (server Rules; hints in Content.AnomalyHints). Debut nights from
 -- anomalies-v2-proposal.md §5 (game-designer tunes; TASK-271 brings the V2 night table).
 local function odd(night: number, number: number, key: string, name: string): Anomaly
 	const row = anomaly(night, key, name, "Customer", 1, "Party", 60, false, {}, { "jumpscare" })
@@ -262,10 +267,17 @@ const roofWalker = anomaly(9, "anm_019_roof_walker", "The roof walker", "World",
 roofWalker.Ref = "ANM-019"
 roofWalker.Family = "B"
 
+-- owner 2026-10-22 (condition Plain, Provisional): a topping = the plate thrown at the wall (cue plate_throw)
+const shaker = odd(2, 11, "anm_011_shaker", "The shaker")
+shaker.Cues = { "jumpscare", "plate_throw" }
+
 -- TASK-341 (Provisional): debuts on Night 4 (was 3), the rain night, swapped with the blackout
 const turnedNeck = odd(4, 12, "anm_012_turned_neck", "The turned neck")
 turnedNeck.Cues = { "jumpscare", "neck_snap", "window_slam" } -- TASK-336
-turnedNeck.Stare = true -- TASK-482 (DEC-294 §8): the turned head follows who stares
+-- owner 2026-10-21 (Provisional): no stare pressure on her before the talk (the head following who stares turned her neck
+-- too early). Owner 2026-10-22 (Provisional, condition NoLook): the stare pressure runs only in the delivery queue now
+-- (Phase Queue), so it is back on her as the warning of her condition: staring at her = heart, edges, STOP STARING
+turnedNeck.Stare = true
 
 const whiteEyes = odd(5, 13, "anm_013_white_eyes", "The white eyes")
 whiteEyes.Stare = true -- TASK-482 (DEC-294 §8): white eyes / wrong smile
@@ -305,7 +317,7 @@ const rows: { Anomaly } = {
 	longCar,
 	knock,
 	hush,
-	odd(2, 11, "anm_011_shaker", "The shaker"),
+	shaker,
 	turnedNeck,
 	whiteEyes,
 	odd(6, 14, "anm_014_big_head", "The big head"),

@@ -11,9 +11,13 @@
 --   Empty -> Working   SFX-020 `grill_drop` at the slot
 --   bar reaches 1      SFX-022 `grill_ready` + ReadyVFX (10 stars) at the slot
 --   Ready -> Empty     SFX-023 `grill_collect` at the slot ("Collect" took it to the rail)
---   any slot busy      SFX-021 `grill_sizzle` loop on the grill (volume by busy slots) + smoke, Rate 3 per busy slot
+--   any slot Working   SFX-021 `grill_sizzle` loop on the grill (volume by frying slots) + smoke, Rate 3 per frying slot
+--                      (owner 2026-10-21: a Ready / Burnt sausage left on the rollers or a cleaning grill is silent)
+--   Flip 0 -> 1        the sausage hops up and rolls over (owner 2026-10-22: "dá um pulinho e realmente gira"), local,
+--                      FLIP_TIME s, FLIP_HOP studs high, about its long axis; it lands turned (the same pose as Turn)
 -- Wave 3 (TASK-110): a slot with `Altered` >= 1 shows SausageWrong (AST-061) whatever the bar says (no ready burst).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
@@ -27,7 +31,7 @@ const derive = Vide.derive
 const cleanup = Vide.cleanup
 const untrack = Vide.untrack
 
-const SIZZLE_MIN = 0.5 -- sizzle volume with 1 busy slot; full with every slot busy
+const SIZZLE_MIN = 0.5 -- sizzle volume with 1 frying slot; full with every slot frying
 const SMOKE_RISE = 0.3
 
 const KIND = "grill"
@@ -36,6 +40,9 @@ const OVERLAY_SCALE = 1.012 -- the grilled model over the raw one: no z-fight
 const FADE_FROM = 0.1 -- cooking share at which the grilled colour starts to show (Provisional, S1)
 -- DEC-311: an unflipped sausage waits at this share until its flip (the server holds it without touching the record)
 const HOLD_AT = Content.Restaurant.Grill.HoldAt
+const FLIP_TIME = 0.42 -- s of the hop (Provisional, judged in Play)
+const FLIP_HOP = 0.55 -- studs at the top of the hop
+const FLIP_ROLL = 3 * math.pi -- a roll and a half about the long axis: it lands turned over (Turn = pi)
 
 local function spotPosition(spot: Slots.Spot): Vector3
 	return (spot.Host.CFrame * spot.Offset).Position
@@ -95,8 +102,89 @@ local function mountSlot(
 		return "Pair"
 	end)
 
+	-- the hop in progress lands at once when the slot unmounts (its effects re-run on every record change)
+	local landing: (() -> ())? = nil
+	cleanup(function()
+		if landing ~= nil then
+			landing()
+		end
+	end)
+	-- the flip hop: the models of the slot leave their welds, jump and roll about the long axis, land turned and weld again
+	local function hop(models: { Model })
+		if landing ~= nil then
+			landing() -- a hop still in the air lands first
+		end
+		const centre = CFrame.new(0, Slots.FlipCenter, 0)
+		local function frame(): CFrame
+			return spot.Host.CFrame * spot.Offset * centre
+		end
+		const start = frame()
+		const rel: { [Model]: CFrame } = {}
+		for _, model in models do
+			Slots.Detach(model)
+			rel[model] = start:ToObjectSpace(model:GetPivot())
+		end
+		const began = os.clock()
+		local connection: RBXScriptConnection? = nil
+		local function land()
+			landing = nil
+			if connection ~= nil then
+				connection:Disconnect()
+				connection = nil
+			end
+			for _, model in models do
+				if model.Parent ~= nil and spot.Host.Parent ~= nil then
+					-- the landing pose: turned once (the rebuild's Turn = pi); the extra roll is whole turns
+					model:PivotTo(frame() * CFrame.Angles(math.pi, 0, 0) * rel[model])
+					Slots.Attach(model, spot.Host)
+				end
+			end
+		end
+		connection = RunService.RenderStepped:Connect(function()
+			const t = math.clamp((os.clock() - began) / FLIP_TIME, 0, 1)
+			if t >= 1 or spot.Host.Parent == nil then
+				land()
+				return
+			end
+			-- up and down (a parabola), the roll eased out so it settles on the grill
+			const lift = FLIP_HOP * 4 * t * (1 - t)
+			const roll = FLIP_ROLL * (1 - (1 - t) ^ 2)
+			const at = frame() * CFrame.new(0, lift, 0) * CFrame.Angles(roll, 0, 0)
+			for _, model in models do
+				if model.Parent ~= nil then
+					model:PivotTo(at * rel[model])
+				end
+			end
+		end)
+		landing = land
+	end
+
+	-- Flip 0 -> > 0 on the record while the slot shows its models: the hop (a rebuild already lands turned)
+	local lastFlip = -1
+	effect(function()
+		const record = read()
+		const flip = if record ~= nil then record.Flip else 0
+		untrack(function()
+			const before = lastFlip
+			lastFlip = flip
+			if before == 0 and flip > 0 then
+				const models: { Model } = {}
+				for _, model in { entry.Raw, entry.Over } do
+					if model ~= nil and model.Parent ~= nil then
+						table.insert(models, model)
+					end
+				end
+				if #models > 0 then
+					hop(models)
+				end
+			end
+			return nil
+		end)
+	end)
+
 	local lastProgress = 0
 	local shownAlpha = -1
+	local shownDone = false
 	effect(function()
 		const kind = mode()
 		entry.Container = nil
@@ -119,6 +207,7 @@ local function mountSlot(
 			lastProgress = untrack(progress)
 		end
 		shownAlpha = -1
+		shownDone = false
 		Slots.Notify(entry)
 	end)
 
@@ -135,8 +224,11 @@ local function mountSlot(
 			const done = p >= 1
 			const fade = math.clamp((p - FADE_FROM) / (1 - FADE_FROM), 0, 1)
 			const alpha = if done then 0 else math.floor((1 - fade) * 50 + 0.5) / 50 -- Transparency of the grilled one, 50 steps
-			if alpha ~= shownAlpha then
+			-- done is part of the key: the overlay reaches alpha 0 a little before 1, and the raw one must still go (owner
+			-- 2026-10-22: it stayed under the grilled one and the two fought)
+			if alpha ~= shownAlpha or done ~= shownDone then
 				shownAlpha = alpha
+				shownDone = done
 				for _, part in over:GetDescendants() do
 					if part:IsA("BasePart") then
 						part.Transparency = alpha
@@ -201,7 +293,7 @@ local function mountGrill(
 		local count = 0
 		for _, read in readers do
 			const record = read()
-			if record and record.State ~= "Empty" then
+			if record and record.State == "Working" then
 				count += 1
 			end
 		end

@@ -30,10 +30,10 @@ const MAX_SKIPS = 8 -- guard against a skip loop on a broken table
 
 const Flow = {}
 
--- Next shift at the boundary (end of Summary). Calendar (user decision 2026-10-12): Day 1 is the tutorial day shift (a
--- real day, tutorial + the rest of the day); from Day 2 on there are ONLY night shifts, forever: D1, N1 (Day 2), N2
--- (Day 3) ... N10 (Day 11), Finale. Day keeps counting one per shift (unlocks, order phases and growth read it), so
--- night k is always played on Day k + 1. Past the last night (never reached: it ends in the Finale) the last night repeats.
+-- Next shift at the boundary (end of Summary). Calendar (DEC-360): the run is nights only and starts at night, no day
+-- shift: N1 (Day 2), N2 (Day 3) ... N10 (Day 11), Finale. Day keeps counting one per shift (unlocks, order phases and
+-- growth read it), so night k is always played on Day k + 1. Past the last night (never reached: it ends in the Finale)
+-- the last night repeats.
 function Flow.Next(prev: Info, lastNight: number, maxDay: number): Info
 	return {
 		Day = math.min(prev.Day + 1, maxDay),
@@ -43,30 +43,25 @@ function Flow.Next(prev: Info, lastNight: number, maxDay: number): Info
 	}
 end
 
--- Shift played on `day` (clamped): Day 1 is the day shift, Day d >= 2 is Night d - 1
-function Flow.OfDay(day: number, lastNight: number): Info
-	if day <= 1 then
-		return { Day = 1, Night = 0, IsNight = false, Attempt = 0 }
-	end
-	return { Day = day, Night = math.clamp(day - 1, 1, lastNight), IsNight = true, Attempt = 0 }
-end
-
 -- Day on which night k is played
 function Flow.DayOfNight(night: number): number
 	return night + 1
 end
 
--- First shift of a new run: Day 1 (the day shift), or Night 1 on Day 2 when the run skips the day (DEC-300)
-function Flow.Start(atNight: boolean): Info
-	return Flow.OfDay(if atNight then Flow.DayOfNight(1) else 1, 1)
+-- Shift played on `day` (clamped): Day d is Night d - 1; Day 1 (no shift since DEC-360) is Night 1 too
+function Flow.OfDay(day: number, lastNight: number): Info
+	const night = math.clamp(day - 1, 1, lastNight)
+	return { Day = math.max(day, Flow.DayOfNight(night)), Night = night, IsNight = true, Attempt = 0 }
 end
 
--- The run's first shift (Day 1, or Night 1 of a run that starts at night): PriceParty is fixed at its end (DEC-121)
-function Flow.IsFirst(info: Info, atNight: boolean): boolean
-	if atNight then
-		return info.IsNight and info.Night <= 1
-	end
-	return info.Day <= 1 and not info.IsNight
+-- First shift of a new run: Night 1 on Day 2 (DEC-300, DEC-360: the run always starts at night)
+function Flow.Start(): Info
+	return Flow.OfDay(Flow.DayOfNight(1), 1)
+end
+
+-- The run's first shift (Night 1): PriceParty is fixed at its end (DEC-121)
+function Flow.IsFirst(info: Info): boolean
+	return info.IsNight and info.Night <= 1
 end
 
 -- First phase of a shift: a night opens with the boss call, a day with Prep

@@ -61,6 +61,7 @@ const BLINK_HZ = 2
 const VEHICLE_TAG = "Vehicle"
 const INTERACTABLE_TAG = "Interactable"
 const PHONE_ACTION = "answer_phone"
+const LINE_NOISE = "phone_line" -- Content.Sounds loop at the phone while Walt talks
 const PHONE_IDS: { [string]: boolean } = { ["TRL-PHONE"] = true }
 const LIGHT_NAME = "Light_Ring"
 const VFX_NAME = "VFX_Ring"
@@ -108,6 +109,8 @@ function BossController:Setup()
 	self.Speaker = Vide.source(SPEAKER) :: Vide.Source<string>
 	self.Showing = Vide.source(false) :: Vide.Source<boolean>
 	self.Scale = Vide.source(1) :: Vide.Source<number>
+	-- where the line noise loop plays (nil = off)
+	self.LineAt = nil :: Instance?
 	self.RippleAt = Vide.source(0) :: Vide.Source<number>
 	self.StartedAt = 0 :: number
 	self.Lines = {} :: { Content.BossCallLine }
@@ -144,9 +147,17 @@ function BossController:Voice(): Speech.Speech
 	const created = Speech.new(function(): number
 		const volumes = self.Dependencies.AudioController.Volumes
 		return (volumes.Master or 1) * (volumes.Voice or 1)
+	end, function(): Instance?
+		return self:PhoneSpeaker()
 	end)
 	self.Speech = created
 	return created
+end
+
+-- Where Walt's voice and the line noise come from (owner 2026-10-23: from the phone); nil = no phone found (on screen)
+function BossController:PhoneSpeaker(): Instance?
+	const phone = self.Phone
+	return if phone ~= nil then phone.Speaker else nil
 end
 
 local function beatOf(text: string, speaker: string?): Content.CutsceneBeat
@@ -285,7 +296,23 @@ function BossController:Apply(record: Record)
 	elseif previous == "Talking" and record.State ~= "Talking" then
 		self:PlayOnce("phone_hangup") -- end of the call (user request 2026-10-10)
 	end
+	self:SetLineNoise(record.State == "Talking")
 	self:Refresh()
+end
+
+-- The phone line under Walt's voice (owner 2026-10-23: "coloca mais ruído"): a hiss loop at the phone while the call talks
+function BossController:SetLineNoise(on: boolean)
+	const audio = self.Dependencies.AudioController
+	const at = if on then self:PhoneSpeaker() else nil
+	const current = self.LineAt
+	if current ~= nil and current ~= at then
+		audio:Loop(LINE_NOISE, current, false)
+		self.LineAt = nil
+	end
+	if at ~= nil and current ~= at then
+		audio:Loop(LINE_NOISE, at, true)
+		self.LineAt = at
+	end
 end
 
 -- The tutorial takes (true) or gives back (false) the subtitle strip
@@ -569,6 +596,7 @@ end
 
 function BossController:ClearPhone()
 	self:SetLamp(false)
+	self:SetLineNoise(false)
 	const unmount = self.RippleUnmount
 	self.RippleUnmount = nil
 	if unmount then
@@ -603,6 +631,8 @@ function BossController:UsePhone(model: Instance?)
 	if host then
 		self.RingSound = self:NewSound("phone_ring", host)
 	end
+	-- a phone found mid-call (streaming, swap): the line noise moves to it
+	self:SetLineNoise(Vide.untrack(self.State) == "Talking")
 
 	const adornee = phone.Ripple
 	const parent = self.Gui

@@ -201,9 +201,6 @@ const UPLOADED: { [string]: string } = {
 	heartbeat = "rbxassetid://139459003161851", -- owner Studio upload "heartbeat" (2026-10-18)
 	horror_chase_stop = "rbxassetid://123355946453444",
 	ui_click = "rbxassetid://127105730240202",
-	-- owner 2026-10-21: the old "Artillery Distant 2" (9113169432) did not read as thunder; real thunder, ProSoundEffects
-	thunder = "rbxassetid://9120016256", -- far strike: "Thunder Cracks Big Rumbling Blasts Booming 3 (SFX)"
-	thunder_near = "rbxassetid://9120016021", -- near strike / shower opening: "... Booming 2 (SFX)"
 	locked_door = "rbxassetid://136518625715192", -- SFX-232 ReplicatedStorage.Assets.SFX["Locked door"] (user, ANM-004)
 	-- ANM-003 bell (TASK-340): ReplicatedStorage.Assets.SFX["Very scary bell sound/church bell"] (user upload)
 	church_bell = "rbxassetid://6891548543",
@@ -242,13 +239,13 @@ local function studio(row: Sound, name: string): Sound
 	if row.Ref == "" then
 		row.Ref = `{name} (owner Studio upload)`
 	end
+	return row
+end
+
 -- Row tuned by hand in Studio (StudioTune): sound, volume and pitch all come from the Studio Sound `name`
 local function tuned(row: Sound, name: string): Sound
 	row.StudioTune = true
 	return studio(row, name)
-end
-
-	return row
 end
 
 local function ui(key: string, volume: number?): Sound
@@ -289,7 +286,9 @@ const base = Table.new({
 	-- horror layer over the street bed in the tense window (Rules.Tension)
 	ambient("amb_horror", false, "rbxassetid://88784462446827", "HorrorAmbient (user upload)"),
 	-- atmospheres ATM-4 / ATM-5 (TASK-275; AtmosphereController plays it on screen, fades it with the look)
-	ambient("amb_rain", false, "rbxassetid://9112853286", "Rain Heavy 2 (SFX), ProSoundEffects"),
+	-- rain bed of the atmospheres: SoundId from the Studio Sound Assets.SFX.Ambience "Rain" (owner swaps it there),
+	-- ProSoundEffects 9112853286 "Rain Heavy 2 (SFX)"; loudness = Atmospheres.Rules.RainVolume
+	studio(ambient("amb_rain", false, nil, "Rain Heavy 2 (SFX), ProSoundEffects"), "Rain"),
 	-- Sfx
 	sfx("grill_sizzle", true),
 	sfx("bun_slice"),
@@ -361,8 +360,12 @@ const base = Table.new({
 	studio(sfx("whispers_bed", true, { Spatial = false, Volume = 0.45 }), "Whispers"),
 	studio(sfx("heartbeat", false, { Spatial = false, Volume = 0.9 }), "heartbeat"),
 	sfx("horror_chase_stop", false, { Spatial = false, Volume = 0.4 }),
-	sfx("thunder", false, { Spatial = false, Volume = 0.8 }), -- far lightning (TASK-275, Atmospheres)
-	sfx("thunder_near", false, { Spatial = false, Volume = 1 }), -- near lightning, shower opening (loud on purpose)
+	-- lightning (TASK-275, Atmospheres): owner 2026-10-21, the old "Artillery Distant 2" (9113169432) did not read as
+	-- thunder. The SoundId comes from the Studio Sounds Assets.SFX.Ambience "Thunder" / "Thunder near" (the owner swaps
+	-- them there): ProSoundEffects 9120016256 "Thunder Cracks Big Rumbling Blasts Booming 3" (far) and 9120016021
+	-- "... Booming 2" (near strike, shower opening: loud on purpose)
+	studio(sfx("thunder", false, { Spatial = false, Volume = 0.8 }), "Thunder"),
+	studio(sfx("thunder_near", false, { Spatial = false, Volume = 1 }), "Thunder near"),
 	-- anomalies, owner requests 2026-10-15 (TASK-331..340). Id "" = silence until the owner sends the file
 	sfx("church_bell", false, { Spatial = false, Volume = 0.9 }), -- ANM-003: the three strokes
 	sfx("neck_crack", false, { Volume = 0.9, MaxDistance = 50 }), -- ANM-012: the neck turns for good (owner's SFX)
@@ -399,17 +402,39 @@ const base = Table.new({
 	sfx("rat_squeak", false, { Volume = 0.7, MaxDistance = 40, Id = "rbxassetid://9118058248", Ref = "SFX-259 Rat Squeaks 18 (SFX), ProSoundEffects" }),
 	sfx("camera_static", false, { Spatial = false, Volume = 0.5, Id = "rbxassetid://9117060042", Ref = "SFX-260 Nasa Static Burst 2 (SFX), ProSoundEffects" }),
 	sfx("camera_fixed", false, { Volume = 0.6, MaxDistance = 40, Id = "rbxassetid://9118026602", Ref = "SFX-261 Radio Static 1 (SFX), ProSoundEffects" }),
+	-- Walt's notes (owner request 2026-10-22, Provisional; Content.Hints): the tip of the night being written. On screen:
+	-- the player hears it on the phone, ~32 studs from the paper (was 3D 30 studs from the paper: silent there)
+	sfx("pencil_write", false, { Spatial = false, Volume = 0.7, Id = "rbxassetid://9117277763", Ref = "SFX-262 Pencil Scribbling 3 (SFX), ProSoundEffects" }),
+	-- owner 2026-10-23 ("coloca mais ruído... direcional, vir do telefone"): the line hiss at the phone while Walt talks
+	-- (BossController:SetLineNoise); own work, tools/sfx/gen_phone_line.py
+	sfx("phone_line", true, { Volume = 0.8, MaxDistance = 140, Id = "rbxassetid://105534914844172", Ref = "SFX-266 phone line noise (own, gen_phone_line.py)" }),
 	-- TASK-483: the boards giving under the crawler (restaurant, Signal of its scene)
-	sfx("floor_creak", false, { Volume = 0.6, MaxDistance = 50, Id = "rbxassetid://9120832269", Ref = "SFX-247 Wood Creak Intense Cracking Splintering 1 (SFX), ProSoundEffects" }),
 	-- owner 2026-10-21: the "behind you" sounds (Content.Nights.Behind), tuned by hand in Studio under
 	-- ReplicatedStorage.Assets.SFX.Behind (SoundId, Volume, PlaybackSpeed); silent until those Sounds exist
 	tuned(sfx("behind_step", false, { MaxDistance = 40 }), "Behind Step"),
 	tuned(sfx("behind_creak", false, { MaxDistance = 40 }), "Behind Creak"),
 	tuned(sfx("behind_tap", false, { MaxDistance = 40 }), "Behind Tap"),
+	-- owner 2026-10-21 (Provisional): cave-style ambience of the night (Effects/CaveSound), 3D from a point around the player
+	-- owner 2026-10-21: raised to 2 in Studio (was 0.7); rows stop at 1, so Effects/CaveSound plays it x2
+	sfx("cave_low", false, { Volume = 1, MaxDistance = 120, Id = "rbxassetid://9120015495", Ref = "Thunder Airy Whomps Calm Sudden Bursts 8 (SFX), ProSoundEffects" }),
+	-- owner 2026-10-21: cave_violin (9120432573 "Violin Scrape Muted Strings 1") cut, did not sound good; this wail instead
+	sfx("cave_wail", false, { Volume = 0.5, MaxDistance = 120, Id = "rbxassetid://9114170117", Ref = "Dream Weirdness Constant 5 (SFX), ProSoundEffects" }),
+	sfx("cave_metal", false, { Volume = 0.4, MaxDistance = 120, Id = "rbxassetid://9126149486", Ref = "Underwater Sheet Metal Bending Whining Creak (SFX), ProSoundEffects" }),
+	sfx("cave_eerie", false, { Volume = 0.5, MaxDistance = 120, Id = "rbxassetid://1839852480", Ref = "The Labyrinth (b), APM Music" }),
+	sfx("floor_creak", false, { Volume = 0.6, MaxDistance = 50, Id = "rbxassetid://9120832269", Ref = "SFX-247 Wood Creak Intense Cracking Splintering 1 (SFX), ProSoundEffects" }),
+	-- ANM-011 the shaker's tantrum (owner 2026-10-22, Provisional; Content.PlateThrow; sound-list.md §5.23). Same library and
+	-- licence as the banks above (credits.md); Provisional until the owner's Play. His stomps reuse steps_stop
+	sfx("plate_smash", false, { Volume = 0.9, MaxDistance = 70, Id = "rbxassetid://9117653536", Ref = "SFX-263 Plate Break Concrete Floor 8 (SFX), ProSoundEffects" }),
+	sfx("plate_drop", false, { Volume = 0.45, MaxDistance = 50, Id = "rbxassetid://9117653229", Ref = "SFX-264 Plate Break Concrete Floor 7 (SFX), ProSoundEffects" }),
+	sfx("anger_thud", false, { Volume = 1, MaxDistance = 70, Id = "rbxassetid://9113480917", Ref = "SFX-265 Body Fall Thud 1 (SFX), ProSoundEffects" }),
 	-- restaurant (tech/restaurant-flow.md rev. 2 §4.2; wave R0 rows, Id "" = silence until the audio list uploads them)
 	sfx("plate_put", false, { Volume = 0.5, MaxDistance = 40 }),
 	sfx("ticket_pop", false, { Spatial = false, Volume = 0.4 }), -- HUD note pop-up per item at the tablet
 	sfx("dialog_blip", false, { Volume = 0.4, MaxDistance = 30 }),
+	-- owner 2026-10-22: one per typed letter of the talk (TabletController:Cue); Assets.SFX.TalkTyping holds the preview
+	-- owner 2026-10-22: "um pouco mais suave" (was 0.35)
+	sfx("talk_key", false, { Volume = 0.18, MaxDistance = 30, Id = "rbxassetid://9113142220", Ref = "Apple Keyboard 16 (SFX), ProSoundEffects" }),
+	sfx("talk_anomaly", false, { Volume = 0.8, MaxDistance = 30, Id = "rbxassetid://119215270074785", Ref = "80 Hz triangle pulse, 110 ms (generated: tools/sfx/gen_anomaly_blip.py)" }),
 	sfx("grill_burnt", false, { Volume = 0.6, MaxDistance = 50 }),
 	sfx("car_horn", false, { Volume = 0.8, MaxDistance = 120 }),
 	sfx("car_horn_long", false, { Volume = 0.9, MaxDistance = 120 }),
@@ -442,7 +467,8 @@ const rules: SoundRules = {
 		Day = { "music_day_sunny", "music_day_small" },
 		-- owner 2026-10-18: no soundtrack at night (the street ambience stays; the horror score still plays its stages)
 		Night = {},
-		FirstNight = { "music_night_town", "music_night_fall" },
+		-- owner 2026-10-21: no music on Night 1 either (was music_night_town, music_night_fall)
+		FirstNight = {},
 		FirstNightVolume = 0.45,
 	},
 	ShiftMusicPhase = "Prep", -- 7 AM / 7 PM: start of every shift (Shift.luau)

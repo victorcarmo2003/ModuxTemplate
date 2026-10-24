@@ -19,6 +19,9 @@ export type Cam = {
 	Model: string, -- name of the Model inside the folder (its pivot = the view)
 	Label: string, -- stamp on screen ("CAM 1")
 	Fov: number, -- degrees
+	-- camera_static chore (Q-436): the Fix Camera prompt also shows from inside the trailer (LZ-1). false = outside
+	-- only, the camera hangs outside and the prompt would reach through the walls (owner 2026-10-21, Provisional)
+	FixInside: boolean,
 }
 
 export type Look = {
@@ -118,10 +121,11 @@ const security: Security = {
 		Vignette = "rbxassetid://118506746509108",
 	},
 	Cams = Table.new({
-		{ Key = "CAM1", Model = "CAM1", Label = "CAM 1", Fov = 70 },
-		{ Key = "CAM2", Model = "CAM2", Label = "CAM 2", Fov = 70 },
+		{ Key = "CAM1", Model = "CAM1", Label = "CAM 1", Fov = 70, FixInside = false },
+		{ Key = "CAM2", Model = "CAM2", Label = "CAM 2", Fov = 70, FixInside = false },
 		-- owner request 2026-10-21 (Q-437): the front, by the tip jar, down the queue (tools/assetplace/security_front_cam.luau)
-		{ Key = "CAM3", Model = "CAM3", Label = "CAM 3", Fov = 70 },
+		-- at the tip of the trailer by the PICK UP window: its Fix Camera prompt shows from inside too
+		{ Key = "CAM3", Model = "CAM3", Label = "CAM 3", Fov = 70, FixInside = true },
 	}),
 }
 

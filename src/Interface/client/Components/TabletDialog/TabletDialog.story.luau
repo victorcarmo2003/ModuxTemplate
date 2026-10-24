@@ -1,7 +1,8 @@
 --!strict
--- TabletDialog on a phone-sized frame (667 x 375 at UI scale 1). "Playing" runs the talk on its own clock (the same steps
--- TabletController reads from the server: greeting, opening, one pop-up per item, "That's it!"); with it off, the Step
--- slider picks the moment by hand. Pick the order and turn Pair on for a 2nd hot dog.
+-- TabletDialog on a phone-sized frame (667 x 375 at UI scale 1). The customer's line types letter by letter on the
+-- story's own clock (Content.OrderSpeech, the same speech TabletController builds from the server record), looping.
+-- Pick the order, Pair for a 2nd hot dog, and Who: an ordinary customer (Normal / Stressed by its id) or one of the odd
+-- ones (its text style; a Content.Tics row plays its tic: the freeze, the caption, the broken rest of the line).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UILabs = require(ReplicatedStorage.DevPackages.UILabs)
@@ -11,13 +12,14 @@ local TabletDialog = require(script.Parent)
 
 const create = Vide.create
 const source = Vide.source
+const derive = Vide.derive
 const cleanup = Vide.cleanup
 
 type Controls = {
 	Order: () -> string,
 	Pair: () -> boolean,
+	Who: () -> string,
 	Playing: () -> boolean,
-	Step: () -> number,
 	Shown: () -> boolean,
 }
 
@@ -27,64 +29,75 @@ const ORDERS: { [string]: { string } } = {
 	["K3 ketchup + bacon + potato sticks"] = { "ketchup", "bacon", "potato_sticks" },
 }
 
-const DIALOG = Content.Restaurant.Dialog
-const STEP_TIME = 0.6 -- s per step while Playing
+-- Who -> (NpcId, rig Variant): ids picked so the ordinary ones land Normal (1) and Stressed (5, OrderSpeech.StyleOf)
+const WHO: { [string]: { Npc: number, Variant: string } } = {
+	["Ordinary"] = { Npc = 1, Variant = "" },
+	["Ordinary, stressed"] = { Npc = 5, Variant = "" },
+	["Shaker (ANM-011)"] = { Npc = 4, Variant = "shake" },
+	["Turned neck (ANM-012)"] = { Npc = 9, Variant = "neck" },
+	["White eyes (ANM-013)"] = { Npc = 6, Variant = "eyes" },
+	["Big head (ANM-014)"] = { Npc = 7, Variant = "bighead" },
+	["Copy (ANM-004)"] = { Npc = 8, Variant = "mirror" },
+	["Blank folks (ANM-001)"] = { Npc = 10, Variant = "blank" },
+}
+
+const LOOP_REST = 1.5 -- s the finished talk stays before it starts over
 
 return UILabs.CreateVideStory({
 	vide = Vide,
 	controls = {
 		Order = UILabs.Choose({ "K2 mustard + cheese", "K0 plain", "K3 ketchup + bacon + potato sticks" }),
 		Pair = false,
+		Who = UILabs.Choose({
+			"Ordinary",
+			"Ordinary, stressed",
+			"Shaker (ANM-011)",
+			"Turned neck (ANM-012)",
+			"White eyes (ANM-013)",
+			"Big head (ANM-014)",
+			"Copy (ANM-004)",
+			"Blank folks (ANM-001)",
+		}),
 		Playing = true,
-		Step = UILabs.Slider(4, 0, 12, 1),
 		Shown = true,
 	},
 }, function(props)
 	-- UI Labs types the control sources loosely; pin them to what the story reads.
 	const controls: Controls = (props.controls :: any)
 
-	local function items(): { string }
-		const list: { string } = { "bun", "sausage" }
-		for _, key in ORDERS[controls.Order()] or {} do
-			table.insert(list, key)
+	local function set(keys: { string }): { [string]: boolean }
+		const out: { [string]: boolean } = {}
+		for _, key in keys do
+			out[key] = true
 		end
-		if controls.Pair() then
-			table.insert(list, "bun")
-			table.insert(list, "sausage")
-			table.insert(list, "ketchup")
-		end
-		return list
+		return out
 	end
 
-	-- steps: 0 greeting, 1 opening, 2..(1 + #items) one item each, then the close line
+	const speech = derive(function(): Content.Speech
+		const who = WHO[controls.Who()] or WHO.Ordinary
+		const row = Content.Tics.ByVariant[who.Variant]
+		return Content.OrderSpeech.Build({
+			Npc = who.Npc,
+			Variant = who.Variant,
+			Night = 5,
+			Order = set(ORDERS[controls.Order()] or {}),
+			Order2 = if controls.Pair() then set({ "ketchup" }) else nil,
+			Tic = row,
+			Said = if row ~= nil then Content.Tics.Said(row, 1, "Rookie") else nil,
+		})
+	end)
+
 	const elapsed = source(0)
 	const connection = RunService.Heartbeat:Connect(function(dt: number)
 		if controls.Playing() then
-			elapsed((elapsed() + dt) % (STEP_TIME * (#items() + 4)))
+			const span = Vide.untrack(speech).Duration + LOOP_REST
+			elapsed((elapsed() + dt) % span)
 		end
 	end)
 	cleanup(connection)
 
-	local function step(): number
-		return if controls.Playing() then math.floor(elapsed() / STEP_TIME) else controls.Step()
-	end
-
-	local function reveal(): number
-		return math.clamp(step() - 1, 0, #items())
-	end
-
-	local function text(): string
-		const s = step()
-		if s <= 0 then
-			return DIALOG.Greeting[1]
-		elseif s == 1 then
-			return DIALOG.Opening[1]
-		elseif s <= 1 + #items() then
-			const key = items()[s - 1]
-			const lines = DIALOG.Ask[key]
-			return if lines then lines[1] else key
-		end
-		return DIALOG.Close[1]
+	local function now(): Content.SpeechAt
+		return Content.OrderSpeech.At(Vide.untrack(speech), Vide.untrack(elapsed))
 	end
 
 	return create("Frame")({
@@ -96,11 +109,34 @@ return UILabs.CreateVideStory({
 		TabletDialog({
 			Shown = controls.Shown,
 			Speaker = function(): TabletDialog.Speaker
-				return if step() <= 0 then "Player" else "Customer"
+				elapsed()
+				const style = Content.OrderTalk.Styles[speech().Style]
+				return if style ~= nil and style.Voice == "You" and now().Phase == "After" then "Player" else "Customer"
 			end,
-			Text = text,
-			Items = items,
-			Reveal = reveal,
+			Text = function()
+				return speech().Text
+			end,
+			Clock = function()
+				const at = now()
+				return { Typed = at.Typed, Phase = at.Phase }
+			end,
+			Style = function(): Content.TalkStyle?
+				return Content.OrderTalk.Styles[speech().Style]
+			end,
+			Break = function(): number?
+				return speech().Break
+			end,
+			Caption = function(): string?
+				elapsed()
+				return now().Caption
+			end,
+			Items = function()
+				return speech().Items
+			end,
+			Reveal = function()
+				elapsed()
+				return now().Reveal
+			end,
 		}),
 	})
 end)

@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Content = require(ReplicatedStorage.shared.Content)
 local OrderBoard = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.OrderBoard)
 
 export type Record = {
@@ -15,6 +16,7 @@ export type Record = {
 	Phase: string,
 	Number: number?,
 	Pickup: number?,
+	Bread: boolean?, -- the order is a bun alone (Content.OrderRules.BreadOnly, ANM-011)
 }
 export type Tablet = {
 	State: string,

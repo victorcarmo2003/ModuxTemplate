@@ -259,3 +259,28 @@ Marcador `_SHL_OrigPivot` (pose antes da 1ª execução; o undo volta a ela). Ap
 ## Luz da Gear Stand (2026-10-20, `gearstand_lights.luau`, pedido do dono)
 
 A Gear Stand não tinha luz própria e ficava escura à noite. `run("assetplace/gearstand_lights", "dry" | nil | "undo")` cria a pasta `GearLights` (marcador `_GSL_Created`) dentro de `Workspace.MAP01_Assets.GearStand`: 3 SpotLights quentes sob o teto (y 10,6) sobre os pedestais e 1 PointLight na frente da fachada; sem sombra. Aprovado pelo dono em Play no mesmo dia. **Um `Place.run` apaga a pasta**: rodar o snippet de novo depois do `Place.run` + `Bind.run`.
+
+## Gear Stand movida + placa TIMER (2026-10-21, pedido do dono)
+
+O dono moveu e girou a Gear Stand no Studio. As 8 entradas `GEAR_STAND` de `MAP-01_placements.luau` (stand, porta tripla, 6 pedestais) foram capturadas na pose nova (MAP-01: stand x 46,562 / y 0,339 / z 100,734, rotY 0). `Place.diff` com `ids = { GEAR_STAND = true }`: 7 iguais; o stand difere só por partes extras vivas, que um `Place.run` **apaga**:
+
+- `GearLights` (4 partes): rodar `gearstand_lights.luau` de novo (seção acima).
+- `TIMER` (Part + SurfaceGui + TextLabel, feita à mão pelo dono): **não tem snippet**. Antes de um `Place.run`, copiar a `TIMER` para fora de `MAP01_Assets` e devolvê-la dentro de `GearStand` depois. O texto é do `MarketController/Sign.luau` (CLOSED / OPEN / CLOSES IN m:ss), que acha a peça pelo nome `TIMER` dentro do model do stand.
+
+## Papel de dicas do Walt no lugar do pote de gorjetas (2026-10-22, pedido do dono, Provisório)
+
+O dono tirou o pote de gorjetas (`TRL-TIPJAR`, já fora do Workspace; só sobram cópias sem tag em `ServerStorage.TrailerBackup`) e
+pôs uma folha solta (`Workspace.Part`) no lugar, na ponta leste do balcão da frente, perto da CAM3. Feito à mão no Studio (sem
+snippet), fora do `MAP01_Assets` (um `Place.run` não a apaga; `Place.diff` antes = depois = 613, nada do `MAP01_Assets` mudou):
+
+- `Workspace.Part` virou `Workspace.MAP01_Restaurant.Trailer.Front.HintNote`: Part ancorada, `CanCollide`/`CanTouch`/`CastShadow`
+  false, SmoothPlastic creme (255, 248, 234), `Size` (1,5; 0,04; 1,0) com Y girado 85° (mesma pegada 1 × 1,5 do dono, levemente
+  torta), centro (-29,4; 3,02; 12,98) no tampo (Y 3,0): o dono a pôs em Z 13,14, recuada 0,16 porque a persiana fechada da janela
+  (`Front.Shutter_Panel`, Z 13,82..14,02) desce até o tampo e cobria o "NOTES" no close (a folha vai de Z 12,19 a 13,77; o tampo
+  de 12,14 a 14,34). Atributo `MapId = HINT-NOTE` (`Content.Hints.Rules.MapId`).
+- `Prompt_Read` (Attachment, 0,5 acima do centro): o `HintService` põe `PromptAction = read_hints` e a tag `Interactable` em
+  runtime (o place não leva a tag; sem o código o place segue válido). Sem o Attachment, o serviço o cria.
+- `NoteFace` (SurfaceGui Top, 200 px/stud): folha pautada com "NOTES" (visual de Edit e reserva). O `HintController` a esconde no
+  cliente e desenha a folha viva por cima (lista das dicas, "NEW!").
+- Face Top: o "para cima" do texto é o -X da peça (teste no Studio): girar a folha no Y gira o texto junto e a câmera do close
+  acompanha. O dono precisa salvar o place (Ctrl+S).

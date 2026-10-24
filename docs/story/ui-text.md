@@ -258,6 +258,17 @@ Chaves propostas; o nome final é do architect (TASK-047). Tom: diz o que falta,
 Legenda: "Walt: {line}" (§12.4). Cada linha abaixo é **uma** entrada de `Lines`. A última linha de toda ligação
 noturna é a forma curta aprovada (`anomalies.md`).
 
+> **Atualização 2026-10-23 (secretário).** Os textos vivos estão em `src/Shared/Content/BossCalls.luau` e no roteiro
+> `tools/voice/elevenlabs_script.md`; esta seção é histórico em vários pontos. Vale:
+> - **DEC-360 (Aprovado):** a run é 100% noite, sem dia. **§11.1 (parte "Day 1" fora do tutorial), §11.2, §11.3, §11.4 e
+>   §11.5 estão mortas — sem dia**: nenhuma dessas ligações toca. O tutorial (§11.1) e a lição de upgrade acontecem na
+>   Noite 1. Destino proposto das pistas das manhãs: a 1ª linha de cada ligação da noite (Provisório, `Q-485`,
+>   `walt-dialogue-audit.md` §3.3).
+> - **§11.7:** com `Chances = 0` (DEC-319) não há noite repetida nem noite perdida com volta; só o fim da run (§14, `Q-479`).
+> - **DEC-361 (Aprovado):** fechar a janela despacha as anomalias-cliente (menos a ANM-022) sem susto; os clientes normais
+>   **ficam** (não vão mais embora reclamando). O custo é o dinheiro. Fala do Walt sobre isso: `Q-481`.
+> - §14 "Days worked: {Day}" deixa de fazer sentido sem dia (Provisório: tirar a linha; game-designer/frontend).
+
 ### 11.1 Day 1 (tutorial) e dicas
 
 `script.md` §3 usa gatilhos de proximidade ("perto da placa"); o contrato só tem `Hint` por **1ª execução de uma ação**
@@ -272,8 +283,8 @@ noturna é a forma curta aprovada (`anomalies.md`).
 | `hint_bun_cut` | `Hint`, `bun_cut` | "Pop a sausage in the bun." |
 | `hint_board_add_sausage` | `Hint`, `board_add_sausage` | "There's your hot dog. Wait for an order." |
 | `hint_open_sign` | `Hint`, `open_sign` | "We're open! Folks line up at the counter." |
-| `hint_take_order` | `Hint`, `take_order` | "See the bubble? That's the order." · "Add only what they asked for. Nothing extra." |
-| `hint_serve` | `Hint`, `serve` | "Nice! Money goes in the drawer." · "Running low? The Mart's across the street." · "Look both ways! These drivers don't brake." |
+| `hint_take_order` | `Hint`, `take_order` | "See the bubble? That's the order." (2026-10-23: "Nothing extra." saiu) |
+| ~~`hint_serve`~~ | `Hint`, `serve` | **Removida em 2026-10-23** (dono: sem tip jar; o estoque já é dito no tutorial, passo `r_box`) |
 | `hint_buy_package` | `Hint`, `buy_package` | "Careful crossing. Get hit, and you drop it." · "Gear's on the back wall." · "Sometimes there's something special." |
 | `hint_restock` | `Hint`, `restock` | "That's how you restock. Easy." |
 | `hint_discard` | `Hint`, `discard` | "Messed one up? Toss it. No harm done." |

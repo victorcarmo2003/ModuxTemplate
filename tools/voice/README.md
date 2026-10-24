@@ -10,6 +10,8 @@ filters fixed text). Credits and licence: `docs/art/credits.md`, section Voz.
 |---|---|---|
 | Collect the lines | `python collect_lines.py` | `lines.json` (175 active lines: walt 171, crew 4; lines removed from the game stay in `assets.json`). Key = `v_<sha1(speaker NUL spoken)[:10]>`, spoken = `Speech.Spoken(text)` |
 | Generate | `.venv/Scripts/python generate.py all [--new] [--only KEY]` (`--new` = only keys without an ogg yet) | `Assets/audio/voice/<speaker>/<key>.ogg` (ogg vorbis q4, mono 24 kHz), `assets.json` (length, gen_text) |
+| Record (own voice, optional) | `.venv/Scripts/python record.py [--source Steps] [--only KEY,KEY] [--all] [--fx full\|phone\|none]` (needs `sounddevice` in the venv) | replaces `Assets/audio/voice/<speaker>/<key>.ogg`, raw take in `recordings/` (git-ignored), `assets.json` recorded=true and assetId cleared (upload sends it again) |
+| Record in a window | `.venv/Scripts/python record_gui.py` | same as `record.py`; **E** rewrites a line as it will be said (split / remove): `edits.json` (old -> new + sources), takes saved under the key of the new text. Claude applies `edits.json` to the Luau sources, then `collect_lines.py` |
 | Upload | `python upload.py [--only KEY]` (needs env `ROBLOX_API_KEY`, never printed) | `assets.json` (assetId, status ok / rejected / error); resumable; ~1 req/s, backoff on 429 |
 | Catalog | `python build_content.py` | `src/Shared/Content/VoiceLines.luau` (`Lines[key] = { Id, Length, Speaker }`, `Index[speaker NUL spoken] = key`) |
 | Compare voices | `.venv/Scripts/python generate.py samples` then `.venv/Scripts/python evaluate.py "samples/*.wav"` | `samples/` (git-ignored, never uploaded) |

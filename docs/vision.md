@@ -124,7 +124,7 @@ Nota: as §3–§10 do GDD V1 usam uma numeração antiga de 8 pilares (Trabalho
 | Progressão muda **velocidade e capacidade** do jogador, não só números abstratos. Upgrades têm utilidade real. | §3.4, §11 | **[DEC-006]** |
 | Upgrades do negócio podem virar ferramentas de sobrevivência à noite. | §11 | **[DEC-006]** |
 | Receitas são progressão horizontal: mais coisas para vender, não só "mais forte". | §4.3 | Rascunho |
-| Dia confortável e previsível. Noite = risco e anomalias, mas o jogador continua trabalhando. | §6 | **[DEC-010]** |
+| ~~Dia confortável e previsível.~~ (sem dia: DEC-360) Noite = risco e anomalias, mas o jogador continua trabalhando. | §6 | **[DEC-010, DEC-360]** |
 | Clientes normais repetitivos o bastante para criar padrão; anomalia é quebra de padrão. | §14 | **[DEC-010]** |
 | Anomalias: observar → lembrar → decidir → agir. Escalonam de simples para múltiplas simultâneas. Nem toda anomalia mata. | §7 | **[DEC-010]** |
 | Economia simples. Recursos principais: Money, Stock (e Gems entre runs). Sem reputação. Sem XP no MVP. | §12 | **[DEC-051, DEC-081]** |
@@ -134,6 +134,23 @@ Nota: as §3–§10 do GDD V1 usam uma numeração antiga de 8 pilares (Trabalho
 ## 8. Loop de jogo
 
 ### 8.1 Loop macro (carreira) — §15
+
+**Vale (DEC-360, 2026-10-23, Aprovado pelo dono): a run é 100% noite e começa de noite.** Motivo do dono: "Os primeiros 90 segundos do jogador ali no jogo são muito importantes" (entrar e já ver anomalia).
+
+```
+LOBBY → PARTY (1–4) → RUN (restaurante, DEC-307):
+NOITE 1 (ligação do Walt às 7 PM; tutorial dentro dela) → 6 AM resumo + lição de upgrade
+→ NOITE 2 … NOITE 10 (cada uma: ligação 7 PM → compra 30 s → noite 8 PM–6 AM → resumo)
+→ 10ª NOITE: FINAL → CRÉDITOS → FIM DE RUN (gemas) → LOBBY
+   ↘ noite perdida = fim da run (`Chances = 0`, DEC-319)
+```
+
+- Sem turno de dia, sem Prep/Open/Last call de dia, sem ligação da manhã, sem modo dia infinito. **[DEC-360]**
+- A única ligação do Walt por turno é a da noite (fase Call, 7 PM). **[DEC-360]**
+- Final: hoje vale o A1 (DEC-075); o ending "O Segundo Café" está em teste pelo dono (`Q-480`, Provisório).
+- Ganhos e desbloqueios que eram "de dia" (gemas de dia concluído, DEC-070; ingredientes por dia, DEC-071): a rever com o game-designer (Provisório: o contador `Day` do código sobe um por noite).
+
+**Superado por DEC-360** (histórico; não vale mais, junto com DEC-224/DEC-307 para carrinho, trailer e Mart):
 
 ```
 LOBBY → PARTY (1–4) → RUN:
@@ -171,6 +188,8 @@ CUTSCENE (ARRUMAR EMPREGO) → TURNOS DE DIA → VENDER HOT DOGS → GANHAR DINH
 Pendências (nenhuma bloqueante): `Q-112` (membro atrasado: até quando entra, cutscene, voto), `Q-058` (técnica da reconexão e do snapshot), `Q-106` (cutscenes com party visível).
 
 ### 8.2 Loop de turno (dia) — §3, §6, DEC-016, DEC-017
+
+> **Superado por DEC-360 (2026-10-23):** não existe mais turno de dia. O loop de venda (pedido, preparo, entrega, gorjeta) continua valendo **dentro da noite**; os horários e fases de dia abaixo são histórico.
 
 0. Turno pelo relógio: preparação 7:00–8:00 AM (até 60 s, placa "OPEN" abre antes) → loja aberta 8:00 AM–6:00 PM (360 s) → fechamento "CLOSED" (até 30 s) → resumo (15 s). ~7,5 min. **[DEC-048]**
 1. Garantir estoque: o estoque do carrinho é **reabastecido no mercado**; a estação só consome. Gestão de estoque é o mais importante. **[DEC-017, DEC-031]**
@@ -287,11 +306,11 @@ Primeiro lançamento jogável, pequeno, para validar o conceito. (§19)
 | Clientes | 4–6 tipos básicos + ladrão; teto de 12 NPCs simultâneos | **[DEC-018, DEC-045, DEC-050]** |
 | Verbos da noite | 7 (atender, recusar, não olhar, luz, esconder, descartar, ponto seguro) | **[DEC-054]** |
 | Anomalias | **10** (N1–N10, uma nova por noite, 10 noites); regra crítica só N7; final A1 na 10ª | **[DEC-030, DEC-025, DEC-027, DEC-060, DEC-065, DEC-073, DEC-074, DEC-075]** |
-| Ciclo | dia (~7,5 min, relógio fixo), noite, turno, pagamento; dia/noite alternados após trailer (5º dia) | **[DEC-036, DEC-037, DEC-048]** |
+| Ciclo | **só noites** (ligação 7 PM → compra 30 s → noite 8 PM–6 AM → resumo); ~~dia (~7,5 min, relógio fixo), dia/noite alternados após trailer (5º dia)~~ | **[DEC-360]** (supera DEC-036, DEC-037, DEC-048) |
 | Multiplayer | **party de 1–4** em servidor privado, um carrinho, dinheiro comum | **[DEC-012, DEC-032 a DEC-034]** (DEC-012 substitui DEC-001) |
 | Persistência | sem save entre runs; gemas → classes; reconexão à run em andamento enquanto ≥1 jogador segue nela; snapshot de 15 min se todos saem | **[DEC-035, DEC-063, DEC-067, DEC-070, DEC-080]**; técnica `Q-058` |
 | Classes | 4 no MVP: Rookie (grátis), Runner (45), Line Cook (45), Night Owl (120). Outras 4 aprovadas para atualização (Hawker pode ser a 5ª se houver folga) | **[DEC-069, DEC-070]** |
-| Run | longa (cenário L, ~6 h, **1 chance** por run); modo dia infinito sem fim, com gemas | **[DEC-057, DEC-058, DEC-110, DEC-112]** |
+| Run | 10 noites, começa de noite (DEC-360); noite perdida = fim da run (`Chances = 0`, DEC-319); ~~cenário L ~6 h, 1 chance, modo dia infinito~~ | **[DEC-057, DEC-058, DEC-110, DEC-112]** |
 | Monetização | reviver por Robux (developer product); resto adiado | **[DEC-062, DEC-092]** |
 
 ## 10. Pós-lançamento (não é MVP) — §20

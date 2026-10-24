@@ -203,6 +203,23 @@ function PoolModule.release(pool: Pool, rig: Rig, now: number, parking: Instance
 	rig.Model:SetAttribute("Eating", nil) -- SeatingService/Diner.Eat (Q-209)
 	rig.Model:SetAttribute("NpcId", nil)
 	rig.Model:SetAttribute("Variant", nil) -- actor variant (TASK-108): a reused rig is a plain customer again
+	-- anomaly tic of the order talk (TabletService, Content.Tics): a reused rig never carries the last actor's residue
+	-- + the delivery queue of a customer anomaly (Anomaly Kit/CustomerActor, owner 2026-10-22): its deformed body and Hurry step,
+	-- and the Plain tantrum (his rage and the plate he threw)
+	for _, name in {
+		"TicAt",
+		"TicUser",
+		"Tic",
+		"TicFollow",
+		"TicEnd",
+		"TicEcho",
+		"AnomalyQueue",
+		"AnomalyStep",
+		"AnomalyRage",
+		"AnomalyThrow",
+	} do
+		rig.Model:SetAttribute(name, nil)
+	end
 	rig.Model:SetAttribute("FromWalker", nil) -- adopted passer-by (TASK-163)
 	rig.Model.Name = "Npc"
 	rig.Model.Parent = parking

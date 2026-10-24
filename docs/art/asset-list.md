@@ -1780,6 +1780,8 @@ Fichas registradas depois da entrega (TASK-395 achou o ID usado em `design/skins
 
 ### AST-123 — Folhas de roupa, atlas e cabeças das skins (lote Halloween)
 
+> **Nota 2026-10-23 (secretário), DEC-370:** os 3 packs agora são as 3 fases da run (N1–N3 Day, N4–N6 Mid "cansada", N7–N10 Night). Conferido: as 6 skins (Pumpkin, Ghost, Witch, Franken, Vampire, Skeleton) têm roupa e atlas nos 3 packs; Ghost, Witch, Franken e Skeleton têm também a cabeça nos 3; Pumpkin e Vampire usam a cabeça da espécie (que tem os 3). Nada falta para a DEC-370. Toda skin futura precisa dos 3 packs. Falta só conferir no Play se o Mid e o Night das skins se leem como "cansado" e "consumido" (hoje foram feitos para sanidade).
+
 - **Status:** Rascunho (entregue e enviado pela TASK-373; texto da ficha sem DEC) · **Prioridade:** P1 · **Origem:** 2D sobre o rig existente (`tools/assetplace/gen_skin_textures.py`).
 - **Peças:** por skin (`Pumpkin`, `Ghost`, `Witch`, `Franken`, `Vampire`, `Skeleton`) e por pack (`Day`, `Mid`, `Night`, DEC-166): `T_Skin_<Nome>_<Pack>` (roupa: boné, camisa de manga comprida, calça, avental, emblema, luvinhas), `T_Skin_<Nome>Atlas_<Pack>` (orelhas, cauda, boné de orelha em pé) e, só nas skins com pelo próprio (Ghost, Witch, Franken, Skeleton), `T_Skin_<Nome>Head_<Pack>`. Pasta `Assets/textures/character/skins/`, ids em `_texture_ids.json`, prancha `_board.png`.
 - **Uso:** `Content.Skins[*].Ref = "AST-123"`, folhas ligadas em `src/Crew/shared/SkinLooks.luau`.

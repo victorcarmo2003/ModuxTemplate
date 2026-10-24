@@ -57,7 +57,8 @@
 	  2. the `Ticket` (NpcId) of the hot_dog Tool in my hand, when that customer is Waiting;
 	  3. the prompt target (Waiting);
 	  4. the oldest head: the Waiting customer at the front of the pickup line (lowest `Pickup`), else Q1 as before.
-	A blank customer (ANM-001) keeps the empty card in every case.
+	A blank customer (ANM-001) keeps the empty card in every case; in its talk only once its face is gone (TalkBlank,
+	owner 2026-10-22: it arrives with a face and loses it in the talk).
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -83,6 +84,7 @@ const ORDER_RULES = Content.OrderRules
 const WARN_AT = Content.Moods.Rules.AnnoyedAt
 const VARIANT_ATTRIBUTE = "Variant" -- rig attribute (NpcService, TASK-108)
 const BLANK = "blank" -- ANM-001: no icons in the bubble
+const TIC_FACE = "TicFace" -- local rig attribute of the anomaly tics (Effects/Kit/Tic, RigController)
 -- px under the bubble's tail: clears the prompt pill (48 px tall, centred on the neck anchor) at any distance
 const BUBBLE_LIFT = 28
 const FRONT_SLOT = 1 -- Q1
@@ -106,6 +108,7 @@ export type Record = {
 	Order2: { [string]: boolean }?, -- pair leader: 2nd pending hot dog (network.md §14.2)
 	Leader: number?, -- pair partner: NpcId of its leader (no bubble)
 	Pickup: number?, -- restaurant: place in the pickup line PU-1..n (nil = not in it)
+	Bread: boolean?, -- the order is a bun alone (Content.OrderRules.BreadOnly, ANM-011)
 }
 
 -- What the card reads during my talk at a tablet (TabletController:MyTalk(), TASK-383)
@@ -261,6 +264,7 @@ function CustomerController:WriteRecord(id: number, record: Record?)
 		Order2 = if record.Order2 then table.clone(record.Order2) else nil,
 		Leader = record.Leader,
 		Pickup = record.Pickup,
+		Bread = record.Bread,
 	}
 	const old = Vide.untrack(entry.Record)
 	-- (order_take when the order was taken: the restaurant's tablet talk murmurs line by line now, TabletController:Cue; owner
@@ -440,6 +444,10 @@ function CustomerController:Mount(entry: Entry, model: Model)
 			Adornee = head,
 			Empty = function()
 				return entry.Variant() == BLANK
+			end,
+			Bread = function()
+				const record = entry.Record()
+				return record ~= false and record.Bread == true
 			end,
 			Visible = function()
 				const record = entry.Record()
@@ -739,9 +747,22 @@ local function talkRow(talk: Talk, row: number): { string }?
 	return keys
 end
 
+-- Owner 2026-10-22 (ANM-001 arrives with a face; Content.Tics Body "Face"): in the talk its card reads like any other
+-- until its face is gone (the local TicFace naming a face, Effects/Kit/Tic, from the tic's apex), then empty, as in
+-- the delivery queue (the blank ticket). Without that tic row: empty from the start, as before. Re-read at the talk's
+-- 30 Hz clock (MyTalk), so no attribute signal is needed
 function CustomerController:TalkBlank(talk: Talk): boolean
 	const entry = self.Entries[talk.Npc]
-	return entry ~= nil and entry.Variant() == BLANK
+	if entry == nil or entry.Variant() ~= BLANK then
+		return false
+	end
+	const row = Content.Tics.ByVariant[BLANK]
+	const model = entry.Model
+	if row == nil or row.Body ~= "Face" or model == nil then
+		return true
+	end
+	const face = model:GetAttribute(TIC_FACE)
+	return type(face) == "string" and face ~= ""
 end
 
 -- Items said so far in my talk (HudOrder `Reveal`); nil = no talk (the card shows the whole order).

@@ -30,11 +30,11 @@ return Table.new({
 	event("golden_flip", "Golden Flip", false, 2104755363239074), -- 4: a Perfect flip on the grill
 	event("first_night", "First Night Shift", false, 579574344858433), -- 5: Night 1 won
 	event("not_today", "Not Today", false, 664777349866945), -- 6: a customer anomaly refused
-	event("lights_back", "Lights Back On", false, 0), -- 7: blackout fixed in time (ANM-020); trigger pending
-	event("held_breath", "Held My Breath", false, 0), -- 8: hidden from the Walker (ANM-007); trigger pending
-	event("eyes_down", "Eyes Down", true, 0), -- 9: ANM-019 without looking up; trigger pending
-	event("met_hunter", "Met the Hunter", true, 0), -- 10: Q-404; trigger pending
-	event("halfway", "Halfway to Dawn", false, 0), -- 11: Night 5 won
+	event("lights_back", "Lights Back On", false, 3346220351559110), -- 7: blackout fixed in time (ANM-020); trigger pending
+	event("bolted_shut", "Bolted Shut", false, 25820054546149), -- 8: locked the back door in time on ANM-009 (DEC-359)
+	event("eyes_down", "Eyes Down", true, 1336379813159280), -- 9: ANM-019 without looking up; trigger pending
+	event("met_hunter", "Met the Hunter", true, 3893516056885966), -- 10: Q-404; trigger pending
+	event("halfway", "Halfway to Dawn", false, 3931705433826652), -- 11: Night 5 won
 	event("hot_dog_hundred", "Hot Dog Hundred", false, 0), -- 12: 100 complete orders; trigger pending (Stats counter)
 	event("kept_light", "Kept the Light On", false, 0), -- 13: last night won
 	event("not_a_scratch", "Not a Scratch", true, 0), -- 14: run without fainting; trigger pending

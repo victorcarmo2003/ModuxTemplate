@@ -8,15 +8,15 @@
 -- through Advance, the same path as the timer.
 -- Shift boundary (end of Summary), fixed order: BeforeShift(prev) -> Flow.Next -> RunStateService:SetEndless(false) ->
 -- StartShift (atoms in one batch -> ShiftStarted -> PhaseChanged(first) -> Capture).
--- Run flow (user decision 2026-10-12): D1 (tutorial + the rest of a real day shift), then ONLY nights, forever:
--- N1 (Day 2), N2 (Day 3) ... N10 (Day 11), Finale. Day still counts one per shift. Every night is played in the vehicle
--- in use (the trailer, the only vehicle since 2026-10-12); endless days are gone (Flow.Next).
+-- Run flow (DEC-360): nights only, the run starts at night (no day shift): N1 (Day 2, with the tutorial), N2 (Day 3)
+-- ... N10 (Day 11), Finale. Day still counts one per shift. Every night is played in the vehicle in use (the trailer,
+-- the only vehicle since 2026-10-12); endless days are gone (Flow.Next).
 -- Lost night: NightLost (6 s) -> SpendChance -> Restore("RepeatNight") (Sh comes back with Attempt + 1 and a new
 -- capture) or RunEnd + RunEnded("Failed"). Night 10 won: NightEnd -> Finale -> RunEnd + RunEnded("Success").
 -- End of RunEnd: waves 2-3 go back to the first capture (RunStateService:ResetDev, T56) through the Resume phase;
 -- wave 4 hands over to SessionService:EndRun instead. A squad server (HoldRunEnd) stays in RunEnd: no new run there.
--- Clock hold (user decision 2026-10-12, Provisional): while TutorialService's hook (SetClockHold) says so, Prep and Open
--- of Day 1 do not run out: HoldAt (server time the hold began) freezes the clock (Record publishes ClockFrom = ClockTo =
+-- Clock hold (user decision 2026-10-12, Provisional): while TutorialService's hook (SetClockHold) says so, Prep, Night
+-- and Summary of Night 1 do not run out: HoldAt (server time the hold began) freezes the clock (Record publishes ClockFrom = ClockTo =
 -- the clock at HoldAt), the deadline never comes and the tutorial customer is the only one around; on release
 -- PhaseStartedAt moves forward by the time held, so the phase continues exactly where it stopped.
 -- No Require on peripheral services (T42): they plug in with SetPhaseProbe, SetVehicleProbe, SetVerdict, SetWipe,
@@ -401,8 +401,8 @@ function RoundService:SetPhaseProbe(phase: Phase, probe: () -> boolean)
 	self.Probes[phase] = probe
 end
 
--- TutorialService: "the clock stands still now". Asked every tick; the service only honours it on the day shift in Prep,
--- Open (the first-hot-dog tutorial) and Closing (the Day 1 upgrade lesson, 2026-10-14). Last registration wins.
+-- TutorialService: "the clock stands still now". Asked every tick; the service only honours it on a night shift in Prep,
+-- Night (the first-hot-dog tutorial) and Summary (the upgrade lesson at 6 AM). Last registration wins.
 function RoundService:SetClockHold(hold: () -> boolean)
 	if type(hold) ~= "function" then
 		error("[RoundService] SetClockHold needs a function", 2)
@@ -517,21 +517,16 @@ end
 
 -- Phases ----------------------------------------------------------------------------------------------------------
 
--- The clock should stand still now: Prep, Open or Closing of a day, or Prep / Night of a night (owner 2026-10-19: the tutorial is
--- Night 1's, the clock does not run under it), and the hook says yes (errors are a warn and "no")
+-- The clock should stand still now: Prep / Night of a night (owner 2026-10-19: the tutorial is Night 1's, the clock does
+-- not run under it) or its Summary (owner bug 2026-10-20: the upgrade lesson waits for the first purchase), and the hook
+-- says yes (errors are a warn and "no"). Never on a day shift (DEC-360: there is none).
 function RoundService:HoldWanted(): boolean
 	const hold = self.ClockHold
-	if hold == nil then
+	if hold == nil or not self.NightShift() then
 		return false
 	end
 	const phase = self.Phase()
-	if self.NightShift() then
-		-- Summary: the upgrade lesson at the end of Night 1 (owner bug 2026-10-20: the break waits for the first purchase)
-		if phase ~= "Prep" and phase ~= "Night" and phase ~= "Summary" then
-			return false
-		end
-	-- Closing (day = Last call, 6 PM): the Day 1 upgrade lesson (owner request 2026-10-14, Provisional)
-	elseif phase ~= "Prep" and phase ~= "Open" and phase ~= "Closing" then
+	if phase ~= "Prep" and phase ~= "Night" and phase ~= "Summary" then
 		return false
 	end
 	return ask(hold, "clock hold", false)
@@ -577,9 +572,9 @@ function RoundService:Go(phase: Phase, startedAt: number)
 	self:Enter(phase, startedAt, nil, nil)
 	const info = self:Info()
 	if phase == "Summary" then
-		-- Shift is over: Economy deposits and sends ShiftReport, then PriceParty is fixed on Day 1 (DEC-121)
+		-- Shift is over: Economy deposits and sends ShiftReport, then PriceParty is fixed on Night 1 (DEC-121)
 		self.ShiftEnded:Fire(info)
-		if Flow.IsFirst(info, Content.Shift.RunStartsAtNight) then
+		if Flow.IsFirst(info) then
 			self.Dependencies.RunStateService:FixPriceParty()
 		end
 	elseif phase == "NightEnd" then
@@ -665,7 +660,7 @@ function RoundService:EndRun(startedAt: number)
 	if not self.Dependencies.RunStateService:ResetDev() then
 		self.Busy = false
 		warn("[RoundService] RunEnd: no first capture to go back to; starting a new run again")
-		self:StartShift(Flow.Start(Content.Shift.RunStartsAtNight), startedAt, true, true)
+		self:StartShift(Flow.Start(), startedAt, true, true)
 	end
 end
 
@@ -728,7 +723,7 @@ function RoundService:Step()
 	-- a night override's Min: the probe cannot end it before (owner 2026-10-21: upgrade time after the night)
 	const override = if self.NightShift() then Content.Shift.ByKey[phase].Night else nil
 	const minimum = if override ~= nil and override.Min ~= nil then override.Min else 0
-	-- a held phase never ends by its probe either (the day Closing of the Day 1 upgrade lesson)
+	-- a held phase never ends by its probe either (the Summary of the Night 1 upgrade lesson)
 	if
 		Flow.CanProbe(phase)
 		and self.HoldAt() <= 0
@@ -767,7 +762,7 @@ function RoundService:StartRun()
 		return
 	end
 	self:Publish()
-	self:StartShift(Flow.Start(Content.Shift.RunStartsAtNight), workspace:GetServerTimeNow(), true, true)
+	self:StartShift(Flow.Start(), workspace:GetServerTimeNow(), true, true)
 end
 
 -- Started + the Shift set (network writes start here; Lync.start already ran: NetService OnStart, priority 1000)
@@ -783,8 +778,8 @@ function RoundService:Publish()
 end
 
 -- Resume boot (SessionService, DEC-080; architecture.md §5.5 steps 4-5): the run starts from the snapshot the session
--- loaded (RunStateService:Load) in the Resume phase of its shift, instead of a new Day 1; the shift starts again (and
--- captures) when Resume ends. False when the run already started or nothing could be restored (then Day 1 starts).
+-- loaded (RunStateService:Load) in the Resume phase of its shift, instead of a new Night 1; the shift starts again (and
+-- captures) when Resume ends. False when the run already started or nothing could be restored (then Night 1 starts).
 function RoundService:ResumeRun(): boolean
 	if self.Started then
 		return false
@@ -796,7 +791,7 @@ function RoundService:ResumeRun(): boolean
 		return true
 	end
 	warn("[RoundService] ResumeRun: no snapshot to restore; starting a new run")
-	self:StartShift(Flow.Start(Content.Shift.RunStartsAtNight), workspace:GetServerTimeNow(), true, true)
+	self:StartShift(Flow.Start(), workspace:GetServerTimeNow(), true, true)
 	return false
 end
 
@@ -920,24 +915,24 @@ function RoundService:DevSkipPhase()
 	self:Advance(workspace:GetServerTimeNow())
 end
 
--- Shift of Day n in the natural sequence (Flow.OfDay): Day 1 is the day shift, Day n >= 2 is Night n - 1 (/dev day 4 is
--- Night 3, from its first phase).
+-- Shift of Day n in the natural sequence (Flow.OfDay): Day n is Night n - 1 (/dev day 4 is Night 3, from its first phase);
+-- Day 1 has no shift since DEC-360 and lands on Night 1.
 function RoundService:DevSetDay(day: number)
 	self:DevCheck("DevSetDay")
 	if type(day) ~= "number" or day ~= math.floor(day) or day < 1 or day > MAX_DAY then
 		error(`[RoundService] DevSetDay: day must be an integer in 1..{MAX_DAY}`, 2)
 	end
 	const runState = self.Dependencies.RunStateService
-	-- Jumping past Day 1 skips its end: fix PriceParty as the natural path would have (DEC-121)
-	if day > 1 then
+	const info = Flow.OfDay(day, LAST_NIGHT)
+	-- Jumping past Night 1 skips its end: fix PriceParty as the natural path would have (DEC-121)
+	if not Flow.IsFirst(info) then
 		runState:FixPriceParty()
 	end
-	const info = Flow.OfDay(day, LAST_NIGHT)
 	runState:SetEndless(false)
 	self:StartShift(info, workspace:GetServerTimeNow(), true, false)
 end
 
--- Night k on its own day (Day = k + 1: the evening of the day shift before it), from its first phase (Call, skipped
+-- Night k on its own day (Day = k + 1), from its first phase (Call, skipped
 -- without BossService)
 function RoundService:DevSetNight(night: number)
 	self:DevCheck("DevSetNight")
@@ -959,6 +954,18 @@ function RoundService:DevWinNight()
 		error("[RoundService] DevWinNight: only in Call, Prep or Night of a night shift", 2)
 	end
 	self:WinNight(workspace:GetServerTimeNow())
+end
+
+-- Straight into the Finale phase from any phase (owner request 2026-10-23: test the ending without playing ten nights).
+-- The phase itself is the pause: no customer, no anomaly, no boss call; CutsceneService plays Rules.Finale on
+-- PhaseChanged, and the run ends as after a won Night 10 (RunEnd, then back to the first capture in waves 2-3).
+function RoundService:DevFinale()
+	self:DevCheck("DevFinale")
+	if self.Phase() == "Finale" then
+		error("[RoundService] DevFinale: already in the Finale", 2)
+	end
+	self.Result = "Success"
+	self:Go("Finale", workspace:GetServerTimeNow())
 end
 
 -- Showcase clock (ShowcaseService; docs/tech/showcase.md): seconds the current phase has run, and a rewrite of its start

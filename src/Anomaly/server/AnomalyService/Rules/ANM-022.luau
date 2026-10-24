@@ -3,22 +3,22 @@
 -- Q-399). It comes to the window like a customer; the window does NOT send it away. Only the shop's lights going out
 -- (the switch, ctx.Light.IsSwitchOn) makes it leave: Resolved. With the window shut it beats its head on it (cue
 -- head_bang every BangEvery s: thud, camera shake, the shutter jumping) - no penalty, it only gets worse. "Take Order"
--- on it = jumpscare + faint of who took it. Left waiting = it gives up, no penalty.
+-- on it was the error until 2026-10-22. Left waiting = it gives up, no penalty.
+-- Owner 2026-10-22 (Provisional; design/anomalies-after-accept-proposal.md §9): no ACCEPT / REFUSE; the order is taken
+-- at the end of the talk and the actor waits in the delivery queue (Kit/CustomerActor). Not migrated yet: condition
+-- "Serve" (interim: any served order = Resolved, no error, no jumpscare); planned: Hurry by blows (proposal §2.8).
 local Api = require(script.Parent.Parent.Api)
 
 const rule: Api.Rule = {
 	Anomaly = "anm_022_head_banger",
-	-- "refuse" only so Kit/CustomerActor takes the actor (spawn, Take Order = error); the real answer, the lights going
-	-- out, is Anomalies/ANM-022's (WindowRefuses = false: the window never counts as a refusal)
-	Verb = "refuse",
+	-- the lights going out at the counter are Anomalies/ANM-022's answer; in the queue the Kit's condition decides
+	Verb = "serve",
 	LikelyWrongVerb = "refuse",
 	Window = 0,
 	IsCritical = false,
 	Params = {
 		Variant = "banger", -- CustomerService:SpawnActor variant
-		Wrong = "take_order", -- customer action that fails the rule
-		OmissionFails = false,
-		WindowRefuses = false, -- Kit/CustomerActor: the shut window never reaches it
+		Condition = { Kind = "Serve" },
 		BangEvery = 0.55, -- s between two blows on the shut window
 		BangFaster = 0.35, -- s between blows once it has banged BangRamp times
 		BangRamp = 8,

@@ -40,21 +40,23 @@ local function page(key: string, title: string, tag: Tag, signs: { string }, not
 end
 
 const written: { Page } = {
+	-- owner 2026-10-22 (DEC-354/355, Provisional): it arrives with a face and loses it in the talk; every order is taken,
+	-- the answer is in the delivery queue (Fight = Content.AnomalyHints / Hints words; FaintTips quotes the first line)
 	page("anm_001_blank_folks", "The Blank Folks", "Refuse", {
-		"A customer with no face.",
-		"No eyes, no nose, no mouth.",
-	}, { "Real customers always have a face." }, { "Refuse them: close the window.", "Never take their order." }),
+		"Walks up like any other customer.",
+		"Its face fades away while it talks.",
+	}, { "Real customers always have a face." }, { "No face? DON'T COOK IT.", "It leaves on its own." }),
 
 	-- TASK-591 (owner 2026-10-19, Provisional Q-399): starving, not a monster
 	page("anm_011_shaker", "The Shaker", "Careful", {
 		"Shakes fast, all over.",
 		"Even while standing still in line.",
-	}, { "He is just starving." }, { "Serve him a PLAIN hot dog.", "Nothing on it. Never shut him out." }),
+	}, { "He is just starving." }, { "JUST BREAD. Nothing on it.", "Toppings? He throws the plate." }),
 
 	page("anm_012_turned_neck", "The Turned Neck", "Refuse", {
 		"The head is turned all the way back.",
 		"Sometimes it spins, slowly.",
-	}, { "The body still faces you." }, { "Refuse it: close the window.", "It leaves with a CRACK." }),
+	}, { "The body still faces you." }, { "DON'T LOOK AT HER.", "Eyes down when you hand it over." }),
 
 	page("anm_020_blackout", "The Blackout", "Lights", {
 		"Pop! Everything goes dark.",
@@ -70,26 +72,26 @@ const written: { Page } = {
 	page("anm_013_white_eyes", "The White Eyes", "Refuse", {
 		"Eyes all white.",
 		"A smile way too big.",
-	}, { "No pupils at all." }, { "Refuse them: close the window." }),
+	}, { "No pupils at all." }, { "LIGHTS OFF.", "Serve her in the dark." }),
 
 	page("anm_004_copies", "The Copies", "Refuse", {
 		"Two customers that look the same.",
 		"The copy is mirrored: backwards shirt text.",
-	}, { "The real one is not mirrored." }, { "Close the window on the mirrored one.", "Serve the real one." }),
+	}, { "The real one is not mirrored." }, { "Same order twice? DON'T COOK IT.", "Serve the real one." }),
 
 	page("anm_005_raincoat_lady", "The Raincoat Lady", "Careful", {
 		"Yellow raincoat, eyes closed.",
 		"She drips water on a dry night.",
-	}, { "She is NOT a monster." }, { "Serve her! Never refuse her.", "Don't make her wait." }),
+	}, { "She is NOT a monster." }, { "SERVE HER. Be nice.", "Don't make her wait." }),
 
 	page("anm_014_big_head", "The Big Head", "Refuse", {
 		"The head is way too big.",
 		"Or way too tiny.",
-	}, { "The body looks normal." }, { "Refuse them: close the window." }),
+	}, { "The body looks normal." }, { "BE QUICK.", "Serve it before its head hits the glass." }),
 
 	page("anm_015_floater", "The Floater", "Refuse", {
 		"Floats a little above the ground.",
-	}, { "No footsteps. No shadow." }, { "Refuse them: close the window." }),
+	}, { "No footsteps. No shadow." }, { "WAIT FOR THE THUD.", "Serve it when its feet touch the floor." }),
 
 	page("anm_017_crawler", "The Crawler", "Hide", {
 		"Fast scratching under the floor.",
@@ -105,19 +107,19 @@ const written: { Page } = {
 	page("anm_016_starer", "The Starer", "Refuse", {
 		"Never blinks. Never moves.",
 		"The head follows you everywhere.",
-	}, { "Looking at it on the cameras is safe." }, { "Refuse them: close the window.", "When it reaches you, it makes you look." }),
+	}, { "Looking at it on the cameras is safe." }, { "SERVE HIM.", "And don't stare back." }),
 
 	-- owner request 2026-10-21 (Provisional Q-437)
 	page("anm_023_on_camera", "The One on Camera", "Refuse", {
 		"Looks like any other customer.",
 		"On the cameras its body is broken and it stares at the lens.",
-	}, { "Only the cameras show it." }, { "Check the cameras when in doubt.", "Refuse it: close the window." }),
+	}, { "Only the cameras show it." }, { "Check the cameras when in doubt.", "Wrong on the screen? DON'T COOK IT." }),
 
 	-- TASK-591 (Provisional Q-399)
 	page("anm_022_head_banger", "The Head Banger", "Careful", {
 		"Stands at the window and will not leave.",
 		"Shut the window and it beats its head on it.",
-	}, { "Closing the window does nothing." }, { "Turn OFF the shop lights.", "Never take its order." }),
+	}, { "Closing the window does nothing." }, { "BE QUICK.", "Serve it before the glass cracks." }),
 
 	page("anm_008_long_car", "The Long Car", "Careful", {
 		"A long car stops by the trailer.",

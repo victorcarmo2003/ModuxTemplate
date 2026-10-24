@@ -3,7 +3,7 @@
 Cartoon pass (v2): faces and googly eyes on the objects, thick wobbly ink (SVG displacement filter),
 offset sticker shadow, comic bursts, sweat drops and motion marks. Subjects and group colours as v1 (DEC-315).
 
-Usage: python make_badges.py
+Usage: python make_badges.py [key ...]   (keys = render only those; the board is rebuilt from every PNG)
 Output: ../<nn>_<key>.png, source/svg/<key>.svg, source/board.png (5-column contact sheet)
 """
 
@@ -11,6 +11,7 @@ import math
 import os
 import random
 import subprocess
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.dirname(HERE)
@@ -246,25 +247,27 @@ ICONS["lights_back"] = ("night", NIGHT_STARS + f'''
 <path d="M-30,122 Q0,152 30,122" fill="#7C8792" {S}/>
 ''' + marks([(-178, -40, -140, -40), (178, -40, 140, -40), (-132, -158, -106, -132), (132, -158, 106, -132), (0, -205, 0, -172)], 14, "#FFD45A"))
 
-# 8 — hiding behind a crate, cheeks puffed, sweating, while the Walker passes.
-ICONS["held_breath"] = ("night", NIGHT_STARS + f'''
-<g fill="#0B0D1E" stroke="#0B0D1E" stroke-width="6" stroke-linejoin="round">
-	<ellipse cx="96" cy="-150" rx="28" ry="34"/>
-	<path d="M80,-118 L112,-118 L130,40 L116,40 L104,-40 L92,40 L78,40 Z"/>
-	<path d="M80,-110 Q48,-40 56,40 L64,40 Q64,-30 94,-98 Z"/>
-	<path d="M112,-110 Q146,-40 142,40 L134,40 Q130,-30 104,-98 Z"/>
-</g>
-<circle cx="88" cy="-152" r="6" fill="#FF3B30"/><circle cx="106" cy="-152" r="6" fill="#FF3B30"/>
-<path d="M-150,-8 Q-150,-92 -82,-92 Q-14,-92 -14,-8 Z" fill="#E8D9B5" {S}/>
-<circle cx="-150" cy="-22" r="22" fill="#E8D9B5" {S}/>
-<circle cx="-14" cy="-22" r="22" fill="#E8D9B5" {S}/>
-{blush(-146, -20, 13, 9, 0.9)}{blush(-18, -20, 13, 9, 0.9)}
-{googly(-102, -46, 20, 0.75, 0, sw=7)}{googly(-60, -46, 20, 0.75, 0, sw=7)}
-{sweat(-178, -76, 1.0, -25)}{sweat(-6, -100, 0.85, 25)}
-<rect x="-176" y="-12" width="210" height="156" rx="12" fill="#C2602F" {S}/>
-<path d="M-176,40 h210 M-176,92 h210 M-124,-12 v156 M-20,-12 v156" stroke="#7E3519" stroke-width="8"/>
-<rect x="-176" y="-12" width="210" height="156" rx="12" fill="none" {S}/>
-''')
+# 8 — the back door, bolt slammed shut, gritting its teeth while something pounds on the other side (DEC-359).
+ICONS["bolted_shut"] = ("night", NIGHT_STARS + f'''
+<rect x="-128" y="-186" width="236" height="372" rx="10" fill="#4A4E58" {S}/>
+<rect x="-108" y="-166" width="196" height="332" rx="8" fill="#C2602F" {S}/>
+<path d="M-59,-166 v332 M-10,-166 v332 M39,-166 v332" stroke="#7E3519" stroke-width="7"/>
+<rect x="-108" y="-166" width="196" height="332" rx="8" fill="none" {S}/>
+{line("M-84,-108 l46,16 M64,-108 l-46,16", 11)}
+{googly(-56, -66, 25, 0.75, -0.1)}{googly(36, -66, 25, 0.75, -0.1)}
+<rect x="-70" y="-20" width="120" height="44" rx="12" fill="{WHITE}" {S8}/>
+<path d="M-70,2 h120 M-40,-20 v44 M-10,-20 v44 M20,-20 v44" stroke="{INK}" stroke-width="5"/>
+{blush(-86, 10, 13, 8)}{blush(66, 10, 13, 8)}
+{sweat(-88, -132, 0.95, -20)}
+<rect x="-52" y="58" width="80" height="44" rx="8" fill="#C9D1D8" {S8}/>
+<rect x="18" y="66" width="122" height="28" rx="14" fill="#E6EBEF" {S8}/>
+<rect x="56" y="50" width="20" height="38" rx="8" fill="#C9D1D8" {S8}/>
+<rect x="116" y="50" width="34" height="60" rx="6" fill="#7C8792" {S8}/>
+<rect x="-128" y="170" width="236" height="16" fill="#0B0D1E"/>
+<circle cx="-40" cy="178" r="5" fill="#FF3B30"/><circle cx="-22" cy="178" r="5" fill="#FF3B30"/>
+{burst(56, 40, 9, MUSTARD, 1, 9, 104, -122)}
+{text("BAM", 104, -110, 32, WHITE, INK, 8, 14)}
+''' + marks([(118, -40, 150, -50), (122, -8, 156, -10), (-150, -60, -132, -50), (-154, -24, -134, -22), (-150, 12, -132, 4)]))
 
 # 9 — the ceiling shadow grins; you stare very, very hard at the floor.
 ICONS["eyes_down"] = ("horror", f'''
@@ -373,7 +376,7 @@ ICONS["day_100"] = ("milestone", f'''
 
 ORDER = [
 	"welcome", "tutorial_done", "first_hotdog", "golden_flip", "first_night", "not_today", "lights_back",
-	"held_breath", "eyes_down", "met_hunter", "halfway",
+	"bolted_shut", "eyes_down", "met_hunter", "halfway",
 	"hot_dog_hundred", "kept_light", "not_a_scratch", "day_100",
 ]
 
@@ -425,28 +428,30 @@ def board(pngs, path, cell=256, cols=5, bg=(233, 228, 218, 255)):
 	sheet.save(path)
 
 
-def main():
+def main(only):
 	os.makedirs(SVG_DIR, exist_ok=True)
 	os.makedirs(HTML_DIR, exist_ok=True)
 	pngs = []
 	for i, key in enumerate(ORDER, 1):
+		png = os.path.join(OUT, f"{i:02d}_{key}.png")
+		pngs.append(png)
+		if only and key not in only:
+			continue
 		svg = badge_svg(key)
 		with open(os.path.join(SVG_DIR, f"{key}.svg"), "w", encoding="utf-8") as f:
 			f.write(svg)
 		html_path = os.path.join(HTML_DIR, f"{key}.html")
 		with open(html_path, "w", encoding="utf-8") as f:
 			f.write(HEAD + svg + "</body></html>")
-		png = os.path.join(OUT, f"{i:02d}_{key}.png")
 		subprocess.run([
 			CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
 			"--default-background-color=00000000", "--window-size=512,512",
 			"--virtual-time-budget=5000", f"--screenshot={png}", "file:///" + html_path.replace("\\", "/"),
 		], check=True, capture_output=True)
-		pngs.append(png)
 
 	board(pngs, os.path.join(HERE, "board.png"))
-	print("ok", len(ORDER))
+	print("ok", len(only) if only else len(ORDER))
 
 
 if __name__ == "__main__":
-	main()
+	main(set(sys.argv[1:]))

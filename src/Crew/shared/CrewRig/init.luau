@@ -10,10 +10,12 @@
 	      LookPack. Afterwards the server only changes attributes.
 	  Dress(model, pack?, expression?) -> boolean   client only (RigController dresses every AnimalRig)
 	      TextureID of outfit / head / atlas pieces for the pack and the face SurfaceAppearance.
-	  PackForSanity(value, bands) -> Pack   pure: DEC-167 band -> pack (bands come from Content.Sanity, wave 2)
+
+	Sanity no longer picks a pack here (DEC-373, TASK-644): the player's body follows the night (DEC-370, server), and
+	the low-sanity Night on customers / passers-by is a local hallucination decided by RigController.
 
 	Prototype mapping (tools/assetplace/build_crew.luau): Crew.build -> Build; Crew.applyTime + Crew.setExpression ->
-	Dress; Crew.setSanity -> server writes LookPack = PackForSanity(...) and every client re-dresses.
+	Dress.
 ]]
 local Build = require(script.Build)
 local CrewLooks = require(script.Parent.CrewLooks)
@@ -21,20 +23,9 @@ local Dress = require(script.Dress)
 
 export type Pack = CrewLooks.Pack
 export type BuildOptions = Build.Options
--- Sanity thresholds in absolute points (DEC-167): >= High -> Day, >= Mid -> Mid, below -> Night.
-export type Bands = { High: number, Mid: number }
 
 -- Attributes the client re-dresses on (network.md §5.2). NpcId is identity, not look.
 const LOOK_ATTRIBUTES = table.freeze({ "Species", "Outfit", "CustomerType", "LookPack", "Skin" })
-
-local function packForSanity(value: number, bands: Bands): Pack
-	if value >= bands.High then
-		return "Day"
-	elseif value >= bands.Mid then
-		return "Mid"
-	end
-	return "Night"
-end
 
 return table.freeze({
 	Tag = Build.Tag,
@@ -43,5 +34,4 @@ return table.freeze({
 	Dress = Dress.Dress,
 	EffectivePack = Dress.EffectivePack,
 	AsPack = Dress.AsPack,
-	PackForSanity = packForSanity,
 })

@@ -65,6 +65,7 @@ export type Npc = {
 	Node: string, -- last graph node reached (spawn point at first)
 	Walk: number, -- walk order counter: a new order or a despawn cancels the running one
 	Tether: boolean, -- moved by MoveToward / Teleport (pair partner): other rigs never wait for it
+	Aside: boolean, -- off the graph since WalkToPosition (pickup arc, counter, table): graph walkers never wait for it
 }
 
 export type SpawnRequest = {
@@ -452,6 +453,7 @@ function NpcService:Spawn(request: SpawnRequest?): number?
 		Node = from,
 		Walk = 0,
 		Tether = false,
+		Aside = false,
 	}
 	self.Active[id] = npc
 	self.ByModel[model] = id
@@ -543,6 +545,7 @@ function NpcService:WalkTo(id: number, target: string, options: WalkOptions?): b
 	end
 	npc.Walk += 1
 	npc.Tether = false
+	npc.Aside = false
 	const order = npc.Walk
 	local function alive(): boolean
 		return self.Active[id] == npc and npc.Walk == order
@@ -634,7 +637,8 @@ end
 -- Spacing gate of NPC `id` walking along `direction` (flat unit): true when another rig (not a pair partner, not
 -- seated) stands or walks the same way less than SPACING studs ahead. Rigs coming at it are passed, not waited for, and
 -- so is a rig past the waypoint (`remaining` studs away): the first tutorial customer standing at the pickup counter
--- held the next one up to GATE_MAX s just short of Q1, so its Take Order showed late (owner 2026-10-20).
+-- held the next one up to GATE_MAX s just short of Q1, so its Take Order showed late (owner 2026-10-20). A graph walker
+-- never waits for a rig off the graph (Aside): the pickup arc stood in the way to Q1 (owner 2026-10-21).
 function NpcService:Blocked(id: number, direction: Vector3, remaining: number?): boolean
 	const npc = self.Active[id]
 	if npc == nil then
@@ -642,7 +646,7 @@ function NpcService:Blocked(id: number, direction: Vector3, remaining: number?):
 	end
 	const position = npc.Rig.Root.Position
 	for otherId, other in self.Active do
-		if otherId == id or other.Tether then
+		if otherId == id or other.Tether or (other.Aside and not npc.Aside) then
 			continue
 		end
 		const root = other.Rig.Root
@@ -734,6 +738,7 @@ function NpcService:WalkToPosition(id: number, position: Vector3, timeout: numbe
 	end
 	npc.Walk += 1
 	npc.Tether = false
+	npc.Aside = true
 	const order = npc.Walk
 	return Walker.Direct(npc.Rig, position, function(): boolean
 		return self.Active[id] == npc and npc.Walk == order

@@ -47,6 +47,8 @@ export type Props = {
 	Done: (() -> number)?,
 	-- true = empty bubble (ANM-001 blank folks): no icon at all. Default false.
 	Empty: (() -> boolean)?,
+	-- true = the order is a bun alone (Content.OrderRules.BreadOnly, ANM-011): the bun icon, no sausage. Default false.
+	Bread: (() -> boolean)?,
 	-- Patience left, 0..1. Negative = no ring (patience unknown: PatienceEndsAt = 0, T41).
 	Patience: () -> number,
 	-- Below this fraction the ring turns Mustard (Content.Moods.Rules.AnnoyedAt). Default 1/3.
@@ -104,17 +106,25 @@ local function sheet(name: string): (string, Icons.Rect?)
 	return Icons.ImageOf(name), Icons.Rect(name)
 end
 
-local function baseIcon(empty: () -> boolean): GuiObject
+local function baseIcon(empty: () -> boolean, bread: () -> boolean): GuiObject
 	const image, rect = sheet("Item/hot_dog")
+	const breadImage, breadRect = sheet("Ingredient/bun")
 	if rect then
 		return create("ImageLabel")({
 			Name = "Base",
 			LayoutOrder = 0,
 			Size = UDim2.fromOffset(CELL, CELL),
 			BackgroundTransparency = 1,
-			Image = image,
-			ImageRectOffset = rect.Offset,
-			ImageRectSize = rect.Size,
+			-- a bread-only order (ANM-011): the bun alone
+			Image = function(): string
+				return if bread() and breadRect then breadImage else image
+			end,
+			ImageRectOffset = function(): Vector2
+				return if bread() and breadRect then breadRect.Offset else rect.Offset
+			end,
+			ImageRectSize = function(): Vector2
+				return if bread() and breadRect then breadRect.Size else rect.Size
+			end,
 			Visible = function()
 				return not empty()
 			end,
@@ -148,6 +158,9 @@ local function baseIcon(empty: () -> boolean): GuiObject
 			Position = UDim2.fromScale(0.5, 0.42),
 			Size = UDim2.fromOffset(CELL * 0.86, CELL * 0.24),
 			BackgroundColor3 = SAUSAGE,
+			Visible = function()
+				return not bread()
+			end,
 			create("UICorner")({ CornerRadius = UDim.new(0.5, 0) }),
 			createRaw("UIStroke")({
 				Color = Theme.Color.Ink,
@@ -250,6 +263,7 @@ local function row(props: {
 	Order: number,
 	Toppings: () -> { Topping },
 	Empty: () -> boolean,
+	Bread: () -> boolean,
 	Visible: () -> boolean,
 	Resolved: () -> boolean,
 }): Frame
@@ -271,7 +285,7 @@ local function row(props: {
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				Padding = UDim.new(0, GAP),
 			}),
-			baseIcon(props.Empty),
+			baseIcon(props.Empty, props.Bread),
 			indexes(function()
 				return firstThree(props.Toppings())
 			end, toppingIcon),
@@ -321,6 +335,9 @@ return function(props: Props): BillboardGui
 	const warnAt = props.WarnAt or 1 / 3
 	const lift = math.max(props.Lift or 0, 0)
 	const empty = props.Empty or function(): boolean
+		return false
+	end
+	const bread = props.Bread or function(): boolean
 		return false
 	end
 	const done = props.Done or function(): number
@@ -451,6 +468,7 @@ return function(props: Props): BillboardGui
 						Order = 1,
 						Toppings = toppings,
 						Empty = empty,
+						Bread = bread,
 						Visible = function()
 							return true
 						end,
@@ -465,6 +483,7 @@ return function(props: Props): BillboardGui
 							return toppings2() or {}
 						end,
 						Empty = empty,
+						Bread = bread,
 						Visible = function()
 							return rows() == 2
 						end,

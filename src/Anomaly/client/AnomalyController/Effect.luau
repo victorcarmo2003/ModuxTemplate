@@ -45,7 +45,8 @@ local LightTypes = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.
 local RigTypes = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.RigController)
 local RoundTypes = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.RoundController)
 
-export type Phase = "Signal" | "Active" | "Resolved" | "Failed"
+-- "Queue" (owner 2026-10-22): a customer anomaly whose order was taken waits for it in the delivery queue
+export type Phase = "Signal" | "Active" | "Queue" | "Resolved" | "Failed"
 
 -- One record of the `Anomalies` set (network.md §13.5), copied (the set may reuse its table).
 export type Record = {

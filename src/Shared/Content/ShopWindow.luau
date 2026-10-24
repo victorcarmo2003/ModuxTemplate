@@ -4,20 +4,21 @@
 -- window = shop closed (RoundService Paused in the selling phases: no new customer, sign and neon CLOSED). Owners:
 -- VehicleService (window, shop sync), CustomerService (the line leaves), AnomalyService (Anomalies below).
 --
--- Closing the window while customers wait in line or are being served sends ALL of them away angry: mood LeaveMood, every
--- pending hot dog settled as LeaveResult ($0, same ledger and stats as a refusal). The tutorial customer and anomaly
--- actors stay (their own flow decides).
+-- Owner 2026-10-23 (Provisional): closing the window sends ONLY the customer anomalies away (Anomaly/Kit/CustomerActor,
+-- no outcome, no scare); the ordinary customers keep their place. LeaveMood, LeaveResult, ShutGrace, WaitShutGrace,
+-- ComplainTime, LeaveJitter and ShutLines are the old "the line leaves complaining" flow (CustomerService:SendLineAway /
+-- ComplainLineAway, no longer called by the window); ShutLines is still the line of RefuseOne.
 --
--- Complaining (owner request 2026-10-19, Provisional): a window closed BY A PLAYER does not clear the line at once. It must
--- stay shut ShutGrace s (a quick reopen changes nothing); then each customer shows one of ShutLines over its head
--- (packet CustomerComplain), is Complaining with its patience frozen, and leaves ComplainTime (+ up to LeaveJitter) s
--- later with the outcome above. An automatic closing (anomaly) still clears the line at once.
+-- Shift end (owner request 2026-10-21, Provisional): the window shuts when the shift ends (the report, Summary) and stays
+-- shut through the break (boss Call, Prep: Content.Shift Prep Night.Duration = the 30 s to buy); it never opens by itself
+-- there. Opening it in the break starts the night at once; when the Prep runs out the night starts and the window opens
+-- AutoOpenAfter s later (0 = with the night) unless someone toggled it first (`/dev window open` forces it).
 --
 -- Anomalies (game-designer, Provisional Q-270): what the window does to each anomaly. A key missing here = "None".
 --   None    the window changes nothing (its own rule may still read IsShutterClosed / IsProtected, ANM-008/009)
 --   Blocks  a closed window at the scheduled start avoids it: the occurrence is dropped, nothing happens (a closed shop
 --           gets no customer, odd or not; the price is the sales lost while closed)
---   Closes  the anomaly slams the window shut when it starts (the line leaves angry as above)
+--   Closes  the anomaly slams the window shut when it starts (customer anomalies at the counter leave, as above)
 -- NOTE T10: this table replicates, so a client can read which anomalies the window avoids. Accepted while Provisional:
 -- the closed window is visible to everyone anyway, and no verb, deadline or failure rule lives here.
 local Table = require(script.Parent.Table)
@@ -32,6 +33,9 @@ export type ShopWindow = {
 	ComplainTime: number, -- s the complaint bubble shows before the customer walks off
 	LeaveJitter: number, -- up to this many extra s, random per customer, so they do not leave in lockstep
 	ShutLines: { string }, -- short original complaints (bubble text; CustomerComplain.Line is the index)
+	-- s a selling phase (the night) may start with the window still shut before it opens by itself (owner 2026-10-21,
+	-- Provisional); the shop stays closed (Paused) meanwhile. Any toggle in between cancels it. 0 = opens at once
+	AutoOpenAfter: number,
 	Anomalies: { [string]: AnomalyWindow }, -- Content.Anomalies key -> effect; missing = None
 }
 
@@ -42,6 +46,7 @@ const shopWindow: ShopWindow = {
 	WaitShutGrace = 5.2, -- 2 x (1.5 + 2.2) - 2.2: they walk off at twice the line's time
 	ComplainTime = 2.2,
 	LeaveJitter = 0.4,
+	AutoOpenAfter = 0, -- owner 2026-10-21: the window opens with the night itself (the Prep's 30 s are the wait); was 60
 	ShutLines = {
 		"Seriously? I was right here!",
 		"Closed? Now?",

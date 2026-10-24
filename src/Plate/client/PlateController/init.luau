@@ -50,10 +50,11 @@ type Customer = {
 	Order2: { [string]: boolean }?,
 	Pickup: number?,
 	Drive: number?,
+	Bread: boolean, -- the order is a bun alone (Content.OrderRules.BreadOnly, ANM-011)
 }
 
 -- Last order seen for a ticket (a plate whose customer left still shows it)
-type TicketMemo = { Number: number?, Order: { string }, Order2: { string }?, Drive: boolean }
+type TicketMemo = { Number: number?, Order: { string }, Order2: { string }?, Drive: boolean, Bread: boolean }
 
 const PlateController = Modux.Controller("PlateController", { Require = { "InputController" }, Priority = 660 })
 
@@ -103,6 +104,7 @@ function PlateController:WriteCustomer(id: number, record: any?)
 			Order2 = if record.Order2 then table.clone(record.Order2) else nil,
 			Pickup = record.Pickup,
 			Drive = record.Drive,
+			Bread = record.Bread == true,
 		}
 		if record.Number ~= nil then
 			self.Tickets[id] = {
@@ -110,6 +112,7 @@ function PlateController:WriteCustomer(id: number, record: any?)
 				Order = toppingList(record.Order),
 				Order2 = if record.Order2 then toppingList(record.Order2) else nil,
 				Drive = record.Drive ~= nil,
+				Bread = record.Bread == true,
 			}
 		end
 	end
@@ -141,6 +144,40 @@ function PlateController:OrderOf(ticket: number, line: number): { string }?
 		return nil
 	end
 	return if line == 2 then memo.Order2 else memo.Order
+end
+
+-- Reactive: the order of a ticket is a bun alone (Customers, else the last seen)
+function PlateController:BreadOf(ticket: number): boolean
+	if ticket == 0 then
+		return false
+	end
+	const customer = self.Customers()[ticket]
+	if customer ~= nil then
+		return customer.Bread
+	end
+	const memo = self.Tickets[ticket]
+	return memo ~= nil and memo.Bread
+end
+
+-- The equipped plate carries the bun alone and a bread-only order waits for it in the pickup line (its ticket's, or any
+-- one for a plate with no ticket); not reactive. The server decides again (PlateService gate, CustomerService:BreadTarget)
+function PlateController:BreadReady(held: TicketHud.HeldPlate): boolean
+	if held.Item ~= "plate" or not held.Bun or held.Dog or next(held.Toppings) ~= nil then
+		return false
+	end
+	const customers = Vide.untrack(self.Customers)
+	local function waits(customer: Customer?): boolean
+		return customer ~= nil and customer.Bread and customer.State == "Waiting" and customer.Pickup ~= nil
+	end
+	if held.Ticket ~= 0 and waits(customers[held.Ticket]) then
+		return true
+	end
+	for _, customer in customers do
+		if waits(customer) then
+			return true
+		end
+	end
+	return false
 end
 
 -- Reactive: the plate the HUD shows (the equipped plate / hot dog of the world kitchen), nil = none
@@ -178,6 +215,10 @@ function PlateController:HudCard(): TicketHud.CardProps
 			const current = self:Current()
 			if current == nil then
 				return {}
+			end
+			-- a bread-only order (ANM-011): the bun alone
+			if self:BreadOf(current.Ticket) then
+				return { { Key = "bun", Done = current.Bun } }
 			end
 			const cells: { TicketHud.Cell } = {
 				{ Key = "bun", Done = current.Bun },
@@ -383,6 +424,9 @@ function PlateController:Watch(gui: Instance)
 			const customer = self.Customers()[npc]
 			return customer ~= nil and customer.Drive ~= nil
 		end,
+		Bread = function(npc: number): boolean
+			return self:BreadOf(npc)
+		end,
 		Patience = function(npc: number): number?
 			const customer = self.Customers()[npc]
 			if customer == nil or customer.PatienceSpan <= 0 or customer.PatienceEndsAt <= 0 then
@@ -423,6 +467,7 @@ PlateController:OnInit(function(self)
 				Bun = held.Bun,
 				Sausage = held.Dog,
 				AtPickup = if held.Ticket ~= 0 then self:AtPickup(held.Ticket) else nil,
+				Bread = self:BreadReady(held),
 			}
 		end,
 	})

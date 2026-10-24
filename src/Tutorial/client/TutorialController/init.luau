@@ -83,7 +83,8 @@
 
 	Restaurant (TASK-393; design/tutorial-restaurant.md, Provisional; only with Content.Restaurant.Rules.Enabled, else
 	everything above is unchanged): after the window, the tutorial customer's order is taken at the tablet (r_tablet,
-	r_listen while Tablets says Talking), then the world kitchen (kitchen-world.md §1; TASK-581): r_cut (the cut-bun pile) ->
+	r_listen while Tablets says Talking: the close-up and the order typed letter by letter, owner 2026-10-22), then
+	the world kitchen (kitchen-world.md §1; TASK-581): r_cut (the cut-bun pile) ->
 	r_grill -> r_cooking -> r_flip -> r_collect (the rest rail) -> r_take_plate -> r_bun_plate -> r_dog_plate (the plate
 	becomes the hot dog) -> r_toppings (or r_discard) -> r_pickup ("Hand Over" at PICKUP); r_crew while a crewmate holds the
 	hot dog. After the money step, with TutorialRules.Restock and a take_box bay in the map (infinite stock room, owner
@@ -106,7 +107,6 @@ local Cinematic = require(StarterPlayer.StarterPlayerScripts.client.Interface.Ci
 local Objective = require(StarterPlayer.StarterPlayerScripts.client.Interface.Objective)
 local Announce = require(StarterPlayer.StarterPlayerScripts.client.Interface.Announce)
 local Spotlight = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Spotlight)
-local CallSubtitle = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.CallSubtitle)
 local TutorialPanel = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialPanel)
 local TaskList = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TaskList)
 local TutorialPointer = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.TutorialPointer)
@@ -147,6 +147,9 @@ const OPEN_LINE = "Your first customer is on the way."
 const TUTORIAL_CALL = Content.BossCallRules.Tutorial.Call
 -- Day 1 upgrade lesson (owner request 2026-10-14, Provisional): Walt's call, the upgrade to buy, the Gear Stand reach
 const LESSON = TutorialRules.Upgrade
+-- after the lesson: back to the window lever (TickReopen) in these phases while the window is shut
+const REOPEN_STEP = "upg_open"
+const REOPEN_PHASES: { [string]: boolean } = { Summary = true, Call = true, Prep = true, Night = true }
 const LESSON_REACH = Content.Mart.Hint.Reach * 2 -- studs from the pedestal where "go" becomes "buy"
 const CALL_WAIT = 12 -- s of a silent phone before the tutorial goes on without Walt (panel only)
 const RUSH_TIME = 4 -- s between two step changes under which the player is rushing (no praise)
@@ -160,9 +163,10 @@ const TALK_TIME = 7 -- s of a talk step without the call
 -- the dark spotlight on the clock for most of a minute. Past this the step moves on; what he still has to say goes on
 -- as subtitles under the goodbye
 const TALK_MAX = 14
--- TALK_MAX of the closing talk (owner 2026-10-21: the close-up on the clock still lasted too long): spotlight intro (2 s)
--- plus two short lines
-const SHIFT_MAX = 6
+-- TALK_MAX of the closing talk (owner 2026-10-21: the close-up on the clock still lasted too long). The step ends as soon
+-- as Walt said its lines; this only caps a stuck voice. Owner 2026-10-22 ("a fala não tá saindo" on the clock): 6 s cut the
+-- close-up before "Keep an eye on the clock." (praise 1.4 s + two lines ~1.8 s each + gaps, ~7 s with the voices loaded)
+const SHIFT_MAX = 9
 const STEP_SOUND = "prompt_done"
 const SKIP_BIND = "TutorialSkip"
 -- Owner request 2026-10-14 (Provisional): no Skip (Q / D-pad / button) and no top tutorial panel: Walt explains every step on the
@@ -346,6 +350,8 @@ function TutorialController:Setup()
 		return self:VoiceVolume()
 	end, function(message: string)
 		self:Trace(`call: {message}`)
+	end, function(): Instance?
+		return self.Dependencies.BossController:PhoneSpeaker()
 	end) :: Call.Call
 	self.Sent = false :: boolean
 	-- shopping steps after the first sale (the buns ran out); InMart = the player reached the Mart once
@@ -374,6 +380,8 @@ function TutorialController:Setup()
 	self.LessonOn = false :: boolean
 	self.LessonNear = false :: boolean
 	self.LessonSkipped = false :: boolean
+	-- the lesson ended (not skipped): the rookie is sent back to the window lever until the window opens (upg_open)
+	self.ReopenPending = false :: boolean
 	-- how the tutorial ended ("done" | "skip" | "over"; "" = not yet). Set with Finished: read it after tracking Finished
 	self.EndReason = "" :: string
 end
@@ -782,6 +790,14 @@ function TutorialController:Voiced(): boolean
 	return self.Answered and self:CallState() == "talking"
 end
 
+-- Walt's lines for a step: SayAgain from the second tutorial order on (owner 2026-10-23: "do the same thing as before")
+function TutorialController:SayOf(step: Steps.Step): { string }
+	if self.Sales > 0 and step.SayAgain ~= nil then
+		return step.SayAgain
+	end
+	return step.Say or {}
+end
+
 -- Subtitle strip and line queue in step with the call (every tick, also after the tutorial ended: the goodbye)
 function TutorialController:UpdateCall()
 	const voiced = self:Voiced()
@@ -816,7 +832,7 @@ function TutorialController:SpeakStep(before: Steps.Step?, after: Steps.Step?)
 	const now = os.clock()
 	const lastAt = self.SpokeAt
 	self.SpokeAt = now
-	const say = after.Say or {}
+	const say = self:SayOf(after)
 	const afterIndex = Steps.IndexOf[after.Key] or 0
 	if not self.Greeted then
 		self.Greeted = true
@@ -1071,6 +1087,7 @@ function TutorialController:DecideRestaurant(guestId: number, guest: GuestRecord
 	if guest.State == "Ordering" then
 		for _, raw in Restaurant.Tablets:entries() do
 			const record = raw :: TabletRecord
+			-- owner 2026-10-22: the close-up and the order typed on the card; the talk ends by itself
 			if record.Npc == guestId and record.State == "Talking" then
 				return "r_listen", nil, ""
 			end
@@ -1715,9 +1732,10 @@ function TutorialController:TickIdle(step: Steps.Step, target: Instance?)
 	end
 	const remind = step.Remind
 	if remind == nil then
-		if step.Say and not self.Call.Busy() and now - self.StepAt > NUDGE and self:Voiced() then
+		const say = self:SayOf(step)
+		if #say > 0 and not self.Call.Busy() and now - self.StepAt > NUDGE and self:Voiced() then
 			self.StepAt = now
-			self.Call.Queue(step.Say)
+			self.Call.Queue(say)
 		end
 		return
 	end
@@ -2122,13 +2140,21 @@ function TutorialController:UpgradeLesson(): string?
 	return LESSON.Key
 end
 
--- The pedestal (or bench prompt anchor) that sells `key` on the Gear Stand
+-- What the lesson marks: the whole Gear Stand (the Model holding its pedestals). Owner 2026-10-21: "ao invés dele me
+-- obrigar a comprar um upgrade específico, faz com que o highlight fique na loja de upgrades" - any purchase ends the
+-- lesson (BoughtGear). Else the pedestal (or bench prompt anchor) that sells `key`
 function TutorialController:LessonStand(key: string): Instance?
 	const upgrade = Content.Upgrades.ByKey[key]
 	if upgrade == nil then
 		return nil
 	end
 	const tags = Content.Mart.Tags
+	for _, pedestal in CollectionService:GetTagged(tags.Pedestal) do
+		const stand = pedestal.Parent
+		if stand ~= nil and stand:IsA("Model") and stand:IsDescendantOf(Workspace) then
+			return stand
+		end
+	end
 	for _, pedestal in CollectionService:GetTagged(tags.Pedestal) do
 		if pedestal:GetAttribute(tags.Slot) == upgrade.BenchSpot and pedestal:IsDescendantOf(Workspace) then
 			return pedestal
@@ -2143,10 +2169,41 @@ function TutorialController:LessonStand(key: string): Instance?
 	return if TutorialRules.Restaurant then self:Anchor("bench_buy_upgrade", false) else nil
 end
 
+-- After the lesson (owner 2026-10-21, Provisional): back to the window lever while the window is shut, from the Summary
+-- through the next night's call and Prep (and its start, before the window opens by itself). true = it owns the panel
+function TutorialController:TickReopen(): boolean
+	if not self.ReopenPending then
+		return false
+	end
+	const phase = Vide.untrack(self.Dependencies.RoundController.Phase)
+	if self.LessonSkipped or not REOPEN_PHASES[phase] or not self:WindowShut() then
+		self.ReopenPending = false
+		return false
+	end
+	self.LessonOn = true
+	if not Vide.untrack(self.Running) then
+		self.Running(true)
+	end
+	const lever = self:Anchor("shutter_toggle", false)
+	self:SetStep(REOPEN_STEP, lever, "")
+	const step = Steps.ByKey[REOPEN_STEP]
+	if step then
+		self:TickIdle(step, lever)
+	end
+	return true
+end
+
 -- One tick of the lesson; true = it owns the panel this tick (the first-hot-dog flow waits)
 function TutorialController:TickLesson(): boolean
 	const key = self:UpgradeLesson()
 	if key == nil then
+		if self.LessonOn and not self.LessonSkipped and Vide.untrack(self.StepKey) ~= REOPEN_STEP then
+			-- the lesson just ended (bought, or the break ran out): the window is next
+			self.ReopenPending = true
+		end
+		if self:TickReopen() then
+			return true
+		end
 		if self.LessonOn then
 			self.LessonOn = false
 			Vide.batch(function()
@@ -2754,10 +2811,10 @@ function TutorialController:Mount(playerGui: Instance)
 		focus.Parent = playerGui
 
 		-- The shift step (TASK-598): the screen goes almost black around the HUD clock (close-up intro onto it) while Walt
-		-- says the shift ends at six. The call subtitle (BossCall, DisplayOrder 2) would sit under the dark, so the same
-		-- strip is drawn again over it, from the BossController sources (same insets: it lands on the original)
+		-- says the shift ends at six. The call subtitle (BossCall, DisplayOrder 2) would sit under the dark, so its own
+		-- ScreenGui is lifted over the dim meanwhile (a second CallSubtitle drawn over it popped and slid in during the
+		-- intro's undimmed half second while the original still showed: the line appeared twice, owner bug 2026-10-22)
 		const boss = self.Dependencies.BossController
-		const round = self.Dependencies.RoundController
 		local function onClock(): boolean
 			const spot = self.Spot()
 			return shown() and spot ~= false and spot.Name == CLOCK_NAME
@@ -2786,28 +2843,19 @@ function TutorialController:Mount(playerGui: Instance)
 			}),
 		})
 		shiftFocus.Parent = playerGui
-		-- the subtitle copy keeps BossCall's insets (it lands on the original), one step over the dim
-		const shiftSubtitle = Vide.create("ScreenGui")({
-			Name = "TutorialShiftSubtitle",
-			ResetOnSpawn = false,
-			ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
-			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-			DisplayOrder = 6,
-			Enabled = function()
-				return not Cinematic.Active()
-			end,
-			CallSubtitle({
-				Name = "ShiftSubtitle",
-				Visible = function(): boolean
-					return onClock() and boss.Showing()
-				end,
-				Speaker = boss.Speaker,
-				Text = boss.Text,
-				Phone = round.Vehicle,
-				Scale = boss.Scale,
-			}),
-		})
-		shiftSubtitle.Parent = playerGui
+		-- BossCall one step over the dim while the clock is spotlit, back to its own order after
+		local callOrder: number? = nil
+		Vide.effect(function()
+			const lifted = onClock()
+			Vide.untrack(function()
+				const gui = boss.Gui
+				if gui ~= nil then
+					callOrder = callOrder or gui.DisplayOrder
+					gui.DisplayOrder = if lifted then shiftFocus.DisplayOrder + 1 else callOrder :: number
+				end
+				return nil
+			end)
+		end)
 
 		-- Edge pointer: viewport pixels (WorldToViewportPoint), so the whole screen with no inset
 		const overlay = Vide.create("ScreenGui")({

@@ -31,15 +31,16 @@
 --           head (ctx.Looking, Angle = full cone in degrees, Range studs; the Gaze packet of the Stare / "seen" checks).
 --           Looking = the serve is the error (CustomerService:AddActorJudge "Wrong": $0, the hot dog stays in the hand)
 --           and he pays. No fresh Gaze (not in first person) = not looking.
---   Plain   (ANM-011 "JUST BREAD", attention; proposal §9.9) a hot dog with any topping is thrown at the wall
+--   Plain   (ANM-011 "JUST BREAD", attention; proposal §9.9) served right = a plate with the bun alone (owner 2026-10-22:
+--           his order has no sausage, Content.OrderRules.BreadOnly); ANY hot dog, plain or not, is thrown at the wall
 --           (AddActorJudge "Return": the hot dog is lost, $0, no sale; cue plate_throw; rig AnomalyThrow = its toppings,
 --           AnomalyRage = server time of the first throw: enraged until he leaves or is served plain). The first Returns
 --           throws cost who served ReturnSanity and he keeps waiting; one more = thrown again, Phase Failed, -Sanity of
 --           who served it, and after Content.PlateThrow.LeaveDelay he stomps off. Never a jumpscare.
 --   Serve   any served order is the right end; no error (the interim of the anomalies not migrated yet, proposal §9.4).
--- Window (owner 2026-10-22, Provisional): closing the service window still answers the outside threats, but it never
--- reaches a customer anomaly any more, before or after its order: it neither sends her away nor punishes (no refusal
--- exists); her condition keeps running (she can still be served inside, the drawer stays open).
+-- Window (owner 2026-10-23, Provisional): closing the service window sends a customer anomaly away at once, before or
+-- after its order, with no outcome and no scare (unjudge, Leave, Finish). The ordinary customers stay (CustomerService).
+-- ANM-022 (head banger) filters the event out: the shut window is where it bangs its head.
 -- Seen: 1 s in the gaze cone of the actor's head, up to Content ViewRange (ctx.SeenTick, -5 once per night).
 -- Stop sends a still-standing actor away (NightOver, Restore, dev stop).
 --
@@ -54,7 +55,8 @@ local Api = require(script.Parent.Parent.Parent.Api)
 -- Narrow views of the services (only what the kit calls)
 export type CustomerView = { State: string, Variant: string? }
 
-export type ActorJudge = (id: number, toppings: { string }, player: Player) -> string?
+-- `bread` = a plate with the bun alone was handed over, not a hot dog (CustomerService:IsBreadPlate)
+export type ActorJudge = (id: number, toppings: { string }, player: Player, bread: boolean) -> string?
 
 export type Customers = {
 	Get: (self: any, id: number) -> CustomerView?,
@@ -470,7 +472,15 @@ function Kit.Module(options: Options): Api.Module
 	end
 
 	-- Asked by CustomerService before the sale of a serve on the actor (AddActorJudge): the condition's verdict
-	local function judge(ctx: Api.Context, occ: Api.Occurrence, state: State, id: number, toppings: { string }, player: Player): string?
+	local function judge(
+		ctx: Api.Context,
+		occ: Api.Occurrence,
+		state: State,
+		id: number,
+		toppings: { string },
+		player: Player,
+		bread: boolean
+	): string?
 		if id ~= state.Actor or not state.Queued or occ.State ~= state then
 			return nil
 		end
@@ -484,8 +494,9 @@ function Kit.Module(options: Options): Api.Module
 				state.Broke = player
 				return "Wrong"
 			end
-		elseif condition.Kind == "Plain" and #toppings > 0 then
-			-- every topping hot dog is thrown (the return event, thrown); the throw count decides the error
+		elseif condition.Kind == "Plain" and not bread then
+			-- owner 2026-10-22: JUST BREAD = a plate with the bun alone; any hot dog (the sausage, with or without toppings)
+			-- is thrown (the return event, thrown); the throw count decides the error
 			state.Thrown = table.concat(toppings, ",")
 			return "Return"
 		end
@@ -503,8 +514,8 @@ function Kit.Module(options: Options): Api.Module
 		state.Step = 0
 		state.Returned = 0
 		state.Thrown = nil
-		state.Unjudge = Kit.Customers():AddActorJudge(function(id: number, toppings: { string }, server: Player): string?
-			return judge(ctx, occ, state, id, toppings, server)
+		state.Unjudge = Kit.Customers():AddActorJudge(function(id: number, toppings: { string }, server: Player, bread: boolean): string?
+			return judge(ctx, occ, state, id, toppings, server, bread)
 		end)
 		mark(state.Actor, QUEUE_ATTRIBUTE, state.QueuedAt)
 		mark(state.Actor, STEP_ATTRIBUTE, 0)
@@ -635,7 +646,15 @@ function Kit.Module(options: Options): Api.Module
 
 		OnEvent = function(ctx: Api.Context, occ: Api.Occurrence, event: Api.Event)
 			const state = occ.State :: State
-			-- Shutter: the window no longer reaches a customer anomaly (header, Window)
+			-- Shutter: a closed window sends her away (header, Window)
+			if event.Kind == "Shutter" then
+				if event.Closed then
+					unjudge(state)
+					Kit.SendAway(state.Actor, nil)
+					ctx.Finish(occ)
+				end
+				return
+			end
 			if event.Kind ~= "Customer" or event.Npc ~= state.Actor then
 				return
 			end

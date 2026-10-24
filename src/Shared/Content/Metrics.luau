@@ -16,6 +16,7 @@
 --                  session per occurrence. Step 4 is the per-player outcome and is named by the result instead
 --                  (resolved / failed / cut; MetricsService.AnomalyStep)
 --   UiRate         s between two MetricUi packets of one player (the server drops faster ones)
+--   FpsWindow      s of one server frame-rate sample (owner request 2026-10-22, Provisional): server_fps (MetricsService)
 local Table = require(script.Parent.Table)
 
 export type Metrics = {
@@ -25,6 +26,7 @@ export type Metrics = {
 	TutorialMilestone: { [string]: number },
 	AnomalyFunnel: { string },
 	UiRate: number,
+	FpsWindow: number,
 }
 
 const metrics: Metrics = {
@@ -96,6 +98,7 @@ const metrics: Metrics = {
 	},
 	AnomalyFunnel = { "start", "signal", "active" },
 	UiRate = 0.5,
+	FpsWindow = 60,
 }
 
 return Table.record(metrics)

@@ -76,14 +76,15 @@ function Timeline.Next(beats: { Beat }, kind: string, from: number): Beat?
 	return nil
 end
 
--- 0 = clear, 1 = black. Before the first Fade beat the screen is black when that beat is a fade in.
+-- 0 = clear, 1 = black. Before the first Fade beat the screen is black when that beat is a fade in. A beat's own Duration
+-- replaces `fadeTime` (a slow fade in of the dark scenes, a hard cut to black).
 function Timeline.Fade(beats: { Beat }, elapsed: number, fadeTime: number): number
 	const last = Timeline.Last(beats, "Fade", elapsed)
 	if last == nil then
 		const first = Timeline.Next(beats, "Fade", 0)
 		return if first ~= nil and first.Target == "In" then 1 else 0
 	end
-	const progress = math.clamp((elapsed - last.At) / math.max(fadeTime, 1e-3), 0, 1)
+	const progress = math.clamp((elapsed - last.At) / math.max(last.Duration or fadeTime, 1e-3), 0, 1)
 	return if last.Target == "In" then 1 - progress else progress
 end
 
@@ -113,6 +114,17 @@ function Timeline.Title(beats: { Beat }, elapsed: number, hold: number, duration
 		ends = if fade ~= nil then fade.At else duration
 	end
 	return if elapsed < ends then last else nil
+end
+
+-- Credits roll (Rules.Credits, TASK-657): 0..1 of the scroll of `scene` at `elapsed` (0 = the roll under the screen,
+-- 1 = gone above it), or nil when the roll is not on screen (another scene, before At, after At + Roll)
+function Timeline.Roll(scene: Scene, elapsed: number): number?
+	const credits = Content.Cutscenes.Rules.Credits
+	if scene.Key ~= credits.Scene or elapsed < credits.At then
+		return nil
+	end
+	const progress = (elapsed - credits.At) / math.max(credits.Roll, 1e-3)
+	return if progress < 1 then progress else nil
 end
 
 -- Prompt beat on screen during [At, At + time)

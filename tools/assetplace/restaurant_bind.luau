@@ -2979,6 +2979,14 @@ link("N-PAD-2", "Q5") -- queue tail on the corridor
 link("N-PAD-2", "N-PU-IN")
 link("N-PAD-2", "N-PUL-1")
 link("Q1", "N-PU-IN") -- Q1 walks off the counter to the pickup lane
+-- owner 2026-10-21: a customer from the west sidewalk walked past the queue to N-GATE and came back along it (an L);
+-- now the west corridor (N-Z02-07 -> TBL-4 -> N-PAD-3) leads straight to Q1. A queue walk never steps through a slot
+-- ahead of its own (Graph.behind), so only a walk to Q1 takes this way in
+link("N-Z02-07", "TBL-4")
+link("N-PAD-3", "Q1")
+-- the east sidewalk too (owner Play 2026-10-21, N2: "o npc novamente deu uma volta" through N-GATE and in front of the
+-- PICK UP window): N-Z02-05 had no way along the sidewalk to N-Z02-07 but through N-GATE
+link("N-Z02-05", "N-Z02-07")
 link("N-PU-IN", "N-PUL-1")
 for i = 1, #PUL_X do
 	if i < #PUL_X then

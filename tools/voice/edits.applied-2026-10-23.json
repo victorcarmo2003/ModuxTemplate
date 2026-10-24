@@ -1,0 +1,1053 @@
+{
+ "v_7cddf1c8ca": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:93 (Say)"
+  ],
+  "old": "First, open the store.",
+  "new": [
+   "Hello, Rookie! My name is Walt. I've noticed that you're new here, so I'm gonna walk you through this."
+  ],
+  "note": "Vou colocar essa como introdução"
+ },
+ "v_5e48b92aca": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:376",
+   "Steps.luau:197 (Say)"
+  ],
+  "old": "Nothing extra.",
+  "new": [],
+  "note": "Oq seria isso? n faz sentido essa primeira fala"
+ },
+ "v_398e154586": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:75 (Remind)"
+  ],
+  "old": "Pick up the phone.",
+  "new": [],
+  "note": "Isso não precisa de audio, como eu vou mandar ele pegar o telefone se eu estou falando ao mesmo tempo?"
+ },
+ "v_ee99a20f74": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:94 (Done)"
+  ],
+  "old": "We're open.",
+  "new": [
+   "Do you see that lever? Go there and pull it to open the store."
+  ],
+  "note": "Essa deve ser tocada após a introdução com a seta apontando para a alavanca"
+ },
+ "v_e17886c499": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:95 (Remind)",
+   "Steps.luau:534 (Remind)"
+  ],
+  "old": "Pull the window lever.",
+  "new": [
+   "Nice. Here it comes, your first client."
+  ],
+  "note": "Quando o cliente estiver vindo, após puxar a alavanca"
+ },
+ "v_70561a888f": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:111 (Say)",
+   "Steps.luau:241 (Say)"
+  ],
+  "old": "Take their order.",
+  "new": [
+   "Take his order."
+  ],
+  "note": ""
+ },
+ "v_226fd7630d": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:112 (Done)"
+  ],
+  "old": "A ketchup dog. Easy.",
+  "new": [
+   "Plain dog. Go to the grill."
+  ],
+  "note": "Primeiro pedido do tutorial, após o cliente terminar de falar"
+ },
+ "v_2ed2add83d": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:113 (Remind)"
+  ],
+  "old": "Take the order, Rookie.",
+  "new": [
+   "What are you doing? I don't have the whole night. Take his order."
+  ],
+  "note": ""
+ },
+ "v_245112f77f": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:124 (Say)"
+  ],
+  "old": "Now make the hot dog.",
+  "new": [],
+  "note": "Não e necessário esse audio."
+ },
+ "v_0fde55b2de": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:124 (Say)"
+  ],
+  "old": "Take a station. Follow the paw.",
+  "new": [],
+  "note": "Não e necessário esse audio."
+ },
+ "v_04d9c9b305": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:125 (Done)",
+   "Steps.luau:186 (Done)",
+   "Steps.luau:355 (Done)"
+  ],
+  "old": "Beautiful.",
+  "new": [],
+  "note": "Não e necessário esse audio."
+ },
+ "v_e9f9279ea5": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:126 (Remind)"
+  ],
+  "old": "Press Work at a station.",
+  "new": [],
+  "note": "Não e necessário esse audio."
+ },
+ "v_7ec1653677": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:135 (Say)"
+  ],
+  "old": "Frank from the cooler.",
+  "new": [
+   "Take the sausage from the cooler."
+  ],
+  "note": "'Áudio para pegar a slasicha"
+ },
+ "v_082de8f3e6": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:135 (Say)"
+  ],
+  "old": "Onto the grill.",
+  "new": [
+   "Drag it to the grill."
+  ],
+  "note": ""
+ },
+ "v_213276c0ca": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:136 (Done)",
+   "Steps.luau:334 (Done)"
+  ],
+  "old": "Nice.",
+  "new": [
+   "Good."
+  ],
+  "note": ""
+ },
+ "v_d669a97484": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:137 (Remind)"
+  ],
+  "old": "Frank on the grill.",
+  "new": [
+   "Now flip it."
+  ],
+  "note": "Quando chegar na hora de vira a salsicha"
+ },
+ "v_a9764de43f": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:146 (Say)"
+  ],
+  "old": "Slice a bun while it cooks.",
+  "new": [
+   "Now take it and put it aside."
+  ],
+  "note": "Ele não deve cortar o pão enquanto a salsicha frita. Então eu coloquei aqui para ele levar ela para a mesa de descanso de salsicha"
+ },
+ "v_360d3e4019": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:148 (Remind)"
+  ],
+  "old": "Hold to slice the bun.",
+  "new": [
+   "Now go to the cutting board and cut some bread."
+  ],
+  "note": "Após ele colocar a salsicha para descansar e a tela de foco der enfase no botão de close fazendo ele sair da grill, esse audio vai aparecer guiando ele para a tabua de pães"
+ },
+ "v_7c172f2d01": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:165 (Say)"
+  ],
+  "old": "Wait for the bar.",
+  "new": [
+   "Take his plate at the countertop."
+  ],
+  "note": "Após cortar o pão, ele vai mandar ele pegar o prato para assimilar tudo"
+ },
+ "v_631771189b": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:174 (Say)"
+  ],
+  "old": "Ready. Grab it.",
+  "new": [],
+  "note": "Não vejo necessidade"
+ },
+ "v_28115e186d": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:175 (Done)",
+   "Steps.luau:462 (Done)"
+  ],
+  "old": "Got it.",
+  "new": [],
+  "note": "Não vejo necessidade"
+ },
+ "v_7047da1e5a": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:176 (Remind)"
+  ],
+  "old": "Grab it off the grill.",
+  "new": [
+   "Now, take the bread"
+  ],
+  "note": "Após pegar o preto"
+ },
+ "v_df06ad1d56": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:185 (Say)"
+  ],
+  "old": "Frank in the bun.",
+  "new": [
+   "Take the sausage now."
+  ],
+  "note": "Após pegar o pão"
+ },
+ "v_33b29ecd0d": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:198 (Done)",
+   "Steps.luau:366 (Done)"
+  ],
+  "old": "Perfect.",
+  "new": [
+   "This is a plain dog. Deliver it to the customer."
+  ],
+  "note": "Após montar a salsicha e o pão"
+ },
+ "v_3d658be667": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:187 (Remind)"
+  ],
+  "old": "Put it in the bun.",
+  "new": [
+   "This is a plain dog. Deliver it to the customer."
+  ],
+  "note": "Após montar a salsicha e o pão"
+ },
+ "v_9952411d1d": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:197 (Say)"
+  ],
+  "old": "They want ketchup.",
+  "new": [
+   "This one wants ketchup, so just do the same thing as before for now."
+  ],
+  "note": "Quando chegar o novo cliente e ele terminar de falar"
+ },
+ "v_000bbfee95": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:199 (Remind)"
+  ],
+  "old": "Ketchup on the dog, Rookie.",
+  "new": [
+   "Now go to the toppings table and put the ketchup."
+  ],
+  "note": "quando ele termianr de fzr o pão e a salsicha e pegar o prato, nessa etapa ainda, haverão as setas, higlights e interface de close na ui"
+ },
+ "v_28189fdbed": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:207 (Say)",
+   "Steps.luau:376 (Say)"
+  ],
+  "old": "Not what they asked. Toss it.",
+  "new": [
+   "This is not what he asked. What are you doing? No, just toss it."
+  ],
+  "note": ""
+ },
+ "v_7b2ac165bc": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:208 (Remind)",
+   "Steps.luau:377 (Remind)"
+  ],
+  "old": "Toss it in the bin.",
+  "new": [
+   "In the bin, Rookie."
+  ],
+  "note": "highlight na lixeira"
+ },
+ "v_084dafdffc": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:218 (Say)"
+  ],
+  "old": "Drag the plate to them.",
+  "new": [],
+  "note": "Não vejo necessidade"
+ },
+ "v_f3c8411ef1": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:218 (Say)"
+  ],
+  "old": "Looks right.",
+  "new": [
+   "Well, it looks good. Just take it to the customer."
+  ],
+  "note": "Juntei com a próxima"
+ },
+ "v_a0349e1b15": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:219 (Remind)"
+  ],
+  "old": "Drag the plate to the customer.",
+  "new": [],
+  "note": "Não temos mais essa interacão"
+ },
+ "v_f4e083c4a2": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:227 (Say)"
+  ],
+  "old": "Now serve it.",
+  "new": [],
+  "note": "Não temos mais essa interacão, a do it looks good já cobre e fica só o highlight"
+ },
+ "v_2ab9e0108a": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:228 (Remind)"
+  ],
+  "old": "Hand it over.",
+  "new": [],
+  "note": "Não precisa dessa"
+ },
+ "v_9c9c28ad51": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:241 (Say)"
+  ],
+  "old": "That's your first customer.",
+  "new": [],
+  "note": "Não precisa dessa, já temos uma"
+ },
+ "v_59a8bd4b0f": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:242 (Remind)"
+  ],
+  "old": "Tap the tablet, Rookie.",
+  "new": [],
+  "note": "Não precisa dessa, já temos a here it comes your first client, deixa apenas o highlight mesmo e os jogadores vão entender"
+ },
+ "v_08329d7286": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:263 (Say)"
+  ],
+  "old": "Now, start making some sausage.",
+  "new": [],
+  "note": "Não precisa dessa"
+ },
+ "v_cc301909fb": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:264 (Remind)"
+  ],
+  "old": "Sausage on the grill, Rookie.",
+  "new": [],
+  "note": "Não precisa dessa"
+ },
+ "v_620956a811": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:273 (Say)"
+  ],
+  "old": "Wait for it.",
+  "new": [],
+  "note": "Não precisa dessa"
+ },
+ "v_41c4165fcc": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:283 (Done)"
+  ],
+  "old": "Nice flip.",
+  "new": [],
+  "note": "Não precisa dessa, já tem o good"
+ },
+ "v_69676bd5f3": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:284 (Remind)"
+  ],
+  "old": "Flip it now.",
+  "new": [],
+  "note": "Não precisa dessa"
+ },
+ "v_5a210494c2": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:293 (Say)"
+  ],
+  "old": "Done. Off the grill.",
+  "new": [],
+  "note": "Não precisa dessa, já fiz uma antes, a do put it aside"
+ },
+ "v_5383e7bc17": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:294 (Remind)"
+  ],
+  "old": "Onto the rail with it.",
+  "new": [],
+  "note": "Não precisa dessa"
+ },
+ "v_5e30452a59": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:303 (Say)"
+  ],
+  "old": "Now cut some bread.",
+  "new": [],
+  "note": "Não precisa dessa, já tem uma"
+ },
+ "v_3105e64ae5": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:305 (Remind)"
+  ],
+  "old": "Slice the bun.",
+  "new": [],
+  "note": "Não precisa dessa, já tem uma"
+ },
+ "v_2e83243b1d": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:323 (Say)"
+  ],
+  "old": "Grab the plate with their ticket.",
+  "new": [],
+  "note": "Não precisa dessa já tem uma"
+ },
+ "v_50c6578d54": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:333 (Say)"
+  ],
+  "old": "Now take the bread and put it on the plate.",
+  "new": [],
+  "note": ""
+ },
+ "v_4d8a1537d4": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:324 (Remind)"
+  ],
+  "old": "Take the plate.",
+  "new": [],
+  "note": ""
+ },
+ "v_e576dfde8e": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:335 (Remind)"
+  ],
+  "old": "Bun on the plate.",
+  "new": [],
+  "note": ""
+ },
+ "v_30fdce6bc6": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:344 (Say)"
+  ],
+  "old": "Grab the dog.",
+  "new": [],
+  "note": ""
+ },
+ "v_15ef737c92": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:345 (Remind)"
+  ],
+  "old": "Take it from the rail.",
+  "new": [],
+  "note": ""
+ },
+ "v_aab2ac1f7c": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:354 (Say)"
+  ],
+  "old": "Now the sausage.",
+  "new": [],
+  "note": ""
+ },
+ "v_3ac2e96390": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:356 (Remind)"
+  ],
+  "old": "Dog on the plate.",
+  "new": [],
+  "note": ""
+ },
+ "v_e9fd1671de": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:365 (Say)"
+  ],
+  "old": "Take the plate to the condiment table.",
+  "new": [],
+  "note": ""
+ },
+ "v_710d4b7bae": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:367 (Remind)"
+  ],
+  "old": "Sauce on the dog, Rookie.",
+  "new": [
+   "Rookie, just take the sauce."
+  ],
+  "note": ""
+ },
+ "v_c9b08084cd": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:387 (Say)"
+  ],
+  "old": "Hand it over at the pickup.",
+  "new": [],
+  "note": ""
+ },
+ "v_d9eaa51ad3": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:388 (Remind)"
+  ],
+  "old": "Pickup counter. Hand it over.",
+  "new": [],
+  "note": ""
+ },
+ "v_ca3dfc8d65": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:406 (Say)"
+  ],
+  "old": "Cash goes in the drawer.",
+  "new": [],
+  "note": ""
+ },
+ "v_0b51420d50": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:406 (Say)"
+  ],
+  "old": "Ka-ching! First sale.",
+  "new": [
+   "Your first sale, huh? Good."
+  ],
+  "note": ""
+ },
+ "v_15993e64ca": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:416 (Say)"
+  ],
+  "old": "That was your last bun.",
+  "new": [
+   "If you run out of ingredients, take it in the back."
+  ],
+  "note": ""
+ },
+ "v_2585223d7c": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:417 (Say)"
+  ],
+  "old": "Mart's across the street.",
+  "new": [],
+  "note": ""
+ },
+ "v_dbf37e1260": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:418 (Say)",
+   "Steps.luau:485 (Say)"
+  ],
+  "old": "Look both ways.",
+  "new": [],
+  "note": ""
+ },
+ "v_0236fd070b": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:420 (Done)"
+  ],
+  "old": "That's the place.",
+  "new": [],
+  "note": ""
+ },
+ "v_0d5df0bc3f": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:421 (Remind)"
+  ],
+  "old": "Follow the arrow to the Mart.",
+  "new": [],
+  "note": ""
+ },
+ "v_510565a334": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:429 (Say)"
+  ],
+  "old": "Grab buns at the bakery.",
+  "new": [],
+  "note": ""
+ },
+ "v_9426ce2cf4": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:430 (Done)"
+  ],
+  "old": "Eight buns. That'll do.",
+  "new": [],
+  "note": ""
+ },
+ "v_b47071f788": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:431 (Remind)"
+  ],
+  "old": "Bakery shelf. Hold Buy Buns.",
+  "new": [],
+  "note": ""
+ },
+ "v_9ac90c1e2d": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:439 (Say)"
+  ],
+  "old": "Bring them to the trailer.",
+  "new": [],
+  "note": ""
+ },
+ "v_2990698958": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:440 (Remind)"
+  ],
+  "old": "Back to the trailer.",
+  "new": [],
+  "note": ""
+ },
+ "v_d6c0f7b3d1": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:448 (Say)"
+  ],
+  "old": "Hold Restock on the bun crate.",
+  "new": [],
+  "note": ""
+ },
+ "v_de8484defd": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:449 (Done)",
+   "Steps.luau:473 (Done)"
+  ],
+  "old": "Stocked up!",
+  "new": [],
+  "note": ""
+ },
+ "v_811b01e885": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:450 (Remind)"
+  ],
+  "old": "Hold Restock at the bun crate.",
+  "new": [],
+  "note": ""
+ },
+ "v_26d4cc4df9": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:461 (Say)"
+  ],
+  "old": "Grab a box.",
+  "new": [],
+  "note": ""
+ },
+ "v_e5619d79e3": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:461 (Say)"
+  ],
+  "old": "Running low? Hit the stock room.",
+  "new": [],
+  "note": ""
+ },
+ "v_137c1443f9": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:463 (Remind)"
+  ],
+  "old": "Take a box off the shelf.",
+  "new": [],
+  "note": ""
+ },
+ "v_9179f4e99d": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:472 (Say)"
+  ],
+  "old": "Hold Restock.",
+  "new": [],
+  "note": ""
+ },
+ "v_7267d65d8e": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:472 (Say)"
+  ],
+  "old": "Take it to its station.",
+  "new": [],
+  "note": ""
+ },
+ "v_a111a0689a": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:474 (Remind)"
+  ],
+  "old": "Hold Restock at the station.",
+  "new": [],
+  "note": ""
+ },
+ "v_7a64804dde": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:484 (Say)"
+  ],
+  "old": "Low on stuff? Try the Mart.",
+  "new": [],
+  "note": ""
+ },
+ "v_adacd686b6": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:499 (Say)"
+  ],
+  "old": "Keep an eye on the clock.",
+  "new": [],
+  "note": "Removida: 'Your shift ends at six.' já é a fala anterior (take duplicado)"
+ },
+ "v_4522a783a3": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:515 (Remind)"
+  ],
+  "old": "Follow the arrow to the Gear Stand.",
+  "new": [
+   "It's 6 AM, your shift is over. Go outside and check if you find anything useful."
+  ],
+  "note": "Para os upgrades"
+ },
+ "v_b05e7e63d7": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:525 (Remind)"
+  ],
+  "old": "Pick an upgrade, Rookie.",
+  "new": [
+   "You can choose something. I'm gonna pay for it."
+  ],
+  "note": ""
+ },
+ "v_42acd1ee58": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:638 (GREETING)"
+  ],
+  "old": "Good evening, Rookie.",
+  "new": [],
+  "note": ""
+ },
+ "v_3e91827b5e": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:640 (GOODBYE)"
+  ],
+  "old": "That's the job. You got this.",
+  "new": [],
+  "note": ""
+ },
+ "v_b7e3644ee5": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:640 (GOODBYE)"
+  ],
+  "old": "Call me if...",
+  "new": [
+   "That's your job. Call me if you need me."
+  ],
+  "note": "Juntei com a próxima"
+ },
+ "v_04ff36900d": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:642 (SKIP_GOODBYE)"
+  ],
+  "old": "Alright. You know the drill.",
+  "new": [],
+  "note": ""
+ },
+ "v_60345d932a": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:642 (SKIP_GOODBYE)"
+  ],
+  "old": "Call me if you need me.",
+  "new": [],
+  "note": ""
+ },
+ "v_d8303b48c7": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:240"
+  ],
+  "old": "No face? Don't cook it. It'll leave.",
+  "new": [
+   "If you see someone with no face, just don't make any questions. Ignore him and he will leave."
+  ],
+  "note": ""
+ },
+ "v_8834479eb6": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:241"
+  ],
+  "old": "No face? Don't cook it.",
+  "new": [],
+  "note": "="
+ },
+ "v_b85a2cb780": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:252"
+  ],
+  "old": "I've got a key. Lock it.",
+  "new": [
+   "Also, if someone knocks at the door... it's not me, lock it."
+  ],
+  "note": ""
+ },
+ "v_4445f5fc9b": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:252"
+  ],
+  "old": "Shaking? Just bread. Knocks? Lock the door.",
+  "new": [
+   "If you see someone shaking, hes probably just hungry, give him a bread."
+  ],
+  "note": ""
+ },
+ "v_71a7c2c40f": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:252"
+  ],
+  "old": "Just bread. Nothing on it.",
+  "new": [],
+  "note": ""
+ },
+ "v_5f0a0286c5": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:260"
+  ],
+  "old": "Lights out? Breaker. Copy? Don't cook it.",
+  "new": [
+   "If the lights turn off, the breaker is outside, go there and fix it."
+  ],
+  "note": ""
+ },
+ "v_59c25d05ec": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:260"
+  ],
+  "old": "Same order twice? It's a copy. Don't cook it.",
+  "new": [
+   "Rookie, it seems that something weird is happening today... if you see someone showing up twice don't serve him."
+  ],
+  "note": ""
+ },
+ "v_b69d01bd59": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:267"
+  ],
+  "old": "Backwards head? Eyes down. Watcher? Don't look.",
+  "new": [
+   "Some customers have a neck problem, so if you see one, don't stare him, just give the food to him and your head down"
+  ],
+  "note": ""
+ },
+ "v_1649500237": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:267"
+  ],
+  "old": "Don't look at her when you hand it over.",
+  "new": [],
+  "note": "Duplicado, já tem um falando sobre isso"
+ },
+ "v_43f6966d49": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:275"
+  ],
+  "old": "Raincoat lady? Serve her. Be nice.",
+  "new": [
+   "Hey Rookie, if you see the raincoat lady, I love her, server her and be nice to her."
+  ],
+  "note": ""
+ },
+ "v_904fc1271f": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:275"
+  ],
+  "old": "White eyes? Lights off, then serve her.",
+  "new": [
+   "If you see someone with white eyes, TURN OFF THE LIGHTS, and give them the food, they are light sensitive"
+  ],
+  "note": ""
+ },
+ "v_b9faff9e5c": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:275"
+  ],
+  "old": "White eyes? Lights off. Raincoat? Serve her.",
+  "new": [],
+  "note": "não precisa dessse, já tem 2 antes falando sobre isso"
+ },
+ "v_efa8c12c63": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:282"
+  ],
+  "old": "Be quick. Serve it fast.",
+  "new": [],
+  "note": "Juntei na próxima, exclui essa"
+ },
+ "v_fce63cd3f8": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:282"
+  ],
+  "old": "Big head? Be quick. Red fog? Shut the window.",
+  "new": [
+   "If you see the customer with a big head, give them the food fast, they have a headache. And also, a red fog might show up, so close the window if it happens."
+  ],
+  "note": ""
+ },
+ "v_64126d7eea": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:300"
+  ],
+  "old": "It's not me. Lock it.",
+  "new": [],
+  "note": "Já tem um áudio falando isso"
+ },
+ "v_e5b96e0218": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:300"
+  ],
+  "old": "Roof steps? Don't look up. Knocks? Lock the door.",
+  "new": [
+   "If you hear steps at the roof, its probably a cat. Dont look up."
+  ],
+  "note": "Já tem um audio de knocks, então não precisa explicar novamente"
+ },
+ "v_c992349910": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:358"
+  ],
+  "old": "Pick whatever you like. Your call.",
+  "new": [],
+  "note": "esse é de compra? já tem um acredito eu."
+ },
+ "v_cefb6db0ca": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:382"
+  ],
+  "old": "Nice! Tips go to the cash.",
+  "new": [],
+  "note": "não precisa, tiramos a tip jar"
+ },
+ "v_4f24f44a3e": {
+  "speaker": "walt",
+  "sources": [
+   "BossCalls.luau:382"
+  ],
+  "old": "Low on stock? Grab a box in the pantry.",
+  "new": [],
+  "note": "já tem audio de estoque"
+ },
+ "v_2bbbd2abc6": {
+  "speaker": "walt",
+  "sources": [
+   "Steps.luau:282 (Say)"
+  ],
+  "old": "Flip it.",
+  "new": [],
+  "note": "já tem também"
+ }
+}

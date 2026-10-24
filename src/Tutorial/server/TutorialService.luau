@@ -1,8 +1,8 @@
 --!strict
 -- TutorialService (user request 2026-10-11, Provisional; Q-### "tutorial always on Day 1, never saved"): single
 -- responder of `TutorialComplete` (network.md). The tutorial is NOT saved and NOT mandatory: it is pending for every
--- player on Day 1 of the run (normal and infinite mode alike) until that player finishes or skips it (client packet
--- TutorialComplete, idempotent) or the run goes past Day 1 (latched: coming back to Day 1 does not reopen it). State
+-- player on the run's first shift, Night 1 (DEC-360: no day shift), until that player finishes or skips it (client packet
+-- TutorialComplete, idempotent) or the run goes past Night 1 (latched: coming back to Night 1 does not reopen it). State
 -- is in memory of this server (one run per server), per UserId; a player who leaves and comes back to the same run does not get it again (owner 2026-10-21).
 -- The profile field TutorialDone stays in the schema for compatibility with saved data, but nothing reads or writes
 -- it any more. Run place only.
@@ -17,9 +17,9 @@
 -- customer still waits, a hot dog thrown away gives the bun back (never stuck without a bun for the first sale). When
 -- the buns run out with a rookie pending, Cash is topped up to the package price (EconomyService:TopUp) so the
 -- purchase never stalls on money. Server decides: the client only reads the Stock set.
--- Day 1 stands still for the tutorial (user decision 2026-10-12, Provisional): ShouldHold is the single answer to "the
--- tutorial holds Day 1" and feeds two hooks registered in OnInit: RoundService:SetClockHold (the clock of Prep and Open
--- freezes, so the 30 s Prep cap and the 216 s Open cap cannot run out under the lesson) and
+-- Night 1 stands still for the tutorial (user decision 2026-10-12, Provisional): ShouldHold is the single answer to "the
+-- tutorial holds Night 1" and feeds two hooks registered in OnInit: RoundService:SetClockHold (the clock of Prep and Night
+-- freezes, so their caps cannot run out under the lesson) and
 -- CustomerService:SetSpawnHold (no regular customer, adoption or guarantee until it ends). It ends when nobody has the
 -- tutorial pending any more (finished, skipped, left) or after Content.Shift.TutorialHoldMax seconds of holding (safety:
 -- an AFK rookie never freezes the server for good; latched until DevReset). Co-op: held for everyone while any rookie is
@@ -27,13 +27,13 @@
 -- Dev tools (Provisional, user request 2026-10-11; DevService/Commands/Tutorial.luau): DevReset reopens the tutorial for
 -- the player in this run, at any day, without touching the profile (the client restarts the tutorial without the intro), DevSend forwards a client-side dev command (voice
 -- test, debug panel, step jump) to one player through the dev-only `DevClient` packet. Both refuse outside dev mode.
--- Day 1 upgrade lesson (owner request 2026-10-14, Provisional; shared.Tutorial.Rules.Upgrade): a player who answered
--- the tutorial call on Day 1 is a rookie of this run (Rookies, memory only). When the first shift ends (the day Closing
--- at 6 PM; the Summary of Night 1 when the run starts at night, owner bug 2026-10-20) with a rookie in the server and no Gear Stand line bought yet, ShouldHold also holds the Closing (clock frozen
--- at 6 PM, no probe end), and once the last-call line is empty (the Closing probe) the lesson is "due": Cash is topped up
--- to Rules.Upgrade.Cash (at least the Storage price) and BossService rings Rules.Upgrade.Call once (LessonCallDue). It
--- ends for good (LessonOver, latched) when any Gear Stand line is bought, the run leaves Day 1 / the day shift, no rookie
--- is left, or after Content.Shift.TutorialHoldMax s of holding the Closing (AFK rookie). When the call goes out the
+-- Upgrade lesson (owner request 2026-10-14, Provisional; shared.Tutorial.Rules.Upgrade): a player who answered the
+-- tutorial call on Night 1 is a rookie of this run (Rookies, memory only). When the first shift ends (the Summary of
+-- Night 1 at 6 AM, owner bug 2026-10-20; DEC-360) with a rookie in the server and no Gear Stand line bought yet,
+-- ShouldHold also holds the Summary (clock frozen, no probe end), and once the report had Rules.Upgrade.AfterReport s
+-- the lesson is "due": Cash is topped up to Rules.Upgrade.Cash (at least the Storage price) and BossService rings
+-- Rules.Upgrade.Call once (LessonCallDue). It ends for good (LessonOver, latched) when any Gear Stand line is bought,
+-- the run leaves Night 1, no rookie is left, or after Content.Shift.TutorialHoldMax s of holding the Summary (AFK rookie). When the call goes out the
 -- Gear Stand is opened for the lesson (GearStandService:OpenForLesson; its hours open it only on the Summary). TutorialController shows the
 -- steps and MarketController the arrow (client side reads the Upgrades set and the Boss call).
 -- Restaurant (TASK-393, shared.Tutorial.Rules.Restock): the restock steps are client only (stock room bay -> Restock at
@@ -41,6 +41,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
+local Workspace = game:GetService("Workspace")
 local Content = require(ReplicatedStorage.shared.Content)
 local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
 local Modux = require(ServerScriptService.server.Modux)
@@ -51,6 +52,10 @@ const TICK_RATE = 2 -- Hz: the pending check of the tutorial customer
 const HOT_DOG = "hot_dog"
 const PACKAGE = Content.Packages.ByKey[TutorialRules.Package]
 const BUN = if PACKAGE then PACKAGE.Ingredient else "bun"
+
+const SHOWER_LEAD = 0.15 -- s ahead of now the tutorial's shower is stamped (AtmosphereService STRIKE_LEAD: replication)
+-- the tutorial's rain went out in this run's server (Complete; one run per server)
+local rained = false
 
 const SKIP_ATTRIBUTE = "TutorialSkipped" -- on the Player: skipped on the lobby pad or back in a run (TutorialController reads it)
 
@@ -96,7 +101,7 @@ function TutorialService:Setup()
 	self.Seen = {} :: { [number]: boolean }
 	-- UserId -> reopened by /dev tutorial reset: ignores the day gate until it ends again
 	self.Revived = {} :: { [number]: boolean }
-	-- the run went past Day 1 (latched)
+	-- the run went past Night 1 (latched)
 	self.Past = false :: boolean
 	-- os.clock() when the current hold began (0 = not holding); HoldExpired = the safety timeout ran out (latched)
 	self.HoldSince = 0 :: number
@@ -107,12 +112,19 @@ function TutorialService:Setup()
 	self.WaitUsed = 0 :: number
 	self.WaitAt = 0 :: number
 	self.WaitTold = {} :: { [number]: boolean }
-	-- Day 1 upgrade lesson: UserId -> answered the tutorial call this run; lesson over (latched); the call / cash went
-	-- out; os.clock() the Closing hold began (0 = not holding)
+	-- Upgrade lesson: UserId -> answered the tutorial call this run; lesson over (latched); the call / cash went
+	-- out; os.clock() the Summary hold began (0 = not holding)
 	self.Rookies = {} :: { [number]: boolean }
 	self.LessonOver = false :: boolean
 	self.LessonRung = false :: boolean
 	self.LessonSince = 0 :: number
+	-- the night call the tutorial call replaced is still owed (BossService:SetOwed): no anomaly starts until Walt said it
+	-- (owner 2026-10-22)
+	self.CallOwed = false :: boolean
+end
+
+function TutorialService:SetCallOwed(owed: boolean)
+	self.CallOwed = owed
 end
 
 -- The player finished or skipped the tutorial: over for this run (idempotent, not saved)
@@ -126,26 +138,30 @@ function TutorialService:Complete(player: Player, how: string?)
 	self.Revived[player.UserId] = nil
 	if how == "done" then
 		self.Dependencies.RewardService:Unlock(player, "tutorial_done") -- badge "Clocked In" (DEC-315)
+		-- owner 2026-10-21: finishing the tutorial brings the night's rain, once per run. The forced-shower attribute of
+		-- AtmosphereService:Shower, written here so this service needs no new dependency (no generated type change)
+		if not rained then
+			rained = true
+			const rules = Content.Atmospheres.Rules
+			const at = Workspace:GetServerTimeNow() + SHOWER_LEAD
+			Workspace:SetAttribute(rules.ShowerAttribute, `{string.format("%.3f", at)}:{rules.TutorialShower}`)
+		end
 	end
 end
 
--- Day 1 of the run still on (latches off once the day moves on or a night shift starts)
--- The run's first shift: Day 1, or Night 1 (on Day 2) when the run starts at night (Shift.RunStartsAtNight, DEC-300). The name
--- stays OnDayOne (the old run always opened on Day 1); latched once the run is past it.
+-- The run's first shift still on: Night 1 (on Day 2; DEC-300, DEC-360: the run always starts at night). The name stays
+-- OnDayOne (the old run opened on a Day 1 day shift); latched once the run is past it.
 function TutorialService:OnDayOne(): boolean
 	if not self.Past then
 		const info = self.Dependencies.RoundService:Info()
-		const past = if Content.Shift.RunStartsAtNight
-			then info.Night > 1 or (info.Day > 2)
-			else info.Day > 1 or info.IsNight
-		if past then
+		if info.Night > 1 or info.Day > 2 then
 			self.Past = true
 		end
 	end
 	return not self.Past
 end
 
--- A player in the server still has the tutorial ahead: Day 1 of the run and not finished / skipped (or reopened by dev)
+-- A player in the server still has the tutorial ahead: Night 1 of the run and not finished / skipped (or reopened by dev)
 function TutorialService:IsPending(player: Player): boolean
 	if player.Parent == nil or self.Closed[player.UserId] then
 		return false
@@ -161,7 +177,7 @@ function TutorialService:Reason(player: Player): string?
 	if self.Closed[player.UserId] then
 		return "done or skipped this run"
 	end
-	return `day {self.Dependencies.RoundService:GetDay()} is past day 1`
+	return `night {self.Dependencies.RoundService:Info().Night} is past night 1`
 end
 
 function TutorialService:AnyPending(): boolean
@@ -268,14 +284,11 @@ function TutorialService:AnyRookie(): boolean
 	return false
 end
 
--- Phase of the upgrade lesson: the end of the run's first shift. Run at night (Shift.RunStartsAtNight, DEC-300): the
--- Summary of Night 1 (owner bug 2026-10-20: the 10 s break ran out and Night 2's call rang before any purchase); else the
--- day Closing of Day 1 (6 PM)
-local function lessonPhase(): string
-	return if Content.Shift.RunStartsAtNight then "Summary" else "Closing"
-end
+-- Phase of the upgrade lesson: the end of the run's first shift, the Summary of Night 1 at 6 AM (DEC-360; owner bug
+-- 2026-10-20: the 10 s break ran out and Night 2's call rang before any purchase)
+const LESSON_PHASE = "Summary"
 
--- The upgrade lesson runs now: the end of the first shift (lessonPhase), a rookie around, nothing bought yet (latches
+-- The upgrade lesson runs now: the end of the first shift (LESSON_PHASE), a rookie around, nothing bought yet (latches
 -- off for good). Only a real purchase ends it (BoughtGear reads UpgradeService levels), never a walk out and back.
 function TutorialService:LessonActive(): boolean
 	if not self.Enabled or self.LessonOver or not TutorialRules.Upgrade.Enabled then
@@ -286,7 +299,7 @@ function TutorialService:LessonActive(): boolean
 		self.LessonOver = true
 		return false
 	end
-	if round:GetPhase() ~= lessonPhase() or not self:AnyRookie() then
+	if round:GetPhase() ~= LESSON_PHASE or not self:AnyRookie() then
 		return false
 	end
 	if self:BoughtGear() then
@@ -296,13 +309,14 @@ function TutorialService:LessonActive(): boolean
 	return true
 end
 
--- Walt may call (BossService polls this; the call is Once): at once in the Summary, once the last-call line is empty in
--- the day Closing
+-- Walt may call (BossService polls this; the call is Once): in the Summary once the report had its Rules.Upgrade.AfterReport
+-- s (owner 2026-10-21: report first, then the lesson)
 function TutorialService:LessonCallDue(): boolean
 	if not self:LessonActive() then
 		return false
 	end
-	return lessonPhase() ~= "Closing" or self.Dependencies.RoundService:ProbeSaysEnd("Closing")
+	const round = self.Dependencies.RoundService
+	return workspace:GetServerTimeNow() - round.PhaseStartedAt() >= TutorialRules.Upgrade.AfterReport
 end
 
 -- Cash up to Rules.Upgrade.Cash (never below the price of the lesson's level) once the call goes out
@@ -322,11 +336,11 @@ function TutorialService:StepLesson()
 	end
 	self.LessonRung = true
 	self:LessonCash()
-	-- the stand opens on the Summary, after this Closing: open it for the lesson (R-2)
+	-- the stand may still be closed when the call goes out: open it for the lesson (R-2)
 	self.Dependencies.GearStandService:OpenForLesson()
 end
 
--- The Closing of Day 1 stands still for the lesson (own safety timer: an AFK rookie never freezes the server)
+-- The Summary of Night 1 stands still for the lesson (own safety timer: an AFK rookie never freezes the server)
 function TutorialService:LessonHold(): boolean
 	if not self:LessonActive() then
 		self.LessonSince = 0
@@ -338,14 +352,14 @@ function TutorialService:LessonHold(): boolean
 	elseif t - self.LessonSince > Content.Shift.TutorialHoldMax then
 		self.LessonOver = true
 		self.LessonSince = 0
-		warn(`[TutorialService] Day 1 upgrade lesson held {Content.Shift.TutorialHoldMax} s: released (safety timeout)`)
+		warn(`[TutorialService] Night 1 upgrade lesson held {Content.Shift.TutorialHoldMax} s: released (safety timeout)`)
 		return false
 	end
 	return true
 end
 
--- Day 1 stands still for the tutorial: a day shift in Prep or Open with someone still in the tutorial, or the day
--- Closing of the upgrade lesson
+-- Night 1 stands still for the tutorial: Prep or Night of a night shift with someone still in the tutorial, or the
+-- Summary of the upgrade lesson
 function TutorialService:ShouldHold(): boolean
 	if not self.Enabled then
 		return false
@@ -358,8 +372,8 @@ function TutorialService:ShouldHold(): boolean
 	end
 	const round = self.Dependencies.RoundService
 	const phase = round:GetPhase()
-	-- the night's shop too (owner 2026-10-19): Night 1's Prep and Night phases hold for the tutorial
-	const holdable = if round:IsNight() then phase == "Prep" or phase == "Night" else phase == "Prep" or phase == "Open"
+	-- the night's shop (owner 2026-10-19): Night 1's Prep and Night phases hold for the tutorial (no day shift, DEC-360)
+	const holdable = round:IsNight() and (phase == "Prep" or phase == "Night")
 	if not holdable or not self:AnyPending() then
 		self.HoldSince = 0
 		return false
@@ -370,7 +384,7 @@ function TutorialService:ShouldHold(): boolean
 	elseif t - self.HoldSince > Content.Shift.TutorialHoldMax then
 		self.HoldExpired = true
 		self.HoldSince = 0
-		warn(`[TutorialService] Day 1 held {Content.Shift.TutorialHoldMax} s: released (safety timeout)`)
+		warn(`[TutorialService] Night 1 held {Content.Shift.TutorialHoldMax} s: released (safety timeout)`)
 		return false
 	end
 	if not self:CountWait(t) then
@@ -463,6 +477,12 @@ end
 
 function TutorialService:Step()
 	self:StepLesson()
+	-- owner 2026-10-22: no natural rain while anyone's tutorial is still ahead (the shower of Complete is the first one)
+	const showersHeld = Content.Atmospheres.Rules.ShowersHeldAttribute
+	const holdRain = self:AnyPending()
+	if Workspace:GetAttribute(showersHeld) ~= holdRain then
+		Workspace:SetAttribute(showersHeld, holdRain)
+	end
 	if self.Asked and not self:AnyPending() then
 		self.Asked = false
 		self.Dependencies.CustomerService:EndTutorial()
@@ -483,7 +503,8 @@ TutorialService:OnInit(function(self)
 	end)
 	-- owner 2026-10-19: no anomaly and no sanity lost while a rookie's tutorial runs (the first customer is the tutorial's)
 	self.Dependencies.AnomalyService:SetHold(function(): boolean
-		return self:AnyPending()
+		-- owner 2026-10-22: after the tutorial, still none until Walt's night call (after the first customer) was said
+		return self:AnyPending() or self.CallOwed
 	end)
 	self.Dependencies.VitalService:SetHold(function(): boolean
 		return self:AnyPending()

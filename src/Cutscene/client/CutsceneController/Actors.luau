@@ -15,6 +15,8 @@
 --   WaltCoffee     Walt's offer: a coffee flies from his hand to the front of THIS client's camera (ending.md §2.2)
 --   RaincoatLady   frog (DEC-203) in a raincoat with an umbrella: RL-1 -> RL-END, nods at Walt, sinks into a puddle
 --   Flyer          "NIGHT SHIFT — NOW HIRING" flyer flapping on the P-01 post (ending.md §2.4, AN-03)
+--   WaltDawn, HandCup, WaltTurn, DoorBlast, WaltLoom, WaltGrip, Crowd
+--                  "The Second Coffee" (Finale.luau; it gets this file's builders as a Kit)
 --
 -- PROVISIONAL (TASK-121): Walt and the Raincoat Lady are CrewRig placeholders (civil outfit + Part props) until the
 -- sheets AST-059 / CHR-001 ship (TASK-125); the flip, the coffee, the puddle and the flyer are Part placeholders;
@@ -24,6 +26,7 @@ local Workspace = game:GetService("Workspace")
 local Content = require(ReplicatedStorage.shared.Content)
 local CrewRig = require(ReplicatedStorage.shared.Crew.CrewRig)
 local Cars = require(script.Parent.Cars)
+local Finale = require(script.Parent.Finale)
 
 export type Actor = {
 	Model: Model?,
@@ -485,8 +488,20 @@ local function flyer(ctx: Context): Actor?
 	}
 end
 
--- Builds the actor of an `Actor` beat; nil = unknown target or missing map points (warned once by the caller)
-function Actors.Create(target: string, ctx: Context): Actor?
+-- The builders Finale.luau shares (it cannot require this file back)
+const FINALE_KIT: Finale.Kit = {
+	Rig = rig,
+	Part = part,
+	Cylinder = cylinder,
+	Attach = attach,
+	Limb = limb,
+	Flat = flat,
+	WalkPose = walkPose,
+}
+
+-- Builds the actor of an `Actor` beat; nil = unknown target or missing map points (warned once by the caller).
+-- `value` = the beat's Value (DoorBlast: s to the blast)
+function Actors.Create(target: string, ctx: Context, value: number?): Actor?
 	const car = Content.Cutscenes.Rules.Cars[target]
 	if car ~= nil then
 		const actor, problem = Cars.Create(target, car, {
@@ -515,7 +530,7 @@ function Actors.Create(target: string, ctx: Context): Actor?
 	elseif target == "Flyer" then
 		return flyer(ctx)
 	end
-	return nil
+	return Finale.Create(target, ctx, FINALE_KIT, value)
 end
 
 return table.freeze(Actors)

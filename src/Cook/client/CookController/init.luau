@@ -12,7 +12,6 @@
 	The server decides everything (stock, plate, grill, scores clamped); the props are local and go with the focus.
 ]]
 local CollectionService = game:GetService("CollectionService")
-local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -25,6 +24,7 @@ local Grade = require(ReplicatedStorage.shared.Prep.Grade)
 local Restaurant = require(ReplicatedStorage.shared.Libs.Net.Restaurant)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Theme = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Theme)
+local FocusExit = require(StarterPlayer.StarterPlayerScripts.client.Interface.FocusExit)
 local Board = require(script.Board)
 local Grill = require(script.Grill)
 local Hud = require(script.Hud)
@@ -40,14 +40,14 @@ const HOLD = "Cook"
 const FOCUS_ATTRIBUTE = "CookStation" -- local attribute on the own Player while a focus is open
 const BACK_HINT = "CookBackHint" -- local attribute the tutorial sets: pulse the Back button (DEC-311)
 const HUD_LEAN = "HudLean" -- local attribute of HudController: lean tutorial HUD, the hint line stays off (owner 2026-10-19)
-const SINK_ACTION = "CookFocusSink"
 const LEAVE_ACTION = "CookFocusLeave"
 const SINK_PRIORITY = 3000
 const FOV = 55
 -- Framing (DEC-310, owner 2026-10-19: "the grill is too close"): the camera looks down at PITCH and backs off until the framed
 -- box fits the screen with MARGIN around it, never closer than MIN_DISTANCE. Provisional, judged in Play.
 -- owner 2026-10-20 ("n coloca muito de cima não... mais baixa e olhando para a grelha"): grill 55 -> 40, board 58 -> 45
-const PITCH: { [string]: number } = { Board = math.rad(45), Grill = math.rad(40), Toppings = math.rad(52) }
+-- owner 2026-10-22: the condiment table 52 -> 61 (judged in the UI Labs SauceGuide story)
+const PITCH: { [string]: number } = { Board = math.rad(45), Grill = math.rad(40), Toppings = math.rad(61) }
 -- owner 2026-10-20 ("a tela do cachorro quente tá muito afastada, pode aproximar mais?"): 1.35 left a third of the screen to
 -- floor and wall; the box now fills ~90% of the limiting side
 const MARGIN = 1.1
@@ -70,24 +70,9 @@ const LEAVE_TRAVEL = 0.35
 const DONE_DELAY = 1.1 -- s the result stays on screen before the focus leaves by itself
 const GRADE_SHOW = 1.2 -- s the grade of a gesture stays
 const NICE = 70 -- a gesture score from here to Perfect pops "Nice!" (DEC-311; the plate bands stay Perfect / Good / Messy)
-const WALK_KEYS: { Enum.KeyCode } = {
-	Enum.KeyCode.W,
-	Enum.KeyCode.A,
-	Enum.KeyCode.S,
-	Enum.KeyCode.D,
-	Enum.KeyCode.Up,
-	Enum.KeyCode.Down,
-	Enum.KeyCode.Left,
-	Enum.KeyCode.Right,
-	Enum.KeyCode.Space,
-}
 const LEAVE_KEYS: { Enum.KeyCode } = { Enum.KeyCode.Backspace, Enum.KeyCode.Q, Enum.KeyCode.ButtonB }
 -- the gamepad stick and buttons drive the cursor: never the character while focused
 const PAD_SINK: { Enum.KeyCode } = { Enum.KeyCode.Thumbstick1, Enum.KeyCode.ButtonA, Enum.KeyCode.ButtonR2 }
-const SINK_KEYS: { Enum.KeyCode } = table.clone(WALK_KEYS)
-for _, key in PAD_SINK do
-	table.insert(SINK_KEYS, key)
-end
 
 type Station = "Board" | "Grill" | "Toppings"
 
@@ -100,6 +85,7 @@ type Active = {
 	Gui: Instance,
 	Folder: Folder,
 	Heartbeat: RBXScriptConnection,
+	Exit: () -> (), -- unbinds the walk / leave keys (FocusExit)
 }
 
 const CookController =
@@ -455,22 +441,15 @@ function CookController:Enter(station: Station, target: Instance)
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 	-- walking leaves; the stick and the press buttons are the cursor's
-	ContextActionService:BindActionAtPriority(SINK_ACTION, function(_name: string, state: Enum.UserInputState, input: InputObject)
-		if state == Enum.UserInputState.Begin and table.find(WALK_KEYS, input.KeyCode) ~= nil then
-			task.defer(function()
-				self:Leave()
-			end)
-		end
-		return Enum.ContextActionResult.Sink
-	end, false, SINK_PRIORITY, table.unpack(SINK_KEYS))
-	ContextActionService:BindActionAtPriority(LEAVE_ACTION, function(_name: string, state: Enum.UserInputState)
-		if state == Enum.UserInputState.Begin then
-			task.defer(function()
-				self:Leave()
-			end)
-		end
-		return Enum.ContextActionResult.Sink
-	end, false, SINK_PRIORITY, table.unpack(LEAVE_KEYS))
+	const exit = FocusExit.Bind({
+		Name = LEAVE_ACTION,
+		Priority = SINK_PRIORITY,
+		OnLeave = function()
+			self:Leave()
+		end,
+		Leave = LEAVE_KEYS,
+		Sink = PAD_SINK,
+	})
 	self.Dependencies.InputController:Hold(HOLD, true)
 	-- owner 2026-10-20: the stick sat under Back on a phone and walking does nothing here; the jump goes with it
 	GuiService.TouchControlsEnabled = false
@@ -483,6 +462,7 @@ function CookController:Enter(station: Station, target: Instance)
 		Unmount = unmount,
 		Gui = gui,
 		Folder = folder,
+		Exit = exit,
 		Heartbeat = RunService.Heartbeat:Connect(function(dt: number)
 			const current = self.Active
 			if current == nil then
@@ -525,8 +505,7 @@ function CookController:Leave()
 	active.Folder:Destroy()
 	Fx.SetNear(false)
 	hideBody(false)
-	ContextActionService:UnbindAction(SINK_ACTION)
-	ContextActionService:UnbindAction(LEAVE_ACTION)
+	active.Exit()
 	self.Dependencies.InputController:Hold(HOLD, false)
 	GuiService.TouchControlsEnabled = true
 	self.Hint("")

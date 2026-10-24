@@ -5,7 +5,7 @@
 -- the place terrifying while it is on, as a crescendo (horror style: silence, breath, blur, grading):
 --   Grading   own ColorCorrection: darker, crushed, washed out, a cold violet tint, rising over RISE s
 --   Blur      a soft blur that throbs with the heartbeat
---   Sound     a sting at the start, the heartbeat and a whisper bed looping, and now and then a creak, a knock, a held breath
+--   Sound     a sting at the start, the heartbeat and a whisper bed looping, and now and then a creak, a knock
 --             or a whisper (every SCARE_MIN..SCARE_MAX s once the dread is full)
 -- The lights back on (or the attribute gone) fade it all out in FALL s. Local only; nothing here feeds a rule.
 local Lighting = game:GetService("Lighting")
@@ -24,7 +24,7 @@ const FALL = 1.5 -- s back to nothing once the lights are on
 const BEAT = 1.6 -- heartbeats per second at the full dread
 const SCARE_MIN = 6
 const SCARE_MAX = 12
-const SCARES = { "floor_creak", "door_knock", "breath_held", "whisper" }
+const SCARES = { "floor_creak", "door_knock", "whisper" } -- no breath_held: owner 2026-10-21, random sighs
 const TINT = Color3.fromRGB(196, 178, 226)
 
 return function(audio: Audio)

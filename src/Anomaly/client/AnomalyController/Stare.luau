@@ -4,7 +4,8 @@
 	tech/stare-pressure.md). Presentation only (T10): the sanity drain is AnomalyService:StareTick, from the Gaze the
 	camera already sends; nothing here sends or decides anything.
 
-	Target: the head of the actor (record Anchor = NpcId) of an Active occurrence whose Content row has `Stare`. The own
+	Target: the head of the actor (record Anchor = NpcId) of an occurrence in Phase Queue (owner 2026-10-22: its order
+	taken, waiting in the delivery queue; never on arrival) whose Content row has `Stare`. The own
 	camera in first person (CameraController:IsFirstPerson), own character alive, the head within the row's ViewRange,
 	inside the cone Content.Sanity.Stare.Angle around the camera look and in line of sight (TICK s between two reads).
 	  Stare     s of continuous stare; looking away Sanity.Stare.Release s restarts it (same rule as the server)
@@ -107,7 +108,9 @@ local function findTarget(context: Effect.Context): ({ Key: string, Head: BasePa
 			continue
 		end
 		const record = occ.Record()
-		if record.Phase ~= "Active" or record.Anchor == 0 then
+		-- owner 2026-10-22 (anomalies-after-accept-proposal.md §4.2): the arrival is quiet; the stare pressure only while
+		-- the actor waits for its order in the delivery queue (Phase Queue)
+		if record.Phase ~= "Queue" or record.Anchor == 0 then
 			continue
 		end
 		const model = context.Npc(record.Anchor)

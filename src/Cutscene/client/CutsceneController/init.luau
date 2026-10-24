@@ -9,6 +9,8 @@
 
 	  Fade      ScreenFade over the whole screen (black before the first beat when that beat is a fade in)
 	  Text      HudBanner title ("Bellmoor"; "Credits" stays until the next fade)
+	Credits   the roll of Content.Cutscenes.Rules.Credits (Credits.luau) over the black of its scene, scrolled by
+	          Timeline.Roll (a function of the scene time); the skip pill stays on top and votes as in any segment
 	  MoveTo    the own body walks the shared Route (Walker.luau: eased start/stop, flowing waypoints, smooth turn);
 	            the server only places bodies and re-places one that is far (CutsceneService)
 	  LookAt    focus on a point / post / Walt's mark (CameraController:Focus, elastic free look, eased switch)
@@ -29,6 +31,14 @@
 	Cutscene active (for the HUD and anyone else): `CutsceneController.Active` (Vide source, true from the first
 	segment to the end of the chain) and the attribute `CutsceneActive` (true / nil) on Players.LocalPlayer.
 
+	Sound     a Content.Sounds key played once on screen (live beats only)
+	Mash      a cosmetic "mash to break free" bar (DrainBar, lower left) for the beat's Duration: every tap of E / Space /
+	          gamepad X, A / the touch button fills it (never above Value) and kicks the camera; it drains to nothing by the
+	          end of the window and decides nothing. A hold on the same keys still votes the skip (PressSkip)
+	Fx        Content.Cutscenes[].Fx (Fx.luau): blur, grade, flash, quake, music duck - a function of the scene time
+	Regress   Content.Cutscenes[].Regress: the attribute CutsceneRegress (s) at its At; LightController runs a Dawn look back
+	          to the night, the sun backwards ("The Second Coffee", owner request 2026-10-22, PROVISIONAL)
+
 	Every frame is a function of (beats, server time - StartedAt): a late or rejoining client lands on the same frame
 	(Timeline.luau). Sounds and balloons only fire for beats crossed live, never on catch-up.
 
@@ -47,7 +57,7 @@
 	    flip phone is always in the own view. Each client sees its own scene alone; the server record is unchanged.
 	  * HOLD_TIME, FADE_TIME, LINE_HOLD, TITLE_HOLD, PROMPT_TIME, look heights; crew speaker "You".
 	  * Finale lines also use the call strip (its phone badge has no "in person" variant yet).
-	  * Credits show the title only (the roll from docs/art/credits.md is not in Content yet).
+	  * Credits roll (TASK-657): wording, order, author line and the column's sizes (Content.Cutscenes, Credits.luau).
 	  * A non-participant (late member, DEC-205) sees the same presentation; its vote is ignored by the server.
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -63,6 +73,7 @@ local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 local Anchors = require(ReplicatedStorage.shared.Cutscene.Anchors)
 local Route = require(ReplicatedStorage.shared.Cutscene.Route)
 local CallSubtitle = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.CallSubtitle)
+local DrainBar = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.DrainBar)
 local HudBanner = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.HudBanner)
 local PromptBillboard = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.PromptBillboard)
 local ScreenFade = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.ScreenFade)
@@ -71,8 +82,10 @@ local Motion = require(StarterPlayer.StarterPlayerScripts.client.Interface.Compo
 local UiScale = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.UiScale)
 local Vignette = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.Vignette)
 local Actors = require(script.Actors)
+local Credits = require(script.Credits)
 local Ambience = require(script.Ambience)
 local Director = require(script.Director)
+local Fx = require(script.Fx)
 local Hide = require(script.Hide)
 local Speech = require(script.Speech)
 local Timeline = require(script.Timeline)
@@ -133,16 +146,29 @@ const WATCH_RATE = 2 -- Hz
 const STALE_MARGIN = 5 -- s
 const FADE_ORDER = 51 -- above the vehicle fade (50) and the HUD
 const UI_ORDER = 52 -- subtitles and skip over the black
-const SPEAKERS: { [string]: string } = { walt = "Walt", crew = "You" }
+const SPEAKERS: { [string]: string } = { walt = "Walt", walt_dark = "Walt", crew = "You", radio = "Radio" }
 const PROMPT_SOUND = "prompt_done"
 const VOTE_SOUND = "skip_vote"
 const VOTE_CLIP = "wave_skip"
 const ACTIVE_ATTRIBUTE = "CutsceneActive"
 const LOOK_ATTRIBUTE = "CutsceneLook" -- Content.Cutscenes[].Look: LightController applies that preset while the scene plays
 const NIGHTFALL_ATTRIBUTE = "CutsceneNightfall" -- Content.Cutscenes[].Nightfall.Time: s LightController blends to the night
+const REGRESS_ATTRIBUTE = "CutsceneRegress" -- Content.Cutscenes[].Regress.Time: s LightController runs a Dawn look back to the night
 const CINEMA_ORDER = 50 -- letterbox and vignette: under the fade (51) and the subtitles (52)
 const VIGNETTE_COLOR = Color3.fromRGB(34, 20, 12) -- warm dark edge, never the night blue
 const ACTOR_LIFT = Vector3.new(0, 2, 0) -- focus on a car: a bit above its base
+-- actors a Focus beat follows by their head ("The Second Coffee": Walt walking in, Walt in the pantry doorway)
+const FOCUS_ACTORS: { [string]: boolean } = { Walt = true, WaltDawn = true, WaltLoom = true }
+-- mash to break free (cosmetic; PROVISIONAL, judged in Play)
+const MASH_BIND = "CutsceneMash"
+const MASH_STEP = 0.07 -- bar per tap
+const MASH_DRAIN = 0.22 -- bar per s
+const MASH_FINISH = 1.2 -- s before the window ends in which the bar drains four times as fast
+const MASH_KICK = 0.4 -- camera kick per tap (0..1, decays at MASH_KICK_DECAY 1/s)
+const MASH_KICK_DECAY = 10
+const MASH_SHAKE = 0.16 -- studs of camera kick at 1
+const MASH_TILT = 0.05 -- radians of roll kick at 1
+const MASH_TOUCH_SIZE = 90
 const WINDOW_PATTERN = "NoHelp" -- NO HELP WANTED cards (AST-033_NoHelpSign, blockout Window_NoHelpWanted_*)
 const WINDOW_RANGE = 34 -- studs: cards farther than this are not glanced at
 const WINDOW_AHEAD = 0.15 -- dot with the walk heading: only cards ahead or beside
@@ -171,6 +197,9 @@ function CutsceneController:Setup()
 	self.LineText = Vide.source("") :: Vide.Source<string>
 	self.LineShown = Vide.source(false) :: Vide.Source<boolean>
 	self.Banner = Vide.source(false :: Shown) :: Vide.Source<Shown>
+	-- credits roll (Rules.Credits): 0..1 of the scroll and whether it shows
+	self.Roll = Vide.source(0) :: Vide.Source<number>
+	self.RollShown = Vide.source(false) :: Vide.Source<boolean>
 	self.PromptText = Vide.source("") :: Vide.Source<string>
 	self.PromptShown = Vide.source(false) :: Vide.Source<boolean>
 	self.Voted = Vide.source(false) :: Vide.Source<boolean>
@@ -182,6 +211,16 @@ function CutsceneController:Setup()
 	self.Bars = Vide.source(0) :: Vide.Source<number>
 	self.Vignette = Vide.source(0) :: Vide.Source<number>
 	self.EndBars = 0 :: number
+	-- screen and audio effects of the chain (Fx.luau)
+	self.Fx = nil :: Fx.Fx?
+	-- mash to break free: bar (0..1 of the DrainBar), its text, whether the bar shows, the level, its cap and the camera kick
+	self.MashLeft = Vide.source(0) :: Vide.Source<number>
+	self.MashText = Vide.source("") :: Vide.Source<string>
+	self.MashShown = Vide.source(false) :: Vide.Source<boolean>
+	self.MashLevel = 0 :: number
+	self.MashCap = 0.8 :: number
+	self.MashKick = 0 :: number
+	self.MashBound = false :: boolean
 	self.Ambience = nil :: Ambience.Ambience?
 
 	-- segment
@@ -345,6 +384,19 @@ function CutsceneController:FocusGetter(target: string): (() -> Vector3?)?
 			end
 			return if cards ~= nil then cards() else nil
 		end
+	elseif FOCUS_ACTORS[target] then
+		return function(): Vector3?
+			const entry = self.Actors[target]
+			const model = if entry ~= nil then entry.Actor.Model else nil
+			if model == nil or model.Parent == nil then
+				return nil
+			end
+			const head = model:FindFirstChild("Head")
+			if head ~= nil and head:IsA("BasePart") then
+				return head.Position
+			end
+			return model:GetPivot().Position + ACTOR_LIFT
+		end
 	elseif Content.Cutscenes.Rules.Cars[target] ~= nil then
 		return function(): Vector3?
 			const entry = self.Actors[target]
@@ -453,7 +505,8 @@ function CutsceneController:ActorContext(): Actors.Context
 	const audio = self.Dependencies.AudioController
 	return {
 		Point = function(id: string): CFrame?
-			return if MapIndex.HasBinding() then MapIndex.FindPoint(id) else nil
+			-- Anchors.Point: a MapPoint, or "a|b@f" between two (the Second Coffee's stand spots)
+			return Anchors.Point(id)
 		end,
 		Post = postGround,
 		Find = function(target: string): Actors.Actor?
@@ -534,6 +587,8 @@ function CutsceneController:ClearSegment()
 	end
 	Players.LocalPlayer:SetAttribute(LOOK_ATTRIBUTE, nil)
 	Players.LocalPlayer:SetAttribute(NIGHTFALL_ATTRIBUTE, nil)
+	Players.LocalPlayer:SetAttribute(REGRESS_ATTRIBUTE, nil)
+	self:UnbindMash()
 	self.Scene = nil
 	self.Beats = {}
 	table.clear(self.Fired)
@@ -546,6 +601,8 @@ function CutsceneController:ClearSegment()
 		self.LineShown(false)
 		self.PromptShown(false)
 		self.Banner(false)
+		self.MashShown(false)
+		self.RollShown(false)
 	end)
 end
 
@@ -575,6 +632,12 @@ function CutsceneController:BeginChain()
 	self.Active(true)
 	Players.LocalPlayer:SetAttribute(ACTIVE_ATTRIBUTE, true)
 	self:SpeechOf()
+	const audio = self.Dependencies.AudioController
+	self.Fx = Fx.new({
+		Duck = function(multiplier: number, time: number?)
+			audio:SetMusicDuck(multiplier, time)
+		end,
+	})
 	-- one avatar in the scene whatever the server holds: always the Solo variant
 	self.Party = false
 	self.Mates = Hide.new()
@@ -593,6 +656,11 @@ function CutsceneController:EndChain()
 	self.EndBars = Vide.untrack(self.Bars)
 	self.EndedAt = os.clock()
 	self:ClearSegment()
+	const fx = self.Fx
+	self.Fx = nil
+	if fx ~= nil then
+		fx.Destroy()
+	end
 	const speech = self.Speech
 	self.Speech = nil
 	if speech ~= nil then
@@ -725,12 +793,16 @@ function CutsceneController:FireBeat(beat: Beat, live: boolean)
 		if self.Actors[beat.Target] ~= nil then
 			return
 		end
-		const actor = Actors.Create(beat.Target, self:ActorContext())
+		const actor = Actors.Create(beat.Target, self:ActorContext(), beat.Value)
 		if actor == nil then
 			self:WarnOnce(`actor:{beat.Target}`, `actor "{beat.Target}" not shown (unknown target or map points missing)`)
 			return
 		end
 		self.Actors[beat.Target] = { Actor = actor, At = beat.At }
+	elseif beat.Kind == "Sound" then
+		if live then
+			self.Dependencies.AudioController:Play(beat.Target)
+		end
 	elseif beat.Kind == "Line" then
 		self:QueueCaption(beat, live)
 	elseif beat.Kind == "Prompt" and live then
@@ -893,6 +965,15 @@ function CutsceneController:StepCinema(scene: Scene, elapsed: number, last: numb
 		player:SetAttribute(NIGHTFALL_ATTRIBUTE, nightfall.Time)
 		player:SetAttribute(LOOK_ATTRIBUTE, nil)
 	end
+	-- Regress: the Dawn look goes back to the night (LightController reads the attribute: s of the blend)
+	const regress = scene.Regress
+	if regress ~= nil and elapsed >= regress.At and player:GetAttribute(REGRESS_ATTRIBUTE) == nil then
+		player:SetAttribute(REGRESS_ATTRIBUTE, regress.Time)
+	end
+	const fx = self.Fx
+	if fx ~= nil then
+		fx.Step(scene, elapsed)
+	end
 	if scene.Cinema ~= true and scene.Shots == nil then
 		return 0, 0
 	end
@@ -900,7 +981,24 @@ function CutsceneController:StepCinema(scene: Scene, elapsed: number, last: numb
 	const audio = self.Dependencies.AudioController
 	const live = elapsed - last <= LIVE_WINDOW
 	if scene.Shots ~= nil then
-		self.Dependencies.CameraController:SetRig(Director.Rig(scene, elapsed, not Motion.Reduced()))
+		const rig = Director.Rig(scene, elapsed, not Motion.Reduced())
+		if rig ~= nil then
+			-- the Quake effects and the kick of the mash on top of the shot's own hand-held shake
+			local quake, quakeTilt = Vector3.zero, Vector3.zero
+			if fx ~= nil then
+				quake, quakeTilt = fx.Shake()
+			end
+			const kick = self.MashKick
+			local kickShift, kickTilt = Vector3.zero, Vector3.zero
+			if kick > 0.01 then
+				const scale = if Motion.Reduced() then 0.3 else 1
+				kickShift = Vector3.new(math.random() - 0.5, math.random() - 0.5, 0) * (2 * MASH_SHAKE * kick * scale)
+				kickTilt = Vector3.new(0, 0, math.random() - 0.5) * (2 * MASH_TILT * kick * scale)
+			end
+			rig.Shake = rig.Shake + quake + kickShift
+			rig.Tilt = rig.Tilt + quakeTilt + kickTilt
+		end
+		self.Dependencies.CameraController:SetRig(rig)
 		if live then
 			const shot, index = Director.ShotAt(scene, elapsed)
 			if shot ~= nil and index ~= self.ShotIndex then
@@ -999,10 +1097,12 @@ function CutsceneController:Step()
 	end
 
 	const dip, bars = self:StepCinema(scene, elapsed, last)
+	self:StepMash(elapsed, math.clamp(elapsed - last, 0, 0.1))
 
 	const line = self:StepCaptions(elapsed)
 	const title = Timeline.Title(self.Beats, elapsed, TITLE_HOLD, scene.Duration)
 	const prompt = Timeline.Prompt(self.Beats, elapsed, PROMPT_TIME)
+	const roll = Timeline.Roll(scene, elapsed)
 	-- the prompt "completes" when its fill ends (crossed live only)
 	const lastPrompt = Timeline.Last(self.Beats, "Prompt", elapsed)
 	if lastPrompt ~= nil and crossed(lastPrompt.At + PROMPT_TIME, elapsed, last) then
@@ -1032,6 +1132,12 @@ function CutsceneController:Step()
 		elseif banner ~= false then
 			self.Banner(false)
 		end
+		if roll ~= nil then
+			self.Roll(roll)
+		end
+		if Vide.untrack(self.RollShown) ~= (roll ~= nil) then
+			self.RollShown(roll ~= nil)
+		end
 		if prompt ~= nil and Vide.untrack(self.PromptText) ~= (prompt.Text or "") then
 			self.PromptText(prompt.Text or "")
 		end
@@ -1041,6 +1147,83 @@ function CutsceneController:Step()
 	end)
 
 	self:StepHold()
+end
+
+-- Mash ----------------------------------------------------------------------------------------------------------
+
+-- Window of the Mash beat now (nil = none)
+function CutsceneController:MashWindow(elapsed: number): Beat?
+	const beat = Timeline.Last(self.Beats, "Mash", elapsed)
+	if beat ~= nil and beat.Duration ~= nil and elapsed < beat.At + beat.Duration then
+		return beat
+	end
+	return nil
+end
+
+function CutsceneController:BindMash()
+	if self.MashBound then
+		return
+	end
+	self.MashBound = true
+	self.Dependencies.InputController
+		:Bind({
+			Name = MASH_BIND,
+			Key = Enum.KeyCode.E,
+			Keys = { Enum.KeyCode.Space, Enum.KeyCode.ButtonX, Enum.KeyCode.ButtonA },
+			TouchButton = true,
+			Title = "MASH",
+			TouchSize = MASH_TOUCH_SIZE,
+			-- above the skip bind, which these keys also feed (a hold still votes)
+			Priority = Enum.ContextActionPriority.High.Value + 2,
+		})
+		.OnPress(function()
+			self.MashLevel = math.min(self.MashLevel + MASH_STEP, self.MashCap)
+			self.MashKick = math.min(self.MashKick + MASH_KICK, 1)
+			self:PressSkip()
+		end)
+		.OnRelease(function()
+			self:ReleaseSkip()
+		end)
+end
+
+function CutsceneController:UnbindMash()
+	if self.MashBound then
+		self.MashBound = false
+		self.Dependencies.InputController:Unbind(MASH_BIND)
+		self:ReleaseSkip()
+	end
+	self.MashLevel = 0
+	self.MashKick = 0
+end
+
+-- The bar of the window: taps fill it up to the beat's Value, it drains by itself and is empty when the window ends
+function CutsceneController:StepMash(elapsed: number, dt: number)
+	self.MashKick *= math.exp(-MASH_KICK_DECAY * dt)
+	const beat = self:MashWindow(elapsed)
+	if beat == nil then
+		self:UnbindMash()
+		if Vide.untrack(self.MashShown) then
+			self.MashShown(false)
+		end
+		return
+	end
+	self:BindMash()
+	const cap = beat.Value or 0.8
+	self.MashCap = cap
+	const remaining = beat.At + (beat.Duration or 0) - elapsed
+	const drain = MASH_DRAIN * (if remaining < MASH_FINISH then 4 else 1)
+	self.MashLevel = math.clamp(self.MashLevel - drain * dt, 0, cap)
+	const key = KEY_LABEL[Vide.untrack(self.Dependencies.InputController.Device)]
+	const text = if key == "" or key == nil then `TAP {beat.Text or ""}` else `MASH {key} {beat.Text or ""}`
+	Vide.batch(function()
+		self.MashLeft(self.MashLevel)
+		if Vide.untrack(self.MashText) ~= text then
+			self.MashText(text)
+		end
+		if not Vide.untrack(self.MashShown) then
+			self.MashShown(true)
+		end
+	end)
 end
 
 -- Skip ----------------------------------------------------------------------------------------------------------
@@ -1235,6 +1418,13 @@ function CutsceneController:Mount(gui: Instance)
 				BackgroundTransparency = 1,
 				createRaw("UIScale")({ Scale = UiScale.Current }),
 
+				-- the credits roll, under every other piece of this screen (ZIndex 0)
+				Credits({
+					Name = "CutsceneCredits",
+					Data = Content.Cutscenes.Rules.Credits,
+					Progress = self.Roll,
+					Visible = self.RollShown,
+				}),
 				HudBanner({ Name = "CutsceneTitle", Banner = self.Banner }),
 				CallSubtitle({
 					Name = "CutsceneSubtitle",
@@ -1246,6 +1436,22 @@ function CutsceneController:Mount(gui: Instance)
 					Phone = function()
 						return "trailer"
 					end,
+				}),
+				-- the mash bar: lower left (nothing centred over a first-person view), clear of the skip pill
+				Vide.create("Frame")({
+					Name = "CutsceneMash",
+					AnchorPoint = Vector2.new(0, 1),
+					Position = UDim2.fromScale(0.04, 0.8),
+					Size = UDim2.fromOffset(330, 40),
+					BackgroundTransparency = 1,
+					Visible = self.MashShown,
+					DrainBar({
+						Left = self.MashLeft,
+						Text = self.MashText,
+						Width = 330,
+						Height = 40,
+						TextSize = 18,
+					}),
 				}),
 				SkipPill({
 					Name = "CutsceneSkip",

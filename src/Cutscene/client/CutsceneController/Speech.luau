@@ -167,6 +167,11 @@ const PAUSE_DOTS = 0.6 -- after "..."
 const PAUSE_ALONE = 0.3 -- a "..." standing alone adds this to the pause before it
 const PIECE_SLACK = 0.5 -- s past a piece's TimeLength before the chain moves on without its Ended
 const LINE_GAP = 0.15 -- s between the end of a line and the next one
+-- Owner 2026-10-23 ("faz ele ser direcional e vir do telefone"): a Speech given an anchor plays its catalog lines as a 3D
+-- Sound there; full volume within ANCHOR_MIN studs, softer out to ANCHOR_MAX (the kitchen stays in earshot of the phone).
+-- Text-to-speech pieces stay on screen (the AudioDeviceOutput graph has no position)
+const ANCHOR_MIN = 14
+const ANCHOR_MAX = 140
 const PIECE_MAX = 12 -- s a piece of unknown length may play before the chain moves on
 
 const Speech = {}
@@ -328,7 +333,8 @@ local function logPlay(entry: Entry)
 	end
 end
 
-function Speech.new(volume: () -> number): Speech
+-- anchor() = the BasePart / Attachment the voice comes from (nil, or nil returned = on screen)
+function Speech.new(volume: () -> number, anchor: (() -> Instance?)?): Speech
 	local enabled = true
 	local offReason = ""
 	local alive = true
@@ -543,7 +549,15 @@ function Speech.new(volume: () -> number): Speech
 				if piece.Clip ~= nil then
 					const row = VOICES[entry.Speaker]
 					pcall(function()
-						(voice :: Sound).Volume = math.clamp(volume() * (if row ~= nil then row.Volume else 1), 0, 10)
+						const sound = voice :: Sound
+						sound.Volume = math.clamp(volume() * (if row ~= nil then row.Volume else 1), 0, 10)
+						-- from the anchor when there is one, else on screen (a loaded Sound keeps its load when moved)
+						const at = if anchor ~= nil then anchor() else nil
+						const placed = at ~= nil and at.Parent ~= nil and (at:IsA("BasePart") or at:IsA("Attachment"))
+						sound.Parent = if placed then at else SoundService
+						sound.RollOffMode = Enum.RollOffMode.InverseTapered
+						sound.RollOffMinDistance = ANCHOR_MIN
+						sound.RollOffMaxDistance = ANCHOR_MAX
 					end)
 				end
 				if not playPiece(voice, mine, onStart) then

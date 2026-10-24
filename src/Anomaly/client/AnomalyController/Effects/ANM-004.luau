@@ -41,8 +41,10 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 local CrewRig = require(ReplicatedStorage.shared.Crew.CrewRig)
 local Zones = require(ReplicatedStorage.shared.Light.Zones)
 local Effect = require(script.Parent.Parent.Effect)
+local Content = require(ReplicatedStorage.shared.Content)
 local Fade = require(script.Parent.Kit.Fade)
 local Kit = require(script.Parent.Kit.CustomerActor)
+local Tic = require(script.Parent.Kit.Tic)
 local Haptics = require(StarterPlayer.StarterPlayerScripts.client.Input.Haptics)
 local VehicleRoot = require(ReplicatedStorage.shared.Vehicle.VehicleRoot)
 
@@ -503,6 +505,14 @@ return {
 	Ref = "ANM-004",
 	Mount = function(ctx: Effect.Context, occ: Effect.Occurrence)
 		Vide.cleanup(Kit.Follow(ctx, occ, VARIANT, "mirror_accessories", mirrorAccessories))
+		-- anomaly tic (owner 2026-10-22, Provisional; Content.Tics "mirror"): the echo's head tilt and the taker's screen
+		-- layer (Kit/Tic); the echoed line itself is TabletController's
+		const tic = Content.Tics.ByVariant[VARIANT]
+		if tic ~= nil then
+			Vide.cleanup(Kit.Follow(ctx, occ, VARIANT, "mirror_tic", function(model: Model): Kit.Undo
+				return Tic.Mount(ctx, model, tic)
+			end))
+		end
 	end,
 	Cue = function(ctx: Effect.Context, cue: Effect.Cue)
 		if cue.Cue == "mirror_smile" then

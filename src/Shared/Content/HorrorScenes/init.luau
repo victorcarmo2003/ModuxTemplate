@@ -8,7 +8,16 @@
 -- index (occurrence) as the seed.
 --   At      s since the record entered Phase. A late joiner skips one-shot steps already past (> Rules.Latency late)
 --           and applies the held state of the persistent kinds (Lights, Vignette, Lightning, Music) where it is.
---   Phase   "Signal" | "Active" | "Resolved" | "Failed" (the record phases)
+--   Phase   "Signal" | "Active" | "Queue" | "Resolved" | "Failed" (the record phases; Queue = a customer anomaly waiting
+--           for its order in the delivery queue, owner 2026-10-22)
+-- Customer anomalies (owner 2026-10-22, Provisional; design/anomalies-after-accept-proposal.md §9, Q-468 a): the arrival
+-- shows nothing on the screen. For every scene whose Key is a Content.Anomalies row with Actor "Customer", the loader
+-- below keeps in Active only the steps seen through the security cameras (Seen "Cameras", the channel of the truth) and
+-- MOVES every other Active step to Queue with the same At: the bars, words, edges, colour, heart, stings and props of
+-- the old arrival play when she waits for her order (the record turns Queue at the end of the talk). Moved Whispers say
+-- the anomaly's hint (Words queue_<key>: Content.AnomalyHints Hint x3 + Words; the "outside" list stays); with a Live
+-- hint the Queue also opens with the whisper (AnomalyHints.Rules.Sound) and the hint alone on screen (Words hint_<key>).
+-- An anomaly whose hint is not Live yet whispers AnomalyHints.Rules.Generic (Words queue_generic).
 --   Who     nil/"All" = every client of the party; "Caught" = only the client that got the anomaly's caught cue
 --           (Cue "jumpscare" with Entity = its UserId % 65536); "Safe" = every other client
 -- Kinds:
@@ -60,6 +69,8 @@
 -- the scene below with the same Key (or adds it), so every anomaly's scene can be rewritten in its own file; with
 -- Extend = true it adds its steps to that scene instead (TASK-589).
 local Table = require(script.Parent.Table)
+local Anomalies = require(script.Parent.Anomalies)
+local AnomalyHints = require(script.Parent.AnomalyHints)
 local Restaurant = require(script.Parent.Restaurant)
 local Types = require(script.Types)
 
@@ -315,13 +326,12 @@ const turnedNeck: Scene = {
 	Name = "The turned neck",
 	Live = true,
 	Steps = {
-		{ At = 0, Phase = "Active", Kind = "Sound", Target = "neck_crack", Point = "Q1", Value = 0.35 },
+		-- owner 2026-10-21: no crack before the talk ("ele quebrou o pescoço antes de eu iniciar a interação"): the three
+		-- arrival cracks (A+0 / 6 / 11) and their silence / blur are gone; her neck breaks only in the talk (Content.Tics)
 		{ At = 1.5, Phase = "Active", Kind = "Cinema", Value = 0.08, Duration = 1.5 },
 		{ At = 2, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.18, Duration = 8 },
 		{ At = 2.5, Phase = "Active", Kind = "Whispers", Target = "neck", Value = 0.3, To = 1.1, Duration = 7 },
-		{ At = 6, Phase = "Active", Kind = "Sound", Target = "neck_crack", Point = "Q1", Value = 0.6 },
 		{ At = 9.5, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
-		{ At = 11, Phase = "Active", Kind = "Sound", Target = "neck_crack", Point = "Q1", Value = 0.8 },
 		-- the bars go with the words (owner 2026-10-18: no black bars left alone after the warning)
 		{ At = 9.5, Phase = "Active", Kind = "Cinema", Value = 0, Duration = 1.5 },
 		{ At = 9.5, Phase = "Active", Kind = "Vignette", Value = 0.18, To = 0.08, Duration = 3 },
@@ -338,9 +348,6 @@ const turnedNeck: Scene = {
 		{ At = 2, Phase = "Failed", Kind = "Cinema", Value = 0, Duration = 1 },
 		-- TASK-493: the colour leaves the counter as she waits; the loud crack blurs the view
 		{ At = 2, Phase = "Active", Kind = "Grade", Target = "Cold", Value = 0, To = 0.32, Duration = 10 },
-		{ At = 10.6, Phase = "Active", Kind = "Silence", Value = 1, To = 0.2, Duration = 0.4 },
-		{ At = 11, Phase = "Active", Kind = "Silence", Value = 0.2, To = 1, Duration = 1.5 },
-		{ At = 11, Phase = "Active", Kind = "Blur", Value = 4, To = 0, Duration = 1 },
 		{ At = 9.5, Phase = "Active", Kind = "Grade", Value = 0.32, To = 0.12, Duration = 3 },
 		-- TASK-493: colour and sound come back
 		{ At = 0, Phase = "Resolved", Kind = "Silence", Value = 1, To = 1, Duration = 0 },
@@ -1124,10 +1131,75 @@ for _, child in if sceneFolder ~= nil then sceneFolder:GetChildren() else {} do
 	end
 end
 
+-- Owner 2026-10-22 (header, "Customer anomalies"): the arrival of a customer anomaly is quiet; its tension plays in the
+-- delivery queue (Phase Queue), the whispers saying its hint
+const QUEUE_GENERIC = "queue_generic"
+const KEEP_SEEN = "Cameras" -- the channel of the truth stays on the arrival
+const OUTSIDE_WORDS = "outside" -- the "get back inside" list stays as it is
+const HINTS = AnomalyHints.Rules
+words[QUEUE_GENERIC] = table.clone(HINTS.Generic)
+
+local function quietArrival(scene: Scene): Scene
+	const row = Anomalies.ByKey[scene.Key]
+	if row == nil or row.Actor ~= "Customer" then
+		return scene
+	end
+	const hint = AnomalyHints.ByKey[scene.Key]
+	const live = hint ~= nil and hint.Live
+	local queueWords = QUEUE_GENERIC
+	if live then
+		const said = (hint :: AnomalyHints.Hint).Hint
+		const list: { string } = { said, said, said }
+		for _, word in (hint :: AnomalyHints.Hint).Words do
+			table.insert(list, word)
+		end
+		queueWords = `queue_{scene.Key}`
+		assert(words[queueWords] == nil, `HorrorScenes: Words '{queueWords}' already exists`)
+		words[queueWords] = list
+		words[`hint_{scene.Key}`] = { said }
+	end
+	const steps: { Step } = {}
+	for _, step in scene.Steps do
+		if step.Phase ~= "Active" or step.Seen == KEEP_SEEN then
+			table.insert(steps, step)
+			continue
+		end
+		const moved: Step = table.clone(step)
+		moved.Phase = "Queue"
+		if moved.Kind == "Whispers" and moved.Target ~= OUTSIDE_WORDS then
+			moved.Target = queueWords
+		end
+		table.insert(steps, moved)
+	end
+	if live then
+		-- the whisper with the caption (AnomalyController/Score), then the hint alone on the screen
+		const whisper: Step = { At = 0, Phase = "Queue", Kind = "Sound", Target = HINTS.Sound, Value = HINTS.SoundVolume }
+		const said: Step = {
+			At = 0.15,
+			Phase = "Queue",
+			Kind = "Whispers",
+			Target = `hint_{scene.Key}`,
+			Value = HINTS.WhisperRate,
+			To = HINTS.WhisperRate,
+			Duration = HINTS.WhisperFor,
+			Where = "Inside",
+		}
+		table.insert(steps, whisper)
+		table.insert(steps, said)
+	end
+	const quiet: Scene = table.clone(scene)
+	quiet.Steps = steps
+	return quiet
+end
+
+for index, scene in scenes do
+	scenes[index] = quietArrival(scene)
+end
+
 return Table.with(Table.new(scenes), {
 	Rules = Table.record(rules),
 	Stare = Table.record(stare),
 	Outside = Table.record(outside),
 	Words = Table.record(words),
-	PhaseOrder = table.freeze({ Signal = 1, Active = 2, Resolved = 3, Failed = 3 }),
+	PhaseOrder = table.freeze({ Signal = 1, Active = 2, Queue = 2.5, Resolved = 3, Failed = 3 }),
 })

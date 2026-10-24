@@ -10,8 +10,8 @@
 --   Climax   "it is here" / the anomaly failed: the owner's horror choir.
 --   Release  resolved or gone: a relief sting, the theme fades and the score is back to Calm after Hold s.
 -- The stage of the moment = the highest Priority stage among the live anomaly records the client sees (Anomalies set);
--- Resolved records map to Release. Family A (the customer at the tablet) is NOT listed: the customer is the sign, the
--- music never gives it away. Outside Rules.Phases (and while a cue / cutscene owns the music) the score is Calm.
+-- Resolved records map to Release. Family A (the customer at the tablet) is NOT listed on arrival: the customer is the
+-- sign, the music never gives it away; owner 2026-10-22: only once its order is taken (Phase Queue) may it score. Outside Rules.Phases (and while a cue / cutscene owns the music) the score is Calm.
 -- While the stage is Uneasy, Tension or Climax the street "Last window" horror layer and the shift track are held off
 -- (never two tension themes at once); the kitchen SFX (Rules.KitchenKeys) duck to the stage's DuckKitchen.
 -- Rules.Enabled = false: no director, the AnomalyController stings come back (the published behaviour).
@@ -41,9 +41,11 @@ export type Stage = {
 }
 
 -- How one anomaly drives the score, by Ref (Content.Anomalies[k].Ref). Missing phase = that phase does not score.
+-- Queue (owner 2026-10-22): a customer anomaly waiting for its order in the delivery queue (its tension, never on arrival)
 export type AnomalyScore = {
 	Signal: StageKey?,
 	Active: StageKey?,
+	Queue: StageKey?,
 	Failed: StageKey?, -- default Climax
 	Ramp: number, -- s of the Tension ramp (presentation only; the real windows live in AnomalyService/Rules)
 	Caption: string?, -- key of Captions shown when the record turns Active (fresh only)
@@ -169,7 +171,11 @@ const stages = Table.new({
 } :: { Stage })
 
 -- Outside anomalies only (rule 2: the omen is reserved). Ramps mirror the Rules windows (Provisional).
+-- Owner 2026-10-22 (Provisional; anomalies-after-accept-proposal.md §9): the customer anomalies with a jumpscare at stake
+-- score only their Queue phase (the arrival stays quiet); the caption of their hint is Content.AnomalyHints'.
 const anomalies: { [string]: AnomalyScore } = {
+	["ANM-014"] = { Queue = "Tension", Ramp = 40 }, -- the big head, Hurry: = Rules/ANM-014 Condition.Seconds
+	["ANM-012"] = { Queue = "Tension", Ramp = 30 }, -- the turned neck, NoLook: the violins while she waits
 	["ANM-006"] = { Signal = "Uneasy", Active = "Tension", Ramp = 20 }, -- the stalker at the bus stop
 	["ANM-008"] = { Signal = "Uneasy", Active = "Tension", Ramp = 8 }, -- the long car
 	["ANM-009"] = { Signal = "Uneasy", Active = "Tension", Ramp = 10 }, -- knock at the back

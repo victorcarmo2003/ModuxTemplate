@@ -34,6 +34,8 @@ const CORE_KEYS = {
 	"phone_ring",
 	"phone_pickup",
 	"phone_hangup",
+	"pencil_write", -- Walt's notes: written during the night call, ready before it
+	"phone_line", -- the line noise under Walt's calls (the tutorial call is the first one)
 	"order_take",
 	"serve",
 	"tip",

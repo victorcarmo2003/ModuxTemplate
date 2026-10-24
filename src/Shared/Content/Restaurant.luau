@@ -166,9 +166,11 @@ export type PickupArc = {
 	Enabled: boolean, -- false = the PU-k line as before
 	Radius: number, -- studs from PU-1 to the arc
 	Spread: number, -- degrees each side of the outward direction
+	Spacing: number, -- studs at least between two arc spots (a rig's width); what does not fit goes to an outer ring
 	Shift: number, -- studs along the counter (+ = towards +X of the map) the arc centre moves from PU-1
 	Slots: number, -- plates the counter shows at once (Gap apart)
 	Gap: number, -- studs between two plates on the counter
+	StandGap: number, -- studs between two customers taking their plates (a rig's width, wider than Gap)
 	CollectTimeout: number, -- s the walk arc -> counter may take before the plate goes into its hands anyway
 }
 
@@ -199,9 +201,11 @@ const restaurant: Restaurant = {
 		Enabled = true,
 		Radius = 5,
 		Spread = 70,
+		Spacing = 3.5, -- 2026-10-21: arc of 6-8 spots at Radius 5 put rigs ~2 studs apart, overlapping
 		Shift = -3,
 		Slots = 3,
 		Gap = 1.2,
+		StandGap = 3.5,
 		CollectTimeout = 8,
 	},
 	ManualDoors = { "DOOR-B" },

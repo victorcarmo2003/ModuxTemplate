@@ -45,11 +45,12 @@ const STEAM_RISE = 0.2
 const MIN_SPAN = 0.05
 const MODES: { [string]: BrewTag.Mode } = { Working = "Brewing", Cleaning = "Cooldown", Ready = "Ready" }
 -- Cup spot search (TASK-328): footprint radius of the cup, how far the surface may sit from the machine bottom, steps
-const CUP_RADIUS = 0.2
+const CUP_RADIUS = 0.17 -- the coffee Tool's Handle is 0.33 x 0.35 (was 0.2: the 0.37 strip of TRL-COFFEE never fitted it)
 const CUP_SURFACE_SLACK = 0.35
 const CUP_SIDE_GAP = 0.3
 const CUP_SCAN_STEP = 0.05 -- studs per step when looking for the counter edge in front of the machine
 const CUP_SCAN_MAX = 3
+const INVISIBLE = 0.95 -- a surface at least this transparent does not hold the cup (an invisible collider)
 
 -- Placeholder steam (style guide palette: soft white, no asset id). Low rate for the reference phone.
 const STEAM_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
@@ -146,7 +147,8 @@ end
 -- Cup spot (TASK-328) ---------------------------------------------------------------------------------------------------
 
 -- Height of the surface under `point` if a cup fits there: every footprint ray lands within the slack of the machine
--- bottom (a counter, not the floor or the counter lip). nil = no room.
+-- bottom (a counter, not the floor or the counter lip) on a part you can see. nil = no room. Owner 2026-10-23 (print: the
+-- cup floated past the counter): an invisible collider (the old CoffeeBench blockout, Transparency 1) is no surface.
 local function surfaceAt(point: Vector3, top: number, bottom: number, params: RaycastParams): number?
 	const drop = top - bottom + 2
 	local height: number? = nil
@@ -154,6 +156,9 @@ local function surfaceAt(point: Vector3, top: number, bottom: number, params: Ra
 		const origin = Vector3.new(point.X, top + 0.5, point.Z) + offset * CUP_RADIUS
 		const hit = workspace:Raycast(origin, Vector3.new(0, -drop, 0), params)
 		if hit == nil or math.abs(hit.Position.Y - bottom) > CUP_SURFACE_SLACK then
+			return nil
+		end
+		if hit.Instance.Transparency >= INVISIBLE then
 			return nil
 		end
 		height = if height then math.max(height, hit.Position.Y) else hit.Position.Y

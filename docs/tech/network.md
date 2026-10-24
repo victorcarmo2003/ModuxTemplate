@@ -25,6 +25,16 @@ troca `FriendsOnly` por `Access`; `PartyConfigure` troca `FriendsOnly` por `Acce
 **Versão 5.9, 2026-10-18 (TASK-512; DEC-302, DEC-303, DEC-304; Provisório):** cozinha com esteira (§19): packets novos
 `PrepBelt` e `PrepStage` (namespace "game"), `CenterPut` (namespace "restaurant"); set `PrepSeats` ganha `Stop`, `Wait`,
 `Line`, `Away` (prato parado na esteira; emenda do dono: dois prompts, ação nova `prep_grill`); set `Plates` ganha `Grade` e passa a ser a mesa central (vagas 1..8). Contrato completo em `prep-conveyor.md`.
+**Versão 5.10, 2026-10-22 (pedido do dono, Provisório; DEC-353 vira histórico):** namespace "restaurant": o packet
+`TabletDecide` (c → s, ACCEPT / REFUSE) **sai**, e o enum `State` do set `Tablets` perde `Greeting` e `Deciding` (fica
+`Idle` / `Talking` / `Full`). Take Order abre o close, o cliente fala e a conversa termina sozinha em `EndsAt` com o
+pedido anotado (`TakeOrderFor`) para todo cliente. A fala não viaja: cada client monta a mesma com
+`Content.OrderSpeech` a partir do registro (`Npc`, `Order`, `Order2`, `StartedAt`) e dos atributos do rig (`Variant`,
+`TicAt`, `TicEcho`, `TicUser`, `Tic`) e digita no relógio do servidor; o servidor usa a mesma conta para o `EndsAt`.
+`TabletLeave` fica igual.
+**Versão 5.11, 2026-10-23 (TASK-638; DEC-371, DEC-372; Provisório):** Walt sem telefone e Walt sombrio (§21): packet
+`WaltReaction` (s → jogadores da run) e set `WaltWatch` (registro 1). Tabelas novas `Content.WaltReactions` e
+`Content.WaltWatch`.
 **Versão 5.2, 2026-10-10 (DEC-221):** set `Hides` sai; janela do trailer = atributo `Shutter` no `Model` do veículo
 (§13.6, T61); `Actions` perde `hide`/`get_up` e ganha `shutter_toggle`; `Notices` troca `hide_taken` por `shutter_closed`.
 Versão 4, 2026-10-10 (**TASK-001**: estado DEC-140 a DEC-201, núcleo da onda 1). Versão anterior: 3.1, 2026-10-08.
@@ -225,8 +235,8 @@ RunState = Lync.replicate(Lync.struct({
 
 | | |
 |---|---|
-| Escreve | `EconomyService` (dono único de `Cash` e `Drawer`; outros chamam `Spend(amount): boolean`, `AddToDrawer`) |
-| Lê | `EconomyController` → sources `Cash`, `Drawer`; BillboardGui da gaveta (igual para todos, FEAT-012) |
+| Escreve | `EconomyService` (dono único de `Cash` e `Drawer`; outros chamam `Spend(amount): boolean`, `AddSale`, `AddTip`) |
+| Lê | `EconomyController` → sources `Cash` / `Shown` (HUD). Desde 2026-10-22 (pedido do dono, Provisório) não há pote de gorjetas: a gorjeta cai direto no `Cash`, `Drawer` fica sempre 0 (campo mantido no fio) e o packet `CashCollected` ("Collect Tips") saiu |
 | Frequência | por venda, compra, depósito (~0,2–1/s em pico) |
 
 ### 3.4 `Stock` (id = `Content.Ingredients.IndexOf[key]`)
@@ -580,6 +590,7 @@ Sanity = Lync.packet(Lync.struct({  -- s → dono; enviado na mudança (≤ 1 Hz
 | | |
 |---|---|
 | Mudança da v3 | `Sanity`/`MaxSanity` saem do set (iam a todos) e vão só ao dono. DEC-167: "o número nunca é mostrado a outro jogador"; a party vê a faixa pela aparência (`LookPack`, §5). Menos dado exposto a exploit; banda igual |
+| Escuro no cliente | o pacote não diz a causa da queda. O servidor marca o `Player` com o atributo `SanityDarkAt` (`Content.Sanity.DarkAtAttribute`, hora do servidor do último tick que tirou sanidade por escuro) e o `VitalController` liga o visual de escuro até `DARK_HOLD` depois dele (Q-477; antes era a heurística "queda ≤ 2 × DarkPerSecond") |
 | Escreve | `VitalService` (+ componente `Vital`); `LookPack` no personagem pela faixa (≥ 60 Day, 40–59 Mid, < 40 Night; de dia sempre Day; `Content.Sanity.Bands`) |
 | Lê | `VitalController` (medidor e retrato), `CameraController` (spectate), `ReviveController`, `HallucinationController` (faixas de alucinação < 60/< 40/< 20, FEAT-019) |
 | Packet e reconexão | como o `Profile`: reenviado no `ClientReady` e no respawn |
@@ -587,7 +598,6 @@ Sanity = Lync.packet(Lync.struct({  -- s → dono; enviado na mudança (≤ 1 Hz
 ### 6.2 Demais entradas (sem mudança de schema desde a v3.1)
 
 ```lua
-| Escuro no cliente | o pacote não diz a causa da queda. O servidor marca o `Player` com o atributo `SanityDarkAt` (`Content.Sanity.DarkAtAttribute`, hora do servidor do último tick que tirou sanidade por escuro) e o `VitalController` liga o visual de escuro até `DARK_HOLD` depois dele (Q-477; antes era a heurística "queda ≤ 2 × DarkPerSecond") |
 Switches = Lync.replicate(Lync.struct({ On = Lync.bool() })), -- interruptor do trailer (DEC-189: vem de fábrica)
 Bench = Lync.replicate(Lync.struct({
 	Item = Lync.enum(Content.BenchItems.Keys),  -- inclui "none"
@@ -1502,3 +1512,48 @@ Tráfego novo por jogador < 2 pacotes/s em ritmo normal (setas e etapas); sets: 
 `cutsceneRecord`) por causa do orçamento do LuauSolverV2 no namespace "game"; se ainda estourar, `PrepBelt` e `PrepStage`
 vão para um namespace próprio `Net/Belt.luau` requerido pelo `init.luau` (como `Net/Restaurant.luau`), decisão registrada
 pela TASK-513 (`prep-conveyor.md` P23).
+
+## 20. Papel de dicas do Walt (pedido do dono 2026-10-22, **Provisório**; `Content.Hints`)
+
+| Entrada | Tipo | Direção | Escreve / responde | Conteúdo |
+|---|---|---|---|---|
+| `Hints` | set, registro único `1` | s → todos | `HintService` (depois da ligação da noite) | `{ Night = Lync.int(0, 255) }`: a última noite cuja dica está escrita no papel do balcão (0 = nenhuma). O client lista `Content.Hints` 1..Night; uma subida (não o primeiro registro) é o lápis tocando. Um registro de 8 bits, sem o piso do `drop.section` |
+| `HintOpen` | packet `Lync.empty()` | s → dono | `HintService` (prompt `read_hints`) | abre o close do papel no client (`HintController`); nada muda no servidor |
+
+Removido no mesmo pedido: `CashCollected` (s → grupo, "Collect Tips" do pote, `TipJarService`). O enum `Interact.Action` perde
+`collect_tips` e ganha `read_hints` (vem de `Content.Actions.Keys`). Snapshot novo `Hn` = `Hints.Night` (`HintService`).
+
+## 21. Walt sem telefone e Walt sombrio (v5.11, TASK-638; DEC-371, DEC-372; **Provisório**)
+
+Feature nova `src/Walt/` (servidor `ReactionService` TASK-639, `WaltWatchService` TASK-646; client `ReactionController`
+TASK-640, `WaltWatchController` TASK-647). Dados: `Content.WaltReactions` (R1–R10, `Rules`) e `Content.WaltWatch.Rules`
+(`content-data.md` fica para o secretário no fim da rodada). Sem `keyBy`; o enum vem de `Content.WaltReactions.Keys`
+(Lync ordena os nomes, os dois lados requerem o mesmo `Content`).
+
+```lua
+WaltReaction = Lync.packet(Lync.struct({      -- s → jogadores da run
+	Key = Lync.enum(Content.WaltReactions.Keys), -- r01_breaker … r10_banger_dark
+	StartedAt = Lync.f64(),                    -- hora do servidor em que a fala começa
+})),
+WaltWatch = Lync.replicate(Lync.struct({      -- registro 1
+	Present = Lync.bool(),                     -- o Walt sombrio está em WaltWatch.Rules.Point agora
+	Night = Lync.int(0, 10),                   -- noite a que o registro se refere (0 = fora de noite de run)
+	At = Lync.f64(),                           -- última troca (o client só faz o fade se for recente)
+})),
+```
+
+| Entrada | Tipo / direção | Escritor | Leitor | Quando / ritmo | Por quê |
+|---|---|---|---|---|---|
+| `WaltReaction` | packet s → todos da run (`fireAll` no servidor da run) | `ReactionService:React(key)` (único escritor); quem chama: `LightService` R1, `Walt/server/Street` R2, `AnomalyService`/`CustomerActor` R3–R5, `ANM-009` R9, `ANM-022` R10, `WaltWatchService` R6, `CoffeeHandService` R7, `HintService` R8 | `ReactionController` (responder no `OnInit`): voz 2D sem `phone_line`, ducking da ligação, legenda "Walt: …" pelo tempo do áudio | só quando passa no portão: 1ª vez da Key na run (`Rules.OncePerRun`), < `Rules.MaxPerNight` (2) na noite, nenhuma anomalia em `Signal`/`Active`/`Queue`, `Call.State = Idle`. Senão **descarta** (não enfileira). Teto: 2 por noite, 10 por run | evento único sem estado: **packet**. Sem replay (DEC-077): quem entra depois não deve ouvir, então um set seria errado. Uma Key só (a fala sai de `Content`), a party inteira ouve igual (DEC-372). `StartedAt` deixa o client cortar a legenda pelo relógio do servidor se chegar atrasado |
+| `WaltWatch` | set, registro único `1` | `WaltWatchService` | `WaltWatchController` (figura parada em `WALT-PARK`, fade de `Rules.Fade` s) | `Present = true` no início de cada noite ≥ `Rules.FromNight` (nas noites ≤ `Rules.WaitCallUntil`, só depois da ligação voltar a `Idle`, até `Rules.CallWait` s); `Present = false` para **todos** quando um jogador ativo chega a < `Rules.Distance` (e `React(Rules.React)`), no fim da noite e fora da run. ≤ 3 escritas por noite | estado que todos dividem e quem entra depois precisa ver (está lá ou não): **set**. Um registro só (o Walt é um), largo por causa do `f64`: sem o piso de `drop.section`. A distância é decidida no servidor (posição do personagem), nunca pelo client |
+
+Regras:
+
+- Nada novo do client para o servidor: o "chegar perto" é medido no servidor e os gatilhos já são eventos do servidor, então não
+  há superfície para o client forçar uma reação.
+- Nenhum responder fora de Service/Controller; o `WaltWatchController` lê o set (`Net.WaltWatch`) no `OnInit`.
+- O Walt sombrio nunca entra no set `Anomalies`, no agendador, na sanidade nem nas vagas de NPC (DEC-371, nota da DEC-177).
+- Voz: `Content.WaltReactions.Rules.Speaker = "walt_near"` (speaker próprio do `VoiceLines`; `tools/voice/generate.py`
+  só filtra `walt` e `radio`, então a gravação sai crua). Sem gravação: TTS com `Cutscenes.Rules.Voices[Rules.TtsVoice]`.
+- Snapshot de debug sugerido para a TASK-646: `Ww` = `WaltWatch.Present`.
+

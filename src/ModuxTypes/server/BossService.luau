@@ -9,6 +9,9 @@ export type Record = { Call: string, State: State, StartedAt: number }
 export type Entry = { Key: string, Priority: number, Order: number }
 
 export type Public = {
+	AfterTutorial: string?,
+	AfterTutorialFronts: number,
+	AfterTutorialQueued: boolean,
 	CallSince: number,
 	CoffeeLater: string?,
 	Cued: { [string]: boolean },
@@ -24,6 +27,8 @@ export type Public = {
 	Record: Charm.Atom<Record>,
 	TutorialAnswered: boolean,
 	Setup: (self: Public) -> (),
+	SetOwed: (self: Public, key: string?) -> (),
+	OnFronted: (self: Public) -> (),
 	GetState: (self: Public) -> State,
 	GetCall: (self: Public) -> string,
 	IsBusy: (self: Public) -> boolean,

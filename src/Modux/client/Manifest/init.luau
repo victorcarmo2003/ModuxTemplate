@@ -26,6 +26,7 @@ local DoorController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTy
 local DriveThruController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.DriveThruController)
 local EconomyController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.EconomyController)
 local HallucinationController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.HallucinationController)
+local HintController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.HintController)
 local HudController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.HudController)
 local HapticsController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.HapticsController)
 local InputController = require(StarterPlayer.StarterPlayerScripts.client.ModuxTypes.InputController)
@@ -101,6 +102,7 @@ export type AllControllers = {
 	DriveThruController: DriveThruController.Public,
 	EconomyController: EconomyController.Public,
 	HallucinationController: HallucinationController.Public,
+	HintController: HintController.Public,
 	HudController: HudController.Public,
 	HapticsController: HapticsController.Public,
 	InputController: InputController.Public,

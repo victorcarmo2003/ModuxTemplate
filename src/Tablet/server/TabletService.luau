@@ -10,41 +10,58 @@
 -- window, CustomerService:DriveFront, and the pickup line is not checked: the car waits at the window). TAB-2 (UPG-027) is
 -- ignored with a log.
 --
--- Talk: tablet_take (tap, Actions.tablet_take.Radius) with the customer of Q1 in Ordering, the tablet Idle, room on the
--- plates (PlateService:HasRoomFor) and in the pickup line (not CustomerService:IsPickupFull, TASK-380) -> Talking with
--- StartedAt / EndsAt = StartedAt + TalkTime and the order (CustomerService:PendingToppings) on the record, the patience
--- clock paused (CustomerService:PausePatience, TASK-380). TalkTime = Talk.Open + Talk.Lead + Talk.PerItem x (2 + K) +
--- Talk.Confirm, a pair adds Talk.PairExtra + Talk.PerItem x (2 + K2), floor Talk.MinTotal. The player is not frozen and
--- walking away does not cancel (board TASK-381). A 2 Hz tick ends it: at EndsAt CustomerService:TakeOrderFor(user, npc)
--- (same gate and write as the old prompt; PlateService puts the ticket on a plate from Acted); if the customer left Q1
--- or Ordering before that (anomaly, window closed, shift end) the tablet goes back to Idle with no order. Another
--- tablet_take during the talk = Notice tablet_busy. Idle with no room = Full ("Kitchen full" lamp for everyone).
+-- Talk (owner 2026-10-22: "tira o botão de refuse... quando ele clicar em take order, ele vai dar aquele close na câmera,
+-- vai fazer a animação dele surgindo a anomalia, daí ele vai de fila"; DEC-353's ACCEPT / REFUSE is history): tablet_take
+-- (tap, Actions.tablet_take.Radius) with the customer of Q1 in Ordering, the tablet Idle, room on the plates
+-- (PlateService:HasRoomFor) and in the pickup line (not CustomerService:IsPickupFull, TASK-380) -> Talking with StartedAt,
+-- the order (CustomerService:PendingToppings) on the record and EndsAt = StartedAt + the speech's Duration
+-- (Content.OrderSpeech: the customer's hi and order, or its odd line / its tic, typed letter by letter at
+-- Tics.Rules.TypeRate with the punctuation pauses, + OrderTalk.Speech.Hold; the client types it on the same clock), the
+-- patience clock paused (CustomerService:PausePatience, TASK-380). At EndsAt (a delayed Step, and the 2 Hz tick)
+-- CustomerService:TakeOrderFor(user, npc) for EVERY customer, ordinary or anomaly (same gate and write as the old prompt;
+-- PlateService puts the ticket on a plate from Acted; what an anomaly does once its order is taken is its module's). If
+-- the customer left Q1 or Ordering before that (anomaly, window closed, shift end) the tablet goes back to Idle with no
+-- order. Walking away skips the talk through the taker's client (TabletLeave, see Leave below; the server keeps no radius of its
+-- own). Another tablet_take during the talk = Notice tablet_busy. Idle with no room = Full ("Kitchen full" lamp for
+-- everyone).
 -- Attendant gone mid-talk (R-8, docs/tests/restaurant-e2e.md; design FEAT-043 "afastar cancela, a paciência volta a
 -- correr" / "cancela sem criar pedido nem cobrar"): when the player who started the talk leaves the server or stops being
 -- an active member (Down, spectator), the talk is CANCELLED at once (Reset): no order, no charge, the customer keeps Q1 in
 -- Ordering with its patience running again, and the next tablet_take (anyone) starts the talk over. Logged with print,
--- not lost behind a warn. Walking away is still not a cancel (board TASK-381; design gap noted in R-5).
+-- not lost behind a warn. Walking off / Back on the talk screen skips the talk instead (Leave below).
 -- TASK-380 runs in parallel: the CustomerService methods it adds are called by name and skipped (logged once) while
 -- missing.
--- Choice (owner 2026-10-21, DEC-353; 2nd pass the same day: "o primeiro step seria um greeting e dai vem o refuse / accept e
--- depois sim ele faz o pedido"). Three steps, the patience frozen all along:
---   Greeting  StartedAt..EndsAt = Talk.Open + Talk.Lead: the player says hi, the customer answers (an odd one with its odd line)
---   Deciding  waits for the User's TabletDecide. Refuse = CustomerService:RefuseOne (only that customer leaves; an anomaly
---             customer is answered by its module). Accept: an anomaly customer = TakeOrderFor at once (its module scares,
---             in the close-up); an ordinary one goes on to
---   Talking   the order itself (new StartedAt, EndsAt = OrderTime = the old talk minus the greeting); at EndsAt
---             CustomerService:TakeOrderFor as before.
--- The customer gone / the user gone in any of them = the same Reset / Cancel.
+-- Leave (owner 2026-10-21, 2026-10-22): the user walking off or pressing Back on the talk screen sends TabletLeave = skip
+-- (the talk ends at once and the order is taken, the same Finish as at EndsAt).
+-- Tics (design/anomaly-tics-proposal.md, pilot ANM-012, Provisional Q-459..Q-461): an odd customer with a Content.Tics row
+-- (by its Variant) whose rig has not done its tic yet plays it in this talk: the rig gets TicAt (server time of LineStart =
+-- StartedAt + OrderTalk.Speech.Start) and TicUser (the taker's UserId); every client turns the head on that clock
+-- (OddCustomer), the taker alone gets the silence / camera / card layer. The talk lasts the tic's line (Tics.Timing End)
+-- + Speech.Hold. Leaving the talk before Timing.Peak takes the attributes off (cancelled: she is as before and the next
+-- talk plays it in full);
+-- at or past it the rig keeps them and gets Tic = "Done" (the residue, for everyone; the next talk is the short "..."), and
+-- the user leaving it then also writes TicFollow = their UserId (her turned head follows them). NpcService's pool clears
+-- the attributes when the rig is reused. Leaving never solves, fails or costs sanity (it takes the order, Leave).
+-- Owner 2026-10-22 (the next tics, ANM-013 / ANM-004 / ANM-014, Provisional): the same hook for every Content.Tics row.
+-- Past the peak, leaving before the last beat also writes TicEnd (server time: the big head keeps the step it reached);
+-- TicFollow only for OnLeave "Follow". A row with Residue "None" (the copy's echo) never gets Tic = "Done": its attributes
+-- go when the talk is over, so every talk plays it again. The echo: the rig gets TicEcho = the NpcId of the last ordinary
+-- customer whose talk this taker opened (the original, ANM-004: the copy comes right after it; none = the copy's own id),
+-- and the line is Tics.Said(row, TicEcho, the taker's DisplayName) on the server and on every client.
+-- Owner 2026-10-22 (the tension in the talk, Provisional): the line freezes on "..." for the row's Hold (1-2 s) while the
+-- taker's tension builds up to the apex (= Timing.Peak, the same cut for Leave); EndsAt covers it (Timing.End + Hold).
+-- The tension itself is the taker's client's (Effects/Kit/Tic, Content.Tics Layers); no packet, no new attribute.
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Content = require(ReplicatedStorage.shared.Content)
 local Lync = require(ReplicatedStorage.Packages.Lync)
+local CrewRig = require(ReplicatedStorage.shared.Crew.CrewRig)
 local Restaurant = require(ReplicatedStorage.shared.Libs.Net.Restaurant)
 local Modux = require(ServerScriptService.server.Modux)
 
-export type TabletState = "Idle" | "Talking" | "Full" | "Deciding" | "Greeting"
+export type TabletState = "Idle" | "Talking" | "Full"
 
 export type Tablet = {
 	Index: number,
@@ -57,8 +74,11 @@ export type Tablet = {
 	Order: { string }, -- topping keys of the 1st hot dog
 	Order2: { string }?, -- pair (FEAT-038)
 	PromptOn: boolean?, -- last state written to the prompt (owner 2026-10-18: it showed with nobody at the counter)
-	OrderTime: number?, -- s of the order talk after Accept (DEC-353), set at Start
+	Tic: TicTalk?, -- the tic playing in this talk (Content.Tics), nil = none
 }
+
+-- A tic playing in a talk: the rig carrying its attributes, its row and the server times of its peak and its last beat
+export type TicTalk = { Rig: Model, Npc: number, Row: Content.Tic, PeakAt: number, EndAt: number }
 
 const ACTION = "tablet_take"
 const ANCHOR_TAG = "Interactable"
@@ -67,18 +87,31 @@ const TABLET_BUSY = "tablet_busy"
 const PICKUP_FULL = "pickup_full"
 const PLATES_FULL = "plates_full"
 const HEAD_INDEX = 1 -- TAB-1 = the head of the counter queue (Q1); TAB-2 needs the 2nd queue head (R4)
-const TICK_RATE = 2 -- Hz (tech §7: only for the end of the talk)
+const TICK_RATE = 2 -- Hz (tech §7: only for the end of the talk; a delayed Step lands it on EndsAt)
+const END_SLACK = 0.05 -- s: the delayed Step may wake a hair before EndsAt on the server clock
 -- Same notice to the same player at most once per this many seconds (FEAT-005 anti-spam). PROVISIONAL constant, same
 -- value as CustomerService NOTICE_GAP: no Content field holds it yet.
 const NOTICE_GAP = 2
+-- Rig attributes of the anomaly tics (read by Effects/Kit/OddCustomer, Effects/Kit/Tic and TabletController)
+const TIC_AT = "TicAt" -- server time of LineStart of the talk with the tic
+const TIC_USER = "TicUser" -- UserId of the taker (the screen layer is theirs)
+const TIC_STATE = "Tic" -- "Done" once past the peak (the residue)
+const TIC_FOLLOW = "TicFollow" -- UserId of who left the talk after the peak
+const TIC_END = "TicEnd" -- server time the talk was left between the peak and the last beat (the body stops there)
+const TIC_ECHO = "TicEcho" -- the copy's echo (ANM-004): NpcId of the original whose hi it repeats
+const TIC_DONE = "Done"
+
+-- The last ordinary customer whose talk each player opened (the copy's echo, ANM-004). Module state, not a Setup field:
+-- no generated type change (ModuxTypes)
+const lastHeard: { [Player]: number } = {}
 
 local function now(): number
 	return workspace:GetServerTimeNow()
 end
 
--- A talk is on: talking, or done and waiting for the user's SERVE / REFUSE (DEC-353)
+-- A talk is on (owner 2026-10-22: one step, the customer talks and the order is taken at its end)
 local function busy(tablet: Tablet): boolean
-	return tablet.State == "Greeting" or tablet.State == "Talking" or tablet.State == "Deciding"
+	return tablet.State == "Talking"
 end
 
 local function toppingSet(list: { string }): { [string]: boolean }
@@ -156,14 +189,25 @@ end
 
 -- Talk -------------------------------------------------------------------------------------------------------------
 
--- Seconds of the talk for a hot dog with k1 toppings (and the 2nd hot dog of a pair with k2)
+-- Seconds of an ordinary customer's talk (Content.OrderSpeech, NpcId 0's lines) for a hot dog with the first k1
+-- toppings of ToppingKeys (and the 2nd hot dog of a pair with k2). The real talk's length depends on its words (/dev)
 function TabletService:TalkTime(k1: number, k2: number?): number
-	const talk = Content.Restaurant.Talk
-	local total = talk.Open + talk.Lead + talk.PerItem * (2 + k1) + talk.Confirm
-	if k2 ~= nil then
-		total += talk.PairExtra + talk.PerItem * (2 + k2)
+	local function order(k: number): { [string]: boolean }
+		const out: { [string]: boolean } = {}
+		for index, key in Content.Ingredients.ToppingKeys do
+			if index > k then
+				break
+			end
+			out[key] = true
+		end
+		return out
 	end
-	return math.max(total, talk.MinTotal)
+	return Content.OrderSpeech.Build({
+		Npc = 0,
+		Night = 1,
+		Order = order(k1),
+		Order2 = if k2 ~= nil then order(k2) else nil,
+	}).Duration
 end
 
 -- The drive-thru computer (DT-PC, TASK-574)
@@ -208,6 +252,100 @@ function TabletService:Check(player: Player, tablet: Tablet): (boolean, string?)
 	return true, nil
 end
 
+-- Customer rig by NpcId (CrewRig tag, the same lookup as the clients)
+local function rigOf(npc: number): Model?
+	for _, instance in CollectionService:GetTagged(CrewRig.Tag) do
+		if instance:IsA("Model") and instance:GetAttribute("NpcId") == npc then
+			return instance
+		end
+	end
+	return nil
+end
+
+-- The tic this customer (rig Variant `variant`) plays in a talk started now (nil = none: an ordinary customer, no row, or
+-- already done; `done` = the row's tic is done: its residue line). Plain functions, not methods: no generated type change
+local function ticOf(npc: number, variant: string?): (Content.Tic?, Model?, boolean)
+	const row = if variant ~= nil then Content.Tics.ByVariant[variant] else nil
+	if row == nil then
+		return nil, nil, false
+	end
+	const rig = rigOf(npc)
+	if rig == nil then
+		return nil, nil, false
+	end
+	if rig:GetAttribute(TIC_STATE) == TIC_DONE then
+		return nil, rig, true
+	end
+	return row, rig, false
+end
+
+-- The tic of this talk, if one plays (the rig's attributes on the speech's clock: LineStart = at + Speech.Start). Returns
+-- the row, its line in this talk and whether the residue line is said instead (Content.OrderSpeech.Build's inputs)
+local function startTic(tablet: Tablet, player: Player, npc: number, variant: string?, at: number): (Content.Tic?, Content.TicSaid?, boolean)
+	const row, rig, done = ticOf(npc, variant)
+	if row == nil or rig == nil then
+		return nil, nil, done
+	end
+	-- the copy's echo repeats the original this taker heard last (none: its own hi)
+	const original = if row.Line.Echo == true then lastHeard[player] or npc else nil
+	const said = Content.Tics.Said(row, original, player.DisplayName)
+	const timing = Content.Tics.Timing(row, said)
+	const lineStart = at + Content.OrderTalk.Speech.Start
+	rig:SetAttribute(TIC_FOLLOW, nil)
+	rig:SetAttribute(TIC_END, nil)
+	rig:SetAttribute(TIC_ECHO, original)
+	rig:SetAttribute(TIC_USER, player.UserId)
+	rig:SetAttribute(TIC_AT, lineStart)
+	tablet.Tic = {
+		Rig = rig,
+		Npc = npc,
+		Row = row,
+		PeakAt = lineStart + timing.Peak,
+		EndAt = lineStart + timing.BeatsEnd,
+	}
+	return row, said, false
+end
+
+-- The talk with a tic ends (final = the talk is over). Before the peak: cancelled, the attributes go
+-- (she is as before). At or past it: the residue stays (Tic = "Done"); `leaver` = who walked off / pressed Back then
+-- (TicFollow for OnLeave "Follow"; before the last beat, TicEnd = now: the body stops where it was). Residue "None" (the
+-- echo): nothing stays, the attributes go when the talk is over.
+local function clearTic(rig: Model)
+	for _, name in { TIC_AT, TIC_USER, TIC_ECHO, TIC_END } do
+		rig:SetAttribute(name, nil)
+	end
+end
+
+local function settleTic(tablet: Tablet, leaver: Player?, final: boolean)
+	const tic = tablet.Tic
+	if tic == nil then
+		return
+	end
+	if final then
+		tablet.Tic = nil
+	end
+	const rig = tic.Rig
+	if rig.Parent == nil or rig:GetAttribute("NpcId") ~= tic.Npc then
+		return -- the rig went back to the pool (its attributes are cleared there)
+	end
+	const at = now()
+	if tic.Row.Residue == "None" then
+		if final then
+			clearTic(rig)
+		end
+	elseif at >= tic.PeakAt then
+		rig:SetAttribute(TIC_STATE, TIC_DONE)
+		if leaver ~= nil and tic.Row.OnLeave == "Follow" then
+			rig:SetAttribute(TIC_FOLLOW, leaver.UserId)
+		end
+		if leaver ~= nil and at < tic.EndAt and rig:GetAttribute(TIC_END) == nil then
+			rig:SetAttribute(TIC_END, at)
+		end
+	elseif final then
+		clearTic(rig)
+	end
+end
+
 function TabletService:Start(player: Player, tablet: Tablet): boolean
 	if not (self:Check(player, tablet)) then
 		return false
@@ -217,23 +355,45 @@ function TabletService:Start(player: Player, tablet: Tablet): boolean
 	const first = lines[1] or {}
 	const second = lines[2]
 	const at = now()
-	const talk = Content.Restaurant.Talk
-	const greeting = talk.Open + talk.Lead
-	tablet.State = "Greeting"
+	tablet.State = "Talking"
 	tablet.Npc = npc
 	tablet.User = player
 	tablet.StartedAt = at
-	tablet.EndsAt = at + greeting
-	tablet.OrderTime = math.max(self:TalkTime(#first, if second then #second else nil) - talk.Open, talk.MinTotal)
 	tablet.Order = table.clone(first)
 	tablet.Order2 = if second then table.clone(second) else nil
+	const customer = self.Dependencies.CustomerService:Get(npc)
+	const variant: string? = if customer ~= nil then customer.Variant else nil
+	if customer ~= nil and variant == nil then
+		lastHeard[player] = npc -- the copy's echo (ANM-004) repeats this one's hi
+	end
+	-- owner 2026-10-22: the customer says its hi and its order (an odd one its line / its tic) letter by letter, the talk
+	-- ends with the line (+ Speech.Hold) and the order is taken then (Finish); the client types the same speech
+	const row, said, residue = startTic(tablet, player, npc, variant, at)
+	const speech = Content.OrderSpeech.Build({
+		Npc = npc,
+		Variant = variant,
+		Night = self.Dependencies.RoundService:GetNight(),
+		Order = toppingSet(tablet.Order),
+		Order2 = if tablet.Order2 then toppingSet(tablet.Order2) else nil,
+		Tic = row,
+		Said = said,
+		Residue = residue,
+	})
+	tablet.EndsAt = at + speech.Duration
 	self:Pause(npc, true)
 	self:Publish(tablet)
+	-- the talk ends on EndsAt, not on the next 2 Hz tick
+	task.delay(speech.Duration, function()
+		if self.Enabled and busy(tablet) and tablet.StartedAt == at then
+			self:Step()
+		end
+	end)
 	return true
 end
 
 -- Back to Idle (or Full) with no order: the customer keeps its place and its clock runs again
 function TabletService:Reset(tablet: Tablet)
+	settleTic(tablet, nil, true)
 	const npc = tablet.Npc
 	tablet.State = "Idle"
 	tablet.Npc = 0
@@ -242,7 +402,6 @@ function TabletService:Reset(tablet: Tablet)
 	tablet.EndsAt = 0
 	tablet.Order = {}
 	tablet.Order2 = nil
-	tablet.OrderTime = nil
 	if npc ~= 0 then
 		self:Pause(npc, false)
 		-- the car's own "Take Order" went off for the talk (StartDrive); back on while it still waits to order
@@ -272,16 +431,8 @@ function TabletService:DriveTalking(npc: number): boolean
 	return tablet ~= nil and busy(tablet) and tablet.Npc == npc
 end
 
--- End of the talk (DEC-353): the customer said its line; the record stays and waits for the user's SERVE / REFUSE
-function TabletService:Ask(tablet: Tablet)
-	if tablet.State ~= "Greeting" then
-		return
-	end
-	tablet.State = "Deciding"
-	self:Publish(tablet)
-end
-
--- End of the order talk: the order is taken by whoever started it (same path as the old "Take Order" prompt)
+-- End of the order talk: the order is taken by whoever started it (same path as the old "Take Order" prompt), for every
+-- customer, ordinary or anomaly (owner 2026-10-22; what an anomaly does once its order is taken is its module's)
 function TabletService:Finish(tablet: Tablet)
 	if tablet.State ~= "Talking" then
 		return
@@ -297,34 +448,20 @@ function TabletService:Finish(tablet: Tablet)
 	end
 end
 
--- The user's pick (DEC-353, TabletDecide). Accept = an ordinary customer says its order (Talking), an anomaly customer is
--- taken at once (its module answers); Refuse = only that customer leaves. Anyone else, or a tablet not Deciding = ignored.
-function TabletService:Decide(tablet: Tablet, player: Player, serve: boolean)
-	if tablet.State ~= "Deciding" or tablet.User ~= player then
+-- The user left the talk screen (TabletLeave: walked off / Back). Owner 2026-10-22 ("ao clicar sair, ele meio que skip a
+-- conversa... e já prossegue com o pedido"): leaving skips the talk, the order is taken now (Finish), as at EndsAt.
+-- Anyone else, or a tablet not busy = ignored; the customer gone from Q1 / Ordering = Reset (no order, as in Step)
+function TabletService:Leave(tablet: Tablet, player: Player)
+	if not busy(tablet) or tablet.User ~= player then
 		return
 	end
-	const npc = tablet.Npc
-	const customers = self.Dependencies.CustomerService
-	const customer = customers:Get(npc)
-	if serve and customer ~= nil and customer.Variant == nil then
-		const at = now()
-		tablet.State = "Talking"
-		tablet.StartedAt = at
-		tablet.EndsAt = at + (tablet.OrderTime or Content.Restaurant.Talk.MinTotal)
-		self:Publish(tablet)
+	if not self:StillThere(tablet) then
+		self:Reset(tablet)
 		return
 	end
-	self:Reset(tablet)
-	if npc == 0 then
-		return
-	end
-	if serve then
-		if not customers:TakeOrderFor(player, npc) then
-			warn(`[TabletService] TAB-{tablet.Index}: TakeOrderFor({player.Name}, {npc}) refused after ACCEPT`)
-		end
-	elseif not customers:RefuseOne(player, npc) then
-		warn(`[TabletService] TAB-{tablet.Index}: RefuseOne({player.Name}, {npc}) found nobody to refuse`)
-	end
+	-- past the tic's peak her turned head stays and follows who left (before it: the attributes go in Reset)
+	settleTic(tablet, player, false)
+	self:Finish(tablet)
 end
 
 -- The player who started the talk left the server or is no longer an active member (R-8)
@@ -388,9 +525,7 @@ function TabletService:Step()
 				self:Reset(tablet)
 			elseif self:UserGone(tablet) then
 				self:Cancel(tablet, "attendant left")
-			elseif tablet.State == "Greeting" and t >= tablet.EndsAt then
-				self:Ask(tablet)
-			elseif tablet.State == "Talking" and t >= tablet.EndsAt then
+			elseif t >= tablet.EndsAt - END_SLACK then
 				self:Finish(tablet)
 			end
 		elseif self:UpdateFull(tablet) then
@@ -562,19 +697,13 @@ function TabletService:DevTalk(player: Player, index: number?): string
 	return string.format("TAB-%d talking with %d for %.2f s", tablet.Index, tablet.Npc, tablet.EndsAt - tablet.StartedAt)
 end
 
--- Ends the running talk now (as if EndsAt was reached) and picks SERVE for its user (DEC-353), so the dev smoke paths
--- still get a taken order
+-- Ends the running talk now (as if EndsAt was reached): the order is taken, as at the end of any talk
 function TabletService:DevFinish(index: number?): string
 	const tablet = self:DevTablet(index)
 	if not busy(tablet) then
 		return `TAB-{tablet.Index} is {tablet.State}`
 	end
 	const npc = tablet.Npc
-	const user = tablet.User
-	self:Ask(tablet)
-	if user ~= nil then
-		self:Decide(tablet, user, true)
-	end
 	self:Finish(tablet)
 	const customer = self.Dependencies.CustomerService:Get(npc)
 	return `TAB-{tablet.Index} done; customer {npc} is {if customer then customer.State else "gone"}`
@@ -608,15 +737,15 @@ TabletService:OnInit(function(self)
 			end
 		end,
 	})
-	-- DEC-353: SERVE / REFUSE of the Deciding tablet's user
-	Restaurant.TabletDecide:onServer(function(data, player: Player)
-		const tablet = self.Tablets[data.Index]
+	Restaurant.TabletLeave:onServer(function(index: number, player: Player)
+		const tablet = self.Tablets[index]
 		if tablet ~= nil then
-			self:Decide(tablet, player, data.Serve)
+			self:Leave(tablet, player)
 		end
 	end)
 	Players.PlayerRemoving:Connect(function(player: Player)
 		self.NoticeAt[player] = nil
+		lastHeard[player] = nil
 		for _, tablet in self.Tablets do
 			if busy(tablet) and tablet.User == player then
 				self:Cancel(tablet, "attendant left the server")

@@ -2,24 +2,27 @@
 -- TabletDialog: the mini-dialogue at the tablet, on the screen of the player taking the order only (FEAT-043, DEC-270 /
 -- DEC-280; tech/restaurant-flow.md rev. 2 §3.2; TASK-383). The other players see the customer's line in a SpeechBalloon over
 -- the rig (TabletController); nobody gets anything in the middle of the screen (AGENT-BRIEF §4, README "UI no centro").
---   Speaker tab   "You" (Teal) on the greeting, "Customer" (Mustard) on the customer's lines, over the top-left corner
---   Line          the line being said (one or two lines, 16 px Ink on a Cream card)
+--   Speaker tab   "You" (Teal) on the player's lines, "Customer" (Mustard) on the customer's, over the top-left corner
+--   Line          the customer's line typed letter by letter (TypedText; owner 2026-10-22: "as palavras sejam procedurais,
+--                 letra por letra"), 16 px Ink on a Cream card, in the line's text style (Content.OrderTalk.Styles:
+--                 capitals, trembling, swapped or garbled letters)
+--   Caption       a sound caption under the line while it shows (an anomaly tic's "[neck cracks]")
 --   Items         the order said so far: one icon per item (bun, sausage, each topping; a pair = both hot dogs), each new
---                 one pops in (Motion.Pop, 0 -> 1.15 -> 1) when Reveal reaches it. Same AST-071 icons as the HUD note
--- Status only while talking: the talk speeds up with the interact key, not here. Owner 2026-10-21 (DEC-353): when Choice() is
--- true two buttons show under the line - SERVE (Green, the order is taken) and REFUSE (Ketchup, only that customer leaves);
--- the keys are TabletController's (E / Q, gamepad A / B).
+--                 one pops in (Motion.Pop, 0 -> 1.15 -> 1) when Reveal reaches it. Same AST-071 icons as the HUD note. They
+--                 stay plain whatever the line's style (owner 2026-10-22: normal even with the text disfigured)
+-- Status only: the talk ends by itself (owner 2026-10-22, no ACCEPT / REFUSE any more; DEC-353's buttons are gone).
 -- Sized in px at UI scale 1 (smallest phone, 667 x 375): 250 px wide, text >= 14 px; the caller gives the UIScale and the
 -- spot (default: lower left, over the joystick zone, clear of the hotbar and of the interact button on the right).
 -- Pure: only props; build it inside a Vide root.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Content = require(ReplicatedStorage.shared.Content)
 local Theme = require(script.Parent.Theme)
 local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
 local CartoonPanel = require(script.Parent.CartoonPanel)
 local CartoonLabel = require(script.Parent.CartoonLabel)
-local CartoonButton = require(script.Parent.CartoonButton)
+local TypedText = require(script.Parent.TypedText)
 
 const create = Vide.create
 const indexes = Vide.indexes
@@ -31,8 +34,16 @@ export type Speaker = "Player" | "Customer"
 export type Props = {
 	Shown: () -> boolean,
 	Speaker: () -> Speaker,
-	-- The line being said (Content.Restaurant.Dialog)
+	-- The customer's whole line (Content.OrderSpeech); TypedText lays it out and types it
 	Text: () -> string,
+	-- Read every frame: chars typed so far and the speech's phase (TypedText.Clock)
+	Clock: () -> TypedText.Clock,
+	-- The line's text style (Content.OrderTalk.Styles row); nil = plain
+	Style: (() -> Content.TalkStyle?)?,
+	-- Chars before the anomaly tic's freeze (Style.Break applies past it); nil = none
+	Break: (() -> number?)?,
+	-- Sound caption under the line; nil / "" = none
+	Caption: (() -> string?)?,
 	-- Ingredient keys of the order in the order they are said (bun, sausage, toppings; then the 2nd hot dog of a pair)
 	Items: () -> { string },
 	-- How many of Items were said already (0..#Items)
@@ -45,12 +56,6 @@ export type Props = {
 	PlayerLabel: string?,
 	CustomerLabel: string?,
 	Name: string?,
-	-- owner 2026-10-21 (DEC-353): the SERVE / REFUSE pair under the line while this is true
-	Choice: (() -> boolean)?,
-	OnServe: (() -> ())?,
-	OnRefuse: (() -> ())?,
-	ServeLabel: string?,
-	RefuseLabel: string?,
 }
 
 const WIDTH = 250
@@ -62,10 +67,9 @@ const TAB_HEIGHT = 22
 const TAB_TEXT = 14
 const TAB_OVERLAP = 7
 const LABEL_SIZE = 14
-const CHOICE_WIDTH = 92 -- px (UI scale 1; the talk card itself is scaled up on the left)
-const CHOICE_HEIGHT = 32
-const CHOICE_TEXT = 14
-const CHOICE_GAP = 8 -- px between the card and the buttons
+const CAPTION_SIZE = 14
+const CAPTION_FADE = 0.35 -- the caption is quieter than the line
+const LINE_WIDTH = WIDTH - 2 * (PAD + 2) -- the card's padding
 
 -- Letter chip for a key with no cell in the sheet (same colours as HudOrder / PlateTicket).
 const CHIP: { [string]: { Color: Color3, Label: string } } = {
@@ -159,25 +163,9 @@ return function(props: Props): Frame
 		return props.Reveal() > 0 and #props.Items() > 0
 	end
 
-	local function choosing(): boolean
-		return props.Choice ~= nil and props.Choice()
-	end
-
-	local function choice(name: string, text: string, tone: Theme.Tone, at: UDim2, anchor: Vector2, act: (() -> ())?): any
-		return CartoonButton({
-			Name = name,
-			Text = text,
-			TextSize = CHOICE_TEXT,
-			Tone = tone,
-			AnchorPoint = anchor,
-			Position = at,
-			Size = UDim2.fromOffset(CHOICE_WIDTH, CHOICE_HEIGHT),
-			OnActivated = function()
-				if act ~= nil and choosing() then
-					act()
-				end
-			end,
-		})
+	local function caption(): string
+		const read = props.Caption
+		return if read ~= nil then read() or "" else ""
 	end
 
 	return create("Frame")({
@@ -253,21 +241,43 @@ return function(props: Props): Frame
 					SortOrder = Enum.SortOrder.LayoutOrder,
 					Padding = UDim.new(0, 6),
 				}),
-				CartoonLabel({
+				TypedText({
 					Name = "Line",
 					LayoutOrder = 1,
+					Width = LINE_WIDTH,
+					TextSize = TEXT_SIZE,
+					Color = Theme.Color.Dark,
+					Text = props.Text,
+					Clock = props.Clock,
+					Style = props.Style or function(): Content.TalkStyle?
+						return nil
+					end,
+					Break = props.Break or function(): number?
+						return nil
+					end,
+					Active = function()
+						return reveal() > 0.02
+					end,
+				}),
+				CartoonLabel({
+					Name = "Caption",
+					LayoutOrder = 2,
 					Box = UDim2.fromScale(1, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
-					TextSize = TEXT_SIZE,
+					TextSize = CAPTION_SIZE,
 					Wrapped = true,
 					XAlignment = Enum.TextXAlignment.Left,
 					Color = Theme.Color.Dark,
 					Stroke = 0,
-					Text = props.Text,
+					Transparency = CAPTION_FADE,
+					Text = caption,
+					Visible = function()
+						return caption() ~= ""
+					end,
 				}),
 				create("Frame")({
 					Name = "Items",
-					LayoutOrder = 2,
+					LayoutOrder = 3,
 					Size = UDim2.new(1, 0, 0, 0),
 					AutomaticSize = Enum.AutomaticSize.Y, -- a pair can wrap to a 2nd row
 					BackgroundTransparency = 1,
@@ -287,18 +297,6 @@ return function(props: Props): Frame
 					end),
 				}),
 			},
-		}),
-
-		-- owner 2026-10-21 (DEC-353; 2nd pass with the owner's sketch): the text card on top, two small buttons under it,
-		-- one under each end (they were half the card wide and too tall)
-		create("Frame")({
-			Name = "Choice",
-			LayoutOrder = 3,
-			Size = UDim2.new(1, 0, 0, CHOICE_HEIGHT + CHOICE_GAP + TAB_OVERLAP),
-			BackgroundTransparency = 1,
-			Visible = choosing,
-			choice("Serve", props.ServeLabel or "SERVE", Theme.Tone.Green, UDim2.fromOffset(PAD, CHOICE_GAP + TAB_OVERLAP), Vector2.zero, props.OnServe),
-			choice("Refuse", props.RefuseLabel or "REFUSE", Theme.Tone.Ketchup, UDim2.new(1, -PAD, 0, CHOICE_GAP + TAB_OVERLAP), Vector2.new(1, 0), props.OnRefuse),
 		}),
 	})
 end

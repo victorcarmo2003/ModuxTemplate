@@ -28,6 +28,7 @@ return {
 	StarterPlayer.StarterPlayerScripts.client.DriveThru.DriveThruController,
 	StarterPlayer.StarterPlayerScripts.client.Economy.EconomyController,
 	StarterPlayer.StarterPlayerScripts.client.Hallucination.HallucinationController,
+	StarterPlayer.StarterPlayerScripts.client.Hint.HintController,
 	StarterPlayer.StarterPlayerScripts.client.Hud.HudController,
 	StarterPlayer.StarterPlayerScripts.client.Input.HapticsController,
 	StarterPlayer.StarterPlayerScripts.client.Input.InputController,

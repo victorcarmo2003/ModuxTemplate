@@ -1,6 +1,34 @@
-Status: Aprovado (DEC-075 — opção A, variante A1; DEC-076 — Walt só telefone até o final; rodada 7, 2026-10-08). Anotações posteriores: DEC-088 (encenação POV compartilhada, §2.2), DEC-099 (Opal confirmada, §3).
+Status: Aprovado (**DEC-363**, 2026-10-23 — final "O Segundo Café", §0; supera DEC-075 no conteúdo). Histórico: DEC-075 — opção A, variante A1 (§1–§4, agora reserva); DEC-076 — Walt só telefone até o final (mantida); anotações DEC-088, DEC-099.
 
 # Revelação da 10ª noite (Q-040)
+
+## 0. O final que vale: "O Segundo Café" (DEC-363, Aprovado pelo dono)
+
+Fala do dono (2026-10-23): "Ela tá interessante, eu gostei, eu vou manter. A única coisa que falta pendente vai ser o preenchimento dos créditos do jogo."
+Base de lore: `walt-calls-lore.md` §3 (quem chega à 10ª noite fica com o turno; o Walt troca o próprio turno; o 2º café é para quem fica) e §5 opção B, em versão cinemática.
+
+| # | Cena | Fala |
+|---|---|---|
+| 1 | Amanhecer, 6:00. O Walt chega com **dois cafés**. | as 9 falas do A1 (§2.2, 1–9), iguais: viram **isca** |
+| 2 | Ele estende o 2º café. O sol **para**; o céu **volta para a noite**. | Walt (voz grave, `walt_dark`): "Forty years, Rookie. Forty years of nights." |
+| 3 | Na despensa, a porta dos fundos **explode**. O Walt aparece **maior, sem corcunda**. | — |
+| 4 | Ele agarra o jogador pela gola. Barra "MASH TO BREAK FREE" que **nunca solta**. | — |
+| 5 | Ele joga o jogador na rua; mãos do late crowd puxam; corte para o preto. | Walt (`walt_dark`): "Now I get the mornings." |
+| 6 | Preto. | Rádio (voz do último Rookie): "...welcome to the other side, Rookie..." |
+| 7 | Créditos (**pendente: preencher**, `art/credits.md`). | — |
+
+- Squad: cada jogador vê **a si mesmo** sendo agarrado.
+- "Morning, Marigold." **sai** da sequência principal.
+- Como ficam as decisões anteriores (DEC-363): DEC-076 mantida (o Walt só aparece em pessoa nesta cena); a nota "Walt não é anomalia" (DEC-177) mantida na mecânica; o agarrão é **exceção aprovada do Mild** (DEC-172/023) só nesta cena; DEC-312 emendada (o vilão fica claro no final).
+- Fala 2 do A1 no final (DEC-369): "I watched every one. **From across the street.** Best seat in town." (era "From in here"; regravar).
+- **Pós-créditos (DEC-369, Aprovado):** de dia, o poste com o panfleto novo **NIGHT SHIFT — NOW HIRING** ("Must notice things."); um **cachorro** (o próximo Rookie, rig da crew) para e lê o panfleto; **o jogador**, agora do lado de lá (skin Night), observa **de longe, do estacionamento**, no mesmo ponto onde o Walt sombrio ficava (DEC-371). O **Walt passa de dia pela calçada com um café só** (DEC-374, Aprovado).
+- **Tela de fim de run (DEC-369, Aprovado):** "**You Took the Shift**", crachá "[NOME] — NIGHT SHIFT". Ela só faz sentido com a ideia de **"consumidos pela noite"**: nas N1–N3 o jogador usa a skin normal, nas N4–N6 a cansada, nas N7–N10 a da noite (DEC-370). Quando a tela aparece, o jogador já está "do lado de lá".
+- **Easter egg ligado ao final (DEC-371, Aprovado):** desde a Noite 1, o Walt sombrio fica parado no estacionamento; se o jogador chega perto demais ele some e volta na noite seguinte. O pós-créditos mostra o jogador nesse mesmo lugar.
+- Critérios de aceite do §4 continuam valendo (depois das 6:00, pulável por voto, mesma cena para a party, nenhuma palavra proibida), exceto "tom final caloroso" e "duração ≤ 60 s" (a duração é a do Finale, `Content.Shift`).
+
+---
+
+> **Daqui para baixo: histórico (DEC-075, final A1).** A cena `finale` do código fica como reserva técnica.
 
 Autor: narrative-writer, 2026-10-08.
 **Vale: opção A "The Light on the Corner", variante A1** (§2.1, §2.2, §2.4, §3, §4). Opções B, C e a variante A2 ficam só como histórico e **não valem**.
@@ -90,6 +118,8 @@ Walt (telefone): "They were never here to scare you. They were hungry. Like ever
 ## 3. Trilha de pistas (vale para A; quase toda vale para B)
 
 Pistas plantadas ao longo da run. Nenhuma explica; cada uma cria uma pergunta (DEC-008). Objetos são **sugestões** para art-director e level-designer.
+
+> **Anotação 2026-10-23 (secretário; o conteúdo aprovado não muda):** DEC-360 tirou o dia da run. As linhas "Dia 3+", "Lote, dias 1–5", "Dia 11", "Dia 12", "Dia 14" desta tabela não têm mais canal (não há ligação da manhã). Destino proposto, **Provisório** (`Q-485`): a 1ª linha da ligação da noite seguinte. O palco do final (Mart) não existe no restaurante (DEC-307), e o ending "O Segundo Café" está em teste (`Q-480`); este documento segue Aprovado até uma DEC nova.
 
 | Onde / quando | Pista | Pergunta que cria |
 |---|---|---|

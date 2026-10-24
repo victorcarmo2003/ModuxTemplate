@@ -94,6 +94,8 @@ export type Rules = {
 	ReadyWait: number, -- s of a Call phase the first ring waits for every active member's ClientReady (Provisional)
 	DayMaxLines: number,
 	NightMaxSeconds: number,
+	-- customers at the counter after the tutorial before the night call it replaced rings (BossService:OnFronted)
+	AfterTutorialCustomers: number,
 	Tutorial: TutorialRules,
 }
 
@@ -136,23 +138,16 @@ local function infinite(index: number, text: string): BossCall
 	}
 end
 
--- TASK-492: the restaurant text of a night call (Lines + Short), used instead of the trailer one when
--- Restaurant.Rules.Enabled. It names the premiere that actually runs there (Restaurant.Switch.NewAnomalies) and its
--- restaurant answer (horror-cinematic.md §9); nil = the trailer text fits both
-type RestaurantCall = {
-	Lines: { Line },
-	Short: { Line },
-}
-
-local function nightCall(index: number, body: { Line }, short: { Line }, restaurantCall: RestaurantCall?): BossCall
-	const variant = restaurantCall
+-- A night call: its lines and the Short form said after the NightRepeat opener. Owner 2026-10-23: only the restaurant
+-- text is kept (the trailer text of TASK-492 was never played and was dropped)
+local function nightCall(index: number, body: { Line }, short: { Line }): BossCall
 	return {
 		Key = `call_night_{index}`,
-		Lines = if variant then variant.Lines else body,
+		Lines = body,
 		Trigger = { Kind = "NightCall", Night = index },
 		Priority = 3,
 		Once = true,
-		Short = if variant then variant.Short else short,
+		Short = short,
 	}
 end
 
@@ -226,70 +221,145 @@ const base = Table.new({
 	-- fallback) until tools/voice runs again.
 	-- owner 2026-10-18: the night calls were too long (4-7 lines, ~15 s) and the voice ran behind the subtitle; now 2-3
 	-- lines each, only the sign and the answer. Short = what follows the NightRepeat opener on a repeat.
+	-- Owner 2026-10-22 (DEC-354/355; "essa fala dele tá meio errada"): no ACCEPT / REFUSE and the window no longer reaches
+	-- a customer anomaly (anomalies-after-accept-proposal.md §9.5): every order is taken, so the customer lines say the
+	-- condition of the delivery queue, in the words of Content.AnomalyHints / Content.Hints (the paper is written on the
+	-- last line, HintService:WaltSaysRule). Threats from outside (red fog, long car...) keep the window. New lines have
+	-- no pre-generated voice until tools/voice runs again (the call shows them as text meanwhile).
+	-- Owner 2026-10-23 (recorded Walt in his own voice, tools/voice/edits.json): one longer line per rule, in his words (the
+	-- question + answer pairs went). A repeated night says the same lines (Short = Lines) unless noted. The last line still
+	-- writes the paper (HintService:WaltSaysRule). A text changed here loses its recorded audio until it is recorded again.
+	-- TASK-648 (DEC-365..368): captions of "PRONTAS PARA GRAVAR" in tools/voice/elevenlabs_script.md, kept identical (the
+	-- voice id comes from the caption). Every night warns about what is new in it (DEC-367; the breaker on Night 1); the
+	-- last line still writes the paper. Short (PROVISIONAL, TASK-648): the rule lines without the opener.
 	nightCall(
 		1,
-		lines("Evening, Rookie. Some customers look off.", "No face? Shut the window.", "And don't stay outside too long."),
-		lines("No face? Shut the window.")
+		-- opener, the breaker (DEC-367), the window and its cost (DEC-365), ANM-001 (NoServe) last (DEC-368). If the
+		-- recorded call goes over NightMaxSeconds, cut "Only go out for the breaker..." (script note)
+		lines(
+			"Evening, Rookie. Some customers look off.",
+			"Power trips? Breaker's outside. Hold it till the lights come back.",
+			"Only go out for the breaker. Then come right back in.",
+			"Something wrong at the window? Shut it. They'll go. So does the money.",
+			"No face? Blank ticket? Don't cook it. He leaves on his own."
+		),
+		lines(
+			"Power trips? Breaker's outside. Hold it till the lights come back.",
+			"Something wrong at the window? Shut it. They'll go. So does the money.",
+			"No face? Blank ticket? Don't cook it. He leaves on his own."
+		)
 	),
+	-- TASK-591 (Q-399): the shaker is starving, serve him plain (DEC-368: nothing on it); ANM-009: the back door knock,
+	-- Walt has a key (lock it)
 	nightCall(
 		2,
-		-- TASK-591 (Q-399): the shaker is starving - serve him plain. New lines: no pre-generated voice until tools/voice
-		-- runs again (the call plays them as text meanwhile)
-		lines("Someone shaking all over?", "He's just starving. Serve him plain.", "Nothing on it."),
-		lines("Shaking? Plain hot dog."),
-		-- TASK-561: ANM-009 debuts tonight in the restaurant (back door opened by hand); Walt has a key and never knocks
-		-- owner 2026-10-21: the knock's rule is lock the door (TASK-592, Q-398); new lines have no voice until tools/voice runs
-		{ Lines = lines("Someone shaking all over? Serve him plain, nothing on it.", "Knocks on the back door?", "I've got a key. Lock it."), Short = lines("Shaking? Plain. Knocks? Lock the door.") }
+		lines(
+			"Shaky one's just hungry. Plain bun and sausage. Nothing on it.",
+			"Also, if someone knocks at the door... it's not me, lock it."
+		),
+		lines(
+			"Shaky one's just hungry. Plain bun and sausage. Nothing on it.",
+			"Also, if someone knocks at the door... it's not me, lock it."
+		)
 	),
+	-- the blackout (breaker, DEC-368: hold it) and ANM-004 the copies (NoServe)
 	nightCall(
 		3,
-		lines("Lights might go out tonight.", "Breaker's out back. Hold it."),
-		lines("Lights out? Breaker. Hold it."),
-		-- owner 2026-10-21 (at most 2 debuts a night): the copies moved here from Night 5
-		{ Lines = lines("Lights might go out tonight.", "Breaker's on the light panel. Hold it.", "Twins in line? Shut the window on the mirrored one."), Short = lines("Lights out? Breaker. Twins? Window.") }
+		lines(
+			"Lights out? Breaker's outside. Hold it till they come back.",
+			"Rookie, it seems that something weird is happening today... if you see someone showing up twice don't serve him."
+		),
+		lines(
+			"Lights out? Breaker's outside. Hold it till they come back.",
+			"Rookie, it seems that something weird is happening today... if you see someone showing up twice don't serve him."
+		)
 	),
+	-- ANM-012 (NoLook) and the watcher across the street (outside)
 	nightCall(
 		4,
-		lines("Head turned all the way back?", "That's no customer. Shut the window."),
-		lines("Head on backwards? Shut the window."),
-		{ Lines = lines("Head turned all the way back? Shut the window.", "Someone across the street? Don't look."), Short = lines("Backwards head? Window. Watcher? Don't look.") }
+		lines(
+			"Some customers have a neck problem, so if you see one, don't stare him, just give the food to him and your head down",
+			"Someone across the street? Don't look."
+		),
+		lines(
+			"Some customers have a neck problem, so if you see one, don't stare him, just give the food to him and your head down",
+			"Someone across the street? Don't look."
+		)
 	),
+	-- ANM-013 (Dark: LIGHTS OFF) and the Raincoat Lady (Serve)
 	nightCall(
 		5,
-		lines("White eyes? Twins in line? Shut the window.", "Bell rings? Light off by the third."),
-		lines("White eyes or twins? Shut the window."),
-		-- owner 2026-10-21: the copies moved to Night 3, the red fog to Night 6
-		{ Lines = lines("White eyes? A smile way too big?", "Shut the window."), Short = lines("White eyes? Shut the window.") }
+		lines(
+			"If you see someone with white eyes, TURN OFF THE LIGHTS, and give them the food, they are light sensitive",
+			"Hey Rookie, if you see the raincoat lady, I love her, serve her and be nice to her."
+		),
+		lines(
+			"If you see someone with white eyes, TURN OFF THE LIGHTS, and give them the food, they are light sensitive",
+			"Hey Rookie, if you see the raincoat lady, I love her, serve her and be nice to her."
+		)
 	),
+	-- ANM-014 (Hurry: BE QUICK) and the red fog outside (the window stays)
 	nightCall(
 		6,
-		lines("Lights buzz? Heavy steps?", "Hide out back, behind the trailer."),
-		lines("Buzzing lights? Hide out back."),
-		{ Lines = lines("Head way too big for them? Shut the window.", "Red fog on the street?", "Shut it. Stay inside till it's gone."), Short = lines("Big head, red fog? Shut the window.") }
+		lines(
+			"If you see the customer with a big head, give them the food fast, they have a headache. And also, a red fog might show up, so close the window if it happens."
+		),
+		lines(
+			"If you see the customer with a big head, give them the food fast, they have a headache. And also, a red fog might show up, so close the window if it happens."
+		)
 	),
+	-- the scratching under the floor (DEC-368: no "wait for the thud" here) and the floating one (DEC-367)
 	nightCall(
 		7,
-		lines("Scratching under the trailer?", "Out the back and hide. Quick."),
-		lines("Scratching? Hide out back."),
-		{ Lines = lines("Scratching under the floor?", "Get off the floor. Climb the counter."), Short = lines("Scratching? Up on the counter.") }
+		lines(
+			"Scratching under the floor? Up on the counter till it passes.",
+			"Feet not touching the floor? Don't serve yet. Wait for the thud."
+		),
+		lines(
+			"Scratching under the floor? Up on the counter till it passes.",
+			"Feet not touching the floor? Don't serve yet. Wait for the thud."
+		)
 	),
+	-- the long car (window) and ANM-022's second rule, the shop light (DEC-366), last: it writes the paper
 	nightCall(
 		8,
-		lines("Whispers say hide? Hide out back.", "Car flashes its brights? Shut the window."),
-		lines("Whispers? Hide. Headlights? Window."),
-		{ Lines = lines("A long car at the drive-thru?", "Shut the window. Keep it shut."), Short = lines("Long car? Shut it. Keep it shut.") }
+		lines(
+			"A long car at the drive-thru?",
+			"Shut the window. Keep it shut.",
+			"Banging his head on the glass? Window won't stop him. Shop light off."
+		),
+		lines(
+			"Long car? Shut it. Keep it shut.",
+			"Banging his head on the glass? Window won't stop him. Shop light off."
+		)
 	),
+	-- the roof walker (the knocks were told on Night 2: owner 2026-10-23 "não precisa explicar novamente") and the one
+	-- that never blinks (DEC-367)
 	nightCall(
 		9,
-		lines("Steps on the roof? Get out and hide.", "Knocks out back? It's not me. Don't open."),
-		lines("Roof steps? Hide. Knocks? Don't open."),
-		{ Lines = lines("Steps on the roof? Don't look up.", "Knocks on the back door?", "It's not me. Lock it."), Short = lines("Roof steps? Don't look up. Knocks? Lock the door.") }
+		lines(
+			"If you hear steps at the roof, it's probably a cat. Don't look up.",
+			"Never blinks? Serve him like normal. Just don't stare back."
+		),
+		lines(
+			"If you hear steps at the roof, it's probably a cat. Don't look up.",
+			"Never blinks? Serve him like normal. Just don't stare back."
+		)
 	),
+	-- Hush, the lamps (DEC-368: no "dying") and the one on the cameras (DEC-367)
 	nightCall(
 		10,
-		lines("Last night, Rookie.", "Lamps dying? Run inside the Mart."),
-		lines("Lamps out? Run inside the Mart."),
-		{ Lines = lines("Last night, Rookie.", "Lamps dying outside? Shop light off.", "Keep it off till they're back."), Short = lines("Lamps out? Shop light off.") }
+		lines(
+			"Last night, Rookie.",
+			"Lamps going out outside? Shop light off.",
+			"Keep it off till they're back.",
+			"Looks normal? Check the cameras. Wrong on camera, don't cook it."
+		),
+		lines(
+			"Lamps going out outside? Shop light off.",
+			"Keep it off till they're back.",
+			"Looks normal? Check the cameras. Wrong on camera, don't cook it."
+		)
 	),
 	{
 		Key = "call_night_short",
@@ -318,7 +388,8 @@ const base = Table.new({
 	-- never rung: quoted as "Walt: ..." on the run end screen (ui-text.md §14). Provisional.
 	{
 		Key = "call_run_over",
-		Lines = lines("That's two, Rookie.", "No more nights for you.", "Go home. You did well."),
+		-- DEC-368 (TASK-648): the first lost night already ends the run (no second strike to count)
+		Lines = lines("That's it, Rookie.", "No more nights for you.", "Go home. You did well."),
 		Trigger = { Kind = "RunOver" },
 		Priority = 4,
 		Once = false,
@@ -341,7 +412,7 @@ const base = Table.new({
 			"Shift's over, Rookie. Nice work.",
 			"Before tonight, get some gear.",
 			"Gear Stand, in the back.",
-			"Get Storage. More buns, more sauce.",
+			-- owner 2026-10-23: "Pick whatever you like. Your call." cut (upg_buy's reminder says it)
 			"Short on cash? I've got you."
 		),
 		Trigger = { Kind = "UpgradeLesson" },
@@ -353,23 +424,21 @@ const base = Table.new({
 	hint("hint_grill_place", "grill_place", lines("Bar full? Grab it.")),
 	hint("hint_grill_collect", "grill_collect", lines("Now slice a bun.")),
 	hint("hint_bun_cut", "bun_cut", lines("Pop a frank in the bun.")),
-	hint("hint_board_add_sausage", "plate_add_sausage", lines("Hot dog's ready. Wait for orders.")),
+	-- DEC-368 (TASK-648): the hot dog goes to the customer, it does not wait
+	hint("hint_board_add_sausage", "plate_add_sausage", lines("Hot dog's ready. Hand it to the customer.")),
 	-- TASK-284: the window lever opens the shop (key kept: BossCalls ids)
 	-- (hint_open_sign, the line when the window opens, left on owner request 2026-10-19: less talk, only what the player needs)
 	hint(
 		"hint_take_order",
 		"take_order",
-		lines("See the bubble? That's the order.", "Nothing extra.")
+		lines("See the bubble? That's the order.")
 	),
-	hint(
-		"hint_serve",
-		"serve",
-		lines("Nice! Tips go in the jar.", "Low on stock? Grab a box in the pantry.")
-	),
+	-- (hint_serve, after the first serve, removed on owner request 2026-10-23: no tip jar, and the tutorial's r_box line
+	-- already says where the stock is)
 	hint("hint_restock", "restock", lines("That's how you restock. Easy.")),
 	-- owner 2026-10-19: the first time a topping the order does not have goes on the hot dog (not on a discard)
 	hint("hint_discard", "topping_wrong", lines("Messed up? Toss it. No harm.")),
-	hint("hint_bench_buy_upgrade", "bench_buy_upgrade", lines("New gear's in the kitchen. Heh.")),
+	-- (hint_bench_buy_upgrade, Walt praising the first Gear Stand purchase, removed on owner request 2026-10-21: no call there)
 } :: { BossCall })
 
 const rules: Rules = {
@@ -378,6 +447,7 @@ const rules: Rules = {
 	ReadyWait = 20, -- Provisional: the loading screen can last up to 18 s
 	DayMaxLines = 7,
 	NightMaxSeconds = 45,
+	AfterTutorialCustomers = 1, -- owner 2026-10-22: "deixa chegar um cliente só... chegou um cliente, aí ele liga"
 	Tutorial = {
 		Call = "call_tutorial",
 		Goodbye = 6,

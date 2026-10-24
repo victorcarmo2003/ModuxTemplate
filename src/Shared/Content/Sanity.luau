@@ -52,7 +52,7 @@ export type Tier = {
 	PulseDepth: number, -- +- share of the vignette
 	Blur: { number }, -- {min, max} s between two short blurs (Pressure.BlurSize for Pressure.BlurTime); {} = none
 	Heartbeat: number, -- s between two heartbeats; 0 = none
-	Breath: number, -- s between two held breaths; 0 = none
+	Breath: number, -- s between two held breaths; 0 = none (all 0 since 2026-10-21: the owner heard them as random sighs)
 	Words: number, -- s between two bursts of the character's words on screen (HorrorScenes.Words.low_sanity); 0 = none
 }
 
@@ -107,7 +107,9 @@ const sanity: Sanity = {
 	SeeTime = 1,
 	SeeAngle = 40,
 	SeeRange = 60,
-	RuleBroken = 35, -- FEAT-019
+	-- FEAT-019. Owner 2026-10-23 (Provisional): the event anomalies (knock, blackout, long car, roof walker) took too much;
+	-- was 35
+	RuleBroken = 15,
 	DarkDelay = 5, -- FEAT-020; owner 2026-10-18 "a sanidade está descendo muito rápido" (was 3)
 	DarkPerSecond = 0.5, -- FEAT-020; owner 2026-10-18 (was 1). Fractions add up in VitalService (DarkOwed)
 	DarkPhases = { "Call", "Prep", "Night" }, -- not NightEnd: the night is already won (L2-03, Provisional)
@@ -169,7 +171,7 @@ const sanity: Sanity = {
 			PulseDepth = 0,
 			Blur = { 30, 50 },
 			Heartbeat = 0,
-			Breath = 22,
+			Breath = 0, -- owner 2026-10-21: no random sighs (was 22)
 			Words = 0,
 		},
 		{
@@ -186,7 +188,7 @@ const sanity: Sanity = {
 			PulseDepth = 0.15,
 			Blur = { 14, 24 },
 			Heartbeat = 1.4,
-			Breath = 13,
+			Breath = 0, -- owner 2026-10-21: no random sighs (was 13)
 			Words = 20,
 		},
 		{
@@ -203,7 +205,7 @@ const sanity: Sanity = {
 			PulseDepth = 0.22,
 			Blur = { 6, 12 },
 			Heartbeat = 0.85,
-			Breath = 8,
+			Breath = 0, -- owner 2026-10-21: no random sighs (was 8)
 			Words = 9,
 		},
 	},

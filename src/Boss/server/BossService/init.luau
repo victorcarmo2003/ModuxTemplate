@@ -15,7 +15,8 @@
 -- phase inside its 60 s cap, Validate L2-12) or Idle. The server only writes StartedAt: the line is
 -- floor((now - StartedAt) / LineTime), the same for everyone, and whoever joins mid-call gets the rest (T44).
 -- No call starts in Finale, NightLost, RunEnd or Resume; entering one hangs up the current call, and
--- NightLost/RunEnd/Resume also empty the queue. Probe "Call" = queue empty and the phone Idle.
+-- NightLost/RunEnd/Resume also empty the queue. The same while a cutscene holds the screen (CutsceneService:IsHolding,
+-- the Finale and a dev play): no call starts, the current one hangs up, the queue waits. Probe "Call" = queue empty and the phone Idle.
 -- Once rows are marked played when they start Talking (heard), so a shift capture taken at the shift start does
 -- not hold the call of that shift: a Resume plays it again. Snapshot "Bs" = sorted played keys, restored as is.
 --
@@ -93,6 +94,7 @@ const BossService = Modux.Service("BossService", {
 		"VitalService",
 		"KitchenService",
 		"CustomerService",
+		"CutsceneService",
 	},
 	Priority = 560,
 })
@@ -121,6 +123,32 @@ function BossService:Setup()
 	self.Loaded = {} :: { [Player]: boolean }
 	-- os.clock() the current Call phase began
 	self.CallSince = 0 :: number
+	-- the night's own call the tutorial call replaced (OnNightCall); once the tutorial is over it rings after
+	-- Rules.AfterTutorialCustomers customers reached the counter, so Walt still presents the night's anomaly and the paper
+	-- gets its tip; until it was said, no anomaly starts (TutorialService:SetCallOwed) (owner 2026-10-22). nil = none owed
+	self.AfterTutorial = nil :: string?
+	self.AfterTutorialFronts = 0 :: number -- customers at the counter since the tutorial ended
+	self.AfterTutorialQueued = false :: boolean
+end
+
+-- The owed night call (AfterTutorial): set or settled, and the anomaly hold follows it
+function BossService:SetOwed(key: string?)
+	self.AfterTutorial = key
+	self.AfterTutorialFronts = 0
+	self.AfterTutorialQueued = false
+	self.Dependencies.TutorialService:SetCallOwed(key ~= nil)
+end
+
+-- A customer reached the counter: after the tutorial, the owed night call rings once enough of them came
+function BossService:OnFronted()
+	const key = self.AfterTutorial
+	if key == nil or self.AfterTutorialQueued or self.Dependencies.TutorialService:AnyPending() then
+		return
+	end
+	self.AfterTutorialFronts += 1
+	if self.AfterTutorialFronts >= Content.BossCalls.Rules.AfterTutorialCustomers and self:CanStart() then
+		self.AfterTutorialQueued = self:Enqueue(key, true)
+	end
 end
 
 -- Reads -----------------------------------------------------------------------------------------------------------
@@ -149,7 +177,10 @@ end
 
 function BossService:CanStart(): boolean
 	const round = self.Dependencies.RoundService
-	return self.Enabled and round:IsStarted() and not BLOCKED[round:GetPhase()]
+	return self.Enabled
+		and round:IsStarted()
+		and not BLOCKED[round:GetPhase()]
+		and not self.Dependencies.CutsceneService:IsHolding()
 end
 
 -- Queue -----------------------------------------------------------------------------------------------------------
@@ -276,6 +307,9 @@ end
 
 -- End of the last line: the next queued call follows without ringing again
 function BossService:Finish(at: number)
+	if self.AfterTutorial ~= nil and self.Record().Call == self.AfterTutorial then
+		self:SetOwed(nil) -- Walt said the night's rule: the anomalies may start
+	end
 	const nextKey = if self:CanStart() then self:Pop() else nil
 	if nextKey then
 		self:Talk(nextKey, at)
@@ -496,6 +530,9 @@ end
 
 -- Call phase of a night: lost-night calls first by Priority, then the night's own call
 function BossService:OnNightCall(night: number, attempt: number)
+	if self.AfterTutorial ~= nil then
+		self:SetOwed(nil) -- a call owed from an earlier night is not this night's
+	end
 	for _, key in self.Pending do
 		self:Enqueue(key, true)
 	end
@@ -506,6 +543,7 @@ function BossService:OnNightCall(night: number, attempt: number)
 	-- Rookie. First, open the store."); the rules call counts as heard
 	if key and self.Dependencies.TutorialService:AnyPending() then
 		self.Played[key] = true
+		self:SetOwed(key) -- owner 2026-10-22: it still rings after the tutorial, once a customer came (OnFronted)
 		self:QueueTutorial()
 	elseif key then
 		self:Enqueue(key)
@@ -518,6 +556,9 @@ end
 function BossService:OnPhase(phase: string, day: number, night: number)
 	if CLEARS[phase] then
 		self:Stop(true)
+		if self.AfterTutorial ~= nil then
+			self:SetOwed(nil) -- the night is over: its call is for another night
+		end
 		if phase ~= "NightLost" then
 			table.clear(self.Pending)
 		end
@@ -708,6 +749,13 @@ BossService:OnInit(function(self)
 	round.PhaseChanged:Connect(function(phase, day, night)
 		self:OnPhase(phase, day, night)
 	end)
+	-- a cutscene hangs up the current call, like a blocked phase (the queue waits for the chain to end)
+	self.Dependencies.CutsceneService.Changed:Connect(function(scene)
+		if scene ~= "none" then
+			self:Stop(false)
+		end
+		self:RefreshPhones()
+	end)
 	round.NightResolved:Connect(function(_info, result, reason)
 		self:OnNightResolved(result, reason)
 	end)
@@ -756,6 +804,11 @@ BossService:OnStart(function(self)
 		if self.Dependencies.NetService:IsRunning() then
 			self.Libs.Net.Call:update(RECORD, record)
 		end
+	end)
+
+	-- the night call owed after the tutorial waits for customers at the counter (owner 2026-10-22)
+	self.Dependencies.CustomerService.Fronted:Connect(function()
+		self:OnFronted()
 	end)
 
 	-- InteractionService (730) already scanned the anchors with the default PromptEnabled: phones start silent

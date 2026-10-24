@@ -13,7 +13,8 @@
 --   RoundService:AddRunReportStep       RunReport.Gems = RunRewards.Gems of this run (T59)
 -- Event badges (DEC-315, design/badges.md): Unlock(player, key) once per account. Listened here: ProfileService.Loaded
 -- (welcome), NightResolved (first_night, halfway, kept_light), CustomerService.Acted (first_hotdog, not_today),
--- KitchenService.Emitted "grill_flip" (golden_flip). TutorialService calls Unlock (tutorial_done).
+-- KitchenService.Emitted "grill_flip" (golden_flip). TutorialService calls Unlock (tutorial_done), Anomalies/ANM-009
+-- (bolted_shut).
 -- NightResolved and AddRunReportStep come with TASK-054: until then they are looked up at runtime (warn once) and
 -- the run ends with Gems = 0 (§19.0 rule 4). PENDING when TASK-054 lands: drop the RoundHooks cast.
 -- Who gets paid: connected members with a loaded profile, in any life state (DEC-104). A connected player whose

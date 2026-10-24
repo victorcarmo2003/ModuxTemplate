@@ -34,6 +34,10 @@ export type OrderRules = {
 	-- owner 2026-10-22 (Provisional): scale (0, 1] of BOTH patience clocks (Queue and Order) of a customer anomaly the
 	-- player must not serve (NoServe: ANM-001, 004, 023; Rules Params.Unservable = true): it does not stand there long
 	UnservablePatienceScale: number,
+	-- owner 2026-10-22 (Provisional): actor variants whose order is a bun ALONE, no sausage (ANM-011 the shaker, "JUST
+	-- BREAD"). Net.Customers.Bread = true for them: every order picture shows the bun only, and a plate with the bun alone
+	-- is served to them (CustomerService, PlateService gate); a hot dog is thrown (the condition Plain)
+	BreadOnly: { [string]: boolean },
 	WireSpanMax: number, -- patience span on the wire is an int 0..this (Net.Customers.PatienceSpan)
 	IncompletePct: number, -- floor
 	GradeThresholds: { A: number, B: number, C: number },
@@ -61,6 +65,7 @@ const rules: OrderRules = {
 	OrderPatienceBase = 75, -- Q-192 (Provisional): 75 + 5K s (K 0..3 = 75..90; pair K1 + K2 up to 105 + bonus)
 	OrderPatiencePerK = 5,
 	UnservablePatienceScale = 0.5, -- owner 2026-10-22 (Provisional): half the patience while waiting for the order
+	BreadOnly = { shake = true },
 	WireSpanMax = 255,
 	IncompletePct = 50, -- floor(50%) (DEC-072)
 	GradeThresholds = { A = 0.90, B = 0.75, C = 0.50 }, -- satisfied share (DEC-051, FEAT-014)

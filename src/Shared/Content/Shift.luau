@@ -60,9 +60,9 @@ const base = Table.new({
 		SkipWithoutProbe = false,
 		-- the night's buying break: 30 s after the report and the boss call, then the night starts with the window open
 		-- (opening the window earlier starts it at once). Was 90 s, then 36 s (owner 2026-10-21, Provisional)
-		-- owner 2026-10-21: the MORNING after the night - the clock runs 6 AM -> 8 PM over the 30 s (day light, walkers and
-		-- day traffic follow it; Shift.Morning: dusk in the last ~5 s)
-		Night = { Duration = 30, ClockFrom = hours(6), ClockTo = hours(20) },
+		-- 7 PM -> 8 PM, dark (owner 2026-10-21: "tira esse sistema de ficar de dia"). With Shift.Morning.Enabled the clock
+		-- ran 6 AM -> 8 PM over the 30 s: day light, walkers and day traffic, dusk in the last ~5 s
+		Night = { Duration = 30, ClockFrom = hours(19), ClockTo = hours(20) },
 	},
 	-- Open: 8:00 AM -> 6:00 PM in 216 s, 1 game hour = 21.6 s (DEC-048, FEAT-003; was 360 s / 36 s, Q-200).
 	{ Key = "Open", Duration = 216, ClockFrom = hours(8), ClockTo = hours(18), Kind = "Day", Selling = true, SkipWithoutProbe = false },
@@ -102,9 +102,9 @@ const base = Table.new({
 	{
 		Key = "Call",
 		Duration = 50,
-		-- owner 2026-10-21: Walt calls in the morning, right after the report (was 7 PM)
-		ClockFrom = hours(6),
-		ClockTo = hours(6),
+		-- 7 PM (owner 2026-10-21: the morning after the night is off for now, Shift.Morning.Enabled; it was 6 AM with it)
+		ClockFrom = hours(19),
+		ClockTo = hours(19),
 		Kind = "Night",
 		Selling = false,
 		SkipWithoutProbe = true,
@@ -123,10 +123,10 @@ const base = Table.new({
 	},
 	-- Lost night sequence (lights out, dawn), 6 s; clock held (architecture.md §19.4, T58).
 	{ Key = "NightLost", Duration = 6, ClockFrom = 0, ClockTo = 0, Kind = "Night", Selling = false, SkipWithoutProbe = false },
-	-- Finale cutscene after Night 10 is won; cap 150 s at 6:00 AM (FEAT-027).
+	-- Finale cutscene after Night 10 is won; cap 200 s at 6:00 AM (FEAT-027).
 	{
 		Key = "Finale",
-		Duration = 150,
+		Duration = 200, -- "The Second Coffee" chain (caps 43 + 38 + 23) and the credits (75), owner request 2026-10-22; was 150
 		ClockFrom = hours(30),
 		ClockTo = hours(30),
 		Kind = "Night",
@@ -155,6 +155,10 @@ return Table.with(base, {
 	-- light, more walkers, day traffic, no Hunter (OutsideService is Night-phase only) - until DuskFrom (game minutes of the
 	-- Prep clock), when it darkens fast (LightController blend), the fog comes back and walkers / cars stop spawning.
 	-- 5:40 PM = the last ~5 s of the 30 s Prep (6 AM -> 8 PM). RoundService:IsDark() / RoundController.Dark read it.
-	Morning = { DuskFrom = hours(17, 40) },
+	-- FromNight: the first night that has a morning. Owner 2026-10-21 ("tem que começar já na noite"): the run opens on
+	-- Night 1 already dark; the morning is the break between two nights.
+	-- Enabled: owner 2026-10-21 ("tira esse sistema de ficar de dia, vamos deixar sem ele por enquanto"): off, the night
+	-- shift stays dark from the report to the next night; the Call / Prep clocks went back to 7 PM.
+	Morning = { Enabled = false, DuskFrom = hours(17, 40), FromNight = 2 },
 	ClockStepMinutes = 5, -- HUD updates every 5 game minutes (1.8 s real on day) (DEC-048; user request 2026-10-11, was 10)
 })

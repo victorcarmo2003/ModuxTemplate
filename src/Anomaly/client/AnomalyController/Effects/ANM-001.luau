@@ -3,8 +3,12 @@
 	ANM-001 The blank folks, client effect (TASK-112; anomalies.md N1; style guide §4.4, §10; AST-060, AST-082;
 	DEC-195). Presents what AnomalyService/Anomalies/ANM-001 (TASK-111) decides; never a verb or a payment.
 
-	Already done elsewhere (TASK-110): smooth face (RigController, Variant "blank") and an order bubble without
-	topping icons (CustomerController). Here:
+	Already done elsewhere (TASK-110): the blank face (RigController, Variant "blank": CrewExpressions.Blank on the face
+	shell; owner 2026-10-22: the head keeps the species' own skin, it is no longer swapped for the AST-060 flat head) and
+	an order bubble without topping icons (CustomerController). Here:
+	  - the tic (owner 2026-10-22, Provisional; Content.Tics "blank", Kit/Tic Body "Face"): it arrives with its own face
+	    and mood (the cameras already show it blank); in the order talk the face fades out while the line drops its
+	    letters, and from the apex it is faceless for everyone (the residue, the delivery queue), with the taker's tension;
 	  - no breathing: while the actor stands, its idle is held on the first frame (Kit.HoldStill), bound to the rig's
 	    Variant so it lasts while it walks off slowly after the record is gone;
 	  - cue `blank_coin` (DEC-195 flavor, sent on "Take Order" = the failure): a coin with no design hops from the
@@ -19,9 +23,11 @@ local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local Content = require(ReplicatedStorage.shared.Content)
 local Effect = require(script.Parent.Parent.Effect)
 local Kit = require(script.Parent.Kit.CustomerActor)
 local Jumpscare = require(script.Parent.Kit.Jumpscare)
+local Tic = require(script.Parent.Kit.Tic)
 
 const VARIANT = "blank"
 const COIN_NAME = "Coin_Blank"
@@ -163,6 +169,14 @@ return {
 		Vide.cleanup(Kit.Follow(ctx, occ, VARIANT, "blank_still", function(model: Model): Kit.Undo
 			return Kit.HoldStill(ctx, model)
 		end))
+		-- the face that fades in the talk and the taker's tension (Kit/Tic); without the row the face is blank from the
+		-- spawn as before (RigController), rollback = remove the row
+		const tic = Content.Tics.ByVariant[VARIANT]
+		if tic ~= nil then
+			Vide.cleanup(Kit.Follow(ctx, occ, VARIANT, "blank_tic", function(model: Model): Kit.Undo
+				return Tic.Mount(ctx, model, tic)
+			end))
+		end
 	end,
 	Cue = function(ctx: Effect.Context, cue: Effect.Cue)
 		if cue.Cue == "blank_coin" then

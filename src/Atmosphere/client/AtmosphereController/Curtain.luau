@@ -15,7 +15,7 @@ const TEXTURE = "rbxasset://textures/particles/smoke_main.dds" -- same puffs as 
 export type Curtain = {
 	Spec: Spec,
 	Folder: Folder,
-	Holders: { Part },
+	Holders: { BasePart },
 	Emitters: { ParticleEmitter },
 	Alpha: number,
 	Step: (self: Curtain, alpha: number) -> (),
@@ -31,7 +31,7 @@ function Curtain.new(spec: Spec): Curtain
 	folder.Name = "AtmosphereCurtain"
 	folder.Parent = camera or Workspace
 
-	const holders: { Part } = {}
+	const holders: { BasePart } = {}
 	const emitters: { ParticleEmitter } = {}
 	const arc = 2 * math.pi * spec.Radius / spec.Count
 	for _ = 1, spec.Count do

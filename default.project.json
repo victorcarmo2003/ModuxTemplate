@@ -317,6 +317,12 @@
 						"optional": "src/Hallucination/server"
 					}
 				},
+				"Hint": {
+					"$ignoreUnknownInstances": false,
+					"$path": {
+						"optional": "src/Hint/server"
+					}
+				},
 				"Interaction": {
 					"$ignoreUnknownInstances": false,
 					"$path": {
@@ -680,6 +686,12 @@
 						"$ignoreUnknownInstances": false,
 						"$path": {
 							"optional": "src/Hallucination/client"
+						}
+					},
+					"Hint": {
+						"$ignoreUnknownInstances": false,
+						"$path": {
+							"optional": "src/Hint/client"
 						}
 					},
 					"Hud": {

@@ -232,7 +232,7 @@ return Lync.define("game", {
 	-- §3.3, record 1. Writer: EconomyService
 	Economy = Lync.replicate(Lync.struct({
 		Cash = Lync.int(0, 2147483647),
-		Drawer = Lync.int(0, 1000000), -- tips in the TIP JAR since DEC-239 (name kept for the wire)
+		Drawer = Lync.int(0, 1000000), -- the old drawer / tip jar: always 0 since the jar left (owner 2026-10-22; field kept)
 	})),
 
 	-- §3.4, record = Content.Ingredients.IndexOf[key] (all 9 always). Writer: KitchenService
@@ -290,6 +290,8 @@ return Lync.define("game", {
 		Number = Lync.optional(Lync.int(1, 255)),
 		-- §3.4 (wave R3): drive-thru lane spot (DriveCars id); nil = a walking customer
 		Drive = Lync.optional(Lync.int(1, 3)),
+		-- owner 2026-10-22: the order is a bun alone, no sausage (Content.OrderRules.BreadOnly, ANM-011); nil = false
+		Bread = Lync.optional(Lync.bool()),
 	})),
 
 	-- §3.7, record = Content.Upgrades.IndexOf[key]; levels of the current vehicle only (DEC-184). Writer: UpgradeService
@@ -345,11 +347,6 @@ return Lync.define("game", {
 	CustomerComplain = Lync.packet(Lync.struct({
 		Npc = Lync.int(1, 65535), -- NpcId
 		Line = Lync.int(1, 64), -- index into Content.ShopWindow.ShutLines
-	})),
-
-	-- §4.3b s -> group. Writer: TipJarService ("Collect Tips", DEC-239): the tip jar went to Cash. Presentation only
-	CashCollected = Lync.packet(Lync.struct({
-		Amount = Lync.int(1, 1000000),
 	})),
 
 	-- §4.4 s -> group, start of Summary. Writer: EconomyService
@@ -463,9 +460,12 @@ return Lync.define("game", {
 	-- §13.5, record = occurrence 1..255 (cyclic, per night). Writer: AnomalyService. No verb or deadline (T10)
 	Anomalies = Lync.replicate(Lync.struct({
 		Anomaly = Lync.enum(Content.Anomalies.Keys),
-		Phase = Lync.enum({ "Signal", "Active", "Resolved", "Failed" }),
+		-- "Queue" (owner 2026-10-22, appended so the older indexes stay): a customer anomaly whose order was taken waits
+		-- for it in the delivery queue (its condition runs; the scene's tension plays then)
+		Phase = Lync.enum({ "Signal", "Active", "Resolved", "Failed", "Queue" }),
 		StartedAt = Lync.f64(),
-		-- Walker: step 0..Steps (4); Hush: posts out; others 0
+		-- Walker: step 0..Steps (4); Hush: posts out; a customer anomaly in the Queue phase: its condition's step
+		-- (Hurry: how far the head has swollen); others 0
 		Step = Lync.int(0, 20),
 		-- NpcId of the customer anomaly, or anchor index (AnchorId/MapPoint); 0 = none
 		Anchor = Lync.int(0, 65535),
@@ -795,4 +795,33 @@ return Lync.define("game", {
 	JournalClaim = Lync.packet(Lync.enum(Content.Journal.Keys)),
 	-- s -> owner: the read_journal prompt went through, open the tablet. Writer: JournalService
 	JournalOpen = Lync.packet(Lync.empty()),
+
+	-- Walt's notes (owner request 2026-10-22, Provisional; Content.Hints). Set, record 1: Night = the last night whose tip is
+	-- written on the paper of the front counter (0 = none yet); the paper lists Content.Hints rows 1..Night. A rise is the
+	-- pencil being heard (the client plays it when the record changes, not on the first one). One record, 8 bits: no
+	-- drop.section floor. Writer: HintService (after the night's call). Reader: HintController
+	Hints = Lync.replicate(Lync.struct({
+		Night = Lync.int(0, 255),
+	})),
+	-- s -> owner: the read_hints prompt went through, open the close-up of the paper. Writer: HintService
+	HintOpen = Lync.packet(Lync.empty()),
+
+	-- Walt with no phone (DEC-372, TASK-638; network.md §21, Provisional). s -> every player of the run (fireAll on a run
+	-- server), the moment a reaction passes ReactionService's gate (1st time of the Key in the run, < MaxPerNight this
+	-- night, no anomaly in Signal/Active/Queue, Call Idle). StartedAt = server time it starts (the client cuts the
+	-- subtitle short or drops the line if it arrives late). No replay (DEC-077), no state: a late joiner misses it on
+	-- purpose. Writer: ReactionService. Responder: ReactionController (OnInit)
+	WaltReaction = Lync.packet(Lync.struct({
+		Key = Lync.enum(Content.WaltReactions.Keys),
+		StartedAt = Lync.f64(),
+	})),
+	-- The dark Walt in the parking lot (DEC-371, TASK-638; network.md §21, Provisional). Set, record 1: Present = he
+	-- stands at Content.WaltWatch.Rules.Point now; Night = the night this record is about (0 = lobby / no run night);
+	-- At = server time of the last change (the client fades only when fresh; a late joiner just sees him or not). One
+	-- record, wide (f64): no drop.section floor. Writer: WaltWatchService. Reader: WaltWatchController
+	WaltWatch = Lync.replicate(Lync.struct({
+		Present = Lync.bool(),
+		Night = Lync.int(0, 10),
+		At = Lync.f64(),
+	})),
 })

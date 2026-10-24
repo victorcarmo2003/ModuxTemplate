@@ -2,8 +2,10 @@
 -- Condiment table of the cooking focus (kitchen-focus.md §1 #4). The hot dog in hand (on its dish) sits in the middle of the table,
 -- turned so the bun runs left to right on screen; the pans of the order are lit by PlateController.
 --   tap a pan                  selects that condiment (a white outline)
---   sauce (ketchup, mustard, cream cheese): all in 3D on the hot dog (TASK-594; owner 2026-10-19: "tudo 3D", no 2D board): a soft
---                              Cream line along the S over the sausage and a Mustard start dot (no arrowheads, owner 2026-10-19), a see-through squeeze bottle rides the pointer and empties as the line
+--   sauce (ketchup, mustard, cream cheese): on the hot dog (TASK-594; owner 2026-10-19: "tudo 3D", no 2D board): the guide is a
+--                              row of 2D Mustard arrows (owner 2026-10-22: UI, the tutorial's arrows; Components/SauceGuide) put
+--                              each frame through the S's points on the sausage, so they bend with it; the paw coaches without its
+--                              own 3D trail; a see-through squeeze bottle rides the pointer and empties as the line
 --                              grows (it holds about 1.6 times the pattern); the line is drawn on the hot dog itself. Release =
 --                              Cook Topping with the drawn line (it stays on the hot dog: HotDogVisual.Sauce) and Gestures.Trace ->
 --                              Grade.Score. The focus bar fills with the share of the pattern covered so far. Until the player
@@ -15,6 +17,7 @@
 -- With a condiment in hand, a press on the hot dog draws / drops there even when a pan's hitbox reaches over it (owner 2026-10-19:
 -- "não tá detectando que estou pressionando no cachorro quente").
 -- The step ends when every topping of the order is on (an order not known = never by itself).
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Content = require(ReplicatedStorage.shared.Content)
 local Grade = require(ReplicatedStorage.shared.Prep.Grade)
@@ -23,6 +26,9 @@ local Sauce = HotDogVisual.Sauce
 local Gestures = require(script.Parent.Gestures)
 local Kit = require(script.Parent.Kit)
 local Session = require(script.Parent.Session)
+local StarterPlayer = game:GetService("StarterPlayer")
+local Vide = require(ReplicatedStorage.Packages.Vide)
+local SauceGuide = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.SauceGuide)
 
 const BUILD = Content.Prep.Build
 const BUN_LENGTH = 0.85 -- HotDogVisual: share of the Handle's long side the bun space covers
@@ -43,10 +49,13 @@ const SLACK = 0.3 -- share of the bun around it where a press starts a line / th
 const BEAD = 0.05
 -- the guide (owner 2026-10-19: the chevron chain looked like a centipede, then "a gente pode retirar" the arrowheads): one soft
 -- Cream line along the S and a Mustard start dot (Theme colours), shares of the bun length
-const GUIDE_LINE = 0.016
-const GUIDE_FADE = 0.35
-const GUIDE_COLOR = Color3.fromHex("#FFF1D6") -- Theme Cream
-const ARROW_COLOR = Color3.fromHex("#F6C12B") -- Theme Mustard: the start dot
+-- owner 2026-10-22 ("em vez dessa linha em 3D... em 2D, como UI, que vai se curvar junto com a salsicha"; "tá muito pra cima"):
+-- px at 720 p (scaled by the viewport height), see-through share, Ink outline px, points per stretch of the S, and the lift
+-- over the sausage in beads (it was 1.2: the far half of the S stood out over the sausage's top edge)
+const GUIDE_SPACING = 21 -- owner 2026-10-22 (UI Labs): px between two arrows at 720 p (scaled by the viewport height)
+const GUIDE_SIZE = 18 -- px of an arrow at 720 p
+const GUIDE_STEPS = 6
+const GUIDE_LIFT = 1.25 -- owner 2026-10-22 (UI Labs SauceGuide story)
 -- the hot dog proper: a pan under the pointer outside this still (re)selects (a wider margin swallowed the pans next to the bun)
 const OVER_BUN = { X = 0.02, Y = 0.1 }
 -- the touch reach of a sauce (TASK-594, owner 2026-10-19: "tá muito ruim de posicionar... a parte final da salsicha... pras crianças
@@ -57,6 +66,9 @@ const REACH = 110
 const REACH_MIN = 64
 const CLAMP_X = { -0.04, 1.04 } -- bun-space x the drawn line may reach (the sausage runs a little past the bun space)
 const PICK_COLOR = Color3.fromHex("#FFFFFF")
+-- the server writes Toppings / Sauce first and rebuilds the ToppingVisual after it, so the attribute can reach this client before
+-- the new visual does (the prop drew a bare bun for the last second, owner 2026-10-22): the prop waits for the visual this long
+const PAINT_WAIT = 0.6
 -- the squeeze bottle, studs at the prop's size: nozzle, cap, see-through body; it leans a little to the screen's right
 const BOTTLE = { Nozzle = 0.14, Cap = 0.1, Body = 0.62, Width = 0.26, Lean = 0.3 }
 const BOTTLE_GLASS = Color3.fromHex("#F4F1EA")
@@ -84,6 +96,34 @@ local function pathLength(): number
 end
 
 const Toppings = {}
+
+-- The replicated ToppingVisual of the hot dog in hand already shows what its attributes say (every topping, each drawn sauce as
+-- its line)
+local function painted(tool: Tool): boolean
+	const keys = HotDogVisual.parse(tool:GetAttribute("Toppings") :: string?)
+	const visual = tool:FindFirstChild(HotDogVisual.VisualName)
+	if visual == nil then
+		return #keys == 0
+	end
+	const shown: { [string]: boolean } = {}
+	for _, child in visual:GetChildren() do
+		const key = child:GetAttribute("Ingredient")
+		if type(key) == "string" then
+			shown[key] = true
+		end
+	end
+	for _, key in keys do
+		if not shown[key] then
+			return false
+		end
+	end
+	for key in Sauce.Decode(tool:GetAttribute(Sauce.Attribute)) do
+		if table.find(keys, key) ~= nil and visual:FindFirstChild(`Sauce_{key}`) == nil then
+			return false
+		end
+	end
+	return true
+end
 
 local function toppingModel(key: string): Model?
 	const assets = ReplicatedStorage:FindFirstChild("Assets")
@@ -164,11 +204,34 @@ function Toppings.Start(session: Session.Session): Session.Handler
 	const inkFolder = Instance.new("Folder")
 	inkFolder.Name = "Ink"
 	inkFolder.Parent = folder
-	const guide = Instance.new("Folder")
-	guide.Name = "Guide"
-	guide.Parent = folder
+	-- the 2D guide: one ScreenGui of the focus with the arrows (SauceGuide), the S's points on screen written every frame (Step)
+	const guidePoints = Vide.source({} :: { Vector2 })
+	const guideScale = Vide.source(1)
+	const guidePath = SauceGuide.Dense(BUILD.Sauce.Path, GUIDE_STEPS)
+	const unmountGuide, guide = Vide.root(function()
+		return Vide.create("ScreenGui")({
+			Name = "CookSauceGuide",
+			IgnoreGuiInset = true, -- WorldToViewportPoint coordinates
+			ResetOnSpawn = false,
+			DisplayOrder = 1,
+			Enabled = false,
+			SauceGuide.Component({
+				Points = guidePoints,
+				Spacing = function(): number
+					return GUIDE_SPACING * guideScale()
+				end,
+				Size = function(): number
+					return GUIDE_SIZE * guideScale()
+				end,
+			}),
+		})
+	end)
+	guide.Parent = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
 	local space: Space? = nil
 	local shown = ""
+	-- the signature the prop waits to draw (its visual still on the way) and since when
+	local waiting = ""
+	local waitSince = 0
 	local selected: string? = nil
 	local pick: Highlight? = nil
 	local ghost: Model? = nil
@@ -219,7 +282,17 @@ function Toppings.Start(session: Session.Session): Session.Handler
 		end
 		-- the dish (already at the bun's size and a little under it: KitchenService attachDish, TASK-594) follows the bun down
 		const dish = model:FindFirstChild("Dish")
-		if dish ~= nil and dish:IsA("Model") and top ~= nil then
+		const base = if dish ~= nil then dish:FindFirstChild("DishBase") else nil
+		if dish ~= nil and dish:IsA("Model") and base ~= nil and base:IsA("BasePart") and top ~= nil then
+			-- owner 2026-10-22 ("o pão tá flutuando, alinha com o Y do prato"): the bun sits on the dish's base (its top face, in
+			-- its own frame), centred over it; the whole prop then stands on the table by its lowest point (the dish)
+			const bunUp = handle.CFrame.UpVector
+			const bunBottom = handle.Position - bunUp * (handle.Size.Y / 2)
+			const baseTop = base.Position + base.CFrame.UpVector * (base.Size.Y / 2)
+			const flat = handle.Position - base.Position
+			const centre = flat - bunUp * flat:Dot(bunUp)
+			dish:PivotTo(dish:GetPivot() + bunUp * (bunBottom - baseTop):Dot(bunUp) + centre)
+		elseif dish ~= nil and dish:IsA("Model") and top ~= nil then
 			dish:PivotTo(dish:GetPivot() + handle.CFrame.UpVector * -BUN_DROP)
 		end
 		const kitRadius = HotDogVisual.radiusOf(model)
@@ -363,32 +436,29 @@ function Toppings.Start(session: Session.Session): Session.Handler
 		current.Model.Parent = folder
 	end
 
-	-- the S over the sausage: a soft line and a start dot (owner 2026-10-19: no arrowheads, "vai ficar até melhor desse jeito")
+	-- the S over the sausage: a soft line and a start dot (owner 2026-10-19: no arrowheads, "vai ficar até melhor desse jeito").
+	-- 2D (owner 2026-10-22): on while a sauce is in hand; placeGuide moves it every frame
 	local function drawGuide()
-		guide:ClearAllChildren()
-		const current = space
-		if current == nil then
+		guide.Enabled = space ~= nil
+	end
+
+	-- the guide's points on screen this frame (the camera glides in, the hot dog may be redrawn)
+	local function placeGuide()
+		const camera = workspace.CurrentCamera
+		if not guide.Enabled or camera == nil or space == nil then
 			return
 		end
-		const lift = bead() * 1.2
-		const width = current.Length * GUIDE_LINE
-		const path = BUILD.Sauce.Path
-		const points: { Vector3 } = {}
-		for _, point in path do
-			const at = worldOf(point.X, point.Y, lift)
-			if at ~= nil then
-				table.insert(points, at)
+		guideScale(camera.ViewportSize.Y / 720)
+		const lift = bead() * GUIDE_LIFT
+		const screen: { Vector2 } = {}
+		for _, point in guidePath do
+			const world = worldOf(point.X, point.Y, lift)
+			if world ~= nil then
+				const at = camera:WorldToViewportPoint(world)
+				table.insert(screen, Vector2.new(at.X, at.Y))
 			end
 		end
-		for index = 2, #points do
-			const piece = Kit.Segment(guide, points[index - 1], points[index], GUIDE_COLOR, width)
-			piece.Transparency = GUIDE_FADE
-			Kit.Ball(guide, points[index], GUIDE_COLOR, width, GUIDE_FADE).Material = Enum.Material.SmoothPlastic
-		end
-		-- the start: a bigger Mustard dot
-		if points[1] ~= nil then
-			Kit.Ball(guide, points[1], ARROW_COLOR, width * 3.5, 0).Material = Enum.Material.SmoothPlastic
-		end
+		guidePoints(screen)
 	end
 
 	local function clearLine()
@@ -414,7 +484,7 @@ function Toppings.Start(session: Session.Session): Session.Handler
 			bottle.Model:Destroy()
 			bottle = nil
 		end
-		guide:ClearAllChildren()
+		guide.Enabled = false
 		clearLine()
 		session.Progress(nil)
 		selected = nil
@@ -699,6 +769,7 @@ function Toppings.Start(session: Session.Session): Session.Handler
 				return
 			end
 			coach()
+			placeGuide()
 			const held = session.Held()
 			if held == nil or held:GetAttribute("Item") ~= "hot_dog" then
 				if shown ~= "" then
@@ -712,6 +783,13 @@ function Toppings.Start(session: Session.Session): Session.Handler
 			end
 			const signature = `{held:GetAttribute("Toppings") or ""}|{held:GetAttribute("Sauce") or ""}`
 			if signature ~= shown then
+				if signature ~= waiting then
+					waiting = signature
+					waitSince = os.clock()
+				end
+				if not painted(held) and os.clock() - waitSince < PAINT_WAIT then
+					return
+				end
 				shown = signature
 				drawProp(held)
 				const sent = folder:FindFirstChild("InkSent")
@@ -736,6 +814,8 @@ function Toppings.Start(session: Session.Session): Session.Handler
 		end,
 		Stop = function()
 			clearPick()
+			unmountGuide()
+			guide:Destroy()
 		end,
 	}
 end

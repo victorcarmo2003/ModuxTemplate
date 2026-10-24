@@ -40,6 +40,10 @@ return table.freeze({
 		Key = "bun_box",
 		Call = "call_tutorial_upgrade",
 		Cash = 100,
+		-- s into the Summary before Walt's lesson call (owner 2026-10-21, Provisional): the night's report shows first
+		-- (HudController SUMMARY_SHOWN = 3 s), then the lesson; after the purchase the rookie is guided back to open the
+		-- window (TutorialController step upg_open)
+		AfterReport = 3,
 	}),
 	-- Restaurant tutorial (TASK-393): the steps of the restaurant loop (tablet -> cut -> plate -> grill -> plate -> take
 	-- -> toppings -> pickup) replace the trailer kitchen steps; Restock = after the first sale, a box from a product bay

@@ -323,7 +323,13 @@ function Slots.Food(name: string, spot: Spot, parent: Instance, options: { Turn:
 		copy:ScaleTo(options.Scale)
 	end
 	const turn = if options ~= nil and options.Turn ~= nil then options.Turn else 0
-	copy:PivotTo(spot.Host.CFrame * spot.Offset * CFrame.new(0, FLIP_CENTER, 0) * CFrame.Angles(turn, 0, 0) * CFrame.new(0, -FLIP_CENTER, 0))
+	-- a scaled copy (the grilled overlay) grows from its base: its middle goes back onto the turning axis, so it wraps the raw
+	-- one evenly on both sides (owner 2026-10-22: flipped, its top sat on the raw one's top and the two fought)
+	const scale = if options ~= nil and options.Scale ~= nil then options.Scale else 1
+	const centred = CFrame.new(0, -FLIP_CENTER * (scale - 1), 0)
+	copy:PivotTo(
+		spot.Host.CFrame * spot.Offset * CFrame.new(0, FLIP_CENTER, 0) * CFrame.Angles(turn, 0, 0) * CFrame.new(0, -FLIP_CENTER, 0) * centred
+	)
 	copy.Parent = parent
 	cleanup(copy)
 	-- welded (not anchored) so it rides along when the vehicle is moved by the server
@@ -531,5 +537,8 @@ function Slots.Bar(
 	gui.Parent = spot.Host
 	cleanup(gui)
 end
+
+-- Height over the spot of the axis a flipped sausage turns about (Food's Turn; the grill's flip hop turns about it too)
+Slots.FlipCenter = FLIP_CENTER
 
 return table.freeze(Slots)

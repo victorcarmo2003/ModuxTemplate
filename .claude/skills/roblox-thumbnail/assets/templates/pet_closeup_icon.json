@@ -1,0 +1,64 @@
+{
+ "_archetype": "One face filling the square, huge eyes, sparkles. Icons for cute/pet games. Ref: Pet Sim 99, Adopt Me.",
+ "out": "icon.png",
+ "size": [
+  512,
+  512
+ ],
+ "bg_color": [
+  90,
+  190,
+  255
+ ],
+ "spots": [
+  {
+   "at": [
+    0.5,
+    0.45
+   ],
+   "radius": 0.6,
+   "color": [
+    255,
+    255,
+    255
+   ],
+   "strength": 0.25
+  }
+ ],
+ "layers": [
+  {
+   "path": "hero.png",
+   "key": "green",
+   "at": [
+    0.5,
+    0.55
+   ],
+   "height": 0.95,
+   "anchor": "center",
+   "saturation": 1.35,
+   "contrast": 1.08,
+   "sharpen": 0.5,
+   "outline": {
+    "color": [
+     30,
+     20,
+     40
+    ],
+    "width": 5
+   },
+   "outline2": {
+    "color": [
+     255,
+     255,
+     255
+    ],
+    "width": 3
+   }
+  }
+ ],
+ "grade": {
+  "saturation": 1.1,
+  "contrast": 1.06
+ },
+ "sharpen": 0.4
+}

@@ -65,7 +65,7 @@ const params: RunParams = {
 		"refuse",
 		"restock",
 		"take_box",
-		"collect_tips",
+		-- collect_tips left with the tip jar (owner 2026-10-22: tips go straight to Cash)
 		"brew_coffee",
 		"give_coffee",
 		"breaker_reset",

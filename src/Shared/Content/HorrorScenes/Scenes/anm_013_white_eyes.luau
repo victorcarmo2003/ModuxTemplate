@@ -7,12 +7,12 @@
 -- Eyes); in the silence every light dies and only ITS eyes light the counter (the inverse of the blackout's glow); on
 -- the security cameras there are eyes at every window and they never go out (Seen "Cameras"). After the refusal the
 -- eyes shine through the shutter for a second. Presentation only (T10). Every number PROVISIONAL until the owner's
--- Play. The "windows" are the MapPoints outside the shop (restaurant_bind): the service window (Kit eyes, already at
+-- Play. Owner 2026-10-22 (anomaly tics): it arrives with normal eyes (the cameras see them white) and they turn white
+-- in the Take Order talk (Content.Tics); this scene no longer lights ITS eyes at the counter. The "windows" are the MapPoints outside the shop (restaurant_bind): the service window (Kit eyes, already at
 -- eye height), the drive-thru stop, the pantry's exit door and the van stop (Lantern eyes, 5 studs over the point);
 -- the camera layer adds the back alley, where the cameras watch.
 local Types = require(script.Parent.Parent.Types)
 
-const COUNTER = "Q1"
 const OUTSIDE = "SCENE-WINDOW-EYES" -- outside the service window (eyes height)
 const WINDOWS = { "DT-STOP", "DOOR-B", "VAN-STOP" } -- after the service window, in the order they light up
 const WATCHED = { "DT-STOP", "DOOR-B", "SCENE-STEPS-FAR", "SCENE-DOOR-OUT", "VAN-STOP" } -- the camera layer (floor points)
@@ -59,7 +59,8 @@ const scene: Types.Scene = {
 		{ At = EYES_OUT, Phase = "Active", Kind = "Silence", Value = 1, To = 0.25, Duration = 0.4 },
 		{ At = 9.4, Phase = "Active", Kind = "Lights", Target = "Off" },
 		{ At = 9.4, Phase = "Active", Kind = "Sound", Target = "lights_off", Value = 0.6 },
-		{ At = 9.4, Phase = "Active", Kind = "Lantern", Target = "Eyes", Point = COUNTER, Value = 12, Duration = 2.3 },
+		-- owner 2026-10-22: ITS white eyes at the counter in the dark (Lantern Eyes at Q1, Value 12, 2.3 s) showed the tic before
+		-- the talk; the eyes turn white only in the talk now (Content.Tics, Kit/Tic). The dark stays, without them
 		-- R9: the lights crash back, every head snaps to the player again
 		{ At = 11.7, Phase = "Active", Kind = "Lights", Target = "Cascade", Duration = 1.5 },
 		{ At = 11.7, Phase = "Active", Kind = "Sound", Target = "horror_sting", Value = 0.6 },

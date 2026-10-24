@@ -28,6 +28,8 @@
 	    the Content.Sounds row through AudioController, or the owner's Studio Sound ReplicatedStorage.Assets.SFX
 	    [Hours.Assets] while the row has no Id yet. Animated with Mart.Door times and the L -> C -> R stagger; the first record (late
 	    joiner) snaps to the final state. Without GearShutter models a test shutter is generated (1 warning);
+	  * lamps and TIMER board (Sign.luau, owner request 2026-10-21): the stand's GearLights on only while it is open, the
+	    TIMER part reads CLOSED / OPEN / CLOSES IN m:ss (Hours.Attributes.ClosesAt);
 	  * miniatures (Minis.luau) over the pedestals: the piece of the NEXT level on the current vehicle ("Sale", bob +
 	    spin), the current level when maxed (still), the first trailer level at 50% for "Trailer only" (still), none
 	    on the empty S1. Frozen with the camera beyond Mart.Mini.ActiveRadius or the shutter down;
@@ -56,6 +58,7 @@ local GearTag = require(StarterPlayer.StarterPlayerScripts.client.Interface.Comp
 local Hint = require(script.Hint)
 local Kiosk = require(script.Kiosk)
 local Labels = require(script.Labels)
+local Sign = require(script.Sign)
 local MapIndex = require(ReplicatedStorage.shared.Place.MapIndex)
 local VehicleRoot = require(ReplicatedStorage.shared.Vehicle.VehicleRoot)
 local Minis = require(script.Minis)
@@ -163,6 +166,8 @@ function MarketController:Setup()
 	self.GearOpen = Vide.source("Unknown" :: GearState) :: Vide.Source<GearState>
 	self.KioskSynced = false :: boolean -- first Shift record applied (later changes animate)
 	self.Kiosk = Kiosk.new() :: Kiosk.Kiosk
+	-- the stand's lamps and TIMER board follow KioskOpen (owner request 2026-10-21)
+	self.Sign = Sign.new() :: Sign.Sign
 	self.Minis = Minis.new() :: Minis.Minis
 	self.Pedestals = {} :: { [string]: Instance }
 	self.LastStep = os.clock() :: number
@@ -927,6 +932,7 @@ function MarketController:Step()
 	self:StepBunHint()
 	self:StepHint()
 	self.Kiosk:Step(now)
+	self.Sign:Step(now, Vide.untrack(self.KioskOpen))
 	const camera = workspace.CurrentCamera
 	if camera then
 		self.Minis:Step(now, dt, camera.CFrame.Position, Vide.untrack(self.KioskOpen))

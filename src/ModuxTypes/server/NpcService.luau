@@ -20,6 +20,7 @@ export type Npc = {
 	Node: string, -- last graph node reached (spawn point at first)
 	Walk: number, -- walk order counter: a new order or a despawn cancels the running one
 	Tether: boolean, -- moved by MoveToward / Teleport (pair partner): other rigs never wait for it
+	Aside: boolean, -- off the graph since WalkToPosition (pickup arc, counter, table): graph walkers never wait for it
 }
 export type SpawnRequest = {
 	Role: Role?, -- default "Customer"

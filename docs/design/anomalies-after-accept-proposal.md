@@ -400,7 +400,7 @@ Uma **reclamação** é um cliente **normal** que a equipe mandou embora sem ser
 | REFUSE num cliente normal | 1 | quem recusou |
 | cliente normal desiste na fila (`Left`, ninguém fez Take Order) | 1 | dividido entre os jogadores dentro da loja |
 | pedido aceito de cliente normal que expira (`Slow`) | 1 | quem aceitou (fecha a brecha "aceitar e nunca entregar") |
-| janela fechada por jogador manda a fila embora | 1 por cliente com ticket | quem fechou |
+| ~~janela fechada por jogador manda a fila embora~~ (DEC-361: a fila normal fica; o custo da janela é só o dinheiro) | ~~1 por cliente com ticket~~ | — |
 | ... durante uma ameaça de fora ativa (021, 008, 010) ou até 10 s depois | 0 | — |
 | recusar / não entregar / janela numa anomalia | 0 (exceto 005 e 016, §2.10–2.11) | — |
 | última chamada das 6 h, Summary, tutorial | 0 | — |
@@ -558,7 +558,7 @@ instruções do Walt"). O "aceite" virou o fim da conversa e não há recusa. O 
 |---|---|
 | ACCEPT / REFUSE; REFUSE é a saída antes do aceite | sem escolha: o pedido é sempre anotado no fim da conversa |
 | fase nova `Accepted` | fase nova **`Queue`** (registro `Anomalies`), do pedido anotado até o fim |
-| saída segura universal: não entregar / janela | **não entregar** continua (a paciência acaba, ela vai embora; Hurry é a exceção). A **janela não alcança mais** anomalia de cliente (§9.5) |
+| saída segura universal: não entregar / janela | **não entregar** continua (a paciência acaba, ela vai embora; Hurry é a exceção). ~~A janela não alcança mais anomalia de cliente~~ → **DEC-361:** a janela despacha a anomalia-cliente (menos a 022), custo = dinheiro (§9.5) |
 | crescendo de tela só na borda da falha e na entrega | todo o crescendo de hoje (barras, sussurros, borda, cor, coração, stings, props) toca **na fila**, ao entrar nela |
 | `Validate` cobrando chegada quieta | o **carregador** das cenas move os passos (§9.2); nenhuma cena precisou ser reescrita |
 
@@ -631,6 +631,13 @@ O "sussurro" é o SFX `whisper` + as palavras na tela; uma **voz** sussurrando a
 `Content.VoiceLines` (tools/voice), fora desta rodada.
 
 ### 9.5 A janela com anomalia na fila (Q-473)
+
+> **Superado por DEC-361 (2026-10-23, Aprovado pelo dono):** fechar a janela **despacha** as anomalias-cliente (antes ou
+> depois do pedido), sem susto e sem nota; os clientes normais **ficam** (a fila não vai mais embora). **Exceção: ANM-022**
+> (ignora a janela, bate a cabeça nela, só sai com a luz da loja apagada). **Custo = dinheiro:** com a janela fechada as
+> vendas param, e a anomalia despachada sai sem pagar (sem o × `PayMult` e sem o bônus). Nenhuma outra penalidade.
+> Abertos em `Q-481`: a Raincoat Lady despachada leva o −5 de "não atendida"?; o Walt ensina a janela? O texto abaixo
+> é histórico.
 
 Fechar a janela continua valendo para as ameaças de fora (021, 008, 006...). Com uma anomalia de cliente, **antes ou
 depois do pedido**, a janela **não resolve nem pune**: ela não é mandada embora (a fila normal vai, como hoje), ninguém

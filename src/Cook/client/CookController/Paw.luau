@@ -29,6 +29,8 @@ const LIFT = 0.35 -- studs over the work plane before the press
 const ALPHA = 0.08 -- Transparency of the paw while it shows
 const DASHES = 10
 const ARROW_ARM = 0.14 -- studs of a trail arrow's arm
+-- gestures whose way is already drawn on the screen (owner 2026-10-22: the sauce's 2D arrows, SauceGuide): the paw alone, no trail
+const NO_TRAIL: { [string]: boolean } = { sauce_trace = true }
 
 const CREAM = Theme.Color.Cream
 const INK = Theme.Color.Ink
@@ -237,7 +239,7 @@ function PawModule.new(folder: Instance): Paw
 			const at = if tap or math.floor(clock / 0.9) % 2 == 0 then points[1] else points[#points]
 			pose(at, 1, ALPHA, points[#points] - points[1])
 			for _, arrow in trail do
-				shade(arrow, if tap then 1 else 0.4)
+				shade(arrow, if tap or NO_TRAIL[gesture] then 1 else 0.4)
 			end
 			return
 		end
@@ -271,7 +273,7 @@ function PawModule.new(folder: Instance): Paw
 		pose(at, down, alpha, direction)
 		for index, arrow in trail do
 			const share = (index - 0.5) / #trail
-			shade(arrow, if tap then 1 elseif share <= travel and u >= 0.28 then 0.05 else 0.55)
+			shade(arrow, if tap or NO_TRAIL[gesture] then 1 elseif share <= travel and u >= 0.28 then 0.05 else 0.55)
 		end
 	end
 

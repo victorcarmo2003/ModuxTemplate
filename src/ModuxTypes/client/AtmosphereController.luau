@@ -39,6 +39,7 @@ export type Public = {
 	Begin: (self: Public, row: AtmosphereRow) -> (),
 	Finish: (self: Public) -> (),
 	Write: (self: Public, row: AtmosphereRow, base: Preset, alpha: number, flash: number, indoor: number) -> (),
+	StartSound: (self: Public, row: AtmosphereRow) -> (),
 	Thunder: (self: Public, bolt: Content.AtmosphereLightning, near: boolean) -> (),
 	ScalePosts: (self: Public, scale: number, restore: boolean) -> (),
 	Step: (self: Public, dt: number) -> (),

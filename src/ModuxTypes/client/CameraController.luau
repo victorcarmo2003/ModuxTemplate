@@ -116,6 +116,7 @@ export type Public = {
 	PrepGoal: (self: Public, eye: Vector3, look: Vector3, fov: number, omega: number?, focus: number?, radius: number?) -> (),
 	PrepExitFrame: (self: Public) -> CFrame?,
 	ApplyPrep: (self: Public, camera: Camera) -> (),
+	ApplyPrepLeave: (self: Public, camera: Camera, state: PrepState) -> (),
 	ResetLook: (self: Public) -> (),
 	Cutscene: (self: Public, on: boolean) -> (),
 	SetRig: (self: Public, rig: Rig?) -> (),

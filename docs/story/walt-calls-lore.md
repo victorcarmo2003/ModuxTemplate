@@ -5,6 +5,24 @@ Status: Rascunho
 Autor: narrative-writer, 2026-10-19. Pedido do dono (2026-10-19): menos ligação falsa "vazia"; cada uma traz uma fala com dica; usar esses áudios para montar a lore, com o Walt como verdadeiro vilão no fim.
 Tudo aqui é **Provisório**. Não muda `ending.md` (Aprovado, DEC-075/076) nem regra de jogo. Falas em inglês, documentação em pt-BR.
 
+> **Atualização 2026-10-23 (secretário):**
+> - **DEC-360 (Aprovado):** a run é 100% noite e não existe ligação da manhã. As pistas que dependiam das manhãs (`ending.md` §3: "Ever notice nobody lives upstairs?", "I used to count the lamps", "Tonight's the last one", "Coffee's on me / Tell Opal") **não chegam mais por esse canal**. Destino proposto (Provisório, `Q-485`): a 1ª linha de cada ligação da noite (`walt-dialogue-audit.md` §3.3). Com isso a ligação falsa e o rádio viram o canal principal da lore escondida, junto com a abertura da ligação real.
+> - **DEC-361 (Aprovado):** fechar a janela despacha as anomalias-cliente (menos a ANM-022); o custo é o dinheiro (vendas pausadas, a anomalia sai sem pagar). As falas "Blank face? Window shut." (N1) e "Head on backwards? Window." (N4) **passam a bater** com a gameplay; a ligação real ainda dá a outra resposta (a condição). Se o Walt ensina a janela na ligação real segue em `Q-481`.
+> - **Ending "O Segundo Café"** (Provisório, em teste pelo dono, `Q-480`) é a opção B do §5 em versão cinemática. As falas do §4 que preparam a virada ("I'll bring the coffee myself", rádio "don't take his coffee", "at sunrise he'll offer you the shift", "the second coffee was mine once") ficam alinhadas com ele.
+> - **Fim da run:** com `Chances = 0` (DEC-319) a 1ª noite perdida encerra a run; não há noite repetida.
+>
+> **Atualização 2 (2026-10-23):**
+> - **DEC-363 (Aprovado):** o final é "O Segundo Café" (`ending.md` §0). A opção B do §5 vale, em versão cinemática; as opções A e C ficam como histórico. O plano dos panfletos velhos e o pós-créditos seguem em `Q-486`.
+> - **DEC-362 (Aprovado):** a lore também vem na **abertura de cada ligação real da noite**, crescendo noite a noite. Ligação falsa e rádio continuam como canal extra. Regra do §6 vale para as aberturas: nenhuma pista da noite N revela peça de noite > N.
+> - **DEC-365 (Aprovado):** a Raincoat Lady despachada pela janela custa −5; o Walt liga reclamando ("You shut her out, Rookie. You might regret that.", Provisório). Encaixa na lore: ela é a "old friend" de 1979.
+>
+> **Atualização 3 (2026-10-23):**
+> - **DEC-370 (Aprovado): "consumidos pela noite".** A skin do jogador segue a noite: N1–N3 normal, N4–N6 cansada, N7–N10 da noite. Leitura de lore (Provisória): a noite vai transformando o Rookie no próximo "Walt"; quem chega à 10ª já é do lado de lá. A ligação de abertura pode comentar a mudança (ex.: N4 "You look tired, Rookie. It suits you."; N7 "You're starting to look the part.") — texto com o narrative-writer, sem regra nova.
+> - **DEC-371 (Aprovado):** o Walt sombrio fica no estacionamento desde a Noite 1 e some se o jogador chega perto (volta na noite seguinte). É a mesma figura do final; no pós-créditos o jogador ocupa o lugar dele (DEC-369). Ele nunca fala ali.
+> - **DEC-372 (Aprovado): o Walt fala sem telefone.** No meio da noite, na 1ª vez de algo importante (até 2 por noite), a voz dele vem direto, sem o telefone tocar e sem filtro. **Nunca explicado.** Leitura de lore (só para quem escreve): ele vê tudo "do outro lado da rua" ("Best seat in town"), e o Walt sombrio do estacionamento é ele. Algumas reações deixam escapar que ele viu ("I saw that."). Canal novo da lore, ao lado da ligação falsa e do rádio.
+> - **DEC-373 (Aprovado):** sanidade baixa = só alucinação (clientes e pedestres em Night para quem está mal); o corpo do jogador segue a noite (DEC-370). **DEC-374 (Aprovado):** pós-créditos com o Walt de dia e um café só.
+> - **DEC-366 a DEC-368:** regras novas e corrigidas da ligação real (ANM-022 = luz da loja; disjuntor na N1; floater, starer, câmeras; lote corrigido). As dicas da ligação falsa e do rádio (§4) devem repetir as palavras novas: "Shop light off" para a 022, "Hold it" para o disjuntor.
+
 Canais (já no código):
 
 | Canal | Quando | Quem fala | Legenda | Fonte hoje |
@@ -95,7 +113,7 @@ Walt: simpático, curto, "Rookie", "heh". O rádio: reticências, voz fraca; mai
 
 | Noite | O que revela | Canal | Fala | Dica embutida? | Pista de lore |
 |---|---|---|---|---|---|
-| 1 | nada claro; "já houve outros" | W | "Blank face? Window shut. I've taught plenty." | sim, ANM-001 | "plenty": onde estão os outros Rookies? |
+| 1 | nada claro; "já houve outros" | W | "Blank face? Window shut. I've taught plenty." | sim, ANM-001 (a janela despacha, DEC-361) | "plenty": onde estão os outros Rookies? |
 | | | W | "First night's easy, Rookie. Heh. Mostly." | não (calma) | ele já viu muitas primeiras noites |
 | | | R | "...hello...? Is the light still on over there...?" | não | alguém do outro lado procura a luz |
 | 2 | a chave; o rádio já trabalhou aqui | W | "I've got a key, Rookie. I never knock." | sim, ANM-009 | a chave (só ele tem) |
@@ -134,7 +152,28 @@ Notas:
 - Na N1 a sanidade raramente cai abaixo de 60/40: as falas da N1 são extras, nada essencial.
 - Nenhuma fala de rádio dá ordem nova. "Don't take his coffee" não vira escolha: o final aprovado não tem botão; o café é oferecido igual.
 
-### 4.1 Default (noite sem entrada, noites > 10, modo infinito)
+### 4.2 Abertura da ligação real (DEC-362, TASK-655, Provisório)
+
+Canal que **todo** jogador ouve (1ª linha da ligação das 7 PM). Por isso só peças que o final explica sozinho; as peças
+fortes (a chave, "he sent me instead", o boné) continuam na ligação falsa e no rádio. Texto e ElevenLabs em
+`tools/voice/elevenlabs_script.md` → "Aberturas"; tabela com a origem em `walt-dialogue-audit.md` §3.3.
+
+| Noite | Abertura | O que planta |
+|---|---|---|
+| 1 | "Evening, Rookie. Some customers look off." | o late crowd |
+| 2 | "You came back. Told you nights were quiet." | nem todo Rookie volta |
+| 3 | "Sleep okay? Good. Don't think about it." | ele sabe o que assusta |
+| 4 | "You look tired, Rookie. Coffee's on me tonight." | ele vê o Rookie (do estacionamento, DEC-371); 1º café dele |
+| 5 | "Just one of everybody tonight, I hope. Joke. Mostly." | ele sabe o que vem |
+| 6 | "She liked you. The lady. Forget I said that." | ele conhece a Raincoat Lady ("old friend") |
+| 7 | "You're starting to look the part, Rookie." | a noite faz do Rookie o próximo Walt (DEC-370) |
+| 8 | "You kept your eyes down. Good. I used to count the lamps." | ele já foi o Rookie |
+| 9 | "Long night, huh? I'm saving you a coffee." | o 2º café |
+| 10 | "Last night, Rookie. I'll bring the coffee myself." | ele vem ao amanhecer, com o café |
+
+Nenhuma abertura da noite N revela peça de noite > N (§6). Nenhuma usa palavra proibida.
+
+### 4.1 Default (noite sem entrada, noites > 10)
 
 Só dicas gerais + ecos de lore já revelada. Sem spoiler novo.
 
@@ -197,7 +236,7 @@ Leitura de cada uma:
   1. falas da noite N ainda não ouvidas, na ordem da tabela;
   2. se acabaram: falas não ouvidas de noites < N (nunca > N);
   3. se acabaram: aleatória do `Default`.
-  Noite > 10 e modo infinito: direto para o passo 2, depois `Default`.
+  Noite > 10: direto para o passo 2, depois `Default` (modo infinito não existe mais, DEC-360).
 - **"Ouvida"**: duas opções para o architect.
   - **Por run** (só memória do client; simples): a mesma run não repete; runs novas recomeçam a série.
   - **Por perfil** (recomendada, Provisória): um conjunto pequeno de `Id` no dado salvo; o jogador junta a lore ao longo de várias runs. Custo: campo novo no perfil.

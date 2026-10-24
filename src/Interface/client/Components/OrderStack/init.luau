@@ -27,6 +27,8 @@ export type Direction = "Vertical" | "Horizontal"
 export type Props = {
 	-- Ingredient keys that leave the default (bun and sausage are implicit); more than MaxToppings are cut.
 	Toppings: () -> { string },
+	-- true = a bun alone, no sausage (Content.OrderRules.BreadOnly, ANM-011): base and lid only. Default false.
+	Bread: (() -> boolean)?,
 	Direction: Direction?,
 	-- Vertical: px between two layers (the height of a band). Horizontal: the width of a layer. Default 18.
 	Pitch: number?,
@@ -51,7 +53,10 @@ for _, row in Content.Ingredients.List do
 end
 
 -- The layers of an order, bottom first.
-local function itemsOf(toppings: { string }): { Item }
+local function itemsOf(toppings: { string }, bread: boolean): { Item }
+	if bread then
+		return { { Kind = "base", Key = "bun" }, { Kind = "lid", Key = "bun_lid" } }
+	end
 	const list: { Item } = { { Kind = "base", Key = "bun" }, { Kind = "sausage", Key = "sausage" } }
 	for index = 1, math.min(#toppings, Content.OrderRules.MaxToppings) do
 		table.insert(list, { Kind = "topping", Key = toppings[index] })
@@ -140,7 +145,7 @@ return function(props: Props): Frame
 	const inset = math.max(sprite - pitch, 0) / 2
 
 	const items = function(): { Item }
-		return itemsOf(props.Toppings())
+		return itemsOf(props.Toppings(), props.Bread ~= nil and props.Bread())
 	end
 	const count = function(): number
 		return #items()

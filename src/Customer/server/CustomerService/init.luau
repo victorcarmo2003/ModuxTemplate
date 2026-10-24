@@ -94,9 +94,9 @@
 -- inside the tip window, on a Complete sale only (Incomplete never looks at the grade). Any other hot dog keeps its Quality
 -- attribute (nil = no grade, the base tip).
 --
--- TASK-354 (owner request 2026-10-17, Provisional): no "Refuse" prompt or button any more. Refusing = closing the
--- service window (VehicleService.ShutterChanged -> SendLineAway: Refused, Acted "refuse" with who closed); anomaly
--- actors read the same Shutter event in Anomaly/Kit/CustomerActor.
+-- TASK-354 (owner request 2026-10-17, Provisional): no "Refuse" prompt or button any more. Owner 2026-10-23: closing the
+-- service window sends only the customer anomalies away (Anomaly/Kit/CustomerActor reads the Shutter event); the ordinary
+-- line stays (OnShutter).
 --
 -- Restaurant (TASK-380, R1-C; tech/restaurant-flow.md rev. 2 §2.1, §3.1; design FEAT-043/FEAT-046; DEC-280; Provisional).
 -- Everything below is off unless Content.Restaurant.Rules.Enabled: with the flag off (or the map without PU-1) the flow
@@ -250,6 +250,7 @@ export type Wire = {
 	Pickup: number?,
 	Number: number?,
 	Drive: number?,
+	Bread: boolean?,
 }
 
 -- Sale.Result (network.md §4.3) = EconomyService SaleResult
@@ -282,7 +283,8 @@ export type ServeRule = (customer: Customer, tool: Tool, player: Player) -> Sale
 -- Customer anomaly in the delivery queue (AddActorJudge; owner 2026-10-22, Provisional): asked before the sale of a serve
 -- on an actor, with the served hot dog's toppings. "Return" = the plate comes back; "Wrong" = the error; nil = a sale
 export type ActorVerdict = "Return" | "Wrong"
-export type ActorJudge = (id: number, toppings: { string }, player: Player) -> ActorVerdict?
+-- `bread` = what was handed over is a plate with the bun alone (IsBreadPlate), not a hot dog
+export type ActorJudge = (id: number, toppings: { string }, player: Player, bread: boolean) -> ActorVerdict?
 
 type Weighted = { Point: string, Weight: number }
 
@@ -292,8 +294,6 @@ const SEED_DOMAIN = "customers"
 const ORDER_SEED_DOMAIN = "orders" -- own stream: order draws never shift the spawn draws
 const ACTOR_SEED_DOMAIN = "actors" -- own stream: anomaly actors never shift the customer draws
 const MIRROR = "mirror"
--- TASK-591: actor variants whose ticket is a plain hot dog, no topping (ANM-011 the shaker: serve him plain)
-const PLAIN_VARIANTS: { [string]: boolean } = { shake = true }
 const SALE_MAX = 1000 -- Sale.Amount wire range
 const TAKE_ORDER = "take_order"
 const SERVE = "serve"
@@ -311,6 +311,10 @@ const NOTICE_GAP = 2
 const SERVE_HOLD_HINT = "serve_hold_hot_dog" -- Content.Notices keys (owner request 2026-10-12, Provisional)
 const SERVE_EMPTY_HINT = "serve_nothing"
 const HOT_DOG = "hot_dog"
+-- a plate with the bun alone serves a bread-only order (Content.OrderRules.BreadOnly)
+const PLATE = PlateTool.Plate
+const PLATE_BUN = PlateTool.Attr.Bun
+const PLATE_SAUSAGE = PlateTool.Attr.Sausage
 const HAPPY = "Happy"
 const ANNOYED = "Annoyed"
 const COMPLAINING = "Complaining"
@@ -318,9 +322,9 @@ const LEAVE_TIMEOUT = 45 -- s; a leaving customer that never reaches its exit is
 const NEUTRAL = "Neutral" -- arrival mood (Content.Moods)
 -- Mood ladder, best first (Q-219 B: Messy = one band down; Content.Moods has no order of its own yet)
 const MOOD_LADDER = { HAPPY, NEUTRAL, ANNOYED, COMPLAINING }
--- day phases where the tutorial customer may spawn (the tutorial runs in Prep and Open)
--- Night too (DEC-311): the run starts at night (Shift.RunStartsAtNight), and the tutorial is the first night's shop
-const TUTORIAL_PHASES: { [string]: boolean } = { Prep = true, Open = true, Night = true }
+-- phases where the tutorial customer may spawn: the first night's Prep and shop (DEC-311; DEC-360: the run always
+-- starts at night, there is no day Open any more)
+const TUTORIAL_PHASES: { [string]: boolean } = { Prep = true, Night = true }
 -- Restaurant (TASK-380)
 const PICKUP_SERVE = "pickup_serve" -- Content.Actions key (PICKUP Prompt_Serve)
 const PICKUP_FULL = "pickup_full" -- Content.Notices key
@@ -598,7 +602,7 @@ function CustomerService:IsPaused(): boolean
 	return self.Dependencies.RoundService:IsPaused() or self:SpawnHeld()
 end
 
--- TutorialService: "no regular customer arrives now" (user decision 2026-10-12, Provisional: Day 1 customers wait until
+-- TutorialService: "no regular customer arrives now" (user decision 2026-10-12, Provisional: Night 1 customers wait until
 -- the tutorial is over, so the bun purchase and the restock never race a queue). Only the regular flow, the adoptions,
 -- the guarantee and anomaly actors wait; the tutorial customer is not held. Last registration wins.
 function CustomerService:SetSpawnHold(hold: () -> boolean)
@@ -894,7 +898,66 @@ function CustomerService:Record(customer: Customer): Wire
 		Pickup = if customer.Pickup > 0 then customer.Pickup else nil,
 		Number = customer.Number,
 		Drive = if customer.Drive > 0 then customer.Drive else nil,
+		Bread = if self:IsBread(customer) then true else nil,
 	}
+end
+
+-- The order is a bun alone, no sausage (Content.OrderRules.BreadOnly; ANM-011 the shaker, owner 2026-10-22)
+function CustomerService:IsBread(customer: Customer): boolean
+	return customer.Variant ~= nil and Content.OrderRules.BreadOnly[customer.Variant] == true
+end
+
+-- A plate Tool with the bun alone on it: no sausage, no topping (what a bread-only order is served with)
+function CustomerService:IsBreadPlate(tool: Tool): boolean
+	const items = self.Dependencies.ItemService
+	return items:ItemOf(tool) == PLATE
+		and tool:GetAttribute(PLATE_BUN) == true
+		and tool:GetAttribute(PLATE_SAUSAGE) ~= true
+		and #items:Toppings(tool) == 0
+end
+
+-- The bread plate of the player: the one in the hand, else the first one of the hotbar; nil = none
+function CustomerService:BreadPlateOf(player: Player): Tool?
+	const items = self.Dependencies.ItemService
+	const held = items:GetHeld(player)
+	if held ~= nil and self:IsBreadPlate(held) then
+		return held
+	end
+	for _, candidate in items:Tools(player) do
+		if self:IsBreadPlate(candidate) then
+			return candidate
+		end
+	end
+	return nil
+end
+
+-- The bread-only customer of the pickup line a bread plate goes to: `target` when it wants bread, else the plate's
+-- ticket owner when it does, else the first waiting one in line order. nil = none waiting
+function CustomerService:BreadTarget(tool: Tool, target: number?): number?
+	local function wants(id: number?): boolean
+		const customer = if id ~= nil then self.Customers[id] else nil
+		const ticket = if id ~= nil then self.Tickets[id] else nil
+		return customer ~= nil
+			and ticket ~= nil
+			and customer.State == "Waiting"
+			and customer.Pickup > 0
+			and ticket.TakenAt > 0
+			and #Orders.Pending(ticket) > 0
+			and self:IsBread(customer)
+	end
+	if wants(target) then
+		return target
+	end
+	const owner = self:TicketOwner(tool)
+	if wants(owner) then
+		return owner
+	end
+	for _, id in self.PickupLine.Order do
+		if wants(id) then
+			return id
+		end
+	end
+	return nil
 end
 
 function CustomerService:Publish(customer: Customer, added: boolean)
@@ -1368,8 +1431,9 @@ function CustomerService:JudgeActor(customer: Customer, tool: Tool, player: Play
 		return nil
 	end
 	const toppings = self.Dependencies.ItemService:Toppings(tool)
+	const bread = self:IsBreadPlate(tool)
 	for _, judge in table.clone(self.ActorJudges) do
-		const ok, verdict = pcall(judge, customer.Id, toppings, player)
+		const ok, verdict = pcall(judge, customer.Id, toppings, player, bread)
 		if not ok then
 			warn(`[CustomerService] actor judge failed: {verdict}`)
 		elseif verdict == "Return" or verdict == "Wrong" then
@@ -1735,35 +1799,11 @@ function CustomerService:RefuseOne(player: Player, id: number): boolean
 	return true
 end
 
--- The window must stay shut ShutGrace s before the line reacts; a reopening cancels it. Owner 2026-10-20 (Provisional): only
--- the line (not ordered yet) goes then; the customers whose order was taken keep waiting and go only if the window stays
--- shut WaitShutGrace s (twice the line's time to leave), complaining the same way. An anomaly that slams it clears the line
--- at once and starts the same WaitShutGrace wait for the others.
-function CustomerService:OnShutter(closed: boolean, player: Player?)
+-- Owner 2026-10-23 (Provisional): closing the window no longer sends the ordinary customers away; they keep their place
+-- (the shop is paused, no new arrival) and only the customer anomalies go (Anomaly/Kit/CustomerActor). SendLineAway and
+-- ComplainLineAway stay for other callers.
+function CustomerService:OnShutter(_closed: boolean, _player: Player?)
 	self:CancelShutWait()
-	if not closed then
-		-- owner 2026-10-20 (Provisional): a pause of arrivals after reopening, so the crew catches up before a new wave
-		self.ReopenUntil = now() + Content.Flow.ReopenPause
-		return
-	end
-	const rules = Content.ShopWindow
-	if player == nil then
-		-- automatic (an anomaly slammed it): the line at once
-		self:SendLineAway(nil, false)
-	else
-		self.ShutThread = task.delay(rules.ShutGrace, function()
-			self.ShutThread = nil
-			if self.Dependencies.VehicleService:IsShutterClosed() then
-				self:ComplainLineAway(player, false)
-			end
-		end)
-	end
-	self.WaitShutThread = task.delay(rules.WaitShutGrace, function()
-		self.WaitShutThread = nil
-		if self.Dependencies.VehicleService:IsShutterClosed() then
-			self:ComplainLineAway(player, true)
-		end
-	end)
 end
 
 -- Stops the pending ShutGrace / WaitShutGrace waits (reopened, new shift, shift end)
@@ -1915,8 +1955,9 @@ function CustomerService:OpenTicket(id: number)
 		end
 		pairBonus = Content.Flow.Groups.PatienceBonus
 	end
-	if customer.Variant ~= nil and PLAIN_VARIANTS[customer.Variant] then
-		-- TASK-591 (ANM-011): the shaker only wants a plain hot dog; the draw above still ran (stream unchanged)
+	if self:IsBread(customer) then
+		-- ANM-011 (owner 2026-10-22): the shaker wants a bun alone; no topping on the ticket (no sausage either: IsBread),
+		-- the draw above still ran (stream unchanged)
 		lines = { {} }
 	end
 	const arrivedAt = if customer.JoinedAt > 0 then customer.JoinedAt else now()
@@ -2287,6 +2328,16 @@ function CustomerService:ServeAtPickup(player: Player, target: number?): (SaleRe
 	end
 	const items = self.Dependencies.ItemService
 	local tool = items:Holding(player, HOT_DOG)
+	-- owner 2026-10-22: a plate with the bun alone goes to a bread-only order (ANM-011) waiting in the line; a hot dog in the
+	-- hand still goes first (handed to him, he throws it: the condition Plain)
+	local breadId: number? = nil
+	if tool == nil then
+		const plate = self:BreadPlateOf(player)
+		breadId = if plate ~= nil then self:BreadTarget(plate, target) else nil
+		if breadId ~= nil then
+			tool = plate
+		end
+	end
 	if tool == nil then
 		for _, candidate in items:Tools(player) do
 			if items:ItemOf(candidate) == HOT_DOG then
@@ -2298,18 +2349,22 @@ function CustomerService:ServeAtPickup(player: Player, target: number?): (SaleRe
 			self:NotifyThrottled(player, SERVE_EMPTY_HINT)
 			return nil, nil
 		end
-		self:Equip(player, tool)
 	end
 	const served = tool :: Tool
+	if items:GetHeld(player) ~= served then
+		self:Equip(player, served)
+	end
 	const toppings = items:Toppings(served)
-	const id = Pickup.choose(self.PickupLine, self:TicketOwner(served), target, function(candidate: number): Pickup.Fit
-		const ticket = self.Tickets[candidate]
-		if ticket == nil then
-			return "Other"
-		end
-		const _, verdict = Orders.Match(ticket, toppings)
-		return if verdict == "Complete" then "Exact" else "Other"
-	end)
+	const id = if breadId ~= nil
+		then breadId
+		else Pickup.choose(self.PickupLine, self:TicketOwner(served), target, function(candidate: number): Pickup.Fit
+			const ticket = self.Tickets[candidate]
+			if ticket == nil then
+				return "Other"
+			end
+			const _, verdict = Orders.Match(ticket, toppings)
+			return if verdict == "Complete" then "Exact" else "Other"
+		end)
 	if id == nil then
 		return nil, nil
 	end
@@ -2409,7 +2464,7 @@ function CustomerService:ServeCustomer(
 	ticket: Orders.Ticket,
 	picked: Tool?
 ): SaleResult?
-	const tool = if picked ~= nil then picked else self:PickServeTool(player, ticket)
+	const tool = if picked ~= nil then picked else self:PickServeTool(player, ticket, self:IsBread(customer))
 	if tool == nil then
 		return nil
 	end
@@ -2469,9 +2524,19 @@ end
 --   2. else an inventory hot dog (hotbar / backpack) that is exact for a pending line -> equipped and used (auto);
 --   3. else a hot dog in hand (wrong / incomplete) -> it, with the existing Errado / Incompleto consequence;
 --   4. else nothing is served and the player gets a hint (hold a hot dog / nothing to serve yet).
-function CustomerService:PickServeTool(player: Player, ticket: Orders.Ticket): Tool?
+-- `bread` = a bread-only order (owner 2026-10-22): a plate with the bun alone goes when no hot dog is in the hand.
+function CustomerService:PickServeTool(player: Player, ticket: Orders.Ticket, bread: boolean?): Tool?
 	const items = self.Dependencies.ItemService
 	const held = items:Holding(player, HOT_DOG)
+	if bread and held == nil then
+		const plate = self:BreadPlateOf(player)
+		if plate ~= nil then
+			if items:GetHeld(player) ~= plate then
+				self:Equip(player, plate)
+			end
+			return plate
+		end
+	end
 	const pending = Orders.Pending(ticket)
 	local function exact(tool: Tool): boolean
 		const toppings = items:Toppings(tool)
@@ -2583,6 +2648,9 @@ end
 -- Band of a served hot dog (kitchen-world.md §4): a plate's hot dog (PlateId) by Grade.Assembly against the line, from the time
 -- the order was taken (the ticket's TakenAt) to `at`, with the party size; any other hot dog = its Quality attribute (nil = none).
 function CustomerService:GradeOf(tool: Tool, line: Orders.Line, ticket: Orders.Ticket, at: number): string?
+	if self:IsBreadPlate(tool) then
+		return nil -- a bun alone: nothing was cooked to grade
+	end
 	const items = self.Dependencies.ItemService
 	const id = tool:GetAttribute(PLATE_ID)
 	if type(id) ~= "number" or id <= 0 then

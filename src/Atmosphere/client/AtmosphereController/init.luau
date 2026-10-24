@@ -80,6 +80,9 @@ const shower = { Opened = 0, Forced = nil :: { Start: number, Length: number }? 
 -- Fog curtain of the row being shown (Curtain.luau)
 const fogWall = { Curtain = nil :: Curtain.Curtain? }
 const FORCED_FADE = 3 -- s, rain in / out of a forced shower
+-- Rain bed retry (the first Loop may come back nil while the id loads)
+const bed = { Retry = 0 }
+const BED_RETRY = 2
 const SHOWER_LATE = 1 -- s: a shower already on longer than this (late join, fade-in) opens without a strike
 
 -- Field -> writer. Names are Content.LightPresets fields; each writer gets the LightController effects.
@@ -286,14 +289,8 @@ function AtmosphereController:Begin(row: AtmosphereRow)
 		self.Rain = Rain.new(row.Rain, RULES)
 	end
 	fogWall.Curtain = Curtain.new(RULES.Curtain)
-	if row.Sound then
-		const sound = self.Dependencies.AudioController:Loop(row.Sound, nil, true)
-		if sound then
-			self.Sound = sound
-			self.SoundBase = sound.Volume
-			sound.Volume = 0
-		end
-	end
+	bed.Retry = 0
+	self:StartSound(row)
 	if row.MoonSize then
 		const sky = Lighting:FindFirstChildOfClass("Sky")
 		if sky then
@@ -393,6 +390,19 @@ local function stepShelter(dt: number)
 		else math.max(target, shelter.Indoor - step)
 end
 
+-- Looped bed of the row (rain), RULES.RainVolume over the row volume, silent until Step blends it in.
+function AtmosphereController:StartSound(row: AtmosphereRow)
+	if row.Sound == nil then
+		return
+	end
+	const sound = self.Dependencies.AudioController:Loop(row.Sound, nil, true, { Volume = RULES.RainVolume })
+	if sound then
+		self.Sound = sound
+		self.SoundBase = sound.Volume
+		sound.Volume = 0
+	end
+end
+
 -- Thunder of a strike: far = a slower rumble, near = the scare (louder crack, camera jolt).
 function AtmosphereController:Thunder(bolt: Content.AtmosphereLightning, near: boolean)
 	const audio = self.Dependencies.AudioController
@@ -465,6 +475,10 @@ function AtmosphereController:Step(dt: number)
 	local wet = 1
 	if row.Showers then
 		local level, start = Showers.Level(row.Showers, serverNow)
+		-- a rookie's tutorial still ahead: no natural shower (TutorialService); the forced one below still plays
+		if Workspace:GetAttribute(RULES.ShowersHeldAttribute) == true then
+			level, start = 0, nil
+		end
 		const forced = shower.Forced
 		if forced then
 			const push = Showers.Span(forced.Start, forced.Length, FORCED_FADE, serverNow)
@@ -512,6 +526,11 @@ function AtmosphereController:Step(dt: number)
 	const sky = self.Sky
 	if sky and self.MoonOriginal and row.MoonSize then
 		sky.MoonAngularSize = self.MoonOriginal + (row.MoonSize - self.MoonOriginal) * eased
+	end
+	-- the bed did not start (id still loading, voice cap full): try again every BED_RETRY s
+	if row.Sound and (self.Sound == nil or (self.Sound :: Sound).Parent == nil) and os.clock() >= bed.Retry then
+		bed.Retry = os.clock() + BED_RETRY
+		self:StartSound(row)
 	end
 	const sound = self.Sound
 	if sound then

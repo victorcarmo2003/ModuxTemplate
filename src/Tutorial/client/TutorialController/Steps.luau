@@ -24,6 +24,10 @@
 -- tutorial orders are fixed (Rules.Orders: plain, then ketchup and mustard; DEC-311), so Walt names them.
 -- Punctuation of the Say / Done / greeting lines shapes Walt's voice (Speech speaks sentence by sentence: a pause after
 -- . ? ! and a longer one after "..."); fewer "!" = a calmer tone (user feedback 2026-10-11: "too shouted").
+-- Owner 2026-10-23 (recorded his own voice for Walt, tools/voice/edits.json): the restaurant rows say his lines, longer and
+-- chattier; the second tutorial order says SayAgain ("do the same thing as before": mostly silent); the trailer and Mart
+-- rows (never shown in the restaurant) lost their voice lines. Texts are what he recorded: a line changed here loses its
+-- audio (the voice key is the text) until it is recorded again.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TutorialRules = require(ReplicatedStorage.shared.Tutorial.Rules)
@@ -40,6 +44,9 @@ export type Step = {
 	DriveHint: string?,
 	Action: string?,
 	Say: { string }?, -- Walt's lines when the step starts (nil = silent waiting row)
+	-- Walt's lines on the second tutorial order instead of Say (owner 2026-10-23: the ketchup order is "the same thing as
+	-- before"); nil = Say, {} = silent
+	SayAgain: { string }?,
 	Done: string?, -- Walt's praise when the player moves past this step
 	-- Short reminder (<= 42 chars, a subtitle line) when the player made no progress on the step for a while
 	-- (TutorialController IDLE): Walt says it, the panel hint shows it and the arrow pulses harder. nil = no reminder
@@ -61,8 +68,9 @@ const TOTAL = if TutorialRules.Restaurant
 	else 7
 -- Day 1 upgrade lesson (owner request 2026-10-14, Provisional): when the first shift ends Walt calls (BossCalls
 -- call_tutorial_upgrade, his lines are the call's own) and these two steps lead the rookie to the Gear Stand to buy
--- the Bun Box (shared.Tutorial.Rules.Upgrade); the Gear Stand was closed until then (Content.Mart.FirstShiftClosed)
-const LESSON_TOTAL = 2
+-- the Bun Box (shared.Tutorial.Rules.Upgrade); the Gear Stand was closed until then (Content.Mart.FirstShiftClosed).
+-- Owner 2026-10-21 (Provisional): a third step then sends the rookie back to open the window (the shop) for the night
+const LESSON_TOTAL = 3
 
 const LIST: { Step } = {
 	{
@@ -71,7 +79,6 @@ const LIST: { Step } = {
 		Text = "Answer the phone",
 		Hint = 'Your boss is calling. Press "Answer" on the trailer phone.',
 		Action = "answer_phone",
-		Remind = "Pick up the phone.",
 	},
 	{
 		Key = "wait_call",
@@ -89,8 +96,7 @@ const LIST: { Step } = {
 		Text = "Open the window",
 		Hint = "Pull the window lever next to the phone.",
 		Action = "shutter_toggle",
-		Say = { "First, open the store." },
-		Done = "We're open.",
+		Say = { "Do you see that lever? Go there and pull it to open the store." },
 		Remind = "Pull the window lever.",
 	},
 	{
@@ -99,7 +105,9 @@ const LIST: { Step } = {
 		Text = "Wait for your first customer",
 		Hint = "They're walking up to the counter.",
 		Action = nil,
-		Say = {},
+		-- owner 2026-10-23: said once the lever is pulled (a Done of "open" would be dropped while the lever line still talks)
+		Say = { "Nice. Here it comes, your first client." },
+		SayAgain = {},
 	},
 	{
 		Key = "order",
@@ -107,9 +115,6 @@ const LIST: { Step } = {
 		Text = "Take the order",
 		Hint = 'Press "Take Order" on the customer.',
 		Action = "take_order",
-		Say = { "Take their order." },
-		Done = "A ketchup dog. Easy.",
-		Remind = "Take the order, Rookie.",
 	},
 	-- Day 1 cut (owner decision 2026-10-17, Provisional): in the focused prep mode the kitchen is ONE step, "make the hot
 	-- dog" at a station; the mode's own coach paw walks through grill -> bun -> sausage (the world-prompt steps below
@@ -120,9 +125,6 @@ const LIST: { Step } = {
 		Text = "Make the hot dog",
 		Hint = 'Press "Work" at a station and follow the paw.',
 		Action = nil, -- the focused prep left (TASK-581); the step is never chosen
-		Say = { "Now make the hot dog.", "Take a station. Follow the paw." },
-		Done = "Beautiful.",
-		Remind = "Press Work at a station.",
 	},
 	{
 		Key = "grill",
@@ -131,9 +133,6 @@ const LIST: { Step } = {
 		Hint = 'Grab one at the cooler: press "Grill".',
 		PrepHint = 'Press "Work" at a station, then add a sausage on the Grill tab.',
 		Action = "grill_place",
-		Say = { "Frank from the cooler.", "Onto the grill." },
-		Done = "Nice.",
-		Remind = "Frank on the grill.",
 	},
 	{
 		Key = "slice",
@@ -142,9 +141,6 @@ const LIST: { Step } = {
 		Hint = 'Hold "Slice Bun" at the bun crate.',
 		PrepHint = 'Press "Work" at a station. On the Build tab, drag the knife along the line.',
 		Action = "bun_cut",
-		Say = { "Slice a bun while it cooks." },
-		Done = "Good.",
-		Remind = "Hold to slice the bun.",
 	},
 	{
 		Key = "slicing",
@@ -161,7 +157,6 @@ const LIST: { Step } = {
 		Hint = 'It gets a "Collect" button when ready.',
 		PrepHint = "The bar stops when one side is done: tap the sausage to flip it, then it is ready in a couple of seconds.",
 		Action = "grill_collect",
-		Say = { "Wait for the bar." },
 	},
 	{
 		Key = "collect",
@@ -170,9 +165,6 @@ const LIST: { Step } = {
 		Hint = 'Press "Collect" on the grill.',
 		PrepHint = 'Press "Work" at a station, then "Collect" on the Grill tab.',
 		Action = "grill_collect",
-		Say = { "Ready. Grab it." },
-		Done = "Got it.",
-		Remind = "Grab it off the grill.",
 	},
 	{
 		Key = "assemble",
@@ -181,9 +173,6 @@ const LIST: { Step } = {
 		Hint = 'Press "Add Sausage" at the rest rail.',
 		PrepHint = 'Press "Work" at a station. On the Build tab, drag the sausage onto the bun.',
 		Action = "plate_add_sausage",
-		Say = { "Frank in the bun." },
-		Done = "Beautiful.",
-		Remind = "Put it in the bun.",
 	},
 	{
 		Key = "toppings",
@@ -193,9 +182,6 @@ const LIST: { Step } = {
 		-- TASK-258: seated with the bun and sausage on the plate, the order's topping goes on in the Toppings view
 		PrepHint = "On the Toppings view, put it on the hot dog.",
 		Action = "topping_add",
-		Say = { "They want ketchup.", "Nothing extra." },
-		Done = "Perfect.",
-		Remind = "Ketchup on the dog, Rookie.",
 	},
 	{
 		Key = "discard",
@@ -203,8 +189,6 @@ const LIST: { Step } = {
 		Text = "Throw it away",
 		Hint = "That's not what they asked. Hold \"Throw Away\" at the bin, then make a new one.",
 		Action = "discard",
-		Say = { "Not what they asked. Toss it." },
-		Remind = "Toss it in the bin.",
 	},
 	-- TASK-254 (owner request 2026-10-14): the 3D prep delivery by drag, the plate onto the green DELIVER area of the customer
 	{
@@ -214,8 +198,6 @@ const LIST: { Step } = {
 		-- TASK-258: only once the order's toppings are on the plate (TutorialController:MissingTopping)
 		Hint = "Drag the plate onto the customer.",
 		Action = nil,
-		Say = { "Looks right.", "Drag the plate to them." },
-		Remind = "Drag the plate to the customer.",
 	},
 	{
 		Key = "serve",
@@ -223,8 +205,6 @@ const LIST: { Step } = {
 		Text = "Serve the hot dog",
 		Hint = 'Press "Serve" on the customer.',
 		Action = "serve",
-		Say = { "Now serve it." },
-		Remind = "Hand it over.",
 	},
 	-- Restaurant loop (TASK-393; design/tutorial-restaurant.md §2, Provisional texts until narrative-writer): only with
 	-- TutorialRules.Restaurant (Content.Restaurant.Rules.Enabled). Order of the rows = flow order (Walt's praise only
@@ -237,9 +217,11 @@ const LIST: { Step } = {
 		Hint = 'Press "Take Order" at the tablet.',
 		DriveHint = 'A car at the drive-thru! Press "Take Order" on it.',
 		Action = "tablet_take",
-		Say = { "That's your first customer.", "Take their order." },
-		Remind = "Tap the tablet, Rookie.",
+		Say = { "Take his order." },
+		Remind = "What are you doing? I don't have the whole night. Take his order.",
 	},
+	-- owner 2026-10-22: Take Order opens the close-up and the customer says its order letter by letter; the talk ends by
+	-- itself (the ACCEPT step of DEC-353 and its r_accept row are gone)
 	{
 		Key = "r_listen",
 		Restaurant = true,
@@ -257,8 +239,9 @@ const LIST: { Step } = {
 		Text = "Fry a sausage",
 		Hint = 'Press "Grill" at the grill, then drag a sausage from the box onto the grill.',
 		Action = "cook_focus",
-		Say = { "Now, start making some sausage." },
-		Remind = "Sausage on the grill, Rookie.",
+		-- owner 2026-10-23: "Drag it to the grill." cut
+		Say = { "Plain dog. Go to the grill.", "Take the sausage from the cooler." },
+		SayAgain = { "This one wants ketchup, so just do the same thing as before for now." },
 	},
 	{
 		Key = "r_cooking",
@@ -267,7 +250,7 @@ const LIST: { Step } = {
 		Text = "Wait for the sausage",
 		Hint = "It stops at half: then flip it.",
 		Action = nil,
-		Say = { "Wait for it." },
+		Say = {},
 	},
 	{
 		Key = "r_flip",
@@ -276,9 +259,9 @@ const LIST: { Step } = {
 		Text = "Flip the sausage",
 		Hint = "Tap when the white bar is in the green.",
 		Action = nil, -- inside the grill focus: the flip mini-game
-		Say = { "Flip it." },
-		Done = "Nice flip.",
-		Remind = "Flip it now.",
+		Say = { "Now flip it." },
+		SayAgain = {},
+		Done = "Good.",
 	},
 	{
 		Key = "r_collect",
@@ -287,8 +270,8 @@ const LIST: { Step } = {
 		Text = "Send it to the rest rail",
 		Hint = "Drag the ready sausage onto the rest rail (or tap it).",
 		Action = nil, -- inside the grill focus (DEC-310)
-		Say = { "Done. Off the grill." },
-		Remind = "Onto the rail with it.",
+		Say = { "Now take it and put it aside." },
+		SayAgain = {},
 	},
 	{
 		Key = "r_cut",
@@ -297,9 +280,9 @@ const LIST: { Step } = {
 		Text = "Cut a bun",
 		Hint = 'Press "Cut Bun" at the cutting board, then swipe across the bun.',
 		Action = "cook_focus",
-		Say = { "Now cut some bread." },
+		Say = { "Now go to the cutting board and cut some bread." },
+		SayAgain = {},
 		Done = "Good.",
-		Remind = "Slice the bun.",
 	},
 	{
 		Key = "r_leave",
@@ -317,8 +300,8 @@ const LIST: { Step } = {
 		Text = "Take the plate of the order",
 		Hint = 'Press "Take Plate" on the plate with their ticket.',
 		Action = "plate_take",
-		Say = { "Grab the plate with their ticket." },
-		Remind = "Take the plate.",
+		Say = { "Take his plate at the countertop." },
+		SayAgain = {},
 	},
 	{
 		Key = "r_bun_plate",
@@ -327,9 +310,9 @@ const LIST: { Step } = {
 		Text = "Put the bun on the plate",
 		Hint = 'Press "Add Bun" at the cut-bun crate.',
 		Action = "plate_add_bun",
-		Say = { "Now take the bread and put it on the plate." },
-		Done = "Nice.",
-		Remind = "Bun on the plate.",
+		Say = { "Now, take the bread" },
+		SayAgain = {},
+		Done = "Good.",
 	},
 	{
 		Key = "r_rail",
@@ -338,8 +321,7 @@ const LIST: { Step } = {
 		Text = "Take the sausage",
 		Hint = 'Press "Add Sausage" at the rest rail.',
 		Action = nil, -- kept for the step ids (Metrics); r_dog_plate is the live one
-		Say = { "Grab the dog." },
-		Remind = "Take it from the rail.",
+		Say = {},
 	},
 	{
 		Key = "r_dog_plate",
@@ -348,9 +330,8 @@ const LIST: { Step } = {
 		Text = "Put the sausage in the bun",
 		Hint = 'Press "Add Sausage" at the rest rail.',
 		Action = "plate_add_sausage",
-		Say = { "Now the sausage." },
-		Done = "Beautiful.",
-		Remind = "Dog on the plate.",
+		Say = { "Take the sausage now." },
+		SayAgain = {},
 	},
 	{
 		Key = "r_toppings",
@@ -359,9 +340,8 @@ const LIST: { Step } = {
 		Text = "Add {item}",
 		Hint = 'Press "Toppings", tap the lit {item}, then squeeze it along the arrows.',
 		Action = "cook_focus",
-		Say = { "Take the plate to the condiment table." },
-		Done = "Perfect.",
-		Remind = "Sauce on the dog, Rookie.",
+		Say = { "Now go to the toppings table and put the ketchup." },
+		Remind = "Rookie, just take the sauce.",
 	},
 	{
 		Key = "r_discard",
@@ -370,8 +350,8 @@ const LIST: { Step } = {
 		Text = "Throw it away",
 		Hint = "That's not what they asked. Hold \"Throw Away\" at the bin.",
 		Action = "discard",
-		Say = { "Not what they asked. Toss it." },
-		Remind = "Toss it in the bin.",
+		Say = { "This is not what he asked. What are you doing? No, just toss it." },
+		Remind = "In the bin, Rookie.",
 	},
 	{
 		Key = "r_pickup",
@@ -381,8 +361,8 @@ const LIST: { Step } = {
 		Hint = 'Press "Hand Over" at the pickup counter.',
 		DriveHint = 'Press "Serve" on the car at the drive-thru window.',
 		Action = "pickup_serve",
-		Say = { "Hand it over at the pickup." },
-		Remind = "Pickup counter. Hand it over.",
+		Say = { "This is a plain dog. Deliver it to the customer." },
+		SayAgain = { "Well, it looks good. Just take it to the customer." },
 	},
 	-- co-op: a crewmate holds the hot dog (no plate in progress, own hand empty)
 	{
@@ -397,9 +377,10 @@ const LIST: { Step } = {
 		Key = "money",
 		Number = if TutorialRules.Restaurant then 9 else 7,
 		Text = "First sale! Nice work!",
-		Hint = "Sales go straight to the shared money. Tips pile up in the jar.",
+		-- owner 2026-10-22: the tip jar left, tips go straight to the money too
+		Hint = "Sales and tips go straight to the shared money.",
 		Action = nil,
-		Say = { "Ka-ching! First sale.", "Cash goes in the drawer." },
+		Say = { "Your first sale, huh? Good." },
 		Talk = true,
 	},
 	{
@@ -408,13 +389,6 @@ const LIST: { Step } = {
 		Text = "Go to the Mart",
 		Hint = "Ninth Street Mart, across the street. Look both ways!",
 		Action = nil,
-		Say = {
-			"That was your last bun.",
-			"Mart's across the street.",
-			"Look both ways.",
-		},
-		Done = "That's the place.",
-		Remind = "Follow the arrow to the Mart.",
 	},
 	{
 		Key = "mart_buy",
@@ -422,9 +396,6 @@ const LIST: { Step } = {
 		Text = "Buy a pack of buns",
 		Hint = 'Hold "Buy Buns" at the BAKERY shelf.',
 		Action = "buy_package",
-		Say = { "Grab buns at the bakery." },
-		Done = "Eight buns. That'll do.",
-		Remind = "Bakery shelf. Hold Buy Buns.",
 	},
 	{
 		Key = "mart_back",
@@ -432,8 +403,6 @@ const LIST: { Step } = {
 		Text = "Bring it back",
 		Hint = "Carry the pack back to your trailer.",
 		Action = nil,
-		Say = { "Bring them to the trailer." },
-		Remind = "Back to the trailer.",
 	},
 	{
 		Key = "restock",
@@ -441,9 +410,6 @@ const LIST: { Step } = {
 		Text = "Restock the buns",
 		Hint = 'Hold "Restock" at the bun crate.',
 		Action = "restock",
-		Say = { "Hold Restock on the bun crate." },
-		Done = "Stocked up!",
-		Remind = "Hold Restock at the bun crate.",
 	},
 	-- Restaurant restock (TASK-393, TutorialRules.Restock; owner 2026-10-17: infinite stock room, no phone order): a box
 	-- from a product bay (StockShelf) of the stock room -> Restock at the station of its ingredient
@@ -454,9 +420,7 @@ const LIST: { Step } = {
 		Text = "Take a box",
 		Hint = 'Go to the stock room. Press "Take" at a shelf.',
 		Action = "take_box",
-		Say = { "Running low? Hit the stock room.", "Grab a box." },
-		Done = "Got it.",
-		Remind = "Take a box off the shelf.",
+		Say = { "If you run out of ingredients, take it in the back." },
 	},
 	{
 		Key = "r_restock",
@@ -465,9 +429,7 @@ const LIST: { Step } = {
 		Text = "Restock the station",
 		Hint = 'Hold "Restock" where it goes.',
 		Action = "restock",
-		Say = { "Take it to its station.", "Hold Restock." },
-		Done = "Stocked up!",
-		Remind = "Hold Restock at the station.",
+		Say = {},
 	},
 	-- stands in for the four shopping steps when the buns did not run out (no tutorial stock)
 	{
@@ -476,10 +438,6 @@ const LIST: { Step } = {
 		Text = "Restock at the Mart",
 		Hint = "Ninth Street Mart, across the street: buy a package, bring it back.",
 		Action = nil,
-		Say = {
-			"Low on stuff? Try the Mart.",
-			"Look both ways.",
-		},
 		Talk = true,
 	},
 	-- TASK-598 (owner request 2026-10-19, Provisional): Walt's last talk step, before the goodbye: the shift ends at six
@@ -492,7 +450,7 @@ const LIST: { Step } = {
 		Hint = "Keep an eye on the clock, top centre.",
 		Action = nil,
 		-- owner 2026-10-21: the close-up on the clock lasted too long; "One more thing." cut (the other two keep their voices)
-		Say = { "Your shift ends at six.", "Keep an eye on the clock." },
+		Say = { "Your shift ends at six." },
 		Talk = true,
 	},
 }
@@ -508,16 +466,27 @@ const LESSON: { Step } = {
 			then "In the back of the shop."
 			else "At the Mart, across the street. Look both ways!",
 		Action = nil,
-		Remind = if TutorialRules.Restaurant then "Follow the arrow to the Gear Stand." else "Follow the arrow to the Mart.",
+		-- TASK-650 (DEC-368): the script's "PRONTAS PARA GRAVAR" caption, word for word (the voice id comes from it)
+		Remind = "Six A.M. Shift's over. Gear Stand, in the back. Find something useful.",
 	},
 	{
 		Key = "upg_buy",
 		Number = 2,
 		Lesson = true,
-		Text = "Buy the Bun Box",
-		Hint = 'Hold "Buy" at the Bun Box stand: more buns and sausages.',
+		-- owner 2026-10-21: any upgrade of the Gear Stand, the rookie picks (was "Buy the Bun Box")
+		Text = "Buy an upgrade",
+		Hint = 'Pick any upgrade on the Gear Stand and hold "Buy".',
 		Action = "bench_buy_upgrade",
-		Remind = "Hold Buy at the Bun Box.",
+		Remind = "You can choose something. I'm gonna pay for it.",
+	},
+	{
+		Key = "upg_open",
+		Number = 3,
+		Lesson = true,
+		Text = "Open the window",
+		Hint = "Back to the window lever: open the store for the night.",
+		Action = "shutter_toggle",
+		Remind = "Pull the window lever.",
 	},
 }
 if not TutorialRules.Restaurant then
@@ -545,7 +514,8 @@ const SHOPPING: { string } = { "mart_go", "mart_buy", "mart_back", "restock" }
 -- never gated (it only exists in the selling phases anyway: Content.Actions Requires.Phase).
 -- trailer_exit / trailer_enter: the back door is never gated (the tutorial must not lock the player in or out of the trailer)
 -- pick_up_item: an item dropped by a car hit must always be recoverable, whatever the step (owner bug 2026-10-16)
-const ALWAYS: { string } = { "answer_phone", "pick_up_item" }
+-- read_hints: Walt's notes on the counter (owner 2026-10-22: the paper must always open, tutorial or not)
+const ALWAYS: { string } = { "answer_phone", "pick_up_item", "read_hints" }
 -- Restaurant (TASK-393): from the tablet on, the whole restaurant kitchen shows (a crewmate helping or a player getting
 -- ahead is never locked out; the steps follow the shared state, design/tutorial-restaurant.md §4)
 const KITCHEN: { string } = {
@@ -620,11 +590,13 @@ if TutorialRules.Restaurant then
 end
 
 -- Walt when the call is answered (before the first step line)
-const GREETING: { string } = { "Good evening, Rookie." }
+const GREETING: { string } = {
+	"Hello, Rookie! My name is Walt. I've noticed that you're new here, so I'm gonna walk you through this.",
+}
 -- after the last talk step; the server hangs up after BossCallRules.Tutorial.Goodbye s (the click)
-const GOODBYE: { string } = { "That's the job. You got this.", "Call me if..." }
+const GOODBYE: { string } = { "That's your job. Call me if you need me." }
 -- the player skipped the tutorial during the call
-const SKIP_GOODBYE: { string } = { "Alright. You know the drill.", "Call me if you need me." }
+const SKIP_GOODBYE: { string } = { "That's your job. Call me if you need me." }
 
 const ByKey: { [string]: Step } = {}
 const IndexOf: { [string]: number } = {}
@@ -665,6 +637,9 @@ local function allLines(): { string }
 			continue
 		end
 		for _, text in step.Say or {} do
+			add(text)
+		end
+		for _, text in step.SayAgain or {} do
 			add(text)
 		end
 		if step.Done then

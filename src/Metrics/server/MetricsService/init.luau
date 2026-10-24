@@ -12,7 +12,8 @@
 	products: ShopService (the single ProcessReceipt) calls Log.receipt right before PurchaseGranted.
 
 	Logged here from the services' signals:
-	  progression  Day k / Night k Start and Complete/Fail per player (RoundService), Run Complete/Fail (RunEnded)
+	  progression  Day k / Night k Start and Complete/Fail per player (RoundService), Run Complete/Fail (RunEnded);
+	               server events next_night (each night start) and night_complete / night_lost (next to night_result)
 	  onboarding   the Day 1 tutorial: step 1 = began (TutorialService), the client's steps (MetricTutorial), last =
 	               completed (TutorialService)
 	  anomaly      anomaly_start / anomaly_end (key, phase, failed, party, reason, night, attempt, seconds, t_active) and
@@ -34,6 +35,8 @@
 	               (PartyService.Tracked), solo / squad starts, window funnels (shop, classes, codes)
 	  run zones    run servers only (Zones.luau, owner request 2026-10-21): Zone:run.<zone> per zone change and zone_dwell
 	               on leave, from Content.RunZones, the pantry SafeBox and the trailer LightZone
+	  frame rate   every Content.Metrics.FpsWindow s (owner request 2026-10-22): server_fps (Heartbeat steps: avg, low,
+	               frame_ms, players, mem_mb). The players' FPS and ping come from the RoMetrics SDK itself
 	Economy (Gems per player, crew Cash) is logged where it changes (Log.gems / Log.cash in Class, Codes, Reward,
 	Shop and Economy services).
 ]]
@@ -44,6 +47,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
 local ServerStorage = game:GetService("ServerStorage")
+local Stats = game:GetService("Stats")
+local StarterPlayer = game:GetService("StarterPlayer")
 local Modux = require(ServerScriptService.server.Modux)
 local Content = require(ReplicatedStorage.shared.Content)
 local Verbose = require(ReplicatedStorage.shared.Verbose)
@@ -54,6 +59,7 @@ local AnomalyTypes = require(ServerScriptService.server.ModuxTypes.AnomalyServic
 
 const SECRET = "rometrics_key"
 const KEY_ATTRIBUTE = "RoMetricsTestKey" -- ServerStorage attribute, Studio only (place file, never in git)
+const REPORTER = "RoMetricsClient" -- the SDK's client LocalScript (and the ScreenGui that carries a late copy)
 
 type Props = Log.Props
 type Trace = AnomalyTypes.Trace
@@ -140,6 +146,30 @@ function MetricsService:Init()
 	})
 	self.Started = true
 	self:DefineFunnels()
+	self:HandReporter()
+end
+
+-- The SDK's client reporter (platform, then render FPS every 15 s; SDK 0.5.0) is installed in StarterPlayerScripts by
+-- RoMetrics.init, which only reaches players who join afterwards. On a reserved server the first player is already in
+-- before this OnInit (RoleService waits for them), so a solo run would never report: whoever is in gets a copy in a
+-- ScreenGui of their PlayerGui (ResetOnSpawn off, so a respawn does not run it twice)
+function MetricsService:HandReporter()
+	const scripts = StarterPlayer:FindFirstChildOfClass("StarterPlayerScripts")
+	const reporter = if scripts ~= nil then scripts:FindFirstChild(REPORTER) else nil
+	if reporter == nil or not reporter:IsA("LocalScript") then
+		return
+	end
+	for _, player in Players:GetPlayers() do
+		const gui = player:FindFirstChildOfClass("PlayerGui")
+		if gui == nil or gui:FindFirstChild(REPORTER) ~= nil then
+			continue
+		end
+		const holder = Instance.new("ScreenGui")
+		holder.Name = REPORTER
+		holder.ResetOnSpawn = false
+		reporter:Clone().Parent = holder
+		holder.Parent = gui
+	end
 end
 
 -- Declared steps of every funnel the game logs (Log.define; each server resends them as it starts). The step names a
@@ -208,6 +238,10 @@ function MetricsService:WireRound()
 		end
 		self.RunStarted = true
 		Log.server("shift_start", level, { path = path, day = info.Day, night = info.Night, attempt = info.Attempt })
+		if info.IsNight then
+			-- Every night that begins (owner request 2026-10-22); retry = a lost night repeated from its capture
+			Log.server("next_night", info.Night, { night = info.Night, attempt = info.Attempt, retry = info.Attempt > 1 })
+		end
 	end)
 	round.ShiftEnded:Connect(function(info)
 		if info.IsNight then
@@ -234,6 +268,8 @@ function MetricsService:WireRound()
 			Log.progress(player, "Night", status, info.Night, `night_{info.Night}`, props)
 		end
 		Log.server("night_result", info.Night, extra)
+		-- Named outcome for the panel's event list (owner request 2026-10-22): same value and props as night_result
+		Log.server(if result == "Won" then "night_complete" else "night_lost", info.Night, extra)
 	end)
 	round.RunEnded:Connect(function(result)
 		for _, player in self:Members() do
@@ -489,6 +525,45 @@ function MetricsService:OnUi(player: Player, event: string, key: string?, offer:
 	end
 end
 
+-- Server frame rate (owner request 2026-10-22, Provisional): the SDK heartbeat sends GetRealPhysicsFPS, which never
+-- reads above 60. This counts the server's real Heartbeat steps per whole second and every FpsWindow s logs server_fps
+-- (value = avg) with avg, low (slowest second), frame_ms (mean step), players and mem_mb (Stats)
+function MetricsService:WireFps()
+	const window = Content.Metrics.FpsWindow
+	const seconds: { number } = {}
+	local frames, secondAt, spent = 0, os.clock(), 0
+	RunService.Heartbeat:Connect(function(dt: number)
+		frames += 1
+		spent += dt
+		const now = os.clock()
+		const elapsed = now - secondAt
+		if elapsed < 1 then
+			return
+		end
+		table.insert(seconds, frames / elapsed)
+		frames, secondAt = 0, now
+		if #seconds < window then
+			return
+		end
+		local total, low = 0, math.huge
+		for _, fps in seconds do
+			total += fps
+			low = math.min(low, fps)
+		end
+		const avg = round1(total / #seconds)
+		const steps = avg * #seconds
+		Log.server("server_fps", avg, {
+			avg = avg,
+			low = round1(low),
+			frame_ms = if steps > 0 then round1(spent / steps * 1000) else 0,
+			players = #Players:GetPlayers(),
+			mem_mb = math.floor(Stats:GetTotalMemoryUsageMb() + 0.5),
+		})
+		table.clear(seconds)
+		spent = 0
+	end)
+end
+
 -- Lobby servers: the visit funnel (position polled), the squads and the window funnels
 function MetricsService:WireLobby()
 	if not self.Dependencies.PlaceService:Is("Lobby") then
@@ -598,6 +673,7 @@ MetricsService:OnInit(function(self)
 	self:WireCrew()
 	self:WireWorld()
 	self:WireNet()
+	self:WireFps()
 	self:WireLobby()
 	self:WireRunZones()
 end)

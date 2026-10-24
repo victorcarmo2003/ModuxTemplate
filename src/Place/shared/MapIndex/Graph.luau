@@ -14,7 +14,8 @@ export type Adjacency = { [string]: { string } }
 
 export type PathOptions = {
 	AvoidCrossings: boolean?, -- skip crosswalk edges (MAP-01 §9.2)
-	-- queue slots Q1..Qn are never intermediate (customers outside the queue walk around it), and stepping through a
+	-- queue slots Q1..Qn are never intermediate (customers outside the queue walk around it) except the slots behind a
+	-- queue goal (Graph.behind: up the line from its tail), and stepping through a
 	-- pickup slot PU-n costs PICKUP_PASS more (the lane behind the pickup line wins over walking along the slots, where
 	-- the other customers stand; restaurant patio 2026-10-18, PROVISIONAL)
 	AvoidQueue: boolean?,
@@ -27,6 +28,15 @@ const Graph = {}
 
 function Graph.isQueue(id: string): boolean
 	return string.match(id, "^Q%d+$") ~= nil
+end
+
+-- Queue slot `id` stands behind queue slot `goal` (Q4 behind Q2): walking up the line from its tail passes only free
+-- slots (the line fills from Q1), so an AvoidQueue walk to `goal` may step through it. Owner 2026-10-21: Q1 got its own
+-- way in from the west corridor; a walk to Q3 must not take it through Q1 and Q2, where customers stand
+function Graph.behind(id: string, goal: string): boolean
+	const slot = tonumber(string.match(id, "^Q(%d+)$"))
+	const target = tonumber(string.match(goal, "^Q(%d+)$"))
+	return slot ~= nil and target ~= nil and slot > target
 end
 
 function Graph.isPickup(id: string): boolean
@@ -130,7 +140,7 @@ function Graph.path(
 		open[current] = nil
 		closed[current] = true
 
-		if avoidQueue and current ~= from and Graph.isQueue(current) then
+		if avoidQueue and current ~= from and Graph.isQueue(current) and not Graph.behind(current, to) then
 			continue
 		end
 		const node = nodes[current]

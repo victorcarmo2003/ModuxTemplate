@@ -92,7 +92,9 @@ const EXPRESSIONS = {
 -- Anomaly-variant faces, outside the closed Content.Looks.Expressions (RigController picks them by variant, AST-060 /
 -- AST-062). Textures come from _blank_texture_ids.json, merged into `tex` by Kits.run (EyesClosed, AST-059, is not
 -- built here yet).
-const VARIANT_EXPRESSIONS = { "Blank", "EyesWhite", "EyesClosed" }
+-- Angry (ANM-011, TASK-276) and Rage (ANM-011 tantrum, owner 2026-10-22) come from _texture_ids.json; without them here a
+-- rebuild dropped them from CrewExpressions
+const VARIANT_EXPRESSIONS = { "Blank", "EyesWhite", "EyesClosed", "Angry", "Rage" }
 const BODY = { "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg", "Apron", "Cap" }
 const ARMS = { "Left Arm", "Right Arm" }
 

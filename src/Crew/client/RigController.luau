@@ -9,26 +9,37 @@
 	Local layer (network.md §5.3):
 	  - crew rig (Outfits.Use = "Crew"): its own LookPack, face = Content.Looks.PackFace (everyone sees the same);
 	  - NPC: its LookPack, face = local override (SetExpression: mood from CustomerController, TASK-034) or the
-	    neutral face. The local sanity band no longer dresses NPCs (Provisional, 2026-10-14): the mood holds in the
-	    low band too;
-	  - Night on an NPC only comes from an anomaly variant with an animal rig (NIGHT_VARIANTS: blank, raincoat),
-	    always Night even with high sanity, except reserved outfits (none in use). The player's own
-	    character is Night in the low band through the server (VitalService -> CharacterService:SetLookPack ->
-	    LookPack attribute, crew branch above); nothing to do on this client.
+	    neutral face (the mood holds in the low band too);
+	  - low-sanity hallucination (TASK-644; DEC-168, DEC-169, DEC-373): while THIS player's own sanity is in one of the
+	    LOW_TIERS deepest Content.Sanity.Tiers (SanityTier, DEC-352; Provisional: the two lowest, < 40), customers and
+	    passers-by with no Variant (and the blank one, HALLUCINATION_VARIANTS: it arrives like any other customer) are
+	    dressed Night on this client only; back to the server's pack when the tier rises. Nothing is written: the
+	    LookPack attribute stays the server's, so NightWatch (which reads it) never fires on a hallucination. Crew rigs
+	    never change with the local sanity (the body follows the night on the server, DEC-370 / DEC-373);
+	  - Night on an NPC also comes from an anomaly variant with an animal rig (NIGHT_VARIANTS: raincoat),
+	    always Night even with high sanity, except reserved outfits (none in use); mirror never goes Night.
 	Local-only rigs (Opal, previews) are built with `Tag = false` and dressed by their owner with CrewRig.Dress.
 
 	Wave 3 (TASK-110; architecture.md §19.3, §19.17; anomalies.md N1/N4/N5):
 	  - Customer-anomaly `Variant` (rig attribute written by NpcService, TASK-108: blank / mirror / raincoat; nil =
 	    ordinary). Re-dressed when it changes (a pooled rig loses it on release). Applied on this client only:
-	      blank     face = CrewExpressions.Blank (AST-060 `T_Expr_Blank`, fully transparent) and Dress(..., blank = true):
-	                smooth skin-colour head + repainted ears / tail / nose (CrewLooks.Species[k].Blank, AST-060). A
-	                species without Blank row, or a kit without the expression, silently shows the ordinary look.
+	      blank     face = CrewExpressions.Blank (AST-060 `T_Expr_Blank`, fully transparent): no eyes, mouth or cheeks
+	                on the face shell; the head keeps the species' own skin, markings and nose in the worn pack (owner
+	                2026-10-22: "o sem rosto dele tá com a pele branca... ele deveria manter a cor de pele dele"). Until
+	                then Dress(..., blank = true) swapped the head for the flat AST-060 head (CrewLooks.Species[k].Blank:
+	                one opaque Day-fur colour, no markings) and the atlas for repainted ears / tail / nose, in the Night
+	                pack (NIGHT_VARIANTS): against the darkened body that flat head read as a white blob (all white on
+	                the pale species: panda, rabbit, sheep). BLANK_HEAD = false keeps it off (rollback = true).
+	                With a Content.Tics row of Body "Face" (ANM-001, owner 2026-10-22: it must arrive with a face) the
+	                variant keeps the ordinary face until the local TicFace names one (Effects/Kit/Tic fades it in the
+	                talk), so it never arrives faceless, not even before its effect mounts.
 	      raincoat  face = CrewExpressions.EyesClosed (AST-059); while missing, the mood / neutral face.
 	      mirror    pack = the server's (Day/Mid, like the original), never Night; face = CrewExpressions.EyesWhite
 	                (all-white eyes; another agent creates it, until then the mood / neutral face); outfit sheet =
 	                CrewLooks.Outfits["<outfit>_mirror"] for the worn pack when that row exists (AST-062, only Mid),
 	                else the ordinary sheet.
-	    blank and raincoat are always Night (NIGHT_VARIANTS), whatever the sanity (Provisional, 2026-10-14). The
+	    raincoat is always Night (NIGHT_VARIANTS), whatever the sanity (Provisional, 2026-10-14; blank left it on
+	    2026-10-22: it arrives in the pack of every other customer and keeps it). The
 	    variant face beats the mood (the sign must stay readable: Provisional, frontend-coder). Mirrored accessories
 	    are the ANM-004 effect's (TASK-112).
 	  - Local rigs built on the client with `Tag = true` (passers-by, TASK-123) are tracked like any `AnimalRig` once
@@ -54,6 +65,8 @@ local Content = require(ReplicatedStorage.shared.Content)
 local CrewLooks = require(ReplicatedStorage.shared.Crew.CrewLooks)
 local CrewRig = require(ReplicatedStorage.shared.Crew.CrewRig)
 local SkinLooks = require(ReplicatedStorage.shared.Crew.SkinLooks)
+local SanityTier = require(ReplicatedStorage.shared.Anomaly.SanityTier)
+local Vide = require(ReplicatedStorage.Packages.Vide)
 local Modux = require(StarterPlayer.StarterPlayerScripts.client.Modux)
 
 type Pack = CrewRig.Pack
@@ -61,6 +74,7 @@ type Rig = { Connections: { RBXScriptConnection }, Pending: boolean }
 
 const NIGHT: Pack = "Night"
 const NEUTRAL_FACE = Content.Looks.PackFace.Day -- Normal: NPC face without a mood
+const NIGHT_FACE = Content.Looks.PackFace.Night -- Normal_Night: hallucinated NPC without a mood (DEC-169)
 
 -- Wave 3 (TASK-110): customer-anomaly look (rig attribute, NpcService TASK-108).
 const VARIANT_ATTRIBUTE = "Variant"
@@ -80,12 +94,34 @@ const VARIANT_FALLBACK = table.freeze({
 	shake = "Stressed",
 }) :: { [string]: string }
 -- Variants always dressed Night on a rig, whatever the local sanity (Provisional 2026-10-14). Add future ones here.
-const NIGHT_VARIANTS = table.freeze({ blank = true, raincoat = true }) :: { [string]: boolean }
+-- Owner 2026-10-22: blank left (the ANM-001 customer arrives like any other one and keeps its skin when its face goes).
+const NIGHT_VARIANTS = table.freeze({ raincoat = true }) :: { [string]: boolean }
+-- AST-060 flat Blank head / atlas (CrewLooks.Species[k].Blank) on the blank variant. Off since 2026-10-22 (owner: keep
+-- the species' skin): only the face shell goes blank. true = the old look (rollback).
+const BLANK_HEAD = false
+-- Variants whose fixed face waits for their tic (Content.Tics Body "Face"; owner 2026-10-22, ANM-001 arrives with a
+-- face): without a local TicFace they show the ordinary face; Effects/Kit/Tic writes the blank one when it is due.
+const FACE_WAITS: { [string]: boolean } = {}
+for _, row in Content.Tics.List do
+	if row.Body == "Face" then
+		FACE_WAITS[row.Variant] = true
+	end
+end
+-- Anomaly tics (Effects/Kit/Tic, owner 2026-10-22, Provisional): a LOCAL attribute on the rig that holds back or picks a
+-- variant's fixed face: "" = the ordinary face for now (ANM-013 arrives with normal eyes), a name = that face (the white
+-- eyes once they opened, or through a security camera). Never replicated; nil = the variant's face as always.
+const TIC_FACE = "TicFace"
 const MIRROR_SUFFIX = "_mirror" -- CrewLooks.Outfits key of the mirrored sheet (AST-062), Provisional
+-- TASK-644 (Provisional, DEC-168/169/373): how many of the deepest Content.Sanity.Tiers make customers and passers-by look
+-- Night on this client (2 = Shaken + Breaking, own sanity < 40).
+const LOW_TIERS = 2
+-- Variants that follow the hallucination like an ordinary customer (blank arrives in everyone's pack, owner 2026-10-22).
+-- Not here: raincoat (always Night anyway), mirror (never Night), the family A faces (their own look).
+const HALLUCINATION_VARIANTS = table.freeze({ blank = true }) :: { [string]: boolean }
 -- s: NPC rigs are revealed after this even if the kit preload has not finished (Provisional).
 const WARMUP_TIMEOUT = 12
 
-const RigController = Modux.Controller("RigController", { Priority = 680 })
+const RigController = Modux.Controller("RigController", { Require = { "VitalController" }, Priority = 680 })
 
 -- PreloadAsync list item for a texture id: a Decal holding it (a plain id string is reported Failure and not
 -- downloaded). Instances pass through.
@@ -126,6 +162,8 @@ function RigController:Setup()
 	self.Warm = false :: boolean
 	-- NPC rigs hidden while the kit warms up -> their DescendantAdded connection.
 	self.Concealed = {} :: { [Model]: RBXScriptConnection }
+	-- TASK-644: own sanity in the low tiers right now (local hallucination on NPCs)
+	self.Hallucinating = false :: boolean
 end
 
 local function isNpcRig(model: Model): boolean
@@ -226,7 +264,7 @@ function RigController:Warmup()
 					table.insert(list, id)
 				end
 			end
-			if look.Blank ~= nil then
+			if BLANK_HEAD and look.Blank ~= nil then
 				table.insert(list, look.Blank.Head)
 			end
 		end
@@ -244,6 +282,36 @@ function RigController:Warmup()
 	end)
 end
 
+-- Own sanity in the LOW_TIERS deepest tiers (reactive: reads VitalController's sources). Max 0 (no sanity: lobby,
+-- out of the run) is never low.
+function RigController:LowSanity(): boolean
+	const vital = self.Dependencies.VitalController
+	const max = vital.Max()
+	if max <= 0 then
+		return false
+	end
+	return SanityTier.index(vital.Sanity(), max) > #Content.Sanity.Tiers - LOW_TIERS
+end
+
+-- Re-dresses the NPC rigs whenever the local hallucination turns on or off (crew rigs are not touched).
+function RigController:WatchSanity()
+	Vide.root(function()
+		Vide.effect(function()
+			const low = self:LowSanity()
+			if low == self.Hallucinating then
+				return
+			end
+			self.Hallucinating = low
+			for model in self.Rigs do
+				if isNpcRig(model) then
+					self:Schedule(model)
+				end
+			end
+		end)
+		return nil
+	end)
+end
+
 -- Customer-anomaly variant of a rig (nil = ordinary). Not reactive.
 function RigController:VariantOf(model: Model): string?
 	const value = model:GetAttribute(VARIANT_ATTRIBUTE)
@@ -257,7 +325,7 @@ local function hasExpression(name: string): boolean
 end
 
 -- Pack, face and blank flag this client shows for `model` (nil face = PackFace of the worn pack, inside Dress;
--- blank = dress the species' Blank head / atlas, AST-060).
+-- blank = dress the species' Blank head / atlas, AST-060: only with BLANK_HEAD, off since 2026-10-22).
 function RigController:Resolve(model: Model): (Pack, string?, boolean)
 	const outfit = model:GetAttribute("Outfit")
 	const row = if typeof(outfit) == "string" then Content.Outfits.ByKey[outfit] else nil
@@ -268,16 +336,28 @@ function RigController:Resolve(model: Model): (Pack, string?, boolean)
 	end
 	const variant = self:VariantOf(model)
 	const reserved = row ~= nil and row.Use == "Reserved"
-	const shown: Pack = if variant ~= nil and NIGHT_VARIANTS[variant] and not reserved then NIGHT else pack
+	-- TASK-644: own low sanity -> this client sees the ordinary customer / passer-by in the Night pack
+	const hallucinated = self.Hallucinating
+		and not reserved
+		and (variant == nil or HALLUCINATION_VARIANTS[variant] == true)
+	const nightVariant = variant ~= nil and NIGHT_VARIANTS[variant] == true and not reserved
+	const shown: Pack = if nightVariant or hallucinated then NIGHT else pack
 	local fixed = if variant then VARIANT_FACE[variant] else nil
+	const ticFace = model:GetAttribute(TIC_FACE)
+	if fixed ~= nil and type(ticFace) == "string" then
+		fixed = if ticFace == "" then nil else ticFace
+	elseif fixed ~= nil and variant ~= nil and FACE_WAITS[variant] then
+		fixed = nil -- its face waits for the tic (ANM-001 arrives with its own face)
+	end
 	if fixed ~= nil and not hasExpression(fixed) and variant ~= nil then
 		fixed = VARIANT_FALLBACK[variant]
 	end
 	if fixed ~= nil and hasExpression(fixed) then
-		-- Blank head / atlas only together with the empty face (otherwise the ordinary look, never a bald face).
-		return shown, fixed, variant == BLANK and not reserved
+		-- Blank head / atlas only together with the empty face, and only with BLANK_HEAD (off: the species' own head)
+		return shown, fixed, BLANK_HEAD and variant == BLANK and fixed == VARIANT_FACE[BLANK] and not reserved
 	end
-	return shown, override or NEUTRAL_FACE, false
+	-- DEC-169: the hallucinated NPC wears Normal_Night unless a mood is showing (Provisional: the mood still wins)
+	return shown, override or (if hallucinated then NIGHT_FACE else NEUTRAL_FACE), false
 end
 
 -- Local face for one rig (e.g. the customer's mood); nil clears it. Purely local, never replicated.
@@ -370,7 +450,7 @@ function RigController:Preload(model: Model)
 	const sheets = if typeof(outfit) == "string" then CrewLooks.Outfits[outfit] else nil
 	if look ~= nil then
 		add("Species:" .. (species :: string), look.Head)
-		if look.Blank ~= nil and self:VariantOf(model) == BLANK then
+		if BLANK_HEAD and look.Blank ~= nil and self:VariantOf(model) == BLANK then
 			add("Blank:" .. (species :: string), { Day = look.Blank.Head, Mid = look.Blank.Atlas.Mid, Night = look.Blank.Atlas.Night })
 		end
 	end
@@ -418,7 +498,7 @@ function RigController:Add(instance: Instance)
 	table.insert(
 		rig.Connections,
 		model.AttributeChanged:Connect(function(name: string)
-			if name == VARIANT_ATTRIBUTE or table.find(CrewRig.LookAttributes, name) then
+			if name == VARIANT_ATTRIBUTE or name == TIC_FACE or table.find(CrewRig.LookAttributes, name) then
 				schedule()
 			end
 		end)
@@ -468,6 +548,7 @@ end)
 
 RigController:OnStart(function(self)
 	self:Warmup()
+	self:WatchSanity()
 	CollectionService:GetInstanceAddedSignal(CrewRig.Tag):Connect(function(instance: Instance)
 		self:Add(instance)
 	end)

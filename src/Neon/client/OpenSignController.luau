@@ -45,8 +45,12 @@ function OpenSignController:IsOpen(): boolean
 	if phase == nil or round.Paused() then
 		return false
 	end
-	-- Last call (DEC-240): the day Closing keeps the sign OPEN until the line is served; the night Closing does not
-	return phase.Selling or (phase.LastCall == true and not round.IsNight())
+	-- Last call (DEC-240): the Closing keeps the sign OPEN until the line is served; at night only when its Night override
+	-- is a last call too (owner 2026-10-21)
+	if round.IsNight() then
+		return phase.Selling or (phase.Night ~= nil and phase.Night.LastCall == true)
+	end
+	return phase.Selling or phase.LastCall == true
 end
 
 -- The faces may sit on the tagged mesh or on a proxy part of the same stand model (user 2026-10-11: "Board" part,

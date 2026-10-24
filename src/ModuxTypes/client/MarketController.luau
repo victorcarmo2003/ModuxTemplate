@@ -7,6 +7,7 @@ local Content = require(ReplicatedStorage.shared.Content)
 local GearTag = require(StarterPlayer.StarterPlayerScripts.client.Interface.Components.GearTag)
 local Hint = require(StarterPlayer.StarterPlayerScripts.client.Market.MarketController.Hint)
 local Kiosk = require(StarterPlayer.StarterPlayerScripts.client.Market.MarketController.Kiosk)
+local Sign = require(StarterPlayer.StarterPlayerScripts.client.Market.MarketController.Sign)
 local Minis = require(StarterPlayer.StarterPlayerScripts.client.Market.MarketController.Minis)
 
 export type View = {
@@ -48,6 +49,7 @@ export type Public = {
 	Mounted: { [Instance]: Mounted },
 	Pedestals: { [string]: Instance },
 	Plates: { [string]: Part },
+	Sign: Sign.Sign,
 	Stock: { [string]: Vide.Source<Availability> },
 	SwappedAt: number,
 	Unmount: (() -> ())?,

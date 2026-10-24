@@ -92,8 +92,14 @@ local function readTime(text: string): number
 	return math.max(MIN_TIME, BASE_TIME + words * WORD_TIME)
 end
 
--- show(text) puts a line on the subtitle (nil hides it); volume() = Master x Voice of AudioController
-function Call.new(show: (text: string?) -> (), volume: () -> number, trace: (message: string) -> ()): Call
+-- show(text) puts a line on the subtitle (nil hides it); volume() = Master x Voice of AudioController; anchor() = where
+-- the voice comes from (owner 2026-10-23: the phone; nil = on screen)
+function Call.new(
+	show: (text: string?) -> (),
+	volume: () -> number,
+	trace: (message: string) -> (),
+	anchor: (() -> Instance?)?
+): Call
 	local speech: Speech.Speech? = nil
 	const queue: { string } = {}
 	const pins: { boolean } = {} -- pins[i] = queue[i] survives Replace
@@ -113,7 +119,7 @@ function Call.new(show: (text: string?) -> (), volume: () -> number, trace: (mes
 		if existing ~= nil then
 			return existing
 		end
-		const created = Speech.new(volume)
+		const created = Speech.new(volume, anchor)
 		speech = created
 		return created
 	end

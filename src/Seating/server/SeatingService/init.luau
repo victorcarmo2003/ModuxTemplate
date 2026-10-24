@@ -42,8 +42,8 @@
 --             CustomerService:Dismiss sends it out. Refused (no table, chance, phase, tension): CustomerService sends it
 --             out carrying the plate (takeaway, Restaurant.Rules.TakeawayWhenNoTable).
 --   DirtyTables  true (default): the tray + TableTip stays on the table (Dirty) until clean_table. false: the table goes
---             straight back to Free and the TableTip per diner goes into the tip jar (EconomyService:AddTip, the jar of
---             TipJarService) when the party stands up after eating.
+--             straight back to Free and the TableTip per diner goes straight to Cash (EconomyService:AddTip; the tip
+--             jar left, owner 2026-10-22) when the party stands up after eating.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -874,7 +874,7 @@ function SeatingService:StandUp(party: Party)
 	end
 	spot.Party = nil
 	if ate then
-		-- nobody cleans (TASK-386, DEC-307): the table tip goes straight into the tip jar
+		-- nobody cleans (TASK-386, DEC-307): the table tip goes straight to Cash (the tip jar left, owner 2026-10-22)
 		const tip = math.floor(Tables.Tip(0, #party.Members))
 		const economy = self.Dependencies.EconomyService
 		if tip > 0 and economy:IsDrawerOpen() then

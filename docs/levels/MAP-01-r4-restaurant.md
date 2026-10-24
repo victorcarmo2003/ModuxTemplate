@@ -10,6 +10,9 @@ Números são valores iniciais (DEC-044). O que não tem `[DEC-###]` é **propos
 
 **Rev. 3 (2026-10-17, TASK-382, DEC-281 e DEC-282, Provisório):** a casca é um **trailer expandido** (dois módulos acoplados com o visual do AST-027), não um prédio. A **despensa foi ampliada** para X 25..50, Z 72..79 (era 9 × 7) e ganhou uma **porta externa `DOOR-B`** no lado sul: o jogador sai pela despensa (DOOR-P → passagem livre X 25,5..32 → DOOR-B → calçada) para ir ao Mart. DOOR-P passa a 5 × 8 (X 25,5..30,5); a escotilha `HATCH-L` e o `DROP-R` foram para o lado sul da despensa (X 44..47). Detalhes e medidas: §5.9; comparação e prints: `docs/tasks/captures/restaurant-comparison.md`.
 
+**Rev. 5 (2026-10-23, TASK-645, DEC-369, DEC-371, DEC-374, Provisório):** pontos do Walt sombrio no estacionamento
+(`WALT-PARK`) e do pós-créditos (`DOG-1/2`, `WALT-DAY-1/2`, `PC-CAM`). Tudo na **§17**.
+
 **Rev. 4 (2026-10-18, TASK-503, DEC-302 a DEC-304, Provisório):** a cozinha volta ao modo focado, agora com **esteira**. A bancada do fundo vira **bancada em dois níveis** (estações em cima, esteira embaixo), a mesa de montagem vira a **mesa central** de 8 vagas onde o prato nasce com o ticket, e o `PICKUP` fica onde está. Tudo na **§16**; ela vale sobre §5.4, §5.5, §6 e §7.1 onde discordarem.
 
 ---
@@ -752,3 +755,91 @@ Os nomes batem com o contrato da TASK-512 (`Conveyor.Binding`, `Restaurant.Bindi
 | `GAS-1` vai para a parede leste, perto da grelha nova? | Sim (a alternativa é ficar a 24 da grelha, o que ajuda o susto, mas o jogador tem que largar o posto) |
 | Prompt único: abre a esteira com prato na mão e a grelha sem prato? | **Respondida:** não; dois prompts, `Prompt_Work` e `Prompt_Grill` (DEC-305) |
 | Câmera: larga enquanto o prato anda e perto na parada? | Sim (decisão da TASK-518) |
+
+---
+
+## 17. Walt sombrio no estacionamento e pós-créditos (rev. 5, TASK-645)
+
+Fontes: **DEC-371** (Walt sombrio parado no estacionamento desde a N1, some quando o jogador chega perto, volta na noite
+seguinte), **DEC-369** (pós-créditos: panfleto, cachorro lendo, o jogador observando do estacionamento, "From across the
+street."), **DEC-374** (o Walt passa de dia pela calçada com um café só), `story/ending.md` §0, `MAP-01.md` §4 (Z-05
+estacionamento X 52..104, Z −88..−32), §5.2–5.6 (postes NL, correio, AN-12, N-Z06-04), `tools/assetplace/cutscene_points.luau`
+(panfleto movido pelo dono para o `Post_NinthS_W1`). Contrato: `Content.WaltWatch.Rules.Point = "WALT-PARK"`, `Distance` 20,
+`Fade` 2 (TASK-638). **Tudo nesta seção é Provisório** (proposta do level-designer), menos o que cita DEC.
+
+### 17.1 Planta (ASCII)
+
+Escala: **1 coluna = 4 studs (X)**, **1 linha = 6 studs (Z)**. Norte para cima. ±2 studs; a tabela da §17.2 é a fonte da verdade.
+
+```
+  X →   8      24      40      56      72      88     104
+        |       |       |       |       |       |       |
+  -52   ::::####BANCO####.......................V.......#   estacionamento Z-05 (. ) ; V = van AS-1 (92, -72) fica mais ao sul
+  -46   ::::#############.......W.......................#   W = WALT-PARK (66, -46), olhando para o balcão (SSO)
+  -40   ::::#############...............................#
+  -34   ::::#############ffffff.ffffff:::fffffffffffffff#   f = cerca baixa do estacionamento; boca X 62..78
+  -25   :1>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>2:   calçada norte: Walt de dia WALT-DAY-1 (14) -> WALT-DAY-2 (100), Z -25
+  -19   :::::::::::::::::n:::::::::n:::::L:::n::::::::::   n = postes NL-04 (58) / NL-03 (78) ; L = AN-12 (70, -22, só à noite)
+  -10   ======================================================   NINTH (pista)
+    0   ====d=================================================   d = DOG-1 (19, 6) na faixa CW-4
+   10   =====\================================================
+   18   ::::::\===D=P:::::::::::::::::::::::::::::::::::::::   D = DOG-2 (~33,1; 17,8) lendo; P = poste com o panfleto (36,4; 19,7)
+   26   ::::C:::::::::::::::::::::::::::::::::::::::::::::::   C = PC-CAM (24, Y 6, 26), olhando 40° a leste do norte
+   32   ::::fffffffffffGGGGGffffffffffffffffffffffff        cerca do pátio; G = R-GATE
+   54   ::::WWWWWWWWWWBALCÃO (janela/persiana)WWWWWWWW      vidro do balcão: de onde se vê o WALT-PARK (~100 studs)
+```
+
+### 17.2 Pontos (referencial MAP; no place = `(−x, y, 67,887 − z)`)
+
+Todos são `MapPoint` (Part invisível, `PointId` = ID) em `workspace.MapBinding.Points`, criados pelo snippet
+`tools/assetplace/walt_park_points.luau` (idempotente; `dry` / `undo`). Y = chão achado por raio para baixo.
+
+| ID | Posição (X; Z) | Virado para | Quem lê | Por quê |
+|---|---|---|---|---|
+| `WALT-PARK` | **(66; −46)**, chão do estacionamento (Y ~0,02) | o meio do balcão (42,5; 56), ~SSO | `WaltWatch` (TASK-646/647); no pós-créditos o **jogador** fica aqui (TASK-658) | 14 dentro da cerca, na metade oeste da boca: livre do bloco do banco (X ≤ 52) nas linhas de visada do balcão, longe do caminho dos atores AS-1 → boca |
+| `DOG-1` | (19; 6), sobre a faixa CW-4 | `DOG-2` | cachorro (TASK-658) | refaz a travessia da abertura (CS-1..3 em X 19); entra no quadro pela esquerda |
+| `DOG-2` | panfleto + 3 studs para fora da face (hoje ~(33,1; 17,8), o mesmo lugar do fim da abertura) | o panfleto | cachorro para e lê | calculado do `P-01_Flyer` (o dono moveu o panfleto à mão; nada fixo no código). Sem o panfleto: fallback (33,1; 17,8) olhando para o leste |
+| `WALT-DAY-1` | (14; −25), quina NE do cruzamento, calçada norte | leste | Walt de dia com **um** café (TASK-658) | começa fora do quadro (à esquerda da PC-CAM) |
+| `WALT-DAY-2` | (100; −25), calçada norte | leste | idem | 86 studs (~10,8 s a 8/s); passa a ~21 studs na frente do jogador no estacionamento e sai do quadro pela direita perto do fim; se a cena for curta, o frontend corta a caminhada (o fim pode cair fora do quadro) |
+| `PC-CAM` | (24; Y 6; 26), calçada sul, quina do pátio | yaw **40°** a leste do norte, pitch **−8°**; atributo `Fov` = **40** | câmera do pós-créditos (TASK-658) | enquadra no mesmo plano o panfleto e o cachorro (13–15 studs, à direita), o Walt na calçada norte (meio do quadro) e o jogador no estacionamento (fundo, ~82 studs) |
+
+### 17.3 Restrições conferidas (no papel; o snippet imprime os raios no Studio)
+
+| Restrição (TASK-645) | Valor | Nota |
+|---|---|---|
+| ≥ 25 studs da loja | ~100 do balcão, ~78 da cerca do pátio | "From across the street." |
+| Visível do vidro do balcão (a "janela", persiana `SHUT-1`) | linhas das poses do pote, `PICKUP`, meio e `TAB-1` passam a leste do banco (canto 52; −32) com ≥ 7 de folga | só postes finos no caminho: NL-04 (58; −14,4) fica a ~0,7–1,3 da linha do meio/`PICKUP`, o correio (58; −29,5) a ~2 da linha do `PICKUP`; nenhum tapa a figura inteira. O long car (AN-12) tapa quando está lá: aceito (é anomalia, raro) |
+| "Porta da frente" | **não existe** (DEC-280: nenhuma porta do prédio dá para a rua da frente) | a única saída é a `DOOR-B`, virada para o **sul**: dela o estacionamento **não** aparece. Visto também do pátio/`R-GATE` (cliente) e da calçada da Juniper Sul a caminho do Mart (de (18; 40) a linha passa a 11 do canto do banco). Ver §17.5 |
+| Fora de rota de NPC | nó mais perto `N-Z06-04` (74; −24,6) a ~23; `DR-APT` (32; −31) a ~37; atores de AS-1 (92; −80) → boca passam a ~10 | ≥ `Distance` 20: pedestre nunca "chega perto" no lugar do jogador (a regra é só por jogador, TASK-646) |
+| Fora de rota de carro | carros parados do lote a ≥ 15 (60/68; −81), (100; −48), van (92; −72,5); vaga antiga `TRL-SALE` (78; −58) a 17 | nenhum carro entra no estacionamento; DT e van de entrega ficam no lado sul |
+| Fora do caminho do disjuntor | o disjuntor fica atrás da loja (parede leste da despensa, ~(50,5; 75)); caminho `DOOR-B` → disjuntor todo em Z ≥ 75 | ~125 studs |
+| `Distance` 20 (TASK-638) | anel de 20 em volta do `WALT-PARK` vai de Z −66 a −26: pega a borda da calçada norte (Z −26..−32) | quem anda pela calçada norte rente à cerca faz ele sumir: é o "chegou perto" do DEC-371. Para só sumir dentro do lote, mover para (66; −50) |
+
+### 17.4 Enquadramento da `PC-CAM` (16:9 e 667 × 375)
+
+`Fov` 40 vertical → meia-largura horizontal 33° (cobre de 7° a 73° a leste do norte). Rumos a partir da câmera:
+
+| Alvo | Rumo | Distância | Na tela |
+|---|---|---|---|
+| Poste do panfleto (36,4; 19,7) | 63° | 14 | borda direita, ~70% da meia-largura |
+| Panfleto | 56° | 14,6 | à direita, face visível a ~34° da normal |
+| `DOG-2` (cachorro) | 48° | 12,3 | à direita do centro; pés a −16° (dentro do quadro, 20°) |
+| `WALT-PARK` (jogador) | 30° | 82 | à esquerda do centro, fundo; ~5 studs a 82 = 3,5° ≈ **33 px** de altura em 375 |
+| Walt de dia | −11° → 56° | 51–92 | entra pela esquerda e cruza o quadro inteiro |
+| Poste antigo P-01 (20; 20) | −34° | 7 | fora do quadro (era o risco de pilar na frente da lente) |
+| Arco do `R-GATE` | 116° | 13 | fora (atrás à direita) |
+
+O jogador no fundo é pequeno de propósito ("de longe"). Se o dono quiser o jogador maior, a alternativa é um 2º plano
+fechado (câmera na calçada norte olhando o lote), fora desta task.
+
+### 17.5 Pendências e notas para outras sessões
+
+- **Prints** da `PC-CAM` e da vista do balcão: ficam para a sessão com Studio (este agente não teve acesso ao MCP do Studio na
+  rodada). Rodar `run("assetplace/walt_park_points", "dry")`, depois sem argumento, e conferir os `[blocked]` impressos.
+- **Ordem com a TASK-658:** quando `Content.Cutscenes` citar esses IDs em `Marks`/`MoveTo`/`LookAt`, o `Required.luau` passa a
+  exigi-los; o snippet precisa ter rodado antes no place.
+- **Luz (TASK-647):** o estacionamento é escuro à noite (MAP-01 §4, Z-05). Uma figura escura a ~100 studs no escuro some.
+  Proposta: silhueta contra algo claro (o lote tem as janelas emissivas de B4 ao fundo) ou uma luz fraca e fria só no ponto
+  (1 `PointLight` sem sombra, alcance ~10; conta no orçamento de luzes da §9). Decisão do frontend/art-director.
+- **"Porta da frente"** da TASK-645 não existe no r4 (DEC-280). Se o dono quiser vê-lo também ao sair, a saída `DOOR-B` dá para o
+  sul; o jogador só vê o estacionamento depois de contornar o prédio. Proposta: aceitar balcão + rua.

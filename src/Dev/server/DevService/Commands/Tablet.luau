@@ -5,8 +5,9 @@
 --                           head of the queue, room
 --   tablet talk [n]         starts the talk as you with the customer of Q1 (DT-PC: the car at the window) (every rule but
 --                           the range: Ordering, room on the plates and in the pickup line, tablet not busy)
---   tablet finish [n]       ends the running talk now and picks SERVE (TakeOrderFor; DEC-353)
---   tablet time <k> [k2]    TalkTime for k toppings (k2 = the partner's hot dog of a pair)
+--   tablet finish [n]       ends the running talk now: the order is taken (TakeOrderFor), as at the end of any talk
+--   tablet time <k> [k2]    TalkTime for k toppings (k2 = the partner's hot dog of a pair): an ordinary customer's speech
+--                           (Content.OrderSpeech, NpcId 0's words) typed + OrderTalk.Speech.Hold
 local Api = require(script.Parent.Parent.Api)
 
 const USAGE = "tablet [state [n] | talk [n] | finish [n] | time <k> [k2]]"

@@ -23,6 +23,11 @@
 	  - Where (TASK-589, design/horror-cinematic.md §3.0): "Inside" / "Outside" plays only for a client inside / outside
 	    the shop (LocalPlayer OutsideStage set = outside), checked when the step fires; nil = both.
 	  - Seen (TASK-589): each kit piece shows its step only to the eyes it names (Scene/Seen: Cameras / Eyes / All).
+	  - Carried (owner 2026-10-22, Provisional; Content.Tics header): while this client carries the tension of the record's
+	    actor (Scene/Carry: it saw the apex of her tic in its close-up, Effects/Kit/Tic), the Queue steps whose kind is in
+	    Content.Tics.Rules.Carry (and the on-screen sounds of Rules.CarrySounds) are skipped for it: the bars, words,
+	    heart, edges and colour do not start over when her order is taken. Her body, props, lights and sounds in the
+	    world still play; the other clients get the Queue as before.
 	  - Steps.luau has one handler per Kind; TASK-463/464/465 plug theirs in with Scene.Handle(kind, handler); the pieces
 	    of Scene/Kit register themselves through Kits.Register (TASK-586).
 ]]
@@ -33,6 +38,7 @@ local Workspace = game:GetService("Workspace")
 local Content = require(ReplicatedStorage.shared.Content)
 local Effect = require(script.Parent.Effect)
 local Steps = require(script.Steps)
+local Carry = require(script.Carry)
 
 export type Handler = Steps.Handler
 
@@ -42,6 +48,7 @@ type Run = {
 	Id: number,
 	Key: string,
 	StartedAt: number,
+	Actor: number, -- the record's Anchor (a customer anomaly's NpcId; Carry)
 	Phase: string,
 	Anchor: number, -- server time the record entered Phase
 	Queue: { Step }, -- steps of Phase, by At
@@ -62,6 +69,15 @@ const OUTSIDE_ATTRIBUTE = "OutsideStage" -- OutsideService: set while the player
 -- Lantern, Silhouette (TASK-589): the light around him and the shape outside, where they should be
 const HELD: { [string]: boolean } =
 	{ Lights = true, Vignette = true, Lightning = true, Music = true, Whispers = true, Actor = true, HeadDown = true, Lantern = true, Silhouette = true }
+-- the Queue steps a carrier skips (Content.Tics.Rules.Carry / CarrySounds; header, Carried)
+const CARRY_KINDS: { [string]: boolean } = {}
+for _, kind in Content.Tics.Rules.Carry do
+	CARRY_KINDS[kind] = true
+end
+const CARRY_SOUNDS: { [string]: boolean } = {}
+for _, key in Content.Tics.Rules.CarrySounds do
+	CARRY_SOUNDS[key] = true
+end
 
 -- scene key -> phase -> steps by At (ties keep the data order)
 const QUEUES: { [string]: { [string]: { Step } } } = {}
@@ -109,9 +125,23 @@ local function outside(): boolean
 	return Players.LocalPlayer:GetAttribute(OUTSIDE_ATTRIBUTE) ~= nil
 end
 
+-- A Queue step this client skips because it carries the actor's tension already (header, Carried)
+local function carried(run: Run, step: Step): boolean
+	if step.Phase ~= "Queue" or not Carry.Has(run.Actor) then
+		return false
+	end
+	if CARRY_KINDS[step.Kind] then
+		return true
+	end
+	return step.Kind == "Sound" and step.Point == nil and CARRY_SOUNDS[step.Target or ""] == true
+end
+
 local function allowed(run: Run, step: Step): boolean
 	const where = step.Where
 	if where ~= nil and (where == "Outside") ~= outside() then
+		return false
+	end
+	if carried(run, step) then
 		return false
 	end
 	const who = step.Who or "All"
@@ -203,6 +233,7 @@ function Scene.Record(id: number, record: Effect.Record)
 	records[id] = record
 	const run = runs[id]
 	if run ~= nil and run.Key == record.Anomaly and run.StartedAt == record.StartedAt then
+		run.Actor = record.Anchor
 		if run.Phase ~= record.Phase then
 			enter(run, record.Phase, now())
 		end
@@ -219,6 +250,7 @@ function Scene.Record(id: number, record: Effect.Record)
 		Id = id,
 		Key = scene.Key,
 		StartedAt = record.StartedAt,
+		Actor = record.Anchor,
 		Phase = record.Phase,
 		Anchor = record.StartedAt,
 		Queue = EMPTY,

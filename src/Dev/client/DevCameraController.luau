@@ -55,6 +55,7 @@ const RENDER_STEP = "DevCameraController.Track"
 -- after the CameraController's own step (Camera + 1): the track is the last word on the camera this frame
 const RENDER_PRIORITY = Enum.RenderPriority.Camera.Value + 2
 const HERE_INTERVAL = 0.5 -- s between DevCameraHere packets (2 Hz)
+const HERE_SETTLE = 8 -- s after the game loaded before the first DevCameraHere (past the boot hitches)
 const HERE_DISTANCE = 10 -- studs ahead of the camera the Look point is placed
 const DEFAULT_EASE = "Linear"
 const EASING: { [string]: Enum.EasingStyle } = {
@@ -351,8 +352,16 @@ DevCameraController:OnStart(function(self)
 	if player:GetAttribute(TRACK_ATTRIBUTE) ~= nil then
 		self:Refresh()
 	end
-	RunService.Heartbeat:Connect(function()
-		self:SendHere(os.clock())
+	-- the first packets waited out the boot hitch (a frame over 1 s) and tripped Lync's "queued and never flushed" check:
+	-- start sending once the game is loaded and settled
+	task.spawn(function()
+		if not game:IsLoaded() then
+			game.Loaded:Wait()
+		end
+		task.wait(HERE_SETTLE)
+		RunService.Heartbeat:Connect(function()
+			self:SendHere(os.clock())
+		end)
 	end)
 end)
 

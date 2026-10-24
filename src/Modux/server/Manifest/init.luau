@@ -17,9 +17,9 @@ local CutsceneService = require(ServerScriptService.server.ModuxTypes.CutsceneSe
 local DevService = require(ServerScriptService.server.ModuxTypes.DevService)
 local DriveThruService = require(ServerScriptService.server.ModuxTypes.DriveThruService)
 local EconomyService = require(ServerScriptService.server.ModuxTypes.EconomyService)
-local TipJarService = require(ServerScriptService.server.ModuxTypes.TipJarService)
 local GiftService = require(ServerScriptService.server.ModuxTypes.GiftService)
 local HallucinationService = require(ServerScriptService.server.ModuxTypes.HallucinationService)
+local HintService = require(ServerScriptService.server.ModuxTypes.HintService)
 local InteractionService = require(ServerScriptService.server.ModuxTypes.InteractionService)
 local ItemService = require(ServerScriptService.server.ModuxTypes.ItemService)
 local JournalService = require(ServerScriptService.server.ModuxTypes.JournalService)
@@ -79,9 +79,9 @@ export type AllServices = {
 	DevService: DevService.Public,
 	DriveThruService: DriveThruService.Public,
 	EconomyService: EconomyService.Public,
-	TipJarService: TipJarService.Public,
 	GiftService: GiftService.Public,
 	HallucinationService: HallucinationService.Public,
+	HintService: HintService.Public,
 	InteractionService: InteractionService.Public,
 	ItemService: ItemService.Public,
 	JournalService: JournalService.Public,

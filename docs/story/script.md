@@ -8,6 +8,11 @@ Base: DEC-008, DEC-019, DEC-021 a DEC-025, DEC-028, DEC-036, DEC-037, DEC-047, D
 - **DEC-224:** o **trailer é o veículo único desde o Day 1**; o carrinho saiu. Onde este roteiro diz "cart"/"carrinho", leia **trailer**. **Saem** a compra do trailer (§4.1b `call_trailer_offer` e `call_trailer_bought`, §4.2) e a cena "compra do trailer" (placa FOR SALE, repasse do Walt, foco da câmera). O dia 4 volta a ser um dia comum (`call_day_after_2` sem a oferta). **A explicação das regras do Walt passa para a primeira chamada de noite** (§5, Noite 1: já é onde as regras abrem; nenhuma regra é explicada em outro lugar).
 - **DEC-225:** a **abertura é curta** e começa na **calçada em frente ao Pad** (§1 reescrito abaixo; o roteiro antigo fica como histórico).
 - **DEC-223:** o preparo vira o **modo focado** (V1): o tutorial do Day 1 (§3) ensina por estações (Order, Grill, Build, Serve) em vez de prompts no mundo; as falas dos passos "perto do pão", "pão cortado", "montando" e "hot dog pronto" precisam de reescrita.
+**Decisões do dono de 2026-10-23 (secretário):**
+- **DEC-360 (Aprovado):** a run é **100% noite e começa de noite**. Não existe turno de dia nem ligação da manhã. **§3** (tutorial) vale **dentro da Noite 1**; **§4 inteira (ligações de dia, 7:00 AM) está morta — sem dia**; §4.5 (nota do turno) e §6 passam a ser do resumo da noite. A ligação da noite (§5) é a única do turno e toca às **7 PM** (fase Call), não às 8 PM. Destino proposto das pistas de §4.4: a 1ª linha de cada ligação da noite (Provisório, `Q-485`; `walt-dialogue-audit.md` §3.3).
+- **DEC-361 (Aprovado):** fechar a janela despacha as anomalias-cliente (menos a ANM-022); os clientes normais ficam; o custo é o dinheiro.
+- §1 (abertura) já tinha saído (DEC-309). §5.11 e §7 (noite repetida/perdida com volta) não tocam com `Chances = 0` (DEC-319, `Q-479`). As anomalias e os textos de §5 são da V1; os vivos estão em `BossCalls.luau` e `tools/voice/elevenlabs_script.md`.
+
 Conciliado com `consistency-report.md` (2026-10-08, NW-4 a NW-13, NW-16, NW-20).
 Falas em inglês (texto de jogo). Personagens em `characters.md`; regras das anomalias em `anomalies.md` (Aprovado); final em `ending.md` (Aprovado).
 
@@ -144,6 +149,8 @@ Dicas depois da ação (`hint_*`, uma vez): "Bar full? Grab it." · "Now slice a
 Não existem mais (cortadas em 2026-10-12): "Don't leave the cart alone too long.", "Ooh. You okay? Dust off. Grab your stuff.", "Flip the sign to CLOSED. Finish the line." e "Good job today! See you at seven." como falas de tutorial (ficam como texto de UI do resumo, §4.5/`ui-text.md`).
 
 ## 4. Ligações de dia (7:00 AM)
+
+> **Morta — sem dia (DEC-360, 2026-10-23).** Nada desta seção toca. Histórico; destino proposto das pistas em `Q-485`.
 
 ### 4.1 Dias 1–5 (novo fluxo 2026-10-12: só os dias 1 e 2 têm ligação própria; os dias 3 e 4 viraram `call_day_after_1` e `call_day_after_2`, abaixo e em §4.4)
 

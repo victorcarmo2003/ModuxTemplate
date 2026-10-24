@@ -6,6 +6,7 @@ local Vide = require(ReplicatedStorage.Packages.Vide)
 local Content = require(ReplicatedStorage.shared.Content)
 local Actors = require(StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController.Actors)
 local Ambience = require(StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController.Ambience)
+local Fx = require(StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController.Fx)
 local Hide = require(StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController.Hide)
 local Speech = require(StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController.Speech)
 local Walker = require(StarterPlayer.StarterPlayerScripts.client.Cutscene.CutsceneController.Walker)
@@ -43,12 +44,20 @@ export type Public = {
 	Fade: Vide.Source<number>,
 	Fired: { [number]: boolean },
 	Folder: Folder?,
+	Fx: Fx.Fx?,
 	Gui: Instance?,
 	HoldStart: number?,
 	LastElapsed: number,
 	LineShown: Vide.Source<boolean>,
 	LineText: Vide.Source<string>,
 	LookIndex: number,
+	MashBound: boolean,
+	MashCap: number,
+	MashKick: number,
+	MashLeft: Vide.Source<number>,
+	MashLevel: number,
+	MashShown: Vide.Source<boolean>,
+	MashText: Vide.Source<string>,
 	Mates: Hide.Hide?,
 	Music: string?,
 	Needed: Vide.Source<number>,
@@ -58,6 +67,8 @@ export type Public = {
 	PromptHolder: BasePart?,
 	PromptShown: Vide.Source<boolean>,
 	PromptText: Vide.Source<string>,
+	Roll: Vide.Source<number>,
+	RollShown: Vide.Source<boolean>,
 	Scene: Scene?,
 	SceneKey: Vide.Source<string>,
 	ShotIndex: number,
@@ -100,6 +111,10 @@ export type Public = {
 	StepCinema: (self: Public, scene: Scene, elapsed: number, last: number) -> (number, number),
 	BarFraction: (self: Public, amount: number) -> number,
 	Step: (self: Public) -> (),
+	MashWindow: (self: Public, elapsed: number) -> Beat?,
+	BindMash: (self: Public) -> (),
+	UnbindMash: (self: Public) -> (),
+	StepMash: (self: Public, elapsed: number, dt: number) -> (),
 	CanVote: (self: Public) -> boolean,
 	PressSkip: (self: Public) -> (),
 	ReleaseSkip: (self: Public) -> (),

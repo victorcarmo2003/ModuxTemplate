@@ -232,7 +232,8 @@ Estimativa antiga (histórico): 1 min de intro + 14 dias × 7,5 min + 10 noites 
 
 ### FEAT-003 — Relógio e turnos (ciclo dia/noite)
 
-- Status: Rascunho · Pilares: GERENCIAR, OBSERVAR · Origem: **[DEC-048, DEC-024, DEC-036]**
+- **DEC-360 (2026-10-23, Aprovado pelo dono): só noites.** A run começa de noite; cada turno = ligação (Call, 7 PM) → compra (Prep, 30 s, 7→8 PM) → noite (8 PM–6 AM) → last call das 6 AM → resumo. As fases de dia abaixo (Prep 7 AM, Open, Closing 6 PM) estão sem uso; o código ainda as tem atrás de `Shift.RunStartsAtNight` (limpeza só com TASK).
+- Status: Rascunho · Pilares: GERENCIAR, OBSERVAR · Origem: **[DEC-048, DEC-024, DEC-036, DEC-360]**
 - Resumo: relógio de jogo no servidor; o turno termina pelo relógio.
 
 Turno de dia **[DEC-048]** (durações encurtadas por feedback de playtest 2026-10-11, **Provisório, Q-200**: turno ≈ 4,6 min, era 7,7; valores só em `Content.Shift`, sem número de dia):
@@ -858,6 +859,8 @@ Comparação (orçamento do client, por quadro, com o jogador dentro do Mart):
   - A notificação nunca aparece antes do fim do Day 5 nem depois da compra.
 
 ### FEAT-018 — Ligações do chefe (gatilhos)
+
+- **DEC-360 (2026-10-23, Aprovado):** sem dia, os gatilhos `DayPrep` e `DayInfinite` nunca disparam; vivos: `Tutorial` e `Hint` (Noite 1), `NightCall` (7 PM), `NightCoffee` (N1), `UpgradeLesson` (resumo das 6 AM da N1), `RunOver` (citado na tela). `NightRepeat`, `LostCritical` e `LostLastChance` não tocam com `Chances = 0` (DEC-319). Auditoria em `story/walt-dialogue-audit.md`.
 
 - Status: Rascunho · Pilares: DESCOBRIR · Origem: **[DEC-019, DEC-025, DEC-047, DEC-051, DEC-053, DEC-065, DEC-110, DEC-112, DEC-124]**; rodada 7: Walt Bramble (CHR-001) só por telefone durante a run, **em pessoa só no final** (FEAT-027); ligação **não pode ser repetida pelo jogador**
 - Resumo: sistema de gatilhos data-driven. O conteúdo (falas) é do narrative-writer (`script.md`), referenciado por chave. Falante na legenda: "Walt".

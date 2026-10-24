@@ -97,6 +97,7 @@ local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Vide = require(ReplicatedStorage.Packages.Vide)
+local AdminSettings = require(ReplicatedStorage.shared.Admin.AdminSettings)
 local Content = require(ReplicatedStorage.shared.Content)
 local CrewRig = require(ReplicatedStorage.shared.Crew.CrewRig)
 local LobbyZones = require(ReplicatedStorage.shared.Lobby.LobbyZones)
@@ -187,6 +188,9 @@ const NOTICE_TOP = 8
 const NOTICE_TOP_NARROW = 64 -- under the Roblox top bar (the HUD sides are centred, the top is free)
 const NARROW_VIEWPORT = 420
 const ONLINE_SPACE = 34 -- px (x the notice scale) the LobbyHud online pill takes, gap included (28 + 6)
+-- owner 2026-10-21: the players-online pill shows only with more than this many players in the whole game (a small
+-- count reads as an empty game). PROVISIONAL. Admins (AdminSettings.IsAllowed, the /dev allow-list) always see it
+const ONLINE_MIN = 1000
 const QUEUE_SPACE = 56 -- px (x the notice scale) the LobbyHud queue strip takes in a pad room, gap included (48 + 8)
 const BIND_PRIORITY = 10 -- over ClassController's Crew toggle (priority 0) on C / ButtonY
 
@@ -2378,12 +2382,14 @@ LobbyController:OnInit(function(self)
 		self.Parties(copy)
 	end)
 
-	-- players online (record 1, lobby roles only; PresenceService)
+	-- players online (record 1, lobby roles only; PresenceService); at or under ONLINE_MIN the pill stays hidden (0),
+	-- except for an admin
+	const onlineAlways = AdminSettings.IsAllowed(Players.LocalPlayer)
 	net.Online:onAdded(function(_, record)
-		self.Online(record.Count)
+		self.Online(if onlineAlways or record.Count > ONLINE_MIN then record.Count else 0)
 	end)
 	net.Online:onChanged(function(_, record)
-		self.Online(record.Count)
+		self.Online(if onlineAlways or record.Count > ONLINE_MIN then record.Count else 0)
 	end)
 
 	net.PartyInviteReceived:onClient(function(data)

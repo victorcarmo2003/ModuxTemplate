@@ -9,14 +9,17 @@
 -- Service window (architecture.md §19.14 v4.2, network.md §13.6, T61; FEAT-023; DEC-204, DEC-221; TASK-130): state of
 -- the trailer (Content.Vehicles[v].HasShutter). Single writer of the attribute Shutter on the vehicle Models (true =
 -- closed). Action shutter_toggle (Prompt_Shutter, hold 0.5, night only, party cooldown 1 s, Active member, anchor of the
--- trailer, caller inside the trailer = LightZone LZ-1); opens by itself on ShiftStarted, NightLost, Resume and restore;
--- not in the snapshot. Gate "Shutter": take_order/serve/refuse refused while closed (reason Shutter:Closed) + Notice
+-- trailer, caller inside the trailer = LightZone LZ-1); opens by itself on NightLost, Resume and restore, and
+-- AutoOpenAfter s into a selling phase that started shut; not in the snapshot. Gate "Shutter": take_order/serve/refuse refused while closed (reason Shutter:Closed) + Notice
 -- shutter_closed to who acted (one per NOTICE_EVERY s). API IsShutterClosed, IsInside, IsInsidePoint, IsProtected,
 -- SetShutter; signal ShutterChanged.
 -- TASK-284 (owner request 2026-10-14, Provisional Q-270): the window IS the shop, day and night (the red "Open Shop"
 -- switch left). It shuts by itself when Prep starts; opening it in Prep starts the selling phase (RoundService:OpenShop);
--- in a selling phase closed = RoundService Paused (no new customer, sign CLOSED). A selling phase opens it by itself
--- (the Prep ran out). The line leaving angry is CustomerService's (ShutterChanged); anomalies: AnomalyService.
+-- in a selling phase closed = RoundService Paused (no new customer, sign CLOSED). Shift end (owner request 2026-10-21,
+-- Provisional; Content.ShopWindow): the Summary shuts it (the report shows with the window closed) and nothing opens it
+-- through the break (Call, Prep: the old ShiftStarted opening is gone). A selling phase that starts with it still shut
+-- (the Prep ran out) stays Paused and opens it by itself ShopWindow.AutoOpenAfter s later unless it was toggled first.
+-- The line leaving angry is CustomerService's (ShutterChanged); anomalies: AnomalyService.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -50,6 +53,10 @@ const COUNTER_ACTIONS: { [string]: boolean } = { take_order = true, serve = true
 const OPEN_TEXT = "Open Window"
 -- Phases where the window opens by itself (NightLost; Resume = restore waiting for the roster)
 const OPEN_PHASES = { "NightLost", "Resume" }
+-- Phase that shuts the window by itself: the end of the shift (the report shows with the window closed)
+const SUMMARY = "Summary"
+-- a player's opening is walking the round through Summary / Call / Prep right now (SyncShop): they keep the window open
+local opening = false
 
 -- Model tagged Vehicle that contains `instance` (or is it), with its key
 local function vehicleOf(instance: Instance): (Instance?, string?)
@@ -86,6 +93,9 @@ function VehicleService:Setup()
 	self.ShutterClosed = false :: boolean
 	self.ShutterAt = 0 :: number -- os.clock() of the last shutter_toggle (party cooldown; 0 = none yet)
 	self.ShutterAnchors = {} :: { [Instance]: boolean }
+	-- Pending automatic opening of a selling phase that started shut (ShopWindow.AutoOpenAfter): bumped by every change
+	-- of the window, so a toggle in between cancels it
+	self.AutoOpenToken = 0 :: number
 	self.InteriorPart = nil :: BasePart?
 	self.NoticeAt = setmetatable({}, { __mode = "k" }) :: { [Player]: number }
 	-- (closed, player?) player = who toggled; nil = automatic opening or dev. AnomalyService (570) connects in OnInit
@@ -205,6 +215,7 @@ function VehicleService:SetShutter(closed: boolean, player: Player?, force: bool
 		return true
 	end
 	self.ShutterClosed = closed
+	self.AutoOpenToken += 1
 	self:ApplyShutter()
 	self.ShutterChanged:Fire(closed, player)
 	self:SyncShop(player ~= nil)
@@ -216,8 +227,13 @@ end
 function VehicleService:SyncShop(byPlayer: boolean)
 	const round = self.Dependencies.RoundService
 	const closed = self:IsShutterClosed()
-	if not closed and byPlayer and (round:GetPhase() == PREP or round:GetPhase() == CALL) then
+	const phase = round:GetPhase()
+	if not closed and byPlayer and (phase == PREP or phase == CALL or phase == SUMMARY) then
+		-- OpenShop walks Summary / Call through Prep to the night at once (PhaseChanged fires inline): those phases must
+		-- not shut the window the player just opened (owner 2026-10-21: "não consegui abrir a loja")
+		opening = true
 		round:OpenShop()
+		opening = false
 	elseif round:IsSelling() then
 		round:SetPaused(closed)
 	end
@@ -275,6 +291,32 @@ function VehicleService:DevReset()
 	self:Restore(VEHICLE)
 end
 
+-- /dev window open|close|status: forces the window now (open in a selling phase also lifts the Paused shop)
+function VehicleService:DevWindow(arg: string?): string
+	self:DevCheck("DevWindow")
+	if arg == "open" or arg == "close" then
+		self:SetShutter(arg == "close", nil, true)
+	elseif arg ~= nil and arg ~= "status" then
+		error("usage: window [open | close | status]", 0)
+	end
+	const round = self.Dependencies.RoundService
+	return `window {if self:IsShutterClosed() then "closed" else "open"}; phase {round:GetPhase()}; shop {if round:IsPaused() then "paused" else "not paused"}`
+end
+
+-- Selling phase entered with the window still shut: the shop stays closed, the window opens by itself AutoOpenAfter s
+-- later if nothing touched it meanwhile (same phase, still shut)
+function VehicleService:ScheduleAutoOpen(phase: string)
+	const round = self.Dependencies.RoundService
+	round:SetPaused(true)
+	self.AutoOpenToken += 1
+	const token = self.AutoOpenToken
+	task.delay(Content.ShopWindow.AutoOpenAfter, function()
+		if self.AutoOpenToken == token and round:GetPhase() == phase and self:IsShutterClosed() then
+			self:SetShutter(false, nil, true)
+		end
+	end)
+end
+
 -- /dev trailer status: vehicle, window, distance of the model to the TRL point
 function VehicleService:DevStatus(): string
 	self:DevCheck("DevStatus")
@@ -325,18 +367,21 @@ VehicleService:OnInit(function(self)
 		end
 		return true, nil
 	end)
-	round.ShiftStarted:Connect(function(_info)
-		self:SetShutter(false, nil, true)
-	end)
 	round.PhaseChanged:Connect(function(phase)
 		const row = Content.Shift.ByKey[phase]
-		if phase == PREP or phase == CALL then
+		if (phase == PREP or phase == CALL or phase == SUMMARY) and not opening then
 			-- shop closed until someone opens the window (TASK-284); the night call too (2026-10-17: opening it there
-			-- starts the night while Walt keeps talking)
+			-- starts the night while Walt keeps talking); the Summary shuts it at the end of the shift (owner 2026-10-21)
 			self:SetShutter(true, nil, true)
-		elseif table.find(OPEN_PHASES, phase) ~= nil or (row ~= nil and row.Selling) then
-			-- a selling phase opens the shop (the Prep ran out, or the window just opened it)
+		elseif table.find(OPEN_PHASES, phase) ~= nil then
 			self:SetShutter(false, nil, true)
+		elseif row ~= nil and row.Selling and self:IsShutterClosed() then
+			-- the Prep ran out with the window shut: closed shop, opens by itself later (owner 2026-10-21, Provisional)
+			if Content.ShopWindow.AutoOpenAfter > 0 then
+				self:ScheduleAutoOpen(phase)
+			else
+				self:SetShutter(false, nil, true)
+			end
 		end
 	end)
 end)

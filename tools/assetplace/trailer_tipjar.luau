@@ -1,5 +1,8 @@
 --!nonstrict
 --[[
+	OBSOLETE (owner 2026-10-22): the tip jar left the game (tips go straight to Cash; TipJarService, Content.TipJar and the
+	collect_tips action are gone) and Walt's notes paper (HINT-NOTE) took its spot. Do NOT run this snippet.
+
 	trailer_tipjar.luau (owner decision 2026-10-13, DEC-239, Provisional: "the register leaves, a TIP JAR that fills with
 	money takes its place"). Edit-mode Studio snippet, NOT gameplay code. Idempotent, surgical, NO Place.run.
 	Undo: run("trailer_tipjar", "undo").   AST-121 (docs/art/asset-list.md).

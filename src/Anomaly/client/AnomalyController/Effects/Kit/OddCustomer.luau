@@ -6,7 +6,11 @@
 	is undone when the pool clears the attribute.
 
 	Variants (rig attribute written by NpcService):
-	  shake    ANM-011  the whole body shakes fast (RootJoint C0 jitter)
+	  shake    ANM-011  the whole body shakes fast (RootJoint C0 jitter); owner 2026-10-22: only a restless fidget
+	                    (SHAKE_FIDGET) until his order is taken (rig AnomalyQueue), then the full tremor. A topping on
+	                    his plain order (condition Plain, §9.9): cue plate_throw = Kit/Tantrum throws the plate at the
+	                    wall, the TUM and his line; while the rig carries AnomalyRage, Kit/Tantrum's rage (monster face,
+	                    bugged ticks) owns the RootJoint and this tremor steps aside
 	  neck     ANM-012  the head is turned 180° around the neck and sways a little
 	  eyes     ANM-013  all-white eyes: the face is RigController's (VARIANT_FACE); here only the idle is held still
 	  bighead  ANM-014  head and everything welded to it at BIG_HEAD × size, growing up from the neck
@@ -22,6 +26,12 @@
 	snaps round the rest of the way (SNAP_TIME, a roll) with the `neck_crack` SFX and stays there, no more sway;
 	`window_slam` (Entity = actor): the bang of the service window thrown open (`window_slam`, `door_close` when the
 	first has no Id yet) and a short camera kick for who stands near the window.
+	Owner 2026-10-22 (Provisional): the same for "eyes" (ANM-013: normal eyes with a glint until the talk; the cameras see
+	them white) and "bighead" (ANM-014: the head arrives normal, Q-461, and grows in the talk; the cameras see it huge).
+	Anomaly tics (design/anomaly-tics-proposal.md, pilot ANM-012, Provisional Q-459 a): a variant with a Content.Tics row
+	(by Variant) gets its body from Kit/Tic instead (she arrives with the head forward, twitches, the cameras show it
+	turned, the talk turns it); without the row the old modifier above is used (rollback = remove the row). Once the tic
+	left its residue (rig Tic = "Done") the neck_snap cue does nothing: the head is already round.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -33,9 +43,13 @@ local TrailerFront = require(ReplicatedStorage.shared.Anomaly.TrailerFront)
 local Effect = require(script.Parent.Parent.Parent.Effect)
 local Actor = require(script.Parent.CustomerActor)
 local Jumpscare = require(script.Parent.Jumpscare)
+local Tic = require(script.Parent.Tic)
+local Tantrum = require(script.Parent.Tantrum)
 
 const SHAKE_MOVE = 0.08 -- studs of jitter
 const SHAKE_TURN = math.rad(4)
+const SHAKE_FIDGET = 0.25 -- share of the tremor before his order is taken (owner 2026-10-22, Provisional)
+const QUEUE_ATTRIBUTE = "AnomalyQueue" -- Anomaly Kit/CustomerActor: the actor waits in the delivery queue
 const NECK_SWAY = math.rad(8)
 const NECK_SWAY_SPEED = 0.7 -- rad/s of the sway
 const BIG_HEAD = 1.9
@@ -85,12 +99,15 @@ local function shake(model: Model): Actor.Undo
 	const base = root.C0
 	const rng = Random.new()
 	const connection = RunService.RenderStepped:Connect(function()
-		const offset = Vector3.new(
-			rng:NextNumber(-SHAKE_MOVE, SHAKE_MOVE),
-			rng:NextNumber(-SHAKE_MOVE, SHAKE_MOVE),
-			rng:NextNumber(-SHAKE_MOVE, SHAKE_MOVE)
-		)
-		root.C0 = base * CFrame.new(offset) * yaw(base, rng:NextNumber(-SHAKE_TURN, SHAKE_TURN))
+		if Tantrum.Raging(model) then
+			return -- enraged (Kit/Tantrum): its own tremor and ticks on the RootJoint
+		end
+		-- owner 2026-10-22 (proposal §2.5): restless on arrival, the full tremor only once he waits for his order
+		const amount = if model:GetAttribute(QUEUE_ATTRIBUTE) ~= nil then 1 else SHAKE_FIDGET
+		const move = SHAKE_MOVE * amount
+		const turn = SHAKE_TURN * amount
+		const offset = Vector3.new(rng:NextNumber(-move, move), rng:NextNumber(-move, move), rng:NextNumber(-move, move))
+		root.C0 = base * CFrame.new(offset) * yaw(base, rng:NextNumber(-turn, turn))
 	end)
 	return function()
 		connection:Disconnect()
@@ -318,12 +335,36 @@ end
 -- neck_snap: mark the rig (the neck modifier reads it) and crack at the head
 local function snapNeck(ctx: Effect.Context, npcId: number)
 	const model = ctx.Npc(npcId)
-	if model == nil then
+	if model == nil or model:GetAttribute("Tic") == "Done" then
 		return
 	end
 	model:SetAttribute(SNAP_ATTRIBUTE, os.clock())
 	const head = model:FindFirstChild("Head")
 	ctx.Audio:Play(CRACK_KEY, if head ~= nil and head:IsA("BasePart") then head else model:GetPivot().Position)
+end
+
+-- A short camera kick for this client when it stands within `radius` studs of `at`
+local function kick(at: Vector3?, radius: number)
+	const character = Players.LocalPlayer.Character
+	const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	const camera = Workspace.CurrentCamera
+	if at == nil or camera == nil or root == nil or not root:IsA("BasePart") then
+		return
+	end
+	if (root.Position - at).Magnitude > radius then
+		return
+	end
+	const started = os.clock()
+	local last = 0
+	const connection = RunService.RenderStepped:Connect(function()
+		const t = (os.clock() - started) / SLAM_KICK_TIME
+		const angle = if t < 1 then SLAM_KICK_ANGLE * math.sin(t * math.pi) else 0
+		camera.CFrame = camera.CFrame * CFrame.Angles(angle - last, 0, 0)
+		last = angle
+	end)
+	task.delay(SLAM_KICK_TIME + 0.05, function()
+		connection:Disconnect()
+	end)
 end
 
 -- window_slam: the bang at the service window and a short camera kick nearby
@@ -334,26 +375,7 @@ local function slamWindow(ctx: Effect.Context)
 	if key ~= nil then
 		ctx.Audio:Play(key, at, { Volume = 1 })
 	end
-	const character = Players.LocalPlayer.Character
-	const root = if character then character:FindFirstChild("HumanoidRootPart") else nil
-	const camera = Workspace.CurrentCamera
-	if at == nil or camera == nil or root == nil or not root:IsA("BasePart") then
-		return
-	end
-	if (root.Position - at).Magnitude > SLAM_KICK then
-		return
-	end
-	const started = os.clock()
-	local last = 0
-	const connection = RunService.RenderStepped:Connect(function()
-		const t = (os.clock() - started) / SLAM_KICK_TIME
-		const kick = if t < 1 then SLAM_KICK_ANGLE * math.sin(t * math.pi) else 0
-		camera.CFrame = camera.CFrame * CFrame.Angles(kick - last, 0, 0)
-		last = kick
-	end)
-	task.delay(SLAM_KICK_TIME + 0.05, function()
-		connection:Disconnect()
-	end)
+	kick(at, SLAM_KICK)
 end
 
 -- Builds the effect module of one family A anomaly.
@@ -362,12 +384,21 @@ function OddCustomer.Effect(ref: string, variant: Variant): Effect.Module
 		Ref = ref,
 		Mount = function(ctx: Effect.Context, occ: Effect.Occurrence)
 			Vide.cleanup(Actor.Follow(ctx, occ, variant, `odd_{variant}`, function(model: Model): Actor.Undo
+				-- anomaly tics (Content.Tics): a variant with a row gets its body from Kit/Tic (owner 2026-10-22: the white
+				-- eyes and the big head join the turned neck); without the row the old modifier below (rollback)
+				const tic = Content.Tics.ByVariant[variant]
 				if variant == "shake" then
-					return shake(model)
+					-- the tremor + the tantrum of condition Plain (Kit/Tantrum: the throw pose, the rage)
+					const undoShake = shake(model)
+					const undoTantrum = Tantrum.Mount(ctx, model)
+					return function()
+						undoTantrum()
+						undoShake()
+					end
 				elseif variant == "neck" then
-					return neck(model)
+					return if tic ~= nil then Tic.Mount(ctx, model, tic) else neck(model)
 				elseif variant == "bighead" then
-					return bighead(model)
+					return if tic ~= nil then Tic.Mount(ctx, model, tic) else bighead(model)
 				elseif variant == "float" then
 					return float(model)
 				elseif variant == "stare" then
@@ -377,8 +408,17 @@ function OddCustomer.Effect(ref: string, variant: Variant): Effect.Module
 				elseif variant == "oncam" then
 					return oncam(model)
 				end
-				-- eyes: the face is the sign; the idle is held still like the blank folks
-				return Actor.HoldStill(ctx, model)
+				-- eyes: the face is the sign; the idle is held still like the blank folks (with a tic row the white eyes
+				-- wait for the talk, Kit/Tic)
+				const still = Actor.HoldStill(ctx, model)
+				if variant == "eyes" and tic ~= nil then
+					const undoTic = Tic.Mount(ctx, model, tic)
+					return function()
+						undoTic()
+						still()
+					end
+				end
+				return still
 			end))
 		end,
 		Cue = function(ctx: Effect.Context, cue: Effect.Cue)
@@ -386,6 +426,8 @@ function OddCustomer.Effect(ref: string, variant: Variant): Effect.Module
 				snapNeck(ctx, cue.Entity)
 			elseif cue.Cue == "window_slam" then
 				slamWindow(ctx)
+			elseif cue.Cue == "plate_throw" then
+				Tantrum.Throw(ctx, cue.Entity)
 			else
 				Jumpscare.Cue(ctx, cue)
 			end

@@ -15,6 +15,8 @@
 	  camera_static  one camera of Content.Security.Cams loses its picture (Mask = its index). Anchor `Chore_Camera`
 	                 (camera_fix, hold, Radius 22) inside the camera model at its pivot: reached from below, never through a
 	                 wall (InSight: head -> anchor, the camera's own model, see-through parts and small props do not block).
+	                 Only from outside the trailer (VehicleService:IsInside; anchor attribute `OutsideOnly`) unless the camera
+	                 has Security.Cams[i].FixInside (CAM3, at the tip of the trailer by the PICK UP window).
 
 	Deadline: Deadline s after the start, if still on, every Active player loses Penalty sanity once (back_door: a family D
 	scare for everyone too). Chores stay on until fixed or until the next shift.
@@ -67,6 +69,7 @@ const ChoreService = Modux.Service("ChoreService", {
 		"VitalService",
 		"HallucinationService",
 		"RestaurantDoorService",
+		"VehicleService",
 	},
 	Priority = 560,
 })
@@ -278,7 +281,9 @@ function ChoreService:Start(key: string): boolean
 		end
 		active.Mask = index
 		active.Model = model
-		active.Anchors[self:Anchor("Chore_Camera", row.Action, model:GetPivot().Position, host)] = 0
+		const anchor = self:Anchor("Chore_Camera", row.Action, model:GetPivot().Position, host)
+		anchor:SetAttribute("OutsideOnly", not Content.Security.Cams.List[index].FixInside)
+		active.Anchors[anchor] = 0
 	end
 	self.Active[key] = active
 	self:Write(key)
@@ -568,7 +573,11 @@ ChoreService:OnInit(function(self)
 	})
 	interaction:RegisterAction("camera_fix", {
 		Validate = function(player: Player, anchor: Instance, _id: number): boolean
-			-- the camera is high on the wall: reached from far below, never through a wall
+			-- the camera is high on the wall: reached from far below, never through a wall, and from outside the trailer
+			-- unless the camera has FixInside
+			if anchor:GetAttribute("OutsideOnly") == true and self.Dependencies.VehicleService:IsInside(player) then
+				return false
+			end
 			return self:Owns("camera_static", anchor) ~= nil and self:InSight(player, anchor)
 		end,
 		Run = function(_player: Player, _anchor: Instance, _id: number)

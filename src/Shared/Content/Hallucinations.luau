@@ -30,25 +30,33 @@ export type Rules = {
 	Interval: { number }, -- {min, max} s between two rolls; the roll now uses Sanity.Tiers[k].Interval (DEC-352), kept for reference
 	NightOnly: boolean, -- sanity exists only at night (DEC-056)
 	ScareGap: number, -- s: after a family D scare the sanity roll waits at least this long (no two in a row)
+	-- owner 2026-10-21 (Provisional): the black cloak (Key, a FamilyD row) may dash past behind the customer while the
+	-- local player is in the talk close-up; Chance per close-up, at most once per Cooldown s, Delay {min, max} s after it opens
+	TalkDash: { Key: string, Chance: number, Cooldown: number, Delay: { number } },
 }
 
 const rules: Rules = {
 	Interval = { 20, 45 }, -- Provisional: rare enough to stay a surprise (DEC-173)
 	NightOnly = true,
 	ScareGap = 12, -- Provisional
+	TalkDash = { Key = "shadow_dash", Chance = 0.15, Cooldown = 150, Delay = { 0.8, 2.2 } },
 }
 
 const base = Table.new({
 	-- < 60
-	{ Key = "fake_call", MaxSanity = 60, FamilyD = true, Effect = "FakeCall", Cooldown = 600, Weight = 0.25 }, -- owner 2026-10-18: phone_glitch too often (was 180 / 1) -- rings, "Walt: ..."
-	{ Key = "grill_hiss", MaxSanity = 60, FamilyD = true, Effect = "GrillHiss", Cooldown = 90, Weight = 1 }, -- empty grill sizzle
-	{ Key = "bottle_fall", MaxSanity = 60, FamilyD = true, Effect = "BottleFall", Cooldown = 150, Weight = 1 }, -- ketchup tips over
+	-- owner 2026-10-21: no phone / knock / object sounds in the scares (Weight 0)
+	{ Key = "fake_call", MaxSanity = 60, FamilyD = true, Effect = "FakeCall", Cooldown = 600, Weight = 0 }, -- owner 2026-10-18: phone_glitch too often (was 180 / 1) -- rings, "Walt: ..."
+	{ Key = "grill_hiss", MaxSanity = 60, FamilyD = true, Effect = "GrillHiss", Cooldown = 90, Weight = 0 }, -- owner 2026-10-21: the grill only sizzles with a sausage frying (was 1) -- empty grill sizzle
+	-- owner 2026-10-21: no phone / knock / object sounds in the scares (Weight 0)
+	{ Key = "bottle_fall", MaxSanity = 60, FamilyD = true, Effect = "BottleFall", Cooldown = 150, Weight = 0 }, -- ketchup tips over
 	-- < 40
 	{ Key = "roof_steps", MaxSanity = 40, FamilyD = true, Effect = "RoofSteps", Cooldown = 90, Weight = 1 }, -- steps on the roof
-	{ Key = "roof_knock", MaxSanity = 40, FamilyD = true, Effect = "RoofKnock", Cooldown = 120, Weight = 1 }, -- 3 knocks on the roof
+	-- owner 2026-10-21: no phone / knock / object sounds in the scares (Weight 0)
+	{ Key = "roof_knock", MaxSanity = 40, FamilyD = true, Effect = "RoofKnock", Cooldown = 120, Weight = 0 }, -- 3 knocks on the roof
 	{ Key = "ghost_customer", MaxSanity = 40, FamilyD = true, Effect = "GhostCustomer", Cooldown = 120, Weight = 1 }, -- gone on 2nd look
 	{ Key = "post_flicker", MaxSanity = 40, FamilyD = true, Effect = "PostFlicker", Cooldown = 120, Weight = 1 }, -- no buzz (DEC-123)
-	{ Key = "radio_voice", MaxSanity = 40, FamilyD = true, Effect = "RadioVoice", Cooldown = 600, Weight = 0.25 }, -- owner 2026-10-18: phone_glitch too often (was 180 / 1) -- static + one line
+	-- owner 2026-10-21: no phone / knock / object sounds in the scares (Weight 0)
+	{ Key = "radio_voice", MaxSanity = 40, FamilyD = true, Effect = "RadioVoice", Cooldown = 600, Weight = 0 }, -- owner 2026-10-18: phone_glitch too often (was 180 / 1) -- static + one line
 	{ Key = "street_watcher", MaxSanity = 40, FamilyD = true, Effect = "StreetWatcher", Cooldown = 150, Weight = 1 }, -- far, staring
 	-- < 20
 	{ Key = "whisper", MaxSanity = 20, FamilyD = true, Effect = "Whisper", Cooldown = 120, Weight = 1 }, -- "Rookie..."
@@ -62,6 +70,11 @@ const base = Table.new({
 	-- owner 2026-10-20 (Provisional Q-415): Night 1 scripted opening (posts, the figure across the street, the call static)
 	{ Key = "night_opening", MaxSanity = 1, FamilyD = true, Effect = "NightOpening", Cooldown = 0, Weight = 1, Scripted = true },
 	{ Key = "monster_glimpse", MaxSanity = 20, FamilyD = true, Effect = "MonsterGlimpse", Cooldown = 180, Weight = 3 }, -- end of street; TASK-341: x3 so N2-N5 show one
+	-- owner 2026-10-21 (Provisional): cave-style ambience (like Minecraft's cave sounds): one low boom, violin scrape, metal
+	-- whine, hiss, whoosh or eerie texture from a point around the player (3D, directional). No verb, no cost; family D any sanity.
+	{ Key = "cave_sound", MaxSanity = 60, FamilyD = true, Effect = "CaveSound", Cooldown = 25, Weight = 4 },
+	-- the black cloak dash of cave_sound's whoosh alone, for `dev scare shadow_dash` (Weight 0: never drawn by itself)
+	{ Key = "shadow_dash", MaxSanity = 60, FamilyD = true, Effect = "ShadowDash", Cooldown = 0, Weight = 0 },
 	-- owner 2026-10-21 (Provisional): "behind you" - the player cooks with the back to the window; a sound right behind
 	-- them, nothing there when they turn. Scripted: only Nights.Behind sends them (the server picks the calm moment and
 	-- the player facing away); no verb, no cost.

@@ -155,7 +155,7 @@ return function(props: Props): Frame
 				TextSize = 17,
 				Outline = Theme.Outline.Normal,
 				Radius = UDim.new(0.5, 0),
-				Tone = Theme.Tone.Mustard,
+				Tone = Theme.Tone.Ketchup, -- owner 2026-10-21: EXIT red (was Mustard)
 				Text = "EXIT",
 				OnActivated = props.OnExit,
 			}),

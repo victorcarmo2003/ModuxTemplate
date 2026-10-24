@@ -9,6 +9,7 @@ type Rig = { Connections: { RBXScriptConnection }, Pending: boolean }
 export type Public = {
 	Concealed: { [Model]: RBXScriptConnection },
 	Expressions: { [Model]: string },
+	Hallucinating: boolean,
 	Preloaded: { [string]: boolean },
 	Rigs: { [Model]: Rig },
 	Warm: boolean,
@@ -17,6 +18,8 @@ export type Public = {
 	Reveal: (self: Public, model: Model) -> (),
 	EndWarmup: (self: Public) -> (),
 	Warmup: (self: Public) -> (),
+	LowSanity: (self: Public) -> boolean,
+	WatchSanity: (self: Public) -> (),
 	VariantOf: (self: Public, model: Model) -> string?,
 	Resolve: (self: Public, model: Model) -> (Pack, string?, boolean),
 	SetExpression: (self: Public, model: Model, expression: string?) -> (),

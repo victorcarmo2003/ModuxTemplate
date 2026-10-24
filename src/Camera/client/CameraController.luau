@@ -191,6 +191,13 @@ const HORROR_RENDER_STEP = "CameraController.HorrorUndo"
 const HORROR_UNDO_PRIORITY = Enum.RenderPriority.Camera.Value - 1
 -- modes the layer plays in (Cutscene, Prep = security monitor and prep, External: someone else owns the camera)
 const HORROR_MODES: { [Mode]: boolean } = { FirstPerson = true, Spectate = true, Fixed = true }
+-- owner 2026-10-22 (the anomaly tics' jolt in the order talk): the talk's close-up is a Prep view that takes the layer too,
+-- while TabletController keeps this attribute on the local player (the cooking focus and the security monitor do not)
+const TALK_CLOSE_UP = "TalkCloseUp"
+
+local function horrorMode(mode: Mode): boolean
+	return HORROR_MODES[mode] == true or (mode == "Prep" and Players.LocalPlayer:GetAttribute(TALK_CLOSE_UP) == true)
+end
 const HORROR_TILT = math.rad(8) -- rad of shake tilt per stud of shake amplitude
 const HORROR_ATTACK = 0.25 -- share of a Fov step's Duration spent reaching the delta when it comes back
 const HORROR_ATTACK_MAX = 1.5 -- s
@@ -643,6 +650,10 @@ function CameraController:ApplyPrep(camera: Camera)
 		self:SetMode("FirstPerson")
 		return
 	end
+	if state.Leaving then
+		self:ApplyPrepLeave(camera, state)
+		return
+	end
 	const player = Players.LocalPlayer
 	if player.CameraMode ~= Enum.CameraMode.Classic then
 		player.CameraMode = Enum.CameraMode.Classic
@@ -653,12 +664,8 @@ function CameraController:ApplyPrep(camera: Camera)
 	const now = os.clock()
 	const dt = math.clamp(now - state.Last, 0, 0.1)
 	state.Last = now
-	local goal = state.To
-	local goalLook = state.ToLook
-	if state.Leaving then
-		goal = self:PrepExitFrame() or state.To
-		goalLook = goal.Position + goal.LookVector * 4
-	end
+	const goal = state.To
+	const goalLook = state.ToLook
 	if state.Omega <= 0 then
 		state.Pos, state.Look, state.Fov = goal.Position, goalLook, state.ToFov
 		state.PosVel, state.LookVel, state.FovVel = Vector3.zero, Vector3.zero, 0
@@ -671,24 +678,60 @@ function CameraController:ApplyPrep(camera: Camera)
 		state.RadiusNow, state.RadiusVel = damp(state.RadiusNow, state.RadiusVel, state.ToRadius, state.Omega, dt)
 	end
 	const alpha = if state.Travel <= 0 then 1 else math.clamp((now - state.Start) / state.Travel, 0, 1)
-	-- the end of the way out: the head of the player exactly, then the driver takes over
-	if state.Leaving and alpha >= 1 then
-		camera.CFrame = goal
+	const eye = state.Pos
+	const target = state.Look
+	camera.CFrame = if (target - eye).Magnitude > 1e-3 then CFrame.lookAt(eye, target) else CFrame.new(eye) * goal.Rotation
+	camera.FieldOfView = state.Fov
+	-- the field of view was written whole: the horror layer (the talk's close-up, horrorMode) adds its delta again on top
+	self.HorrorFovApplied = 0
+	const dof = state.Dof
+	if dof ~= nil then
+		dof.FarIntensity = state.Far * alpha
+		dof.FocusDistance = math.max(state.FocusDist, 0.5)
+		dof.InFocusRadius = math.max(state.RadiusNow, 0.1)
+	end
+end
+
+-- The way out of the prep mode (owner 2026-10-22: the look stayed locked for the glide and the mouse moved meanwhile landed all at
+-- once at its end): the stock first-person camera has the view from the first frame (mouse and stick turn it from what is on
+-- screen: it reads back the CFrame written here), and this glide only carries the eye from the station to the head, levels the
+-- look and brings the field of view back. At its end the driver takes over with the look the player left.
+function CameraController:ApplyPrepLeave(camera: Camera, state: PrepState)
+	const player = Players.LocalPlayer
+	if player.CameraMode ~= Enum.CameraMode.LockFirstPerson then
+		player.CameraMode = Enum.CameraMode.LockFirstPerson
+	end
+	if camera.CameraType ~= Enum.CameraType.Custom then
+		camera.CameraType = Enum.CameraType.Custom
+	end
+	const humanoid = humanoidOf(self:Body())
+	if humanoid ~= nil and camera.CameraSubject ~= humanoid then
+		camera.CameraSubject = humanoid
+	end
+	const now = os.clock()
+	const dt = math.clamp(now - state.Last, 0, 0.1)
+	state.Last = now
+	const alpha = if state.Travel <= 0 then 1 else math.clamp((now - state.Start) / state.Travel, 0, 1)
+	const exit = self:PrepExitFrame()
+	if alpha >= 1 or exit == nil then
 		camera.FieldOfView = state.BaseFov
 		self:PrepClear()
 		self:SetMode("FirstPerson")
 		self.NextDrive = 0
 		return
 	end
-	const eye = state.Pos
-	const target = state.Look
-	camera.CFrame = if (target - eye).Magnitude > 1e-3 then CFrame.lookAt(eye, target) else CFrame.new(eye) * goal.Rotation
+	state.Pos, state.PosVel = damp(state.Pos, state.PosVel, exit.Position, state.Omega, dt)
+	state.Fov, state.FovVel = damp(state.Fov, state.FovVel, state.ToFov, state.Omega, dt)
+	-- the look of this frame (the player's input on top of the last one), its pitch eased toward level
+	const look = camera.CFrame.LookVector
+	const pitch = math.asin(math.clamp(look.Y, -1, 1)) * math.exp(-state.Omega * dt)
+	camera.CFrame = CFrame.new(state.Pos) * CFrame.fromOrientation(pitch, yawOf(look), 0)
 	camera.FieldOfView = state.Fov
+	-- the field of view was written whole: the horror layer adds its delta again on top
+	self.HorrorFovApplied = 0
 	const dof = state.Dof
 	if dof ~= nil then
-		dof.FarIntensity = state.Far * (if state.Leaving then 1 - alpha else alpha)
-		dof.FocusDistance = math.max(state.FocusDist, 0.5)
-		dof.InFocusRadius = math.max(state.RadiusNow, 0.1)
+		dof.FarIntensity = state.Far * (1 - alpha)
 	end
 end
 
@@ -1304,8 +1347,10 @@ end
 --[[
 	Horror camera layer (TASK-463; Content.HorrorScenes steps Shake / Fov / Nudge, called by the scene player). A layer on
 	top of the mode, never a mode: it plays in FirstPerson, Spectate and Fixed and stays out of Cutscene, Prep (the
-	security monitor uses it) and External; a switch to one of those clears it. Every amount is clamped to the Rules and
-	scaled by Rules.ReduceMotion when Motion.Reduced().
+	security monitor uses it) and External; a switch to one of those clears it. Owner 2026-10-22: the order talk's
+	close-up (Prep while LocalPlayer TalkCloseUp is on) takes the Shake and the Fov too, so the anomaly tics' jolt shows
+	(ApplyPrep writes the field of view whole every frame, so the delta goes on top again). Every amount is clamped to the
+	Rules and scaled by Rules.ReduceMotion when Motion.Reduced().
 	  Shake  camera-space offset and tilt (decaying noise), written after the mode and taken off again before the stock
 	         camera reads the view (HorrorUndo), so the first-person look never drifts
 	  Fov    a delta added to whatever field of view the mode has (only the change is written, so the player's own value is
@@ -1329,7 +1374,7 @@ function CameraController:HorrorShake(profile: string, scale: number?)
 		warn(`[CameraController] unknown horror shake profile '{profile}'`)
 		return
 	end
-	if not HORROR_MODES[Vide.untrack(self.Mode)] then
+	if not horrorMode(Vide.untrack(self.Mode)) then
 		return
 	end
 	const amplitude = spec.Amplitude * math.max(scale or 1, 0) * horrorScale()
@@ -1348,7 +1393,7 @@ end
 -- Field-of-view delta in degrees (|delta| <= Rules.MaxFov), eased from the delta now. `back` nil: reaches `delta` over
 -- `duration` and holds it; `back` set (0 = the player's own fov): reaches `delta` in the first part, then eases to `back`.
 function CameraController:HorrorFov(delta: number, back: number?, duration: number)
-	if not HORROR_MODES[Vide.untrack(self.Mode)] then
+	if not horrorMode(Vide.untrack(self.Mode)) then
 		return
 	end
 	const scale = horrorScale()
@@ -1426,7 +1471,7 @@ function CameraController:HorrorUndo()
 	end
 	self.HorrorOffset = nil
 	const camera = workspace.CurrentCamera
-	if camera ~= nil and HORROR_MODES[Vide.untrack(self.Mode)] then
+	if camera ~= nil and horrorMode(Vide.untrack(self.Mode)) then
 		camera.CFrame *= offset:Inverse()
 	end
 end
@@ -1455,7 +1500,7 @@ end
 -- One frame of the layer, after the mode wrote the view: nudges (kept), field of view, shake offset (taken off later).
 function CameraController:ApplyHorror(now: number)
 	const camera = workspace.CurrentCamera
-	if camera == nil or loadingShown() or not HORROR_MODES[Vide.untrack(self.Mode)] then
+	if camera == nil or loadingShown() or not horrorMode(Vide.untrack(self.Mode)) then
 		return
 	end
 

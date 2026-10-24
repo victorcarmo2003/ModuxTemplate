@@ -94,6 +94,7 @@ export type Wire = {
 	Pickup: number?,
 	Number: number?,
 	Drive: number?,
+	Bread: boolean?,
 }
 export type SaleResult = "Perfect" | "Complete" | "Incomplete" | "Wrong" | "Left" | "Refused" | "Slow"
 export type Variant = "blank" | "mirror" | "raincoat" | "shake" | "neck" | "eyes" | "bighead" | "float" | "stare" | "banger" | "oncam"
@@ -111,7 +112,7 @@ export type CustomerActorSpec = {
 export type ActedAction = "take_order" | "serve" | "refuse" | "give_up" | "return"
 export type ServeRule = (customer: Customer, tool: Tool, player: Player) -> SaleResult?
 export type ActorVerdict = "Return" | "Wrong"
-export type ActorJudge = (id: number, toppings: { string }, player: Player) -> ActorVerdict?
+export type ActorJudge = (id: number, toppings: { string }, player: Player, bread: boolean) -> ActorVerdict?
 export type SeatParty = {
 	Leader: number,
 	Partner: number?,
@@ -207,6 +208,10 @@ export type Public = {
 	FrontDrive: (self: Public, id: number) -> boolean,
 	DriveFront: (self: Public) -> number?,
 	Record: (self: Public, customer: Customer) -> Wire,
+	IsBread: (self: Public, customer: Customer) -> boolean,
+	IsBreadPlate: (self: Public, tool: Tool) -> boolean,
+	BreadPlateOf: (self: Public, player: Player) -> Tool?,
+	BreadTarget: (self: Public, tool: Tool, target: number?) -> number?,
 	Publish: (self: Public, customer: Customer, added: boolean) -> (),
 	Walk: (self: Public, customer: Customer, node: string, avoidQueue: boolean, done: (ok: boolean) -> ()) -> (),
 	Refresh: (self: Public) -> (),
@@ -237,7 +242,7 @@ export type Public = {
 	LineAwayIds: (self: Public, waiting: boolean?) -> { number },
 	ComplainLineAway: (self: Public, player: Player?, waiting: boolean?) -> (),
 	RefuseOne: (self: Public, player: Player, id: number) -> boolean,
-	OnShutter: (self: Public, closed: boolean, player: Player?) -> (),
+	OnShutter: (self: Public, _closed: boolean, _player: Player?) -> (),
 	CancelShutWait: (self: Public) -> (),
 	SendLineAway: (self: Public, player: Player?, waiting: boolean?) -> (),
 	RemoveAll: (self: Public) -> (),
@@ -270,7 +275,7 @@ export type Public = {
 	ServeFor: (self: Public, player: Player, tool: Tool?, target: number) -> SaleResult?,
 	ServeCustomer: (self: Public, player: Player, id: number, customer: Customer, ticket: Orders.Ticket, picked: Tool?) -> SaleResult?,
 	OtherHotDog: (self: Public, player: Player, except: Tool, order: { string }) -> Tool?,
-	PickServeTool: (self: Public, player: Player, ticket: Orders.Ticket) -> Tool?,
+	PickServeTool: (self: Public, player: Player, ticket: Orders.Ticket, bread: boolean?) -> Tool?,
 	Equip: (self: Public, player: Player, tool: Tool) -> (),
 	SellLine: (self: Public, id: number, customer: Customer, ticket: Orders.Ticket, player: Player, tool: Tool, index: number, verdict: Orders.Verdict, at: number) -> SaleResult,
 	KeepLook: (self: Public, customer: Customer, index: number, tool: Tool) -> (),

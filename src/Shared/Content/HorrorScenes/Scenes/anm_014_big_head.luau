@@ -6,6 +6,10 @@
 -- the lamp over the counter, which swings and stutters; in the silence it tilts to look in through the service window;
 -- on the security cameras it already fills the room up to the ceiling (Seen "Cameras"). Presentation only (T10). Every
 -- number PROVISIONAL until the owner's Play; the creak is `door_creak` until stretch_creak has an Id (sound-list.md).
+-- Owner 2026-10-22 (anomaly tics, Q-461): the head arrives NORMAL and grows only in the Take Order talk, in two steps
+-- (Content.Tics, Kit/Tic; the huge head on the cameras is the tic body's too). Gone from this scene: the growth while
+-- nobody looks (Pose Scale), the camera layer's Pose Scale and the lamp it bumped (Prop Sway): they showed the tic before
+-- the talk. The rest (sting, heart, words, silence, the tilt) stays.
 local Types = require(script.Parent.Parent.Types)
 
 const COUNTER = "Q1"
@@ -31,25 +35,22 @@ const scene: Types.Scene = {
 		{ At = 0, Phase = "Active", Kind = "Shake", Target = "Jolt", Value = 0.4 },
 		{ At = 0, Phase = "Active", Kind = "Fov", Value = -2, To = 0, Duration = 0.7 },
 		{ At = 1, Phase = "Active", Kind = "Cinema", Value = 0.08, Duration = 1.5 },
-		-- the head grows in steps, each one when this client is not looking (the creak plays as it grows)
-		{ At = 3, Phase = "Active", Kind = "Pose", Target = "Scale", Value = 1.12, Duration = 0.2, Sound = CREAK },
-		{ At = 6, Phase = "Active", Kind = "Pose", Target = "Scale", Value = 1.24, Duration = 0.2, Sound = CREAK },
-		{ At = 9, Phase = "Active", Kind = "Pose", Target = "Scale", Value = 1.36, Duration = 0.2, Sound = CREAK },
+		-- owner 2026-10-22: the head no longer grows here (Pose Scale x1.12 / 1.24 / 1.36 at 3 / 6 / 9 s while not looked
+		-- at): it grows in the talk (Content.Tics)
 		-- the world closes in a degree each step
 		{ At = 3.2, Phase = "Active", Kind = "Fov", Value = -1, To = 0, Duration = 1.4 },
 		{ At = 6.2, Phase = "Active", Kind = "Fov", Value = -1, To = 0, Duration = 1.4 },
 		{ At = 9.2, Phase = "Active", Kind = "Fov", Value = -1, To = 0, Duration = 1.4 },
-		-- R4: on the cameras it is already up against the ceiling
-		{ At = 3, Phase = "Active", Kind = "Pose", Target = "Scale", Value = 1.7, Duration = 1.5, Seen = "Cameras" },
+		-- R4: on the cameras it is already up against the ceiling: owner 2026-10-22, now the tic body's (Content.Tics
+		-- Cameras, Kit/Tic) in place of Pose Scale 1.7 Seen "Cameras"
 		-- R5 + R7: the hint, the heart, the edges, the colour going sick
 		{ At = 3, Phase = "Active", Kind = "Whispers", Target = "big_head_grow", Value = 0.3, To = 1.2, Duration = 7, Where = "Inside" },
 		{ At = 3, Phase = "Active", Kind = "Whispers", Target = "outside", Value = 0.3, To = 1.1, Duration = 7, Where = "Outside" },
 		{ At = 3, Phase = "Active", Kind = "Heartbeat", Value = 70, To = 120, Duration = 7 },
 		{ At = 3, Phase = "Active", Kind = "Vignette", Value = 0, To = 0.22, Duration = 7 },
 		{ At = 3, Phase = "Active", Kind = "Grade", Target = "Sick", Value = 0, To = 0.24, Duration = 7 },
-		-- R2 + R3: it bumps the lamp over the counter, which swings and stutters
-		{ At = 6.5, Phase = "Active", Kind = "Prop", Target = "Sway", Point = COUNTER, Value = 7, To = 10, Duration = 3 },
-		{ At = 6.5, Phase = "Active", Kind = "Sound", Target = "light_flicker", Point = COUNTER, Value = 0.5 },
+		-- R2 + R3: the lamp over the counter stutters (owner 2026-10-22: no longer bumped by a head that is still normal,
+		-- the Prop Sway and its light_flicker at 6.5 s are gone)
 		{ At = 7, Phase = "Active", Kind = "Lights", Target = "Flicker", Duration = 0.35 },
 		-- R8: the silence; it tilts its head to look in through the service window
 		{ At = 10.5, Phase = "Active", Kind = "Whispers", Value = 0, To = 0, Duration = 0 },
@@ -57,9 +58,7 @@ const scene: Types.Scene = {
 		{ At = 10.5, Phase = "Active", Kind = "Silence", Value = 1, To = 0.35, Duration = 0.6 },
 		{ At = 10.6, Phase = "Active", Kind = "Pose", Target = "Tilt", Value = 25, Duration = 1.5 },
 		{ At = 10.6, Phase = "Active", Kind = "Nudge", Point = COUNTER, Value = 2, Duration = 1 },
-		-- R9: the moment the eyes leave it, it is huge; the lamp is knocked hard
-		{ At = 12.5, Phase = "Active", Kind = "Pose", Target = "Scale", Value = 1.5, Duration = 0.15, Sound = CREAK },
-		{ At = 12.5, Phase = "Active", Kind = "Prop", Target = "Sway", Point = COUNTER, Value = 11, To = 10, Duration = 1 },
+		-- R9: the sting (owner 2026-10-22: without the head turning huge, Pose Scale 1.5, nor the lamp knocked, Prop Sway)
 		{ At = 12.5, Phase = "Active", Kind = "Sound", Target = "horror_sting", Value = 0.6 },
 		{ At = 12.5, Phase = "Active", Kind = "Shake", Target = "Jolt" },
 		{ At = 12.5, Phase = "Active", Kind = "Blur", Value = 4, To = 0, Duration = 1 },

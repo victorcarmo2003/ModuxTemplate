@@ -5,12 +5,14 @@
 --
 -- State lives per UserId (survives Away). The life state itself is the RunStateService Member (snapshot source):
 -- this service is its only writer (SetLifeState) and mirrors it, with StateEndsAt/KnockedUntil/Class, in the
--- Vitals set (id = UserId). The sanity number goes only to its owner (packet Sanity, DEC-167); the party sees the
--- band through the LookPack (CharacterService:SetLookPack: High = Day, Mid = Mid, Low = Night; day = Day).
+-- Vitals set (id = UserId). The sanity number goes only to its owner (packet Sanity, DEC-167). The band stays for the
+-- HUD and the pressure only: the body follows the night of the run (DEC-370, DEC-373; TASK-643), LookPack =
+-- Content.Skins.PackForNight(RoundService:GetNight()) through CharacterService:SetLookPack at the night start, entry
+-- and return from Away; CharacterService keeps it per UserId for the respawn. Sanity never changes the body.
 --
 --   Night start   ShiftStarted of a night: Sanity/Max from the class (SanityStart, SanityMax over Sanity.Start),
 --                 RevivesTonight 0, Seen {}. A member who is Away gets the class values on return (once per night)
---   Day           no sanity: packet { 0, 0 }, look Day
+--   Day           no sanity: packet { 0, 0 } (look: the night of the run, DEC-370)
 --   Dark (1 Hz)   Active, with a character, night shift in Sanity.DarkPhases: not IsLit for DarkDelay s ->
 --                 -DarkPerSecond per s (none before ProtectUntil)
 --   Sanity 0      RevivesTonight < Revive.MaxPerNight -> Down (Faint, Stash, StateEndsAt = 6:00 AM), else Spectator
@@ -207,8 +209,10 @@ function VitalService:Ensure(player: Player): Entry
 			classes:GetModifier(player, "SanityStart", rows.Start),
 			classes:GetModifier(player, "SanityMax", rows.Start)
 		)
-		-- Night 1 starts low so the rookie learns the coffee (user request 2026-10-11; 60 since TASK-596, Provisional): never raises
-		const first = if self.Dependencies.RoundService:GetNight() == 1 then rows.FirstNightStart else start
+		-- Night 1 starts low so the rookie learns the coffee (user request 2026-10-11; 60 since TASK-596, Provisional): never raises.
+		-- Owner 2026-10-23: not while a rookie's tutorial runs (the Hold): the bar sat at 60 during the tutorial and read as
+		-- a drop; it starts full and only falls after the tutorial
+		const first = if self.Dependencies.RoundService:GetNight() == 1 and not self:Held() then rows.FirstNightStart else start
 		entry.Sanity = Sanity.clamp(math.min(start, first), max)
 		entry.Max = max
 		entry.HintUntil = 0
@@ -353,17 +357,23 @@ function VitalService:FireLife(userId: number, event: LifeEventKind)
 	self.Libs.Net.LifeEvent:fireClient(net.Audience, { UserId = userId, Event = event })
 end
 
--- Look (DEC-167) ---------------------------------------------------------------------------------------------------
+-- Look (DEC-370, DEC-373) -------------------------------------------------------------------------------------------
 
+-- Crew look of the run night (Content.Skins.LookByNight); 0 = before the run = Day
+function VitalService:NightPack(): Band
+	return Content.Skins.PackForNight(self.Dependencies.RoundService:GetNight())
+end
+
+-- The body follows the night, never the sanity band (DEC-373: mates see no sanity mark, only the HUD shows it)
 function VitalService:ApplyLook(userId: number)
 	const player = Players:GetPlayerByUserId(userId)
 	if player ~= nil then
-		self.Dependencies.CharacterService:SetLookPack(player, self:EntryOf(userId).Band)
+		self.Dependencies.CharacterService:SetLookPack(player, self:NightPack())
 	end
 end
 
--- Band of the current value; with Sanity.BandMinHold > 0 a new band must hold that long (immediate skips it: night
--- start, day, return, respawn).
+-- Band of the current value (HUD and pressure; no longer the look, DEC-373); with Sanity.BandMinHold > 0 a new band
+-- must hold that long (immediate skips it: night start, day, return, respawn).
 function VitalService:RefreshBand(userId: number, immediate: boolean)
 	const entry = self:EntryOf(userId)
 	const target = Sanity.band(entry.Sanity, entry.Max, Content.Sanity)
@@ -385,7 +395,6 @@ function VitalService:RefreshBand(userId: number, immediate: boolean)
 	end
 	entry.Band = target
 	entry.Pending = nil
-	self:ApplyLook(userId)
 end
 
 -- Sanity ------------------------------------------------------------------------------------------------------------
@@ -708,6 +717,8 @@ function VitalService:OnShiftStarted(info: { IsNight: boolean })
 			self:SendSanity(player, true)
 		end
 		self:RefreshBand(userId, true)
+		-- night start (repeated night and dev jump included): the look of the new night
+		self:ApplyLook(userId)
 	end
 	self:QueueWipe()
 end

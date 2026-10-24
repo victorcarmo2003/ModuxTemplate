@@ -7,7 +7,6 @@ local SignalLib = require(ReplicatedStorage.shared.Libs.Signal)
 local Ledger = require(ServerScriptService.server.Economy.EconomyService.Ledger)
 
 export type SaleResult = Ledger.SaleResult
-export type DrawerKind = Ledger.DrawerKind
 export type SaleKind = Ledger.SaleKind
 export type Report = Ledger.Report
 export type ShiftInfo = { Day: number, Night: number, IsNight: boolean, Attempt: number }
@@ -34,8 +33,6 @@ export type Public = {
 	PromptCashPack: (self: Public, player: Player, missing: number) -> (),
 	AddSale: (self: Public, amount: number, kind: SaleKind) -> number,
 	AddTip: (self: Public, amount: number) -> number,
-	AddToDrawer: (self: Public, amount: number, kind: DrawerKind) -> number,
-	CollectTips: (self: Public) -> number,
 	CountArrival: (self: Public) -> (),
 	CountResult: (self: Public, result: SaleResult) -> (),
 	AddReportStep: (self: Public, name: string, fn: ReportStep) -> (),

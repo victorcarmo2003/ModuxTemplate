@@ -1,0 +1,155 @@
+{
+ "_archetype": "Happy avatar + oversized object + giant number/NEW badge, saturated sky. Ref: Grow a Garden, Steal a Brainrot.",
+ "out": "thumb.png",
+ "size": [
+  1920,
+  1080
+ ],
+ "bg": {
+  "path": "bg.jpg",
+  "blur": 2,
+  "saturation": 1.15,
+  "brightness": 1.0
+ },
+ "layers": [
+  {
+   "path": "object.png",
+   "key": "green",
+   "at": [
+    0.68,
+    1.1
+   ],
+   "height": 1.1,
+   "anchor": "bottom",
+   "saturation": 1.3,
+   "contrast": 1.08,
+   "outline": {
+    "color": [
+     30,
+     20,
+     40
+    ],
+    "width": 9
+   },
+   "outline2": {
+    "color": [
+     255,
+     255,
+     255
+    ],
+    "width": 5
+   }
+  },
+  {
+   "path": "hero.png",
+   "key": "green",
+   "at": [
+    0.28,
+    1.22
+   ],
+   "height": 1.0,
+   "anchor": "bottom",
+   "saturation": 1.3,
+   "sharpen": 0.5,
+   "outline": {
+    "color": [
+     30,
+     20,
+     40
+    ],
+    "width": 9
+   },
+   "outline2": {
+    "color": [
+     255,
+     255,
+     255
+    ],
+    "width": 5
+   },
+   "shadow": {
+    "offset": [
+     16,
+     22
+    ],
+    "blur": 18,
+    "opacity": 0.4
+   }
+  }
+ ],
+ "text": [
+  {
+   "text": "$1,000,000/s",
+   "font": "Lalezar-Regular.ttf",
+   "size": 0.17,
+   "at": [
+    0.5,
+    0.13
+   ],
+   "color": [
+    255,
+    255,
+    255
+   ],
+   "gradient": [
+    [
+     255,
+     250,
+     170
+    ],
+    [
+     255,
+     170,
+     20
+    ]
+   ],
+   "stroke": {
+    "color": [
+     40,
+     20,
+     0
+    ],
+    "width": 0.012
+   },
+   "shadow": {
+    "offset": [
+     0.006,
+     0.008
+    ],
+    "opacity": 0.6
+   }
+  },
+  {
+   "text": "NEW!",
+   "font": "TitanOne-Regular.ttf",
+   "size": 0.1,
+   "at": [
+    0.9,
+    0.3
+   ],
+   "color": [
+    255,
+    255,
+    255
+   ],
+   "stroke": {
+    "color": [
+     200,
+     20,
+     20
+    ],
+    "width": 0.012
+   },
+   "rotate": 12
+  }
+ ],
+ "grade": {
+  "saturation": 1.15,
+  "contrast": 1.06
+ },
+ "vignette": {
+  "strength": 0.15
+ },
+ "sharpen": 0.4,
+ "safe_bottom": 0.15
+}

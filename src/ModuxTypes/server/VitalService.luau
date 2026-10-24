@@ -7,6 +7,7 @@ local Life = require(ServerScriptService.server.Vital.VitalService.Life)
 local Sanity = require(ServerScriptService.server.Vital.VitalService.Sanity)
 
 export type LifeState = Life.State
+export type Band = Sanity.Band
 export type LifeEventKind = "Down" | "Revived" | "Spectating" | "Hit" | "Wipe" | "WipeCleared"
 export type PickupHandler = (userId: number, bodyPos: Vector3?) -> ()
 export type Entry = {
@@ -34,7 +35,6 @@ export type Entry = {
 	SentMax: number,
 	LastCause: string,
 }
-export type Band = Sanity.Band
 
 export type Public = {
 	DevAutoRevive: { [number]: boolean },
@@ -72,6 +72,7 @@ export type Public = {
 	SendSanity: (self: Public, player: Player, force: boolean) -> (),
 	SendFaintCause: (self: Public, player: Player, cause: string) -> (),
 	FireLife: (self: Public, userId: number, event: LifeEventKind) -> (),
+	NightPack: (self: Public) -> Band,
 	ApplyLook: (self: Public, userId: number) -> (),
 	RefreshBand: (self: Public, userId: number, immediate: boolean) -> (),
 	SetHold: (self: Public, hold: () -> boolean) -> (),

@@ -2,6 +2,7 @@
 
 export type Public = {
 	Asked: boolean,
+	CallOwed: boolean,
 	Closed: { [number]: boolean },
 	Enabled: boolean,
 	HoldExpired: boolean,
@@ -18,6 +19,7 @@ export type Public = {
 	WaitTold: { [number]: boolean },
 	WaitUsed: number,
 	Setup: (self: Public) -> (),
+	SetCallOwed: (self: Public, owed: boolean) -> (),
 	Complete: (self: Public, player: Player, how: string?) -> (),
 	OnDayOne: (self: Public) -> boolean,
 	IsPending: (self: Public, player: Player) -> boolean,

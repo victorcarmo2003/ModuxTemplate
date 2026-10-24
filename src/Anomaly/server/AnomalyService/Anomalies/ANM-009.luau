@@ -23,7 +23,7 @@
 -- (scene Door Bulge). Not locked by LockBy (the heavy series' start) = the prompt goes back to Open Door and on the last
 -- blow (BurstAt) the door bursts open (SetOpen true, cue door_crack) and every active player gets the error below.
 -- Opening the door by hand while it is not lockable still scares who opened. Stop releases the lock (the door is a door
--- again).
+-- again). Badge (DEC-359): whoever locked it gets bolted_shut at EndsAt (RewardService:Unlock, once per account).
 --
 -- Restaurant (TASK-561, owner 2026-10-18; design/anomalies-v3-restaurant.md §8.3): the back door is DOOR-B, opened by
 -- hand (RestaurantDoorService). At the start the door is shut if someone left it open (the draught slams it). Four
@@ -85,9 +85,12 @@ type State = {
 	BurstAt: number, -- absolute: the last heavy blow; not locked = the door gives
 	Lockable: boolean,
 	Locked: boolean,
+	Locker: Player?, -- who locked it: badge bolted_shut when the door holds (DEC-359)
 	Burst: boolean,
 	Connection: { Disconnect: (self: any) -> () }?,
 }
+
+type Reward = { Unlock: (self: any, player: Player, key: string) -> boolean }
 
 -- restaurant (owner 2026-10-18): the back door is RestaurantDoorService's DOOR-B, opened by hand (door_toggle)
 local restaurantCache: RestaurantDoor? = nil
@@ -96,6 +99,14 @@ local function restaurantDoor(): RestaurantDoor
 		restaurantCache = (require :: any)(ServerScriptService.server.Vehicle.RestaurantDoorService) :: RestaurantDoor
 	end
 	return restaurantCache :: RestaurantDoor
+end
+
+local rewardCache: Reward? = nil
+local function reward(): Reward
+	if rewardCache == nil then
+		rewardCache = (require :: any)(ServerScriptService.server.Reward.RewardService) :: Reward
+	end
+	return rewardCache :: Reward
 end
 
 local function param(rule: Api.Rule?, name: string, default: number): number
@@ -199,6 +210,7 @@ const Knock: Api.Module = {
 				return
 			end
 			state.Locked = true
+			state.Locker = player
 			ctx.Publish(occ, { Anchor = LOCKED_ANCHOR })
 			ctx.Log(occ, `{player.Name} locked the back door`)
 		end)
@@ -249,6 +261,11 @@ const Knock: Api.Module = {
 		state.FinishAt = now + state.Linger
 		if not state.AnyFailed then
 			ctx.Succeed(occ)
+		end
+		-- the badge waits for the door to hold, so the notice does not land in the middle of the blows
+		const locker = state.Locker
+		if state.Locked and locker ~= nil then
+			reward():Unlock(locker, "bolted_shut")
 		end
 	end,
 

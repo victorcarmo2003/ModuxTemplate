@@ -29,8 +29,10 @@
 -- PROVISIONAL Q-398) = run to the restaurant's back door and lock it by hand (RestaurantDoorService:SetLockable).
 export type Verb = "refuse" | "serve" | "dont_look" | "light" | "shutter" | "discard" | "safe_spot" | "hide" | "lock"
 
--- Anomalies set record phase (network.md §13.5)
-export type Phase = "Signal" | "Active" | "Resolved" | "Failed"
+-- Anomalies set record phase (network.md §13.5). "Queue" (owner 2026-10-22, Provisional; anomalies-after-accept-proposal.md
+-- §9): a customer anomaly whose order was taken at the end of the talk waits in the delivery queue and its condition runs
+-- (Anomalies/Kit/CustomerActor); the scene's tension plays there, not on arrival.
+export type Phase = "Signal" | "Active" | "Queue" | "Resolved" | "Failed"
 
 export type StopReason = "Done" | "NightOver" | "Restore"
 
@@ -112,8 +114,10 @@ export type Context = {
 	Kitchen: { Alter: (kind: "rail" | "board") -> boolean },
 	-- TrafficService:Hold (TASK-104). No-op without it
 	Traffic: { Hold: (reason: string, on: boolean) -> () },
-	-- DEC-051: an anomaly customer is not an arrival; the module counts it (+ Wrong) only on a failure
-	Economy: { CountArrival: () -> (), CountResult: (result: string) -> () },
+	-- DEC-051: an anomaly customer is not an arrival; the module counts it (+ Wrong) only on a failure.
+	-- AddSale (owner 2026-10-22, Provisional): extra money into Cash (EconomyService:AddSale "Sale"; the x2 of a customer
+	-- anomaly served right); returns what went in (0 outside a selling phase or Closing)
+	Economy: { CountArrival: () -> (), CountResult: (result: string) -> (), AddSale: (amount: number) -> number },
 	-- warn with the module prefix
 	Log: (occ: Occurrence, message: string) -> (),
 }

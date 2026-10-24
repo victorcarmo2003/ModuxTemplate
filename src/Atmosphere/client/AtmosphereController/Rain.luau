@@ -1,17 +1,19 @@
 --!strict
--- Cartoon rain bound to the camera (TASK-275, ATM-4 / ATM-5; owner 2026-10-21: "gotas com cara de cartoon"). Local
--- only (parts under the CurrentCamera, no collision, no query), moved with one BulkMoveTo per frame.
---   * Drops   a pool of Settings.Drops chunky light-blue stretched balls, tilted along their fall (Wind). Each one is
---             born in a disc of RainRadius around the camera, pushed RainLead along the look, RainHeight above the eye,
---             and casts one ray along its fall: the first surface above the camera (a roof, the trailer, an awning) =
---             that column is covered, the drop waits for the next frame; else it dies on the surface it hit.
---   * Splash  a landing drop pops one, Settings.Splash of the time: a flat disc that widens and fades + three tiny
---             droplets hopping out (pool of Rules.Splashes).
+-- Cartoon rain bound to the camera (TASK-275, ATM-4 / ATM-5; owner 2026-10-21: "gotas com cara de cartoon", then "troca"
+-- the 3D drops for a ParticleEmitter). Local only (parts under the CurrentCamera, no collision, no query).
+--   * Drops   a RainCells x RainCells grid of RainCell-stud cells follows the camera, snapped to the grid so it does
+--             not swim. Each world cell casts five rays down (centre + corners; cached until the camera climbs or
+--             CACHE_LIFE s pass): any surface above the camera (a roof, the trailer, an awning) turns the cell off, so a
+--             cell half over the trailer never rains through its roof (owner 2026-10-21: "tá chovendo dentro do
+--             trailer"); else drops fall from the cell top and die on the centre's surface. Texture T_VFX_RainDropCartoon (teardrop with outline and
+--             shine), always upright (FacingCameraWorldUp) so it reads as a cartoon drop.
+--   * Splash  an emitter on each open cell's ground pops T_VFX_RainSplashCartoon (a crown with droplets) that grows and
+--             fades over SplashLife.
 --   * Drips   the open service / drive-thru window flaps drip from their free edge (Shutter_Panel* parts of a
---             `Vehicle` model whose `Shutter` attribute, written by VehicleService, is not true): a drop swells on the
---             edge for DripGrow s, falls with gravity and splashes. Edges under a roof and farther than DripRange do
---             not drip. Rate = Settings.Drips per stud of edge per second.
--- The amount scales with the atmosphere blend (Step(alpha)).
+--             `Vehicle` model whose `Shutter` attribute, written by VehicleService, is not true): an emitter along the
+--             edge drops swelling drips with gravity, and a splash emitter under it. Edges under a roof and farther
+--             than DripRange do not drip. Rate = Settings.Drips per stud of edge per second.
+-- Rates scale with the atmosphere blend (Step(alpha)).
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,16 +23,15 @@ local Content = require(ReplicatedStorage.shared.Content)
 type Settings = Content.AtmosphereRain
 type Rules = typeof(Content.Atmospheres.Rules)
 
-const ROOF_MARGIN = 1.5 -- studs: a surface this far above the camera covers the column
-const FALL_EXTRA = 40 -- studs below the camera the ray still looks for ground
-const SPAWN_BUDGET = 40 -- drop births (raycasts) per frame
-const SPLASH_BASE = 0.35 -- transparency of a fresh splash
-const SPLASH_BIT = 0.18 -- studs, splash droplet
-const SPLASH_HOP = 7 -- studs/s up of a splash droplet
-const SPLASH_OUT = 3.2 -- studs/s out of a splash droplet
-const GRAVITY = 70 -- studs/s^2 of splash droplets and drips
-const DRIP_POOL = 24
-const DRIP_SCALE = 0.8 -- drip size against a rain drop
+const ROOF_MARGIN = 1.5 -- studs: a surface this far above the camera counts as a roof
+const CACHE_LIFE = 3 -- s a world cell's rays stay valid (doors, shutters and cars move)
+const CACHE_CLIMB = 4 -- studs the camera may climb or drop before every cell is cast again
+const AREA = 100 -- studs^2 the Rate / Splash densities are given for
+const FALL_EXTRA = 60 -- studs below the camera the ray still looks for ground
+const GRAVITY = 70 -- studs/s^2 of a drip
+const DRIP_SLOTS = 4 -- window flaps that can drip at once
+const DRIP_SIZE = 0.75 -- drip size against a rain drop
+const DRIP_SPLASH = 0.6 -- drip splash size against a rain splash
 const DRIP_REFRESH = 0.5 -- s between window flap scans
 const DRIP_ROOF = 40 -- studs above a flap edge that count as a roof
 const VEHICLE_TAG = "Vehicle"
@@ -38,62 +39,49 @@ const SHUTTER_ATTRIBUTE = "Shutter" -- true = closed (VehicleService)
 const HINGE_NAME = "Shutter_Hinge"
 const PANEL_NAME = "Shutter_Panel"
 const PANEL_PREFIX = "Shutter_Panel_"
-const PARKED = CFrame.new(0, -10000, 0)
 
-type Drop = {
-	Part: Part,
-	Live: boolean,
-	Position: Vector3,
-	Velocity: Vector3,
-	Land: number, -- s left until it hits
-	Splash: boolean,
+type Cell = {
+	Drops: Part,
+	Splash: Part,
+	DropEmitter: ParticleEmitter,
+	SplashEmitter: ParticleEmitter,
+	Open: boolean,
+	Ground: boolean, -- the ray hit something (a splash has a floor)
 }
 
-type Splash = {
-	Disc: Part,
-	DiscMesh: SpecialMesh,
-	Bits: { Part },
-	Live: boolean,
-	At: Vector3,
-	Born: number,
-	Scale: number, -- 1 = a rain splash, smaller for a drip
-}
+-- Rays of one world cell: highest surface under the five rays, the centre's surface (nil = no hit)
+type Probe = { Roof: number, Floor: number? }
 
-type Drip = {
-	Part: Part,
-	Mesh: SpecialMesh,
-	Live: boolean,
-	Position: Vector3,
-	Born: number,
-	Speed: number, -- studs/s down (0 while it swells)
-	Ground: number,
+type Slot = {
+	Edge: Part,
+	Floor: Part,
+	DripEmitter: ParticleEmitter,
+	SplashEmitter: ParticleEmitter,
+	Length: number, -- studs of edge (0 = slot unused)
 }
-
-type Edge = { From: Vector3, To: Vector3, Length: number, Debt: number }
 
 export type Rain = {
 	Settings: Settings,
 	Rules: Rules,
 	Folder: Folder,
-	Drops: { Drop },
-	Splashes: { Splash },
-	Drips: { Drip },
-	Edges: { Edge },
+	Cells: { Cell },
+	Slots: { Slot },
 	Panels: { [Instance]: { BasePart } },
-	Tilt: CFrame,
+	Probes: { [string]: Probe },
+	ProbeTop: number, -- Y the cached rays were cast from
+	ProbeAt: number, -- os.clock of the cache
 	Params: RaycastParams,
-	Last: number,
+	NextCheck: number,
 	NextEdges: number,
-	Parts: { BasePart }, -- BulkMoveTo buffers, reused every frame
-	Frames: { CFrame },
-	Spawn: (self: Rain, drop: Drop, eye: CFrame, first: boolean) -> (),
-	Pop: (self: Rain, at: Vector3, scale: number, now: number) -> (),
-	Scan: (self: Rain, eye: Vector3) -> (),
+	Alpha: number,
+	Check: (self: Rain) -> (),
+	Scan: (self: Rain) -> (),
+	Rates: (self: Rain) -> (),
 	Step: (self: Rain, alpha: number) -> (),
 	Destroy: (self: Rain) -> (),
 }
 
-local function ball(name: string, size: Vector3, color: Color3, transparency: number, parent: Instance): (Part, SpecialMesh)
+local function holder(name: string, size: Vector3, parent: Instance): Part
 	const part = Instance.new("Part")
 	part.Name = name
 	part.Anchored = true
@@ -101,17 +89,59 @@ local function ball(name: string, size: Vector3, color: Color3, transparency: nu
 	part.CanQuery = false
 	part.CanTouch = false
 	part.CastShadow = false
-	part.Locked = true
-	part.Material = Enum.Material.SmoothPlastic
-	part.Color = color
-	part.Transparency = transparency
+	part.Transparency = 1
 	part.Size = size
-	part.CFrame = PARKED
-	const mesh = Instance.new("SpecialMesh")
-	mesh.MeshType = Enum.MeshType.Sphere
-	mesh.Parent = part
 	part.Parent = parent
-	return part, mesh
+	return part
+end
+
+local function dropEmitter(settings: Settings, rules: Rules, parent: Part, size: number): ParticleEmitter
+	const emitter = Instance.new("ParticleEmitter")
+	emitter.Name = "Drops"
+	emitter.Texture = rules.DropTexture
+	emitter.Color = ColorSequence.new(settings.Color)
+	emitter.LightEmission = 0.2
+	emitter.LightInfluence = 0.5
+	-- upright in the world whatever the camera does: the teardrop tip stays up
+	emitter.Orientation = Enum.ParticleOrientation.FacingCameraWorldUp
+	emitter.EmissionDirection = Enum.NormalId.Bottom
+	emitter.Shape = Enum.ParticleEmitterShape.Box
+	emitter.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	emitter.Speed = NumberRange.new(settings.Speed[1], settings.Speed[2])
+	emitter.Acceleration = settings.Wind
+	emitter.Size = NumberSequence.new(size)
+	emitter.Transparency = NumberSequence.new(settings.Transparency)
+	emitter.Rate = 0
+	emitter.Parent = parent
+	return emitter
+end
+
+local function splashEmitter(settings: Settings, rules: Rules, parent: Part, scale: number): ParticleEmitter
+	const emitter = Instance.new("ParticleEmitter")
+	emitter.Name = "Splash"
+	emitter.Texture = rules.SplashTexture
+	emitter.Color = ColorSequence.new(settings.Color)
+	emitter.LightEmission = 0.2
+	emitter.LightInfluence = 0.6
+	emitter.Orientation = Enum.ParticleOrientation.FacingCameraWorldUp
+	emitter.EmissionDirection = Enum.NormalId.Top
+	emitter.Shape = Enum.ParticleEmitterShape.Box
+	emitter.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	emitter.Speed = NumberRange.new(0)
+	emitter.Lifetime = NumberRange.new(rules.SplashLife)
+	emitter.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, rules.SplashSize * scale * 0.3),
+		NumberSequenceKeypoint.new(0.4, rules.SplashSize * scale),
+		NumberSequenceKeypoint.new(1, rules.SplashSize * scale * 1.1),
+	})
+	emitter.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, settings.Transparency),
+		NumberSequenceKeypoint.new(0.5, settings.Transparency),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	emitter.Rate = 0
+	emitter.Parent = parent
+	return emitter
 end
 
 local function isPanel(part: Instance): boolean
@@ -167,48 +197,42 @@ function Rain.new(settings: Settings, rules: Rules): Rain
 	folder.Name = "AtmosphereRain"
 	folder.Parent = camera or Workspace
 
-	const dropSize = Vector3.new(settings.Width, settings.Length, settings.Width)
-	const drops: { Drop } = {}
-	for _ = 1, settings.Drops do
-		const part = ball("Drop", dropSize, settings.Color, settings.Transparency, folder)
-		table.insert(drops, {
-			Part = part,
-			Live = false,
-			Position = Vector3.zero,
-			Velocity = Vector3.zero,
-			Land = 0,
-			Splash = false,
+	const cells: { Cell } = {}
+	const side = rules.RainCell
+	for _ = 1, rules.RainCells * rules.RainCells do
+		const drops = holder("Drops", Vector3.new(side, 0.2, side), folder)
+		const splash = holder("Splash", Vector3.new(side, 0.1, side), folder)
+		table.insert(cells, {
+			Drops = drops,
+			Splash = splash,
+			DropEmitter = dropEmitter(settings, rules, drops, settings.Size),
+			SplashEmitter = splashEmitter(settings, rules, splash, 1),
+			Open = false,
+			Ground = false,
 		})
 	end
 
-	const splashes: { Splash } = {}
-	for _ = 1, rules.Splashes do
-		const disc, discMesh = ball("Splash", Vector3.new(1, 0.06, 1), settings.Color, 1, folder)
-		const bits: { Part } = {}
-		for _ = 1, 3 do
-			table.insert(bits, (ball("SplashBit", Vector3.one * SPLASH_BIT, settings.Color, 1, folder)))
-		end
-		table.insert(splashes, {
-			Disc = disc,
-			DiscMesh = discMesh,
-			Bits = bits,
-			Live = false,
-			At = Vector3.zero,
-			Born = 0,
-			Scale = 1,
+	const slots: { Slot } = {}
+	for _ = 1, DRIP_SLOTS do
+		const edge = holder("DripEdge", Vector3.new(1, 0.1, 0.1), folder)
+		const floor = holder("DripFloor", Vector3.new(1, 0.1, 0.4), folder)
+		const drip = dropEmitter(settings, rules, edge, settings.Size * DRIP_SIZE)
+		-- a drip swells on the edge, then gravity takes it
+		drip.Speed = NumberRange.new(0)
+		drip.Acceleration = Vector3.new(0, -GRAVITY, 0)
+		drip.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.05),
+			NumberSequenceKeypoint.new(0.3, settings.Size * DRIP_SIZE),
+			NumberSequenceKeypoint.new(1, settings.Size * DRIP_SIZE),
+		})
+		table.insert(slots, {
+			Edge = edge,
+			Floor = floor,
+			DripEmitter = drip,
+			SplashEmitter = splashEmitter(settings, rules, floor, DRIP_SPLASH),
+			Length = 0,
 		})
 	end
-
-	const drips: { Drip } = {}
-	for _ = 1, DRIP_POOL do
-		const part, mesh = ball("Drip", dropSize * DRIP_SCALE, settings.Color, settings.Transparency, folder)
-		table.insert(drips, { Part = part, Mesh = mesh, Live = false, Position = Vector3.zero, Born = 0, Speed = 0, Ground = 0 })
-	end
-
-	-- every drop leans along the mean fall (the Y axis of the stretched ball points back up its path)
-	const mean = (settings.Speed[1] + settings.Speed[2]) / 2
-	const up = -Vector3.new(settings.Wind.X, -mean, settings.Wind.Z).Unit
-	const right = up:Cross(Vector3.zAxis).Unit
 
 	const params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
@@ -218,75 +242,101 @@ function Rain.new(settings: Settings, rules: Rules): Rain
 		Settings = settings,
 		Rules = rules,
 		Folder = folder,
-		Drops = drops,
-		Splashes = splashes,
-		Drips = drips,
-		Edges = {},
+		Cells = cells,
+		Slots = slots,
 		Panels = setmetatable({}, { __mode = "k" }),
-		Tilt = CFrame.fromMatrix(Vector3.zero, right, up),
+		Probes = {},
+		ProbeTop = 0,
+		ProbeAt = 0,
 		Params = params,
-		Last = os.clock(),
+		NextCheck = 0,
 		NextEdges = 0,
-		Parts = {},
-		Frames = {},
+		Alpha = 0,
 	}, Rain) :: any
 end
 
--- Births a drop above the camera; `first` spreads the first wave along the whole fall (no sheet at the top).
-function Rain.Spawn(self: Rain, drop: Drop, eye: CFrame, first: boolean)
+-- Re-centres the grid on the camera and finds the roof / ground of every cell.
+function Rain.Check(self: Rain)
+	const camera = Workspace.CurrentCamera
+	if camera == nil then
+		return
+	end
 	const settings = self.Settings
 	const rules = self.Rules
-	const look = Vector3.new(eye.LookVector.X, 0, eye.LookVector.Z)
-	const lead = if look.Magnitude > 1e-3 then look.Unit * rules.RainRadius * rules.RainLead else Vector3.zero
-	const angle = math.random() * math.pi * 2
-	const radius = rules.RainRadius * math.sqrt(math.random())
-	const eyeY = eye.Position.Y
-	const top = Vector3.new(
-		eye.Position.X + lead.X + math.cos(angle) * radius,
-		eyeY + rules.RainHeight,
-		eye.Position.Z + lead.Z + math.sin(angle) * radius
-	)
-	const speed = settings.Speed[1] + math.random() * (settings.Speed[2] - settings.Speed[1])
-	const velocity = Vector3.new(settings.Wind.X, -speed, settings.Wind.Z)
-	const fall = (rules.RainHeight + FALL_EXTRA) * velocity.Magnitude / speed
-	const hit = Workspace:Raycast(top, velocity.Unit * fall, self.Params)
-	if hit and hit.Position.Y > eyeY + ROOF_MARGIN then
-		return -- covered column: try again next frame
-	end
-	local time = (if hit then (hit.Position - top).Magnitude else fall) / velocity.Magnitude
-	local start = top
-	if first then
-		const skip = math.random() * time
-		start += velocity * skip
-		time -= skip
-	end
-	drop.Live = true
-	drop.Position = start
-	drop.Velocity = velocity
-	drop.Land = time
-	drop.Splash = hit ~= nil and math.random() < settings.Splash
-end
+	const side = rules.RainCell
+	const half = (rules.RainCells - 1) / 2
+	const eye = camera.CFrame.Position
+	const originX = math.floor(eye.X / side + 0.5) * side
+	const originZ = math.floor(eye.Z / side + 0.5) * side
+	const top = eye.Y + rules.RainHeight
 
-function Rain.Pop(self: Rain, at: Vector3, scale: number, now: number)
-	for _, splash in self.Splashes do
-		if not splash.Live then
-			splash.Live = true
-			splash.At = at
-			splash.Born = now
-			splash.Scale = scale
-			splash.Disc.Transparency = SPLASH_BASE
-			for _, bit in splash.Bits do
-				bit.Transparency = SPLASH_BASE
+	const ignore: { Instance } = { self.Folder }
+	const character = Players.LocalPlayer.Character
+	if character then
+		table.insert(ignore, character)
+	end
+	self.Params.FilterDescendantsInstances = ignore
+
+	const now = os.clock()
+	if now - self.ProbeAt > CACHE_LIFE or math.abs(top - self.ProbeTop) > CACHE_CLIMB then
+		table.clear(self.Probes)
+		self.ProbeAt = now
+		self.ProbeTop = top
+	end
+	const castTop = self.ProbeTop
+	const reach = Vector3.new(0, -(castTop - eye.Y + FALL_EXTRA), 0)
+	const inset = side / 2 - 0.25
+
+	const fastest = settings.Speed[2]
+	const slowest = settings.Speed[1]
+	-- the splash sprite stands on the ground: its centre a bit above the hit
+	const lift = rules.SplashSize * 0.35
+	local index = 0
+	for i = -half, half do
+		for j = -half, half do
+			index += 1
+			const cell = self.Cells[index]
+			const x = originX + i * side
+			const z = originZ + j * side
+			const key = `{x}:{z}`
+			local probe = self.Probes[key]
+			if probe == nil then
+				const centre = Workspace:Raycast(Vector3.new(x, castTop, z), reach, self.Params)
+				local roof = if centre then centre.Position.Y else -math.huge
+				for _, corner in { Vector2.new(-1, -1), Vector2.new(-1, 1), Vector2.new(1, -1), Vector2.new(1, 1) } do
+					const hit = Workspace:Raycast(Vector3.new(x + corner.X * inset, castTop, z + corner.Y * inset), reach, self.Params)
+					if hit then
+						roof = math.max(roof, hit.Position.Y)
+					end
+				end
+				probe = { Roof = roof, Floor = if centre then centre.Position.Y else nil }
+				self.Probes[key] = probe
 			end
-			return
+			const floor = (probe :: Probe).Floor
+			const groundY = floor or eye.Y - FALL_EXTRA
+			const open = (probe :: Probe).Roof <= eye.Y + ROOF_MARGIN
+			cell.Open = open
+			cell.Ground = floor ~= nil
+			if open then
+				const fall = top - groundY
+				cell.Drops.CFrame = CFrame.new(x, top, z)
+				cell.DropEmitter.Lifetime = NumberRange.new(fall / fastest, fall / slowest)
+				cell.Splash.CFrame = CFrame.new(x, groundY + lift, z)
+			end
 		end
 	end
 end
 
--- Free edges of the open window flaps near the camera, not under a roof.
-function Rain.Scan(self: Rain, eye: Vector3)
-	const edges: { Edge } = {}
+-- Free edges of the open window flaps near the camera, not under a roof, one per slot.
+function Rain.Scan(self: Rain)
+	const camera = Workspace.CurrentCamera
+	if camera == nil then
+		return
+	end
+	const eye = camera.CFrame.Position
 	const range = self.Rules.DripRange
+	const lift = self.Rules.SplashSize * DRIP_SPLASH * 0.35
+	local used = 0
 	for _, model in CollectionService:GetTagged(VEHICLE_TAG) do
 		if model:GetAttribute(SHUTTER_ATTRIBUTE) == true then
 			continue
@@ -303,7 +353,7 @@ function Rain.Scan(self: Rain, eye: Vector3)
 			self.Panels[model] = found
 		end
 		for _, panel in panels :: { BasePart } do
-			if panel.Parent == nil then
+			if used >= #self.Slots or panel.Parent == nil then
 				continue
 			end
 			const from, to = freeEdge(panel)
@@ -322,181 +372,64 @@ function Rain.Scan(self: Rain, eye: Vector3)
 			if Workspace:Raycast(mid + Vector3.new(0, 0.3, 0), Vector3.new(0, DRIP_ROOF, 0), params) then
 				continue
 			end
-			table.insert(edges, { From = from, To = to, Length = (to - from).Magnitude, Debt = 0 })
+			const floor = Workspace:Raycast(mid - Vector3.new(0, 0.2, 0), Vector3.new(0, -FALL_EXTRA, 0), params)
+			const groundY = if floor then floor.Position.Y else mid.Y - FALL_EXTRA
+			used += 1
+			const slot = self.Slots[used]
+			const length = (to - from).Magnitude
+			const flat = CFrame.lookAt(mid, mid + Vector3.new(to.X - from.X, 0, to.Z - from.Z))
+			slot.Length = length
+			slot.Edge.Size = Vector3.new(0.1, 0.1, length)
+			slot.Edge.CFrame = flat - Vector3.new(0, 0.15, 0)
+			slot.Floor.Size = Vector3.new(0.4, 0.1, length)
+			slot.Floor.CFrame = flat - Vector3.new(0, mid.Y - groundY - lift, 0)
+			slot.DripEmitter.Lifetime = NumberRange.new(math.sqrt(2 * math.max(mid.Y - groundY, 0.5) / GRAVITY))
+			slot.SplashEmitter.Enabled = floor ~= nil
 		end
 	end
-	-- keep the drip debt of edges that did not move much (same flap, scan to scan)
-	for _, edge in edges do
-		for _, previous in self.Edges do
-			if (previous.From - edge.From).Magnitude < 0.5 then
-				edge.Debt = previous.Debt
-				break
-			end
-		end
+	for index = used + 1, #self.Slots do
+		self.Slots[index].Length = 0
 	end
-	self.Edges = edges
+end
+
+function Rain.Rates(self: Rain)
+	const settings = self.Settings
+	const alpha = self.Alpha
+	const area = self.Rules.RainCell * self.Rules.RainCell / AREA
+	for _, cell in self.Cells do
+		cell.DropEmitter.Rate = if cell.Open then settings.Rate * area * alpha else 0
+		cell.SplashEmitter.Rate = if cell.Open and cell.Ground then settings.Splash * area * alpha else 0
+	end
+	for _, slot in self.Slots do
+		const rate = settings.Drips * slot.Length * alpha
+		slot.DripEmitter.Rate = rate
+		slot.SplashEmitter.Rate = rate
+	end
 end
 
 function Rain.Step(self: Rain, alpha: number)
-	const camera = Workspace.CurrentCamera
-	if camera == nil then
-		return
-	end
 	const now = os.clock()
-	const dt = math.min(now - self.Last, 0.1)
-	self.Last = now
-	const eye = camera.CFrame
-	const settings = self.Settings
-	const rules = self.Rules
-	const parts = self.Parts
-	const frames = self.Frames
-	table.clear(parts)
-	table.clear(frames)
-
-	const ignore: { Instance } = { self.Folder }
-	const character = Players.LocalPlayer.Character
-	if character then
-		table.insert(ignore, character)
+	local dirty = alpha ~= self.Alpha
+	self.Alpha = alpha
+	if now >= self.NextCheck then
+		self.NextCheck = now + self.Rules.RoofCheck
+		self:Check()
+		dirty = true
 	end
-	self.Params.FilterDescendantsInstances = ignore
-
-	-- drops
-	const wanted = math.floor(#self.Drops * alpha + 0.5)
-	local budget = SPAWN_BUDGET
-	for index, drop in self.Drops do
-		if drop.Live then
-			drop.Land -= dt
-			if drop.Land <= 0 then
-				drop.Live = false
-				if drop.Splash then
-					self:Pop(drop.Position + drop.Velocity * (dt + drop.Land), 1, now)
-				end
-			else
-				drop.Position += drop.Velocity * dt
-			end
-		end
-		if not drop.Live and index <= wanted and budget > 0 then
-			budget -= 1
-			self:Spawn(drop, eye, drop.Land == 0) -- 0 = never fell yet
-		end
-		if drop.Live then
-			table.insert(parts, drop.Part)
-			table.insert(frames, self.Tilt + drop.Position)
-		elseif drop.Part.CFrame ~= PARKED then
-			table.insert(parts, drop.Part)
-			table.insert(frames, PARKED)
-		end
-	end
-
-	-- window drips
 	if now >= self.NextEdges then
 		self.NextEdges = now + DRIP_REFRESH
-		self:Scan(eye.Position)
+		self:Scan()
+		dirty = true
 	end
-	if settings.Drips > 0 then
-		for _, edge in self.Edges do
-			edge.Debt += settings.Drips * edge.Length * alpha * dt
-			while edge.Debt >= 1 do
-				edge.Debt -= 1
-				for _, drip in self.Drips do
-					if not drip.Live then
-						const at = edge.From:Lerp(edge.To, math.random()) - Vector3.new(0, 0.1, 0)
-						const hit = Workspace:Raycast(at, Vector3.new(0, -FALL_EXTRA, 0), self.Params)
-						drip.Live = true
-						drip.Position = at
-						drip.Born = now
-						drip.Speed = 0
-						drip.Ground = if hit then hit.Position.Y else at.Y - FALL_EXTRA
-						break
-					end
-				end
-			end
-		end
-	end
-	const half = settings.Length * DRIP_SCALE / 2
-	for _, drip in self.Drips do
-		if not drip.Live then
-			if drip.Part.CFrame ~= PARKED then
-				table.insert(parts, drip.Part)
-				table.insert(frames, PARKED)
-			end
-			continue
-		end
-		const age = now - drip.Born
-		if age < rules.DripGrow then
-			-- swells on the edge, hanging from it
-			const grow = 0.25 + 0.75 * (age / rules.DripGrow)
-			drip.Mesh.Scale = Vector3.new(grow, grow, grow)
-			table.insert(parts, drip.Part)
-			table.insert(frames, CFrame.new(drip.Position - Vector3.new(0, half * grow, 0)))
-			continue
-		end
-		drip.Mesh.Scale = Vector3.one
-		drip.Speed += GRAVITY * dt
-		drip.Position -= Vector3.new(0, drip.Speed * dt, 0)
-		if drip.Position.Y - half <= drip.Ground then
-			drip.Live = false
-			self:Pop(Vector3.new(drip.Position.X, drip.Ground, drip.Position.Z), 0.6, now)
-			table.insert(parts, drip.Part)
-			table.insert(frames, PARKED)
-		else
-			table.insert(parts, drip.Part)
-			table.insert(frames, CFrame.new(drip.Position - Vector3.new(0, half, 0)))
-		end
-	end
-
-	-- splashes: a widening disc + three droplets hopping out
-	const life = rules.SplashLife
-	for _, splash in self.Splashes do
-		if not splash.Live then
-			continue
-		end
-		const age = now - splash.Born
-		const t = age / life
-		if t >= 1 then
-			splash.Live = false
-			splash.Disc.Transparency = 1
-			table.insert(parts, splash.Disc)
-			table.insert(frames, PARKED)
-			for _, bit in splash.Bits do
-				bit.Transparency = 1
-				table.insert(parts, bit)
-				table.insert(frames, PARKED)
-			end
-			continue
-		end
-		const out = 1 - (1 - t) * (1 - t)
-		const width = rules.SplashSize * splash.Scale * (0.2 + 0.8 * out)
-		splash.DiscMesh.Scale = Vector3.new(width, 1, width)
-		const fade = SPLASH_BASE + (1 - SPLASH_BASE) * t
-		splash.Disc.Transparency = fade
-		table.insert(parts, splash.Disc)
-		table.insert(frames, CFrame.new(splash.At + Vector3.new(0, 0.04, 0)))
-		const hop = SPLASH_HOP * splash.Scale
-		const height = math.max(0, hop * age - 0.5 * GRAVITY * age * age)
-		for index, bit in splash.Bits do
-			const turn = (index / #splash.Bits) * math.pi * 2 + splash.Born
-			const reach = SPLASH_OUT * splash.Scale * age
-			bit.Transparency = fade
-			table.insert(parts, bit)
-			table.insert(
-				frames,
-				CFrame.new(splash.At + Vector3.new(math.cos(turn) * reach, 0.05 + height, math.sin(turn) * reach))
-			)
-		end
-	end
-
-	if #parts > 0 then
-		Workspace:BulkMoveTo(parts, frames, Enum.BulkMoveMode.FireCFrameChanged)
+	if dirty then
+		self:Rates()
 	end
 end
 
 function Rain.Destroy(self: Rain)
 	self.Folder:Destroy()
-	table.clear(self.Drops)
-	table.clear(self.Splashes)
-	table.clear(self.Drips)
-	table.clear(self.Edges)
+	table.clear(self.Cells)
+	table.clear(self.Slots)
 end
 
 return Rain

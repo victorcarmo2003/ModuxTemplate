@@ -81,6 +81,7 @@ export type LightPresets = {
 	Night10: LightPreset,
 	Lobby: LightPreset,
 	Cinematic: LightPreset, -- the opening cutscene only (Cutscenes[].Look): warm, contrasty, soft bloom and sun rays
+	Dawn: LightPreset, -- "The Second Coffee" (Cutscenes[].Look = "Dawn"): Cinematic cooled and pinker, a low sun
 	ClassStage: LightPreset, -- lobby while the class screen is open: the world dims, a spotlight keeps the rig lit
 	ClassStageBlend: number, -- s of the blend into and out of ClassStage (faster than BlendTime: it follows a screen)
 	LobbyClock: number, -- ClockTime of the lobby (the user set it at night)
@@ -88,6 +89,7 @@ export type LightPresets = {
 	GoldenFrom: number, -- hour the golden hour starts (§5.2: 4 PM)
 	GoldenTo: number, -- hour it is full (6 PM)
 	DuskClock: number, -- ClockTime of the intro's day look on a night shift; its Nightfall runs the sun down from here (DEC-300)
+	DawnClock: number, -- ClockTime of the Dawn look (the sun just over the roofs); its Regress runs the clock BACK to NightClock
 	BlendTime: number, -- s of the smooth (eased) blend between two presets
 	Blackout: BlackoutLook,
 	SwitchOff: SwitchOffLook,
@@ -278,6 +280,35 @@ const presets: LightPresets = {
 		SunRays = 0.09,
 		SunRaysSpread = 0.28,
 	},
+	-- "The Second Coffee" dawn (owner request 2026-10-22, PROVISIONAL): the Cinematic warmth with the heat taken out and a
+	-- rose cast, a lower sun (DawnClock), more haze for the long shadows, softer rays. It must read as the kindest light of the
+	-- whole game, so the regress to Night10 hurts. Judged in Play.
+	Dawn = {
+		Brightness = 1.45,
+		Exposure = -0.4,
+		Ambient = Color3.fromRGB(86, 76, 84),
+		OutdoorAmbient = Color3.fromRGB(106, 94, 104),
+		ColorShiftTop = Color3.fromRGB(255, 202, 168),
+		ColorShiftBottom = Color3.fromRGB(0, 0, 0),
+		EnvDiffuse = 0.7,
+		EnvSpecular = 0.7,
+		ShadowSoftness = 0.3,
+		AtmDensity = 0.46,
+		AtmOffset = 1,
+		AtmGlare = 1.8,
+		AtmHaze = 1,
+		AtmColor = Color3.fromRGB(220, 194, 196),
+		AtmDecay = Color3.fromRGB(240, 170, 134),
+		CCBrightness = 0,
+		Saturation = 0.2,
+		Contrast = 0.14,
+		Tint = Color3.fromRGB(255, 236, 224),
+		BloomIntensity = 0.45,
+		BloomSize = 34,
+		BloomThreshold = 1.5,
+		SunRays = 0.1,
+		SunRaysSpread = 0.3,
+	},
 	-- Class screen stage (owner 2026-10-21: "too much red, too much contrast, the focus should be only on the skin"):
 	-- the lobby dims to a soft night and the haze softens the background; LobbyController adds a local spotlight on the
 	-- rig. 2nd pass (owner: "too dark behind and on the rig, more outside light"): a dim night, not a black void.
@@ -315,6 +346,7 @@ const presets: LightPresets = {
 	GoldenFrom = 16,
 	GoldenTo = 18,
 	DuskClock = 16.5, -- PROVISIONAL (DEC-300): late afternoon light, the sun sets during the Nightfall blend
+	DawnClock = 6.8, -- PROVISIONAL: the sun a hand over the horizon; the Regress runs it back through 6 to the night
 	BlendTime = 3,
 	Blackout = {
 		Ambient = Color3.fromRGB(16, 17, 28),

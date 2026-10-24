@@ -56,10 +56,11 @@ return Table.new({
 	-- TASK-354 (owner 2026-10-17, Provisional): no handler and no anchor any more (refusing = closing the service window);
 	-- the row stays for the Interact enum and the Acted/metrics verb "refuse"
 	{ Key = "refuse", Text = "Refuse", Hold = 1, Radius = 10, Requires = {}, Night = "Any", Wave = 1 },
-	-- Tip jar (DEC-239, user decision 2026-10-13; was "collect_cash" on the register, Q-201): tips in the jar -> party Cash
-	-- now. Anchor Prompt_Collect on the TRL-TIPJAR model (TipJarService); only enabled while the shop takes entries and the
-	-- jar holds money. Short hold, smaller radius than the counter prompts so it never fights the ketchup / customer pills.
-	{ Key = "collect_tips", Text = "Collect Tips", Hold = 0.4, Radius = 5, Requires = {}, Night = "Any", Wave = 1 },
+	-- collect_tips (the tip jar, DEC-239) left with the jar (owner 2026-10-22): tips go straight to Cash at the sale.
+	-- Walt's notes (owner request 2026-10-22, Provisional; Content.Hints): Prompt_Read on the paper of the front counter
+	-- (HINT-NOTE; HintService makes the anchor). Opens the close-up of the paper on this client (HintOpen); nothing else
+	-- changes on the server.
+	{ Key = "read_hints", Text = "Read", Hold = 0, Radius = 6, Requires = {}, Night = "Any", Wave = 3 },
 	{ Key = "restock", Text = "Restock", Hold = 1, Radius = 7, Requires = { Held = "Package" }, Night = "Any", Wave = 1 },
 	-- Gift bowl (owner request 2026-10-14, Provisional): a topping that just unlocked comes as a CLOSED bowl; "Open" unwraps it and
 	-- fills it to capacity (KitchenService, Stations/Toppings). Anchor Prompt_Unwrap_<Suf> (made at runtime when the map has none)
@@ -113,7 +114,9 @@ return Table.new({
 		Radius = 7,
 		-- "Call" (owner decision 2026-10-17, Provisional): the night call no longer locks the window; opening it while Walt
 		-- talks starts the night at once (RoundService:OpenShop), the call keeps going
-		Requires = { Phase = { "Call", "Prep", "Open", "Closing", "Night" } },
+		-- "Summary" (owner 2026-10-21: "comprei o upgrade, mas não consegui abrir a loja"): the tutorial's upgrade lesson
+		-- sends the rookie to the lever while the report break still runs; opening there starts the next night too
+		Requires = { Phase = { "Summary", "Call", "Prep", "Open", "Closing", "Night" } },
 		Night = "Any",
 		Wave = 1,
 	},

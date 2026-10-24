@@ -177,6 +177,8 @@ function AudioController:Setup()
 	self.ScoreHold = Vide.source(false) :: Vide.Source<boolean>
 	-- kitchen duck multiplier (1 = none) and the director's dev hook (`/dev score <stage>`)
 	self.KitchenDuck = 1 :: number
+	-- music duck multiplier of the cutscene Fx (1 = none; SetMusicDuck)
+	self.MusicDuck = 1 :: number
 	self.ScoreHook = nil :: ((command: string) -> ())?
 	-- rows with a Studio name, resolved to the Studio Sound's id (key -> copy of the row with Id set)
 	self.Resolved = {} :: { [string]: Content.Sound }
@@ -247,6 +249,9 @@ function AudioController:ApplyGroup(name: string, time: number?)
 	local volume = self.Volumes[name] or 1
 	if name == "Music" and self.Ducked() then
 		volume *= RULES.DuckOnCall
+	end
+	if name == "Music" then
+		volume *= self.MusicDuck
 	end
 	if name == KITCHEN then
 		volume = self.KitchenDuck -- no user slider of its own: the Sfx one above it applies
@@ -323,6 +328,17 @@ function AudioController:SetKitchenDuck(multiplier: number, time: number?)
 	end
 	self.KitchenDuck = value
 	self:ApplyGroup(KITCHEN, time)
+end
+
+-- Music group multiplier (1 = none) of a cutscene's Duck effect (CutsceneController/Fx), on top of the user volume and the
+-- call duck; tweened over `time`
+function AudioController:SetMusicDuck(multiplier: number, time: number?)
+	const value = math.clamp(multiplier, 0, 1)
+	if math.abs(value - self.MusicDuck) < 0.001 then
+		return
+	end
+	self.MusicDuck = value
+	self:ApplyGroup("Music", time)
 end
 
 function AudioController:Volume(row: Content.Sound, opts: PlayOptions?): number

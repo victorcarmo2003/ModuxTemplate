@@ -12,6 +12,7 @@
 --   camera_static  one security camera (Content.Security.Cams) loses its picture: the monitor shows only static on it.
 --                  Fixed by holding Fix Camera from below (Radius studs, the anchor sits at the camera, high on the
 --                  wall), never through a wall (server line of sight). No deadline: the cost is a blind camera.
+--                  Only from outside the trailer, except a camera with Security.Cams[i].FixInside (CAM3, by PICK UP).
 --
 -- Draw: from Nights FromNight on, at most PerNight[night] chores a night, one every Every {min, max} s of the Night
 -- phase; each chore at most once at a time and never while an anomaly runs (it waits Retry s). Not under the tutorial

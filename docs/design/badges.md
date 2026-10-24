@@ -32,7 +32,7 @@ Ordem = ordem em que o jogador costuma ganhar.
 | 5 | `first_night` | **First Night Shift** | "Survive your first night." | vencer N1 | não | `N1:night` |
 | 6 | `not_today` | **Not Today** | "Turn away a customer who wasn't quite right." | recusar 1 cliente anômalo (família A) corretamente | não | recusa certa em `AnomalyService` |
 | 7 | `lights_back` | **Lights Back On** | "Get the power back before it finds you." | religar o disjuntor no apagão (ANM-020) antes dos 30 s | não | apagão resolvido |
-| 8 | `held_breath` | **Held My Breath** | "Hide in time when something comes knocking." | estar no ponto seguro quando o Walker (ANM-007) passa | não | `Hide` concluído sem desmaio |
+| 8 | `bolted_shut` | **Bolted Shut** | "Lock the door before it gets in." | trancar a porta dos fundos na Batida (ANM-009) antes das batidas pesadas, e ela aguentar (DEC-359; substitui `held_breath`, o Walker saiu na DEC-307) | não | `RestaurantDoorService.LockedBy` na ANM-009; dado a quem trancou no fim da anomalia |
 | 9 | `eyes_down` | **Eyes Down** | "Don't look up." | passar pela Sombra no teto (ANM-019) sem olhar para cima | sim | ANM-019 terminou sem penalidade de olhar |
 | 10 | `met_hunter` | **Met the Hunter** | "Some things wait for you outside." | ficar **tempo demais fora do restaurante** à noite e encontrar o Hunter (Q-404) | sim | evento do Hunter |
 | 11 | `halfway` | **Halfway to Dawn** | "Survive five nights." | vencer N5 | não | `N5:night` |
@@ -69,13 +69,16 @@ Ordem = ordem em que o jogador costuma ganhar.
 
 Criados no Creator Hub (IDs em `Content/Achievements.luau`): 1 `welcome` 2319638173193014 · 2 `tutorial_done`
 1723416246988299 · 3 `first_hotdog` 2233023475659459 · 4 `golden_flip` 2104755363239074 · 5 `first_night`
-579574344858433 · 6 `not_today` 664777349866945. Faltam 7–15 (5 grátis por dia; a cota zera às 21h de Brasília).
+579574344858433 · 6 `not_today` 664777349866945 · 7 `lights_back` 3346220351559110 · 8 `bolted_shut` 25820054546149 ·
+9 `eyes_down` 1336379813159280 · 10 `met_hunter` 3893516056885966 · 11 `halfway` 3931705433826652 (2026-10-22).
+Faltam 12–15 (5 grátis por dia; a cota zera às 21h de Brasília).
 
 Gatilhos ligados (`RewardService:Unlock`, 1× por conta, sem gema): `welcome` (perfil carregou), `tutorial_done`
 (`TutorialService:Complete` com "done"; pular não conta), `first_hotdog` (`CustomerService.Acted` serve Perfect/Complete),
 `golden_flip` (`KitchenService.Emitted` "grill_flip" com nota Perfect), `not_today` (recusa de cliente com `Variant`),
-`first_night` / `halfway` / `kept_light` (`NightResolved` "Won" na N1 / N5 / última). Sem gatilho ainda: `lights_back`,
-`held_breath`, `eyes_down`, `met_hunter`, `hot_dog_hundred`, `not_a_scratch`. Badge sem ID fica só marcado no perfil e é
+`first_night` / `halfway` / `kept_light` (`NightResolved` "Won" na N1 / N5 / última), `bolted_shut` (ANM-009: quem
+trancou a porta, no fim da anomalia; DEC-359). Sem gatilho ainda: `lights_back`, `eyes_down`, `met_hunter`,
+`hot_dog_hundred`, `not_a_scratch`. Badge sem ID fica só marcado no perfil e é
 dado no próximo login, quando o ID entrar.
 
 ## 6. Implementação (pendente)

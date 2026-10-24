@@ -37,22 +37,27 @@ const BEAD = 0.05 -- share of the bun length
 const BEAD_MIN = 0.04 -- studs
 const SAUCE_LIFT = 0.35 -- beads over the top of the stack
 const WRAP = math.rad(75) -- the angle around the sausage Y = 0 / 1 reaches from its top
+-- owner 2026-10-22 ("a linha de tracejado mais para baixo"): the middle of the S (Y = 0.5) turned this far from the top toward
+-- the Handle's +across side, the face the cooking focus's camera sees (the drawn sauce, its guide and the grade all use it)
+const TILT = math.rad(24) -- owner 2026-10-22, UI Labs (SauceGuide story)
 
 local HotDogVisual = {}
 
 HotDogVisual.VisualName = VISUAL_NAME
 HotDogVisual.Sauce = Sauce
 HotDogVisual.Wrap = WRAP
+HotDogVisual.Tilt = TILT
 
 -- The direction from the sausage's axis of the bun-space share `y` (0..1 across): `up` at 0.5, toward `across` past it
-function HotDogVisual.around(up: Vector3, across: Vector3, y: number): Vector3
-	const angle = (2 * y - 1) * WRAP
+-- (`tilt` = radians instead of TILT: the UI Labs story tries other values)
+function HotDogVisual.around(up: Vector3, across: Vector3, y: number, tilt: number?): Vector3
+	const angle = (2 * y - 1) * WRAP + (tilt or TILT)
 	return up * math.cos(angle) + across * math.sin(angle)
 end
 
 -- The bun-space share across of an offset from the sausage's axis (its parts on `up` and `across`); past 0..1 off the wrap
 function HotDogVisual.acrossOf(onUp: number, onAcross: number): number
-	return math.atan2(onAcross, onUp) / (2 * WRAP) + 0.5
+	return (math.atan2(onAcross, onUp) - TILT) / (2 * WRAP) + 0.5
 end
 
 -- The radius of the sausage (studs, Handle scale) of a hot dog, nil = no Sausage part (flat sauce)

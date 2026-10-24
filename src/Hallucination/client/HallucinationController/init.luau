@@ -48,6 +48,7 @@ const VEHICLE_TAG = "Vehicle"
 const TICK_RATE = 4 -- Hz: eligibility and roll checks
 const RETRY = 5 -- s: next try when nothing could play
 const SPEAKER = "Walt"
+const TALK_ATTRIBUTE = "TalkCloseUp" -- TabletController: on LocalPlayer while the talk close-up is on
 
 const HallucinationController = Modux.Controller("HallucinationController", {
 	Require = {
@@ -77,6 +78,26 @@ function HallucinationController:Setup()
 	self.WhisperText = Vide.source("") :: Vide.Source<string>
 	self.Env = nil :: Context.Env?
 	self.Gui = nil :: ScreenGui?
+	self.TalkDashAt = 0 :: number -- os.clock before which the talk close-up never rolls the cloak again
+end
+
+-- Talk close-up opened (TalkCloseUp on the LocalPlayer, TabletController): rarely, the black cloak dashes past behind the
+-- customer a moment later, if the close-up is still on (Rules.TalkDash, owner 2026-10-21)
+function HallucinationController:OnTalk()
+	const dash = RULES.TalkDash
+	const now = os.clock()
+	if Players.LocalPlayer:GetAttribute(TALK_ATTRIBUTE) ~= true or now < self.TalkDashAt or not self:Eligible() then
+		return
+	end
+	if self.Random:NextNumber() >= dash.Chance then
+		return
+	end
+	self.TalkDashAt = now + dash.Cooldown
+	task.delay(self.Random:NextNumber(dash.Delay[1], dash.Delay[2]), function()
+		if Players.LocalPlayer:GetAttribute(TALK_ATTRIBUTE) == true and self:Eligible() then
+			self:PlayScare({ dash.Key })
+		end
+	end)
 end
 
 -- Effects/<name> modules; rows naming a missing module warn once and never roll.
@@ -278,8 +299,10 @@ function HallucinationController:PlayScare(keys: { string }?): string?
 	if #list == 0 then
 		list = self:ScareCandidates(now, env, allowed, false)
 	end
+	-- keys named by the caller play even at Weight 0 (`dev scare shadow_dash`, a switched-off row to hear it again)
+	const named = #allowed > 0
 	const row = Context.Pick(self.Random, list, function(candidate: Content.Hallucination): number
-		return candidate.Weight
+		return if named then math.max(candidate.Weight, 1) else candidate.Weight
 	end)
 	if row == nil then
 		return nil
@@ -432,6 +455,9 @@ end)
 
 HallucinationController:OnStart(function(self)
 	self.Env = self:BuildEnv()
+	Players.LocalPlayer:GetAttributeChangedSignal(TALK_ATTRIBUTE):Connect(function()
+		self:OnTalk()
+	end)
 	-- PlayerGui may arrive a frame late; do not hold up the other OnStart.
 	task.spawn(function()
 		self:Mount(Players.LocalPlayer:WaitForChild("PlayerGui"))

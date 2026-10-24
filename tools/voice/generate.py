@@ -102,12 +102,35 @@ def filters(role, phone):
     return ",".join(f)
 
 
-def post(wav_in, out_path, role, phone):
-    ext = os.path.splitext(out_path)[1]
-    cmd = [ffmpeg_exe(), "-y", "-loglevel", "error", "-i", wav_in, "-af", filters(role, phone), "-ac", "1", "-ar", str(CFG["out_rate"])]
-    if ext == ".ogg":
+def line_noise():
+    """Phone line under the voice (owner 2026-10-22): pink hiss + sparse velvet crackle, band-limited like the phone,
+    mixed after loudnorm so its level stays fixed. Empty when config phone.noise is off."""
+    ph = CFG["phone"]
+    n = ph.get("noise")
+    if not n:
+        return ""
+    rate = CFG["out_rate"]
+    band = f"highpass=f={ph['highpass']},lowpass=f={ph['lowpass']}"
+    return (f"anoisesrc=color=pink:amplitude={n['hiss']}:sample_rate={rate},{band}[hiss];"
+            f"anoisesrc=color=velvet:density={n['crackle_density']}:amplitude={n['crackle']}:sample_rate={rate},{band}[crackle];")
+
+
+def encode(wav_in, out_path, chain, phone):
+    """ffmpeg: wav_in through `chain` (+ the line noise on phone lines) into out_path (.ogg = vorbis)."""
+    noise = line_noise() if phone else ""
+    cmd = [ffmpeg_exe(), "-y", "-loglevel", "error", "-i", wav_in]
+    if noise:
+        cmd += ["-filter_complex", f"[0:a]{chain}[voice];{noise}[voice][hiss][crackle]amix=inputs=3:duration=first:normalize=0"]
+    else:
+        cmd += ["-af", chain]
+    cmd += ["-ac", "1", "-ar", str(CFG["out_rate"])]
+    if os.path.splitext(out_path)[1] == ".ogg":
         cmd += ["-c:a", "libvorbis", "-q:a", str(CFG["ogg_quality"])]
     subprocess.run(cmd + [out_path], check=True)
+
+
+def post(wav_in, out_path, role, phone):
+    encode(wav_in, out_path, filters(role, phone), phone)
 
 
 def is_phone(entry):

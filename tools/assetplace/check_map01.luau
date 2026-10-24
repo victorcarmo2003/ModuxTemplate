@@ -226,7 +226,8 @@ local VEHICLE_SPEC = {
 		-- TASK-284 (2026-10-14): the red switch TRL-SWITCH-OPEN (open_sign) left; the window lever TRL-SHUTTER is the shop
 		own = { [2] = { answer_phone = 1, switch_light = 1 }, [3] = { shutter_toggle = 1 } },
 		slots = { RailSlots = 8, BoardSlots = 4 }, -- 4 = the four prep seats (DEC-223, TASK-172)
-		counter = { ids = { "TRL-G", "TRL-R", "TRL-B", "TRL-T", "TRL-K", "TRL-TIPJAR" }, relY = 4.6 },
+		-- TRL-TIPJAR left (owner 2026-10-22: no tip jar, tips straight to Cash; the paper HINT-NOTE took its spot)
+		counter = { ids = { "TRL-G", "TRL-R", "TRL-B", "TRL-T", "TRL-K" }, relY = 4.6 },
 	},
 }
 local REQUIRED_PACKAGES = {

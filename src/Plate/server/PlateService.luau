@@ -22,6 +22,7 @@
 --
 -- PICKUP (kitchen-world.md §1 #10): the gate "PlateTicket" on pickup_serve (and serve on a PU-n rig) refuses a `plate` not
 -- made yet (plate_not_ready) and a hot dog whose ticket customer is not Waiting in the pickup line (ticket_other, Value = #n).
+-- A plate with the bun alone passes when a bread-only order waits (owner 2026-10-22; CustomerService:BreadTarget).
 -- The sale and the grade are CustomerService's (Grade.Assembly at SellLine).
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -561,6 +562,11 @@ function PlateService:CheckPickup(player: Player, action: string, anchor: Instan
 	const held = items:GetHeld(player)
 	const heldKey = if held ~= nil then items:ItemOf(held) else nil
 	if heldKey == PLATE then
+		-- owner 2026-10-22: the bun alone is the whole order of a bread-only customer (ANM-011) waiting in the line
+		const target = if action == SERVE then customers:IdOf(anchor) else nil
+		if customers:IsBreadPlate(held :: Tool) and customers:BreadTarget(held :: Tool, target) ~= nil then
+			return true, nil
+		end
 		self:NotifyThrottled(player, PLATE_NOT_READY)
 		return false, PLATE_NOT_READY
 	end

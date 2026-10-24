@@ -2,7 +2,8 @@
 -- Types of Content.HorrorScenes (TASK-586): apart from the init so the scene modules of Scenes/ can type their steps
 -- without requiring the init that requires them. The step kinds and fields are documented in the init header.
 
-export type Phase = "Signal" | "Active" | "Resolved" | "Failed"
+-- "Queue" (owner 2026-10-22): a customer anomaly waiting for its order in the delivery queue (init header)
+export type Phase = "Signal" | "Active" | "Queue" | "Resolved" | "Failed"
 export type Who = "All" | "Caught" | "Safe"
 export type StepKind =
 	"Sound"

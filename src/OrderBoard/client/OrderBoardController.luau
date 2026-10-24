@@ -59,6 +59,7 @@ export type Record = {
 	Phase: string,
 	Number: number?,
 	Pickup: number?,
+	Bread: boolean?, -- the order is a bun alone (Content.OrderRules.BreadOnly, ANM-011)
 }
 
 export type Tablet = {
@@ -111,10 +112,13 @@ local function toppingsOf(order: { [string]: boolean }?): { string }
 	return list
 end
 
--- One icon row: bun, sausage, the toppings; Done from the plate (nil = no plate, drawn full).
-local function rowOf(order: { [string]: boolean }?, plate: Plate?, plated: boolean): { OrderBoard.Item }
+-- One icon row: bun, sausage, the toppings; Done from the plate (nil = no plate, drawn full). `bread` = the bun alone.
+local function rowOf(order: { [string]: boolean }?, plate: Plate?, plated: boolean, bread: boolean?): { OrderBoard.Item }
 	local function done(value: boolean): boolean?
 		return if plated then value else nil
+	end
+	if bread then
+		return { { Key = "bun", Done = done(plate ~= nil and plate.Bun) } }
 	end
 	const row: { OrderBoard.Item } = {
 		{ Key = "bun", Done = done(plate ~= nil and plate.Bun) },
@@ -133,9 +137,12 @@ const READY: OrderBoard.CardState = "Ready"
 const RANK: { [OrderBoard.CardState]: number } = { Queued = 1, Preparing = 2, Ready = 3 }
 const BY_RANK: { OrderBoard.CardState } = { QUEUED, PREPARING, READY }
 
-local function plateState(plate: Plate, order: { [string]: boolean }?): OrderBoard.CardState
+local function plateState(plate: Plate, order: { [string]: boolean }?, bread: boolean?): OrderBoard.CardState
 	if not plate.Bun and not plate.Sausage then
 		return QUEUED
+	end
+	if bread then
+		return if plate.Sausage then PREPARING else READY -- the bun alone is the whole order
 	end
 	if not (plate.Bun and plate.Sausage) then
 		return PREPARING
@@ -178,7 +185,7 @@ function OrderBoardController:Build(): { OrderBoard.Card }
 		const plated = lines ~= nil
 		const first = if lines then lines[1] else nil
 		const second = if lines then lines[2] else nil
-		const rows = { rowOf(record.Order, first, plated) }
+		const rows = { rowOf(record.Order, first, plated, record.Bread) }
 		if pair then
 			table.insert(rows, rowOf(record.Order2, second, plated))
 		end
@@ -203,7 +210,7 @@ function OrderBoardController:Build(): { OrderBoard.Card }
 			-- a pair is as far as its slowest hot dog
 			local rank = RANK.Ready
 			if first then
-				rank = RANK[plateState(first, record.Order)]
+				rank = RANK[plateState(first, record.Order, record.Bread)]
 			end
 			if pair and second then
 				rank = math.min(rank, RANK[plateState(second, record.Order2)])
@@ -240,7 +247,7 @@ function OrderBoardController:Build(): { OrderBoard.Card }
 		if tablet.State ~= "Talking" or tablet.Npc == 0 or (record ~= nil and record.State == "Waiting") then
 			continue
 		end
-		const rows = { rowOf(tablet.Order, nil, true) }
+		const rows = { rowOf(tablet.Order, nil, true, record ~= nil and record.Bread) }
 		if tablet.Order2 ~= nil then
 			table.insert(rows, rowOf(tablet.Order2, nil, true))
 		end

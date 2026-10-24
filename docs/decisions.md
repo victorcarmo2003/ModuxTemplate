@@ -4449,3 +4449,264 @@ Origem das DEC-208 a DEC-214: questionário do orquestrador, 2026-10-10 (20ª pa
 - **2ª passada** (dono, mesmo dia): "ao clicar em takeorder ele vai dar um close no rosto do cliente (escondendo o tablet q fica na frente) e na esquerda vai aparecer os diálogos (um pouco maiores)... o primeiro step seria um greeting e dai vem o refuse / accept e depois sim ele faz o pedido... como estamos dando close, isso abre margem para a gente assustar o player". Aplicado: três passos no tablet (`Greeting` → `Deciding` → `Talking`): oi e a resposta do cliente (normal: um "Hi!"; esquisito: a fala esquisita), depois **ACCEPT** / **REFUSE**, e só no ACCEPT o cliente normal diz o pedido; ACCEPT numa anomalia = o susto na hora, ainda no close. Câmera no rosto do cliente só na tela de quem atende (tablet escondido localmente, andar travado), solta 1,2 s depois; cartão do diálogo à esquerda, no meio da altura, 1,35× maior. **Provisório**: números em `Content.OrderTalk.CloseUp`. Sustos próprios do close (indício por anomalia) ficam para a próxima etapa.
 - Pendências: `Q-455` a `Q-458`.
 - Impacto: `src/Shared/Content/OrderTalk.luau`, `src/Libs/Net/Restaurant.luau`, `src/Interface/client/Components/TabletDialog/init.luau`, `src/Tablet/client/TabletController.luau`, `src/Tablet/server/TabletService.luau`, `src/Customer/server/CustomerService/init.luau`.
+
+### DEC-354 — 2026-10-22 — Fim do ACCEPT/REFUSE: Take Order abre o close, o cliente fala e o pedido entra sozinho (substitui DEC-353 na escolha; emenda DEC-254 família A)
+
+- Origem: chat do dono (2026-10-22), repassado pela sessão principal. Nas palavras dele: "Tira o botão de refuse… a gente abstrai uma etapa do player, que é aquele botão de aceitar e recusar." Sobre a anomalia: "ele vai ter que saber como lidar com aquela anomalia a partir das instruções do Walt".
+- Status: **Aprovado pelo dono** (decisão dele). Números e textos de implementação: **Provisórios**.
+- Decidido pelo dono:
+  - A tela de conversa **não tem mais escolha**: sem ACCEPT, SERVE nem REFUSE.
+  - **Take Order** abre o close no cliente. O cliente fala. **No fim da fala, o pedido entra sozinho.**
+  - Vale para **todo cliente, inclusive anomalias**.
+  - A anomalia vira **obrigatória**: o jogador lida com ela **pelas instruções do Walt**.
+  - Família A: **a recusa deixa de ser resposta**.
+- Substitui: **DEC-353** na parte da escolha: botões SERVE / ACCEPT / REFUSE (e E / Q, X / Y), passo `Deciding`, regra "pareceu ou soou estranho? REFUSE", "ACCEPT numa anomalia = o susto na hora", "recusar um cliente normal: perde a venda". Continua da DEC-353: o close no rosto do cliente e o cartão da conversa. A janela de atendimento não é tratada aqui (segue a DEC-353).
+- Emenda: **DEC-254**, família A ("cliente errado (recusar)"): a resposta deixa de ser recusar e passa a ser seguir a condição na entrega (DEC-355).
+- **Provisório** (agente): quando a anomalia assusta (entrega errada, condição estourada) e os números seguem `design/anomalies-after-accept-proposal.md` (Rascunho) até o Play do dono.
+- Perguntas afetadas (leitura do secretário, **não decisão**; ajustar em `open-questions.md` quem estiver com o arquivo):
+  - `Q-466`: respondida, além da opção (a): não existe REFUSE nem antes do pedido.
+  - `Q-458`, `Q-460`, `Q-462`: perdem o objeto (não há escolha nem REFUSE no close).
+  - `Q-456`: com "a recusa deixa de ser resposta", fechar a janela também deixa de resolver a família A. A confirmar.
+  - `Q-467`: o item "REFUSE de normal" deixa de existir; o resto (desistência, pedido que expira, fila mandada embora) segue aberto.
+  - `Q-457`: as falas de "cliente recusado" saem.
+- Impacto: **backend-coder** (`TabletService`, `CustomerService`, pacote `TabletDecide`, estado `Deciding` do set `Tablets`, `ChoiceAt` em `Content.Tics.Rules`), **frontend-coder** (`TabletDialog`, `TabletController`), **game-designer** (migração da família A), **narrative-writer** (`Content.OrderTalk`; ligações do Walt passam a ensinar como lidar com cada anomalia).
+
+### DEC-355 — 2026-10-22 — Tensão na fila de entrega: os efeitos de tela saem da chegada; a anomalia espera desfigurada, com a dica da condição no título
+
+- Origem: chat do dono (2026-10-22), repassado pela sessão principal. Base: `design/anomalies-after-accept-proposal.md` (Rascunho, game-designer) e as `Q-466` / `Q-468`.
+- Status: **Aprovado pelo dono** (decisão dele). Números, tempos e textos: **Provisórios**.
+- Decidido pelo dono:
+  - Os efeitos de tela da chegada da anomalia (**barras pretas, sussurros, close**) **saem da chegada**.
+  - Eles entram quando a anomalia está **na fila, esperando o pedido**.
+  - Na fila ela fica **desfigurada** (ex.: pescoço quebrado, cabeça estufada).
+  - O **título** na tela mostra uma **dica da condição** (ex.: "seja rápido"), com um **sussurro da mesma frase**.
+  - **Seguir a condição é o que permite servir.**
+- **Provisório** (agente): título e sussurro em inglês no jogo (DEC-022), textos pelo narrative-writer; condição, desfiguração e números por anomalia conforme as fichas do Rascunho; lista dos passos de tela a mover na §4.3 da proposta. Tom Mild (DEC-172) vale para a desfiguração.
+- Emenda: **DEC-254** (princípio "sinal em 1 segundo" na chegada) e toca **DEC-278** (sinal distinguível em ~2 s): o sinal forte passa da chegada para a fila de entrega.
+- Perguntas afetadas (leitura do secretário, **não decisão**): `Q-468` respondida no sentido da (a) (a chegada perde os passos de tela), na versão do dono (barras, sussurros e close na fila de entrega; título com dica e sussurro). `Q-461` a revisar à luz desta DEC.
+- Impacto: **frontend-coder** (cenas de horror por anomalia: fase de chegada vs. fila de entrega; título e sussurro), **backend-coder** (estado "na fila esperando o pedido" e condição por anomalia), **art-director** / **modeler-3d** (poses e rostos desfigurados), **narrative-writer** (frases de dica), áudio (sussurro por frase).
+
+### DEC-356 — 2026-10-22 — Texto da conversa digitado letra por letra, com estilo por tipo de cliente
+
+- Origem: chat do dono (2026-10-22), repassado pela sessão principal.
+- Status: **Aprovado pelo dono** (decisão dele). Velocidades e intensidades: **Provisórias**.
+- Decidido pelo dono:
+  - A fala do cliente no cartão da conversa é **digitada letra por letra**.
+  - Estilo por tipo de cliente:
+    - **Estressado**: texto em **CAPS**.
+    - **Shaker**: letras **tremendo e embaralhando**.
+    - **Pescoço quebrado**: começa **normal** e **desfigura no meio** da fala.
+  - Os **ícones do pedido seguem normais** (sem estilo).
+- **Provisório** (agente): velocidade da digitação, força do tremor e do embaralhar, ponto em que a fala desfigura. Mapeamento a confirmar: estressado = humor `Stressed` do cliente; shaker = ANM-011; pescoço quebrado = ANM-012. Legibilidade no celular (DEC-014) conferida no Play.
+- Complementa DEC-353 / DEC-354 (cartão da conversa). Não substitui decisão.
+- Impacto: **frontend-coder** (`TabletDialog`), `Content.OrderTalk` (estilo por linha de fala), **narrative-writer**.
+
+### DEC-357 — 2026-10-22 — Papel de dicas no balcão, no lugar do pote de gorjetas: o Walt dá uma dica nova a cada noite
+
+- Origem: chat do dono (2026-10-22), repassado pela sessão principal.
+- Status: **Aprovado pelo dono** (decisão dele). Textos, tempos e chances: **Provisórios**.
+- Decidido pelo dono:
+  - Um **papel de dicas** fica no balcão, **no lugar do pote de gorjetas**.
+  - **A cada noite o Walt dá uma dica nova.** Ela é "escrita" no papel, com **som de lápis**.
+  - **Ler o papel** = close de câmera **de cima**, com **rolagem**, **só texto**.
+  - Ficar lendo **pode fazer perder um cliente chegando e levar um susto**.
+- **Provisório** / a definir: posição (a do pote: ponta esquerda do balcão, DEC-280); momento em que a dica é escrita; textos das dicas por noite (narrative-writer, em inglês); regra e chance do susto durante a leitura; como sair da leitura; asset do papel (ficha AST nova, art-director); SFX do lápis (`audio/sound-list.md`).
+- Substitui: **DEC-239** no objeto do balcão (o pote sai; o dinheiro está na DEC-358).
+- Emenda: **DEC-280** e **DEC-269** (o item fixo "pote de gorjetas" do balcão vira o papel de dicas).
+- Emenda: **DEC-077**, consequência "nenhum item (papel, caderno) guarda as regras no MVP": a dica da noite fica escrita e pode ser relida. A ligação em si continua sem replay.
+- Ponto a abrir em `open-questions.md` (não aberto aqui por restrição da tarefa): a dica do papel repete a regra da ligação do Walt ou é outra informação? A rolagem mostra as dicas das noites anteriores ou só a da noite?
+- Impacto: **level-designer** (troca `TRL-TIPJAR` pelo papel), **frontend-coder** (câmera de cima, rolagem, escrita animada, som), **backend-coder** (dica da noite e gatilho do susto), **narrative-writer**, **art-director**.
+
+### DEC-358 — 2026-10-22 — Fim do pote de gorjetas: a gorjeta vai direto para a conta
+
+- Origem: chat do dono (2026-10-22), repassado pela sessão principal.
+- Status: **Aprovado pelo dono** (decisão dele).
+- Decidido pelo dono: não existe mais pote de gorjetas. **A gorjeta vai direto para a conta** (o dinheiro da party, DEC-059).
+- Consequência: saem o prompt "Collect Tips" (ação `collect_tips`) e o auto-depósito de gorjeta no Resumo do turno. A gaveta/caixa continua fora (DEC-239).
+- Substitui: **DEC-239** (pote `TipJar`, coleta e auto-depósito).
+- **Provisório** / a definir: o feedback de gorjeta recebida (texto, som) com o frontend; o campo `Drawer` do set `Economy` fica sem uso.
+- Impacto: **backend-coder** (`TipJarService`, `Content.TipJar`, campo `Drawer` do set `Economy`), **frontend-coder** (`EconomyController`), **level-designer** (sai o `TRL-TIPJAR`, ver DEC-357), `design/economy.md`.
+
+### DEC-359 — 2026-10-22 — Badge 8 vira "Bolted Shut": trancar a porta na Batida (ANM-009), no lugar do "Held My Breath"
+
+- Origem: chat do dono (2026-10-22), revisando a lista de badges que faltam subir: "Não tem como se esconder… dá pra trancar a porta, no caso é trancar a porta, correto?" e, depois, "Sim, troca o badge 8 para trancar a porta na ANM-009: nome, descrição, gatilho e ícone novo."
+- Status: **Aprovado pelo dono** (decisão dele).
+- Decidido pelo dono: o badge 8 (`held_breath`, "Held My Breath", esconder do Walker ANM-007) sai, porque o Walker foi cortado (DEC-307) e o verbo esconder não existe mais no restaurante. No lugar entra **`bolted_shut` — "Bolted Shut"**, descrição no Roblox **"Lock the door before it gets in."**: trancar a porta dos fundos na Batida (ANM-009) a tempo.
+- **Provisório:** quem ganha é **quem trancou** (só ele, não a party inteira), no fim da anomalia (`EndsAt`), para o aviso não cair no meio das batidas; a própria tranca segue Provisória (Q-398). Ícone novo `Assets/ui/badges/08_bolted_shut.png` (porta com cara, ferrolho passado, "BAM" do outro lado), tema noite como antes.
+- Emendas (append-only): **DEC-315** (lista de 15 badges): o item 8 passa a ser `bolted_shut`; o resto da lista não muda.
+- Impacto: `Content/Achievements.luau`, `Anomalies/ANM-009.luau` (gatilho), `design/badges.md`, `Assets/ui/badges/source/make_badges.py`. O badge ainda não foi criado no Creator Hub (`BadgeId = 0`).
+
+Origem das DEC-360 e DEC-361: resposta do dono à auditoria das falas do Walt (`story/walt-dialogue-audit.md`), 2026-10-23, repassada pelo coordenador e resumida fielmente; registrada pelo secretário.
+
+### DEC-360 — 2026-10-23 — A run é 100% noite e começa de noite: sem turno de dia e sem ligação da manhã (responde Q-478)
+
+- Fala do dono: "Não vai ter mais dia. A partir de agora, noite, 100% noite, começa de noite." Motivo: o jogador precisa entrar no jogo e já ver que tem anomalia. "Os primeiros 90 segundos do jogador ali no jogo são muito importantes."
+- Status: **Aprovado pelo dono** (decisão dele).
+- Decidido pelo dono:
+  - A run tem **só noites**: N1 … N10 e o final. **Não existe** fase de dia (Prep de dia, Open, Last call das 6 PM, Summary de dia).
+  - A run **começa de noite** (já é o código: `Shift.RunStartsAtNight = true`, `Flow.Next` sempre noite).
+  - **Não existe ligação da manhã.** A única ligação do Walt em cada turno é a da noite (fase Call, 7 PM). O tutorial e a lição de upgrade acontecem dentro da Noite 1 e no Summary das 6 AM depois dela (já é o código).
+- Consequências (registradas pelo secretário):
+  - As linhas `call_day_1`, `call_day_2`, `call_day_after_1..9` e `call_day_infinite_*` de `Content.BossCalls` ficam **mortas — sem dia**. As falas não são apagadas: o destino proposto (abertura de cada ligação da noite) é **Provisório** e depende de `Q-485`.
+  - O contador `Day` continua subindo um por turno no código (desbloqueios e fases de pedido leem `Day`; a noite k é o Dia k + 1). "Dia N" deixa de ser termo de design: o design fala em **Noite N**.
+  - O modo "dia infinito" e os ganhos de "turno de dia concluído" (DEC-070) ficam sem gatilho (a rever com o game-designer).
+- Emendas (append-only): **DEC-300** e **DEC-309** (começar de noite já valia; agora é a regra, sem a opção de voltar ao Day 1), **DEC-016 a DEC-048** no que fala de turno de dia, **DEC-240** (Last call de dia: sem uso), **DEC-070** (gemas de dia concluído: sem gatilho), **DEC-344/347** (SKIP TUTORIAL segue valendo, dentro da Noite 1). Fecha `Q-478` (opção "cortar as manhãs"; a lore passa para a ligação da noite e para a ligação falsa/rádio, como Provisório).
+- Impacto: `vision.md`, `story/walt-calls-lore.md`, `story/ui-text.md` §11, `story/script.md`, `story/walt-dialogue-audit.md`, `tools/voice/elevenlabs_script.md`, **narrative-writer** (aberturas da noite, `Q-485`), **game-designer** (`progression.md`, `economy.md`: ganhos e desbloqueios que eram de dia), **backend-coder** (limpar `call_day_*` e o caminho `RunStartsAtNight = false` quando houver TASK).
+
+### DEC-361 — 2026-10-23 — Fechar a janela despacha as anomalias-cliente (menos a ANM-022); o custo é o dinheiro perdido (responde Q-481 em parte)
+
+- Fala do dono, sobre fechar a janela: "tem uma penalidade, que é os jogadores não receberem o dinheiro. Essa é uma das penalidades que tem. Então meio que afeta um pouco, né? Mas não tanto."
+- Status: **Aprovado pelo dono** (decisão dele).
+- Decidido pelo dono:
+  - Fechar a janela de serviço **manda embora as anomalias-cliente** (família A), sem susto e sem nota. Os clientes normais **ficam** no lugar.
+  - **Exceção: ANM-022** (head banger) ignora a janela, bate a cabeça nela e só sai quando a luz da loja apaga.
+  - **O custo é o dinheiro:** com a janela fechada as vendas param (loja fechada, ninguém novo chega), e a anomalia despachada **sai sem pagar** (sem o × `PayMult` e sem o bônus de quem a atende bem). A janela **não tem outra penalidade**.
+- Substitui: o fluxo "a fila vai embora reclamando ao fechar a janela" (`Content.ShopWindow` `LeaveMood`, `ShutLines`… já sem uso pela janela desde 2026-10-23); responde `Q-455` (a janela não manda mais a fila embora) e `Q-473` (a janela agora alcança a anomalia-cliente: opção (c), "manda embora sem custo além do dinheiro").
+- Emendas (append-only): **DEC-221** e **DEC-261** (a janela também é resposta para as anomalias-cliente, não só para as ameaças de fora), **DEC-354** (a anomalia é obrigatória **ou** é despachada pela janela).
+- **Segue aberto em `Q-481`:** (1) a Raincoat Lady (ANM-005) despachada pela janela conta como "não atendida" (−5 de sanidade de cada um) ou sai só sem pagar; (2) o Walt ensina a janela na ligação ou fica como descoberta.
+- Impacto: `design/anomalies-after-accept-proposal.md` (§9.5), `story/walt-calls-lore.md`, `story/walt-dialogue-audit.md`, `Content.ShopWindow` (comentário já descreve), **game-designer** (`economy.md`: o custo da janela), **narrative-writer** (falas que dependem de `Q-481`), **qa-tester**.
+
+Origem das DEC-362 a DEC-365: 2ª resposta do dono às perguntas da auditoria do Walt, 2026-10-23, repassada pelo coordenador e resumida fielmente; registrada pelo secretário. Q-482, Q-483 e Q-484: o dono disse "As outras perguntas eu não entendi, não tem como responder"; ficam abertas, reescritas em linguagem simples.
+
+### DEC-362 — 2026-10-23 — A lore do Walt vem aos poucos, na abertura de cada ligação da noite (responde Q-485)
+
+- Fala do dono: "Achei isso interessante. No início de cada noite, a gente progredindo, trazendo um pouquinho mais das pistas da lore. Isso é legal."
+- Status: **Aprovado pelo dono** (decisão dele).
+- Decidido pelo dono: cada ligação da noite **começa com uma pista da lore**, e as pistas **crescem noite a noite** (cada noite revela um pouco mais).
+- **Provisório** (base de trabalho, não escolhida em detalhe pelo dono): a estrutura de 3 atos e o fio do café de `story/walt-dialogue-audit.md` §3.2, as aberturas por noite do §3.3 e o formato "linha 1 = pista, linhas 2–3 = regras". Os textos passam pelo narrative-writer antes de gravar.
+- Consequência: as falas de manhã "mortas — sem dia" (DEC-360) com destino proposto viram candidatas a essas aberturas.
+- Emendas (append-only): **DEC-312** (a lore do Walt vilão vem também pela abertura da ligação real, não só pela ligação falsa e pelo rádio).
+- Impacto: **narrative-writer** (textos das aberturas N1–N10), `Content.BossCalls` (1ª linha de cada `call_night_<k>`), `tools/voice/elevenlabs_script.md`, `Content.Hints` (o papel continua só com regras).
+
+### DEC-363 — 2026-10-23 — O final da run é "O Segundo Café" (supera DEC-075 no conteúdo; responde Q-480)
+
+- Fala do dono: "Ela tá interessante, eu gostei, eu vou manter. A única coisa que falta pendente vai ser o preenchimento dos créditos do jogo."
+- Status: **Aprovado pelo dono** (decisão dele), na versão que ele testou.
+- Decidido pelo dono: o final da vitória na Noite 10 é **"O Segundo Café"**:
+  1. Amanhecer, 6:00. O Walt chega com dois cafés e diz as 9 falas do A1 ("Ten nights…" até "The night shift is yours. If you want it."), que viram isca.
+  2. Ele estende o 2º café; o sol para e o céu volta para a noite. Walt (voz grave): "Forty years, Rookie. Forty years of nights."
+  3. Na despensa, a porta dos fundos explode; o Walt aparece maior, sem corcunda.
+  4. Ele agarra o jogador pela gola; "MASH TO BREAK FREE" que nunca solta.
+  5. "Now I get the mornings." Ele joga o jogador na rua; mãos do late crowd puxam; corte para o preto.
+  6. Rádio, na voz do último Rookie: "...welcome to the other side, Rookie..."
+  7. Créditos. No squad, cada jogador vê a si mesmo sendo agarrado.
+- **Único pendente dito pelo dono:** o **preenchimento dos créditos** do jogo.
+- "Morning, Marigold." **sai** da sequência principal (como no roteiro que o dono testou).
+- Supera: **DEC-075** no conteúdo do final (A1 vira histórico; a cena `finale` do código fica como reserva técnica).
+- Conflitos e como ficam (leitura do secretário):
+  - **DEC-076** (Walt em pessoa só no final): **mantida**. O Walt continua sem aparecer em pessoa durante as noites; tudo acontece dentro da cena final, inclusive a parte em que o céu volta à noite.
+  - **DEC-177**, nota "Walt segue não sendo anomalia": **mantida na mecânica**: o Walt não vira anomalia do agendador nem tem regra; ele é revelado só na cena final.
+  - **DEC-172 / DEC-023** (Mild, sem violência): o dono testou e aprovou a cena com o agarrão, o empurrão para a rua e as mãos. Fica como **exceção aprovada só desta cena**; as regras do Mild valem para todo o resto. (Sem sangue, sem dano, sem palavras proibidas, `world.md` §1.)
+  - **DEC-312** (vilão só por easter egg; o final igual): **emendada**. O vilão agora fica claro para todos no final; as falas falsas e do rádio continuam como pistas.
+- **Não decidido (vai para `Q-486`):** a tela de fim de run nova ("You Took the Shift", crachá "[NOME] — NIGHT SHIFT"), o pós-créditos (panfleto NOW HIRING + Walt de dia com um café só) e o palco sem o Mart (de onde o Walt chega).
+- Impacto: `story/ending.md` (seção nova, Aprovada), `story/walt-calls-lore.md`, `tools/voice/elevenlabs_script.md` (3 falas novas), `art/credits.md` (créditos), **frontend-coder** (cena, créditos), **narrative-writer**, **cinematographer**.
+
+### DEC-364 — 2026-10-23 — Q-479 descartada pelo dono
+
+- Fala do dono, sobre Q-479 (fim da run com `Chances = 0`): "A gente pode descartar ela mesmo, não tem problema."
+- Status: **Aprovado pelo dono** (descarte).
+- Decidido: a pergunta **sai** sem escolha de opção. Nenhuma das propostas dela entra (nem a cena de derrota com a batida "Rookie? It's me. It's Walt. Open up.", nem voltar `Chances = 1`).
+- Leitura do secretário: o texto do fim da run fica como está no código (Provisório). Continua o fato de que "That's two, Rookie." não bate com `Chances = 0`; isso volta ao dono só dentro do lote de textos (`Q-484`), em linguagem simples.
+- Impacto: nenhum de código.
+
+### DEC-365 — 2026-10-23 — Raincoat Lady despachada pela janela custa −5; o Walt reclama e ensina a janela com o custo (responde Q-481)
+
+- Falas do dono: "Sim" (a Raincoat Lady despachada leva o −5 de "não atendida"); quer "uma ligação do Walt reclamando, dizendo que talvez ele se arrependa disso"; e "sim, pode manter" (o Walt ensina a janela na ligação, dizendo o custo).
+- Status: **Aprovado pelo dono** (decisão dele).
+- Decidido pelo dono:
+  - **Raincoat Lady (ANM-005) mandada embora pela janela = −5 de sanidade de cada jogador ativo**, igual a deixá-la sem atender.
+  - Quando isso acontece, **o Walt liga reclamando** e dizendo que o jogador talvez se arrependa.
+  - **O Walt ensina a janela** numa ligação da noite, dizendo o custo (o dinheiro).
+- **Provisório** (agente): texto da reclamação "You shut her out, Rookie. You might regret that."; ela toca logo depois do −5, uma vez por run; texto da janela "Something wrong at the window? Shut it. They'll go. So does the money." na ligação da **Noite 1**. narrative-writer revisa.
+- Complementa: **DEC-361**. Fecha `Q-481`.
+- Impacto: `Anomaly/server` (ANM-005 com a janela), `Content.BossCalls` (ligação nova e linha da N1), `tools/voice/elevenlabs_script.md`, **qa-tester**.
+
+Origem das DEC-366 a DEC-371: 3ª resposta do dono, 2026-10-23 (Q-482, Q-483, Q-484, Q-486, em linguagem simples), repassada pelo coordenador e resumida fielmente; registrada pelo secretário. Textos de fala: narrative-writer, 2026-10-23, Provisórios até gravados.
+
+### DEC-366 — 2026-10-23 — ANM-022: a dica passa a ser apagar a luz da loja, e o Walt avisa na Noite 8 (responde Q-482)
+
+- Fala do dono: "sim, troca para apagar a luz". O dono vai gerar os áudios novos.
+- Status: **Aprovado pelo dono** (opção a).
+- Decidido: o papel do balcão e o sussurro do ANM-022 dizem **apagar a luz da loja** (não mais "BE QUICK"); a ligação da **Noite 8** ganha o aviso dele.
+- **Provisório** (textos do narrative-writer): ligação "Banging his head on the glass? Window won't stop him. Shop light off."; papel "Head on the glass? Window won't help. SHOP LIGHT OFF."; sussurro "SHOP LIGHT OFF" / "WINDOW WON'T STOP HIM. LIGHT OFF.".
+- Impacto: `Content.BossCalls` (`call_night_8`), `Content.Hints` (N8), `Content.AnomalyHints` (`anm_022`; `Live` só quando a regra rodar no código), `tools/voice/elevenlabs_script.md`.
+
+### DEC-367 — 2026-10-23 — O Walt avisa tudo que é novo em cada noite; o disjuntor entra na Noite 1 (responde Q-483)
+
+- Fala do dono: "sim, vamos colocar o Walt com uma interação ativa com o player."
+- Status: **Aprovado pelo dono** (opção a).
+- Decidido: a ligação de cada noite avisa **tudo que estreia** nela, **até 2 avisos por ligação**; o **disjuntor** é ensinado já na **Noite 1**. Entram avisos para o que flutua (N7), o que encara sem piscar (N9) e o das câmeras (N10); "don't stay outside too long" (N1) é trocado para não contradizer o disjuntor.
+- **Provisório:** textos do narrative-writer (roteiro de voz); como encaixar mais de 2 novidades numa noite (o papel cobre o resto).
+- **Aberto em `Q-487`:** se "interação ativa" vai além de avisar (o Walt reagir ao que o jogador faz durante a noite).
+- Impacto: `Content.BossCalls` (`call_night_1`, `_7`, `_9`, `_10`), `Content.Hints`, `tools/voice/elevenlabs_script.md`.
+
+### DEC-368 — 2026-10-23 — Lote de falas corrigidas: o narrative-writer revisa tudo antes de gravar (responde Q-484)
+
+- Fala do dono: "sim, pode seguir com o recomendado."
+- Status: **Aprovado pelo dono** (opção a).
+- Decidido: as 9 correções da `Q-484` entram (o que treme = sem nada em cima; o rato sem "wait for the thud"; sem rosto = não cozinhe; disjuntor = segure; Gear Stand no fundo; sem *dying/kill*; sem rádio do Mart; dica do hot dog pronto; fim da run "That's it, Rookie."). O narrative-writer revisou (2026-10-23); textos no roteiro de voz, prontos para o dono gravar.
+- Consequência: o rádio "Run INSIDE the Mart" (v_86b4351c71) sai; o fim da run deixa de dizer "That's two".
+- Impacto: `Content.BossCalls`, `Tutorial/.../Steps.luau` (lembrete do upgrade), `Anomaly/client/.../Effects/ANM-010.luau` (linha do rádio), `tools/voice/elevenlabs_script.md`.
+
+### DEC-369 — 2026-10-23 — Final: pós-créditos com o próximo Rookie e o jogador do lado de lá; "From across the street."; a tela "You Took the Shift" depende das skins por noite (responde Q-486)
+
+- Falas do dono: tela de fim "não parece muito bom, a não ser que induzamos que a noite meio que transforma todo mundo em um próximo Walt"; pós-créditos com o panfleto: gostou, e acrescenta um personagem de cachorro (o próximo Rookie) e "nós" (o jogador, agora do lado de lá) observando de longe, do estacionamento; trocar "From in here" por "From across the street.".
+- Status: **Aprovado pelo dono**.
+- Decidido:
+  1. **Tela de fim "You Took the Shift"** (crachá "[NOME] — NIGHT SHIFT") entra **só junto com a ideia de "consumidos pela noite"** (as skins por noite, DEC-370).
+  2. **Pós-créditos:** o panfleto NOW HIRING no poste; um **cachorro** (o próximo Rookie) lendo; **o jogador** (agora do lado de lá) observando **de longe, do estacionamento**.
+  3. Fala 2 do final: "I watched every one. **From across the street.** Best seat in town." (regravar).
+- **Aberto em `Q-489`:** o Walt passando de dia com um café só (proposta anterior) continua no pós-créditos?
+- Emenda: **DEC-363** (pós-créditos e tela de fim definidos), **DEC-075 §2.4** (histórico).
+- Impacto: `story/ending.md` §0, cena de créditos (frontend, outra sessão), `art/asset-list.md` (cachorro do próximo Rookie: rig da crew), tela de fim de run (`RunReport`).
+
+### DEC-370 — 2026-10-23 — Skins por noite, no lugar da troca por sanidade baixa: os jogadores são "consumidos pela noite"
+
+- Fala do dono: "eles foram consumidos pela noite e pegaram o shift". Noites 1–3: skin normal; Noites 4–6: skin cansada; Noites 7–10: skin da noite (a que hoje aparece com a sanidade baixa). As skins customizadas (Halloween etc.) precisam das mesmas variações.
+- Status: **Aprovado pelo dono** (ideia dele).
+- Decidido:
+  - O visual do jogador segue **a noite da run**: N1–N3 **Day** (normal), N4–N6 **Mid** (cansada, rosto `Exhausted`), N7–N10 **Night** (rosto `Normal_Night`).
+  - Isso **substitui a troca por sanidade** no visual do jogador.
+  - Toda skin customizada precisa das 3 variações.
+- Estado conferido pelo secretário (2026-10-23): o uniforme da crew, as 8 roupas civis, as cabeças das espécies, as variantes Blank e as **6 skins de Halloween** (Pumpkin, Ghost, Witch, Franken, Vampire, Skeleton) **já têm Day, Mid e Night** (`Assets/textures/character/skins/`, `Crew/shared/SkinLooks.luau`, `CrewLooks.luau`). Rosto: só `Normal` tem versão de noite (DEC-207), e o Mid usa `Exhausted`.
+- Supera: **DEC-166** e **DEC-167** no visual do jogador (era por faixa de sanidade).
+- **Aberto em `Q-488`:** o que fica do resto: os clientes e pedestres que o jogador com sanidade baixa vê em Night (DEC-168, DEC-169) e se os colegas ainda veem alguma marca de sanidade baixa.
+- Impacto: `art/style-guide.md` §2.3, `art/asset-list.md` (AST-053, AST-123), `design/progression.md`, **frontend-coder** (pack por noite em vez de faixa), **art-director** (toda skin nova com 3 packs).
+
+### DEC-371 — 2026-10-23 — Easter egg: o Walt sombrio fica no estacionamento desde a Noite 1
+
+- Fala do dono (resumo fiel): a versão dark do Walt fica no estacionamento desde a primeira noite; se o jogador chegar muito perto, ele desaparece e reaparece na noite seguinte. Isso amarra com o pós-créditos.
+- Status: **Aprovado pelo dono** (ideia dele).
+- Decidido: o **Walt sombrio** (o da cena final) fica **parado no estacionamento** em toda noite, **desde a Noite 1**. Chegou perto demais: ele **some** e só **volta na noite seguinte**.
+- **Provisório** (agente): a distância de "perto demais" (sugestão 20 studs); some com o fade padrão de 2 s; só no client de quem chegou perto ou para todos (sugestão: para todos); sem custo de sanidade, sem verbo, nunca conta como anomalia (respeita a nota de DEC-177), não ocupa vaga de NPC; não aparece no tutorial da Noite 1 antes da ligação.
+- Emenda (append-only): **DEC-076**: o Walt sombrio é uma **figura parada à distância**, não fala nem interage; o Walt continua sem aparecer em pessoa para falar antes do final.
+- Impacto: `levels/` (ponto no estacionamento), **frontend-coder** (figura, fade, reaparecer), `art/asset-list.md` (Walt sombrio maior, sem corcunda: mesmo modelo da cena final).
+
+Origem das DEC-372 a DEC-374: 4ª resposta do dono, 2026-10-23 (Q-487, Q-488, Q-489), repassada pelo coordenador e resumida fielmente; registrada pelo secretário.
+
+### DEC-372 — 2026-10-23 — O Walt reage no meio da noite, sem telefone (responde Q-487)
+
+- Fala do dono: "Vamos incluir a interação sem nem mesmo ele atender o telefone, assim como na fala 'it's me on the line'. Com isso, players atenciosos vão falar algo do tipo 'ué, ele está falando sem o telefone? Ele... como...?' e vai ficar o suspense no ar. Com isso segue no recomendado."
+- Status: **Aprovado pelo dono** (opção a, com o detalhe dele).
+- Decidido:
+  - O Walt dá **reações curtas** no meio da noite, **na 1ª vez** que algo importante acontece na run, **no máximo 2 por noite**, nunca durante uma anomalia em curso.
+  - Essas reações tocam **sem o telefone tocar e sem ninguém atender**. A voz vem **direto, sem o filtro de telefone**, como se ele estivesse perto ou vendo tudo.
+  - É **mistério de propósito**: o jogo **nunca explica** isso (nenhum texto, dica, tutorial ou fala).
+- **Provisório:** as falas e os gatilhos (R1 a R10, narrative-writer 2026-10-23; roteiro de voz, `noite_reacoes/`); o som não é posicional (ouvido "perto", igual para todos da party); legenda "Walt: ..." como nas ligações.
+- Emendas (append-only): **DEC-076** (o Walt continua sem aparecer em pessoa; agora também fala sem telefone, só voz), **DEC-077** (estas falas também não têm replay), **FEAT-018**.
+- Impacto: `Content.BossCalls` ou um conteúdo novo de reações, canal de áudio próprio sem o filtro de telefone, **backend-coder** (gatilhos de 1ª vez por run, teto por noite), **frontend-coder** (voz sem filtro, legenda), `tools/voice/elevenlabs_script.md`.
+
+### DEC-373 — 2026-10-23 — A sanidade baixa vira só alucinação; sai do corpo do jogador (responde Q-488)
+
+- Fala do dono: segue o recomendado.
+- Status: **Aprovado pelo dono** (opção a).
+- Decidido: com sanidade baixa, **clientes e pedestres** continuam aparecendo com a textura da noite **só para quem está mal** (DEC-168, DEC-169, como alucinação). O **corpo do jogador** não muda mais pela sanidade (a skin segue a noite, DEC-370), e os colegas **não veem marca** de sanidade no corpo: só o HUD mostra.
+- Supera: **DEC-167** na parte "colegas veem a faixa no corpo"; confirma **DEC-370**.
+- Impacto: **frontend-coder** (tirar a troca de pack do jogador por sanidade; manter a dos NPCs no client de quem está mal), `art/style-guide.md` §2.3.
+
+### DEC-374 — 2026-10-23 — Pós-créditos: o Walt passa de dia com um café só (responde Q-489)
+
+- Fala do dono: segue o recomendado.
+- Status: **Aprovado pelo dono** (opção a).
+- Decidido: no pós-créditos, além do panfleto, do cachorro e do jogador no estacionamento (DEC-369), o **Walt passa de dia pela calçada com um café só**.
+- Impacto: `story/ending.md` §0, cena de créditos (outra sessão).

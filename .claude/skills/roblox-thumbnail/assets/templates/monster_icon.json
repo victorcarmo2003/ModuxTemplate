@@ -1,0 +1,68 @@
+{
+ "_archetype": "Monster face only, white eyes, black + one colour. Icons for horror. Ref: 99 Nights, Pressure, IT WANTS IN.",
+ "out": "icon.png",
+ "size": [
+  512,
+  512
+ ],
+ "bg_color": [
+  8,
+  6,
+  14
+ ],
+ "spots": [
+  {
+   "at": [
+    0.5,
+    0.45
+   ],
+   "radius": 0.7,
+   "color": [
+    200,
+    20,
+    40
+   ],
+   "strength": 0.45
+  }
+ ],
+ "layers": [
+  {
+   "path": "monster.png",
+   "key": "green",
+   "spill": 12,
+   "at": [
+    0.5,
+    0.55
+   ],
+   "height": 1.0,
+   "anchor": "center",
+   "saturation": 1.0,
+   "contrast": 1.15,
+   "glow": {
+    "color": [
+     255,
+     40,
+     70
+    ],
+    "width": 40,
+    "strength": 0.7
+   },
+   "rim": {
+    "color": [
+     255,
+     80,
+     100
+    ],
+    "side": "right",
+    "width": 6,
+    "strength": 0.7
+   }
+  }
+ ],
+ "grade": {
+  "saturation": 1.05,
+  "contrast": 1.1
+ },
+ "vignette": 0.4,
+ "sharpen": 0.4
+}

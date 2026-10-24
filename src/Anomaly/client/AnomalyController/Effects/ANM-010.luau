@@ -16,9 +16,9 @@
 	    occurrence lives). Posts already out when this client mounted stay quiet.
 	  * Phase Resolved / Failed, or the record leaves: the fog fades out over FOG_OUT, then everything is destroyed.
 	  * "Run" (TASK-334, owner 2026-10-15: he did not understand what to do): a fresh Hush cuts a security camera view
-	    (Kit/Watch), Walt says it on the radio (Kit/Radio), a pulsing Mustard banner at the top says RUN TO THE MART and
-	    the 3D guide arrow (Interface/Arrow3D) stands over the safe point SS; inside the safe radius the banner turns to
-	    "Stay inside the Mart". Gone when the record leaves Active.
+	    (Kit/Watch), Walt says it on the radio (Kit/Radio), a pulsing Mustard banner at the top says TURN OFF THE LIGHTS and
+	    the 3D guide arrow (Interface/Arrow3D) stands over the shop light switch; with the light off the banner turns
+	    to "Keep the lights off" (TASK-490). Gone when the record leaves Active.
 	Cue `jumpscare` (TASK-334): Entity = UserId % 65536 of a player caught outside; only that client shows the face.
 	Cue `hush_fog` (flavor of the error, DEC-195): a bank of fog drifts through the current vehicle for a few seconds.
 	Head (TASK-592, owner 2026-10-19; PROVISIONAL Q-398): record Anchor from Anomalies/ANM-010. 1 = the window is open: a
@@ -50,13 +50,11 @@ local VehicleRoot = require(ReplicatedStorage.shared.Vehicle.VehicleRoot)
 
 -- "Run" warning (TASK-334; PROVISIONAL)
 const RUN_FRESH = 4 -- s: a record older than this when mounted does not replay the radio line
-const RUN_LINE = "The lamps are dying! Run INSIDE the Mart, now!"
 const RUN_LINE_TIME = 6
-const RUN_TEXT = "RUN TO THE MART!"
-const STAY_TEXT = "Stay inside the Mart"
 const SAFE_POINT = "SS"
--- TASK-490 (restaurant: no Mart): the answer is the shop light OFF, kept off; the arrow stands over the light switch
-const SHOP_LINE = "The lamps outside are dying! Kill the lights in here, NOW!"
+-- TASK-490 (restaurant: no Mart): the answer is the shop light OFF, kept off; the arrow stands over the light switch.
+-- TASK-650 (DEC-368): the radio line is the script's "PRONTAS PARA GRAVAR" caption, word for word (the voice id comes from it)
+const SHOP_LINE = "The lamps are going out! Lights off in there, NOW!"
 const SHOP_RUN_TEXT = "TURN OFF THE LIGHTS!"
 const SHOP_STAY_TEXT = "Keep the lights off"
 const SWITCH_GROUP = "trailer_interior" -- the party switch's group (Content.LightGroups)
@@ -350,7 +348,7 @@ local function banner(): (ScreenGui, TextLabel, UIScale)
 	label.Position = UDim2.fromOffset(12, 5)
 	label.FontFace = Font.fromEnum(Enum.Font.FredokaOne)
 	label.TextScaled = true
-	label.Text = RUN_TEXT
+	label.Text = SHOP_RUN_TEXT
 	label.TextColor3 = BANNER_MUSTARD
 	label.Parent = pill
 	return gui, label, scale

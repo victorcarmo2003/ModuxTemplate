@@ -19,6 +19,10 @@
 	    Before the first Shift record the run's first shift decides (Shift.RunStartsAtNight = true: night, Night 1).
 	    While a cutscene with a Look plays (attribute CutsceneLook of the local player, set by CutsceneController) the
 	    day preset is replaced by Content.LightPresets.Cinematic (owner request 2026-10-12) and comes back after it.
+	    Look "Dawn" ("The Second Coffee", owner request 2026-10-22) is Content.LightPresets.Dawn at DawnClock whatever the
+	    shift, every lamp off; when CutsceneController sets the attribute CutsceneRegress (s) the sky goes back to Night10 over
+	    that time and ClockTime runs BACKWARDS to the night (blendClockBack), the lamps come on. Look "Night" holds Night10
+	    (the scenes after the regress).
 	    On a night shift (the intro of a run that starts on Night 1, DEC-300) the look is a late afternoon at
 	    DuskClock with every lamp off; when it leaves (CutsceneNightfall = s of blend) the night comes over that time
 	    and the lamps come on.
@@ -129,7 +133,9 @@ const GOLDEN_FROM = Content.LightPresets.GoldenFrom -- 4:00 PM (style guide §5.
 const GOLDEN_TO = Content.LightPresets.GoldenTo -- 6:00 PM
 const LOBBY_CLOCK = Content.LightPresets.LobbyClock
 -- Lighting children owned by another controller (VitalController's sanity look): never taken as the preset's effect
-const VITAL_EFFECTS = table.freeze({ VitalColor = true, VitalBlur = true } :: { [string]: boolean })
+-- (and CutsceneController/Fx's grade and blur, which the cutscenes stack on top of the look)
+const VITAL_EFFECTS =
+	table.freeze({ VitalColor = true, VitalBlur = true, CutsceneGrade = true, CutsceneBlur = true } :: { [string]: boolean })
 const DAY_CLOCK_MIN = 6.5 -- keep the sun above the horizon on the day shift
 const DAY_CLOCK_MAX = 17.4
 const HOURS = 24
@@ -180,6 +186,7 @@ const NIGHT_1: Preset = PRESETS.Night1
 const NIGHT_10: Preset = PRESETS.Night10
 const LOBBY: Preset = PRESETS.Lobby
 const CINEMATIC: Preset = PRESETS.Cinematic
+const DAWN: Preset = PRESETS.Dawn
 const CLASS_STAGE: Preset = PRESETS.ClassStage
 const CLASS_STAGE_BLEND = PRESETS.ClassStageBlend
 -- attribute of the local player LobbyController sets while the class screen shows the rig (dark stage, owner 2026-10-21)
@@ -189,7 +196,10 @@ const STAGE_MODE = "look:stage"
 const LOOK_ATTRIBUTE = "CutsceneLook"
 -- s of blend into the night when the look leaves at a scene's Nightfall (DEC-300; set by CutsceneController)
 const NIGHTFALL_ATTRIBUTE = "CutsceneNightfall"
+-- s of blend back to the night when a Dawn look regresses (Content.Cutscenes[].Regress.Time; set by CutsceneController)
+const REGRESS_ATTRIBUTE = "CutsceneRegress"
 const DUSK_CLOCK = Content.LightPresets.DuskClock
+const DAWN_CLOCK = Content.LightPresets.DawnClock
 
 local function lerp(a: number, b: number, t: number): number
 	return a + (b - a) * t
@@ -233,6 +243,12 @@ end
 local function blendClock(a: number, b: number, t: number): number
 	const forward = (b - a) % HOURS
 	return (a + forward * math.clamp(t, 0, 1)) % HOURS
+end
+
+-- Backward clock blend (the Regress: 6.8 -> 0 runs the sun back down through the dawn, never forward through noon)
+local function blendClockBack(a: number, b: number, t: number): number
+	const backward = (a - b) % HOURS
+	return (a - backward * math.clamp(t, 0, 1)) % HOURS
 end
 
 local function isLampName(name: string): boolean
@@ -280,6 +296,8 @@ function LightController:Setup()
 	self.FromClock = DAY_CLOCK_MIN :: number
 	self.BlendStart = 0 :: number
 	self.BlendTime = BLEND_TIME :: number
+	-- the running blend is a Regress: its clock runs backwards
+	self.Back = false :: boolean
 	self.Mode = "" :: string -- "day" | "night:<k>"; a change starts a blend
 	-- os.clock() of the last night / attempt / vehicle change (switch click guard)
 	self.ContextAt = 0 :: number
@@ -735,8 +753,9 @@ function LightController:RefreshFixtures()
 	const now = Workspace:GetServerTimeNow()
 	const camera = Workspace.CurrentCamera
 	const eye = if camera then camera.CFrame.Position else nil
-	-- the day look of a cutscene keeps every lamp off, also on a night shift (until its Nightfall, DEC-300)
-	const daylight = Players.LocalPlayer:GetAttribute(LOOK_ATTRIBUTE) == "Cinematic"
+	-- the day look of a cutscene keeps every lamp off, also on a night shift (until its Nightfall, DEC-300); a Dawn
+	-- look only until its Regress starts (the lamps come on with the night)
+	const daylight = self:DayLook()
 	for key, fixtures in self.Fixtures do
 		const groupOn = not daylight and self:GroupOn(key)
 		for _, fixture in fixtures do
@@ -754,13 +773,30 @@ end
 
 -- Lighting preset ------------------------------------------------------------------------------------------------
 
+-- A cutscene's day look holds (Cinematic, or Dawn until its Regress): every lamp off, no kitchen dark
+function LightController:DayLook(): boolean
+	const player = Players.LocalPlayer
+	const look = player:GetAttribute(LOOK_ATTRIBUTE)
+	return look == "Cinematic" or (look == "Dawn" and type(player:GetAttribute(REGRESS_ATTRIBUTE)) ~= "number")
+end
+
 -- Cutscene look on top of the day: the scene's own preset instead of the day one (same clock), blended like any change.
 -- On a night shift (DEC-300: the run's intro on Night 1) the look holds a late afternoon (DuskClock) until the scene's
 -- Nightfall takes it away.
 function LightController:Target(): (Preset, number, string)
 	const preset, clock, mode = self:BaseTarget()
 	const look = Players.LocalPlayer:GetAttribute(LOOK_ATTRIBUTE)
-	if look == "Cinematic" and mode == "day" then
+	if look == "Dawn" or look == "Night" then
+		-- "The Second Coffee": Dawn until its Regress, then (and in the scenes after it) the last night; not in the lobby
+		if mode == "lobby" or mode == STAGE_MODE then
+			return preset, clock, mode
+		end
+		const regressed = look == "Night" or type(Players.LocalPlayer:GetAttribute(REGRESS_ATTRIBUTE)) == "number"
+		if regressed then
+			return NIGHT_10, NIGHT_CLOCK, "look:Night"
+		end
+		return DAWN, DAWN_CLOCK, "look:Dawn"
+	elseif look == "Cinematic" and mode == "day" then
 		return CINEMATIC, clock, `look:{look}`
 	elseif look == "Cinematic" and string.sub(mode, 1, 6) == "night:" then
 		return CINEMATIC, DUSK_CLOCK, `look:{look}`
@@ -840,8 +876,12 @@ function LightController:RefreshPreset()
 		self.FromClock = self.AppliedClock
 		self.BlendStart = now
 		const nightfall = Players.LocalPlayer:GetAttribute(NIGHTFALL_ATTRIBUTE)
+		const regress = Players.LocalPlayer:GetAttribute(REGRESS_ATTRIBUTE)
+		-- a Dawn look that regresses: its own time, and the sun goes back instead of on
+		self.Back = type(regress) == "number" and regress > 0 and self.Mode == "look:Night"
 		self.BlendTime = if stage
 			then CLASS_STAGE_BLEND
+			elseif self.Back then regress :: number
 			elseif type(nightfall) == "number" and nightfall > 0 then nightfall
 			else BLEND_TIME
 	end
@@ -855,7 +895,7 @@ function LightController:RefreshPreset()
 		else
 			alpha = alpha * alpha * (3 - 2 * alpha) -- smoothstep: eases in and out
 			preset = blend(from, target, alpha)
-			outClock = blendClock(self.FromClock, clock, alpha)
+			outClock = if self.Back then blendClockBack(self.FromClock, clock, alpha) else blendClock(self.FromClock, clock, alpha)
 		end
 	end
 	if preset == previous and outClock == self.AppliedClock then
@@ -871,7 +911,8 @@ end
 -- The kitchen is dark: night, a Switch group of the current vehicle off, no cutscene day look
 function LightController:WantsDark(): boolean
 	const round = self.Dependencies.RoundController
-	if not round.Dark() or Players.LocalPlayer:GetAttribute(LOOK_ATTRIBUTE) == "Cinematic" then
+	-- no switch dark under a cutscene's look (Dawn, or the Night that follows it) either: the scene frames its own dark
+	if not round.Dark() or self:DayLook() or Players.LocalPlayer:GetAttribute(LOOK_ATTRIBUTE) == "Night" then
 		return false
 	end
 	if self.Dependencies.PlaceController:Is("Lobby") then

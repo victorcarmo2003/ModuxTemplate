@@ -73,6 +73,7 @@ const SOUND_BUTTON = "switch_click" -- the window button, with the flap sound (n
 const PANEL_TICK = 4 -- Hz: shop open / closed against the flap pose
 -- phases where the window lever works: the `Shutter` attribute alone decides the flap (TASK-284)
 const LEVER_PHASES: { string } = Content.Actions.ByKey.shutter_toggle.Requires.Phase or {}
+const NIGHT_END = "NightEnd"
 
 type Shutter = {
 	Model: Instance, -- vehicle root (Model, or the restaurant's Folder: VehicleRoot)
@@ -334,14 +335,16 @@ function VehicleController:WatchFlap(model: Instance, hinge: Attachment)
 end
 
 -- The flap is down when the window is closed (server attribute) or, outside the lever phases, the shop is not selling
--- (panel). A phase this client does not know yet counts as selling: the flap never closes on a guess.
+-- (panel). A phase this client does not know yet counts as selling: the flap never closes on a guess. The 6 AM beat
+-- (NightEnd) follows the attribute only: the night's last call comes right after it with the window still open (owner
+-- 2026-10-21: the flap shut and opened again there).
 function VehicleController:WantClosed(model: Instance): boolean
 	if model:GetAttribute(SHUTTER_ATTRIBUTE) == true then
 		return true
 	end
 	const phase = self.Dependencies.RoundController.Phase()
 	const row = Content.Shift.ByKey[phase]
-	if row == nil or table.find(LEVER_PHASES, phase) ~= nil then
+	if row == nil or table.find(LEVER_PHASES, phase) ~= nil or phase == NIGHT_END then
 		return false
 	end
 	return not row.Selling

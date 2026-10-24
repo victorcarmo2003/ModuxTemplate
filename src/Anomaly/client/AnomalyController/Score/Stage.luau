@@ -45,6 +45,8 @@ function Stage.Of(score: Content.ScoreAnomaly, phase: string): StageKey?
 		return score.Signal
 	elseif phase == "Active" then
 		return score.Active
+	elseif phase == "Queue" then
+		return score.Queue -- owner 2026-10-22: a customer anomaly waiting for its order
 	elseif phase == "Failed" then
 		return score.Failed or "Climax"
 	elseif phase == "Resolved" then
