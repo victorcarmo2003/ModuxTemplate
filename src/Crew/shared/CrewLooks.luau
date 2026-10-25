@@ -8,8 +8,12 @@ export type Pack = "Day" | "Mid" | "Night"
 export type BlankLook = { Head: string, Atlas: { [Pack]: string } }
 -- Blank variant (ANM-001 / ANM-004, AST-060): smooth skin-colour head + atlas pieces (ears, tail, nose, snout, beak,
 -- eyes) repainted in the head colour. Absent (nil) for a species without it: Dress falls back to the ordinary look.
+-- Fur: Day colour of head and hands. PackFur: hand colour in Mid / Night (MeshPart.Color of the outfit pieces, shown
+-- through the sheet alpha by the SurfaceAppearance Overlay templates, Kit.ApplySheet): what the head shows in that
+-- pack, so hands and head agree (Night heads are navy for every species).
 export type SpeciesLook = {
 	Fur: Color3,
+	PackFur: { Mid: Color3, Night: Color3 },
 	EarsUp: boolean,
 	CapRaise: number,
 	Head: { [Pack]: string },
@@ -28,6 +32,7 @@ const looks: CrewLooks = {
 	Species = { -- keys of Content.Species (18); kit model = Assets.Crew.Animals[Content.Species[k].Asset]
 		dog = { -- Dog: T_Head_Dog[_Mid|_Night]
 			Fur = Color3.fromHex("A9684D"),
+			PackFur = { Mid = Color3.fromHex("644442"), Night = Color3.fromHex("1E2036") },
 			EarsUp = false,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://96664496563985", Mid = "rbxassetid://137640825798247", Night = "rbxassetid://91045360402610" },
@@ -35,6 +40,7 @@ const looks: CrewLooks = {
 		},
 		rabbit = { -- Rabbit: T_Head_Rabbit[_Mid|_Night]
 			Fur = Color3.fromHex("F3F5F6"),
+			PackFur = { Mid = Color3.fromHex("898B96"), Night = Color3.fromHex("1E2036") },
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://106661940106219", Mid = "rbxassetid://131402457548867", Night = "rbxassetid://72480132631515" },
@@ -42,6 +48,7 @@ const looks: CrewLooks = {
 		},
 		cat = { -- Cat: T_Head_Cat[_Mid|_Night]
 			Fur = Color3.fromHex("757E83"),
+			PackFur = { Mid = Color3.fromHex("4A4F5D"), Night = Color3.fromHex("1E2036") },
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://134000758373740", Mid = "rbxassetid://139345902541326", Night = "rbxassetid://135381347313207" },
@@ -49,6 +56,7 @@ const looks: CrewLooks = {
 		},
 		bear = { -- Bear: T_Head_Bear[_Mid|_Night]
 			Fur = Color3.fromHex("955540"),
+			PackFur = { Mid = Color3.fromHex("5A3B3B"), Night = Color3.fromHex("1E2036") },
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://127139549332301", Mid = "rbxassetid://96132346145952", Night = "rbxassetid://119988262238474" },
@@ -56,6 +64,7 @@ const looks: CrewLooks = {
 		},
 		fox = { -- Fox: T_Head_Fox[_Mid|_Night]
 			Fur = Color3.fromHex("DE7234"),
+			PackFur = { Mid = Color3.fromHex("7E4935"), Night = Color3.fromHex("1E2036") },
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://72172708526560", Mid = "rbxassetid://97262074483378", Night = "rbxassetid://124157493386261" },
@@ -63,6 +72,7 @@ const looks: CrewLooks = {
 		},
 		owl = { -- Owl: T_Head_Owl[_Mid|_Night]
 			Fur = Color3.fromHex("79695D"),
+			PackFur = { Mid = Color3.fromHex("4C454A"), Night = Color3.fromHex("1E2036") },
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://131605294880831", Mid = "rbxassetid://81602993820484", Night = "rbxassetid://114733010859711" },
@@ -70,6 +80,7 @@ const looks: CrewLooks = {
 		},
 		panda = { -- Panda: T_Head_Panda[_Mid|_Night]
 			Fur = Color3.fromHex("F3F5F6"),
+			PackFur = { Mid = Color3.fromHex("898B96"), Night = Color3.fromHex("1E2036") },
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://107035147420788", Mid = "rbxassetid://93082637985239", Night = "rbxassetid://94387454098552" },
@@ -77,6 +88,7 @@ const looks: CrewLooks = {
 		},
 		lion = { -- Lion: T_Head_Lion[_Mid|_Night]
 			Fur = Color3.fromHex("ECBE5A"),
+			PackFur = { Mid = Color3.fromHex("856F48"), Night = Color3.fromHex("1E2036") },
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://117801935505340", Mid = "rbxassetid://119372495789660", Night = "rbxassetid://95986857233932" },
@@ -84,6 +96,7 @@ const looks: CrewLooks = {
 		},
 		penguin = { -- Penguin: T_Head_Penguin[_Mid|_Night]
 			Fur = Color3.fromHex("242F33"),
+			PackFur = { Mid = Color3.fromHex("212835"), Night = Color3.fromHex("1E2036") },
 			EarsUp = false,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://123931388358269", Mid = "rbxassetid://80736875394051", Night = "rbxassetid://89367599680359" },
@@ -91,6 +104,7 @@ const looks: CrewLooks = {
 		},
 		hamster = { -- Hamster: T_Head_Hamster[_Mid|_Night]
 			Fur = Color3.fromHex("F89F48"),
+			PackFur = { Mid = Color3.fromHex("8B603F"), Night = Color3.fromHex("1E2036") },
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://102340612754941", Mid = "rbxassetid://74060278626157", Night = "rbxassetid://132794630370165" },
@@ -98,6 +112,7 @@ const looks: CrewLooks = {
 		},
 		mouse = { -- Mouse: T_Head_Mouse[_Mid|_Night]
 			Fur = Color3.fromHex("A8A29C"),
+			PackFur = { Mid = Color3.fromHex("636169"), Night = Color3.fromHex("1E2036") },
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://129261489456841", Mid = "rbxassetid://107138783066765", Night = "rbxassetid://109138723724055" },
@@ -105,6 +120,7 @@ const looks: CrewLooks = {
 		},
 		frog = { -- Frog: T_Head_Frog[_Mid|_Night]
 			Fur = Color3.fromHex("00AB5C"),
+			PackFur = { Mid = Color3.fromHex("0F6649"), Night = Color3.fromHex("1E2036") },
 			EarsUp = false,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://135183718306005", Mid = "rbxassetid://73613673868262", Night = "rbxassetid://73115565618007" },
@@ -112,6 +128,7 @@ const looks: CrewLooks = {
 		},
 		monkey = { -- Monkey: T_Head_Monkey[_Mid|_Night]
 			Fur = Color3.fromHex("834231"),
+			PackFur = { Mid = Color3.fromHex("513134"), Night = Color3.fromHex("1E2036") },
 			EarsUp = false,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://101395404005070", Mid = "rbxassetid://87619323373695", Night = "rbxassetid://81425577486040" },
@@ -119,6 +136,7 @@ const looks: CrewLooks = {
 		},
 		turtle = { -- Turtle: T_Head_Turtle[_Mid|_Night]
 			Fur = Color3.fromHex("009758"),
+			PackFur = { Mid = Color3.fromHex("0F5C47"), Night = Color3.fromHex("1E2036") },
 			EarsUp = false,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://116982946008275", Mid = "rbxassetid://111834225315051", Night = "rbxassetid://87183290884940" },
@@ -126,6 +144,7 @@ const looks: CrewLooks = {
 		},
 		sheep = { -- Sheep: T_Head_Sheep[_Mid|_Night]
 			Fur = Color3.fromHex("E9D0B8"),
+			PackFur = { Mid = Color3.fromHex("847877"), Night = Color3.fromHex("1E2036") },
 			EarsUp = false,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://117304578679749", Mid = "rbxassetid://127849777390802", Night = "rbxassetid://135462136928062" },
@@ -133,6 +152,7 @@ const looks: CrewLooks = {
 		},
 		koala = { -- Koala: T_Head_Koala[_Mid|_Night]
 			Fur = Color3.fromHex("9DAAB0"),
+			PackFur = { Mid = Color3.fromHex("5E6573"), Night = Color3.fromHex("1E2036") },
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://111551990621799", Mid = "rbxassetid://109821449697714", Night = "rbxassetid://73818844795337" },
@@ -140,6 +160,7 @@ const looks: CrewLooks = {
 		},
 		pig = { -- Pig: T_Head_Pig[_Mid|_Night]
 			Fur = Color3.fromHex("FAA39B"),
+			PackFur = { Mid = Color3.fromHex("8C6269"), Night = Color3.fromHex("1E2036") },
 			EarsUp = false,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://73376431637354", Mid = "rbxassetid://118497069683126", Night = "rbxassetid://129336666278943" },
@@ -147,6 +168,7 @@ const looks: CrewLooks = {
 		},
 		raccoon = { -- Raccoon: T_Head_Raccoon[_Mid|_Night]
 			Fur = Color3.fromHex("978F86"),
+			PackFur = { Mid = Color3.fromHex("5B585E"), Night = Color3.fromHex("1E2036") },
 			EarsUp = true,
 			CapRaise = 0.30,
 			Head = { Day = "rbxassetid://134072371174850", Mid = "rbxassetid://71458340748640", Night = "rbxassetid://81689947310165" },
@@ -169,6 +191,7 @@ const looks: CrewLooks = {
 
 for _, s in looks.Species do
 	table.freeze(s.Head)
+	table.freeze(s.PackFur)
 	if s.Blank then
 		table.freeze(s.Blank.Atlas)
 		table.freeze(s.Blank)

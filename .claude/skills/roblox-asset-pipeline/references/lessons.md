@@ -176,3 +176,7 @@
     at placement time. In a dark night preset only Neon details read: plain props vanish, so swap fillers for glowing variants.
 53. (2026-10-21) Concave outlines (moon crescent) through bmesh ear-clip can fill the hollow; build them as a quad strip between
     matching outer/inner points. Facial features slabbed onto a curved body need `lift` > the facet sag (cos(pi/segs)) or they sink.
+54. (2026-10-25) A MeshPart `TextureID` is drawn ignoring its alpha (probe: magenta part + texture with alpha-0 texels
+    showed the RGB stored under them, not the magenta). Where the part Color must show through the texture (fur, tint
+    masks), wear it as a SurfaceAppearance with AlphaMode Overlay: ColorMap is Plugin-only, so build one template per
+    texture id in edit mode and clone it at runtime. Measured on Sell Hotdogs outfit sheets (grey hands on every species).

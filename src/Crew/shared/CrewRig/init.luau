@@ -20,6 +20,7 @@
 local Build = require(script.Build)
 local CrewLooks = require(script.Parent.CrewLooks)
 local Dress = require(script.Dress)
+local Kit = require(script.Kit)
 
 export type Pack = CrewLooks.Pack
 export type BuildOptions = Build.Options
@@ -34,4 +35,6 @@ return table.freeze({
 	Dress = Dress.Dress,
 	EffectivePack = Dress.EffectivePack,
 	AsPack = Dress.AsPack,
+	-- outfit sheet on an OutfitPart piece (TextureID + SurfaceAppearance Overlay template, Kit.ApplySheet)
+	ApplySheet = Kit.ApplySheet,
 })

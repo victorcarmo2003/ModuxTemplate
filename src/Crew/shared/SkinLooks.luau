@@ -7,13 +7,19 @@
 --                       the ones whose DayTextureID is BaseAtlas
 --   Head                (skins with their own fur) the species head over the skin fur, opaque: the uploaded heads carry
 --                       the species fur baked in, so MeshPart.Color alone does not recolour them
+--   HandFur             (skins with their own head) hand colour in Mid / Night: MeshPart.Color of the outfit pieces,
+--                       shown through the sheet alpha (CrewRig Kit.ApplySheet), = what that head shows in the pack.
+--                       Printed by `python tools/assetplace/gen_skin_textures.py --hand-fur`. Day: Content.Skins Fur.
 -- Sources: tools/assetplace/gen_skin_textures.py -> Assets/textures/character/skins/T_Skin_<Sheet>[Atlas]_<Pack>.png, uploaded
 -- 2026-10-17 (Studio upload_image), ids in Assets/textures/character/skins/_texture_ids.json. A repaint = new upload = new
 -- ids here. A skin without a row here dresses in the crew uniform (warned once by Dress).
+-- 2026-10-25: Ghost / Witch / Franken / Skeleton Atlas Mid + Night repainted (fur cells = the pack colour of the skin
+-- head, Day shading: the ears no longer go black at night under a coloured head) and uploaded again (Studio upload_image).
 
 export type Pack = "Day" | "Mid" | "Night"
 export type Sheets = { Day: string, Mid: string, Night: string }
-export type SkinLook = { Day: string, Mid: string, Night: string, Atlas: Sheets, Head: Sheets? }
+export type PackFur = { Mid: Color3, Night: Color3 }
+export type SkinLook = { Day: string, Mid: string, Night: string, Atlas: Sheets, Head: Sheets?, HandFur: PackFur? }
 
 const looks: { [string]: SkinLook } = {
 	skin_dog_pumpkin = { -- T_Skin_Pumpkin_<Pack>, T_Skin_PumpkinAtlas_<Pack>
@@ -27,6 +33,7 @@ const looks: { [string]: SkinLook } = {
 		},
 	},
 	skin_rabbit_ghost = { -- T_Skin_Ghost_<Pack>, T_Skin_GhostAtlas_<Pack>
+		HandFur = { Mid = Color3.fromHex("DEE3ED"), Night = Color3.fromHex("F5FAFF") },
 		Day = "rbxassetid://76539180647041",
 		Mid = "rbxassetid://95687172111972",
 		Night = "rbxassetid://134457735843344",
@@ -37,11 +44,12 @@ const looks: { [string]: SkinLook } = {
 		},
 		Atlas = {
 			Day = "rbxassetid://113093365085569",
-			Mid = "rbxassetid://131371122271677",
-			Night = "rbxassetid://84410288153109",
+			Mid = "rbxassetid://88537369990599",
+			Night = "rbxassetid://132575915730622",
 		},
 	},
 	skin_cat_witch = { -- T_Skin_Witch_<Pack>, T_Skin_WitchAtlas_<Pack>
+		HandFur = { Mid = Color3.fromHex("3B3843"), Night = Color3.fromHex("3B3740") },
 		Day = "rbxassetid://116341754293027",
 		Mid = "rbxassetid://130121208259417",
 		Night = "rbxassetid://81413991124515",
@@ -52,11 +60,12 @@ const looks: { [string]: SkinLook } = {
 		},
 		Atlas = {
 			Day = "rbxassetid://98096091102247",
-			Mid = "rbxassetid://100335129047369",
-			Night = "rbxassetid://83364511646446",
+			Mid = "rbxassetid://139381989756151",
+			Night = "rbxassetid://78743611408850",
 		},
 	},
 	skin_bear_franken = { -- T_Skin_Franken_<Pack>, T_Skin_FrankenAtlas_<Pack>
+		HandFur = { Mid = Color3.fromHex("81AA64"), Night = Color3.fromHex("8CC16D") },
 		Day = "rbxassetid://112204760630413",
 		Mid = "rbxassetid://124737730149808",
 		Night = "rbxassetid://103115523149878",
@@ -67,8 +76,8 @@ const looks: { [string]: SkinLook } = {
 		},
 		Atlas = {
 			Day = "rbxassetid://113266356479503",
-			Mid = "rbxassetid://75852604627872",
-			Night = "rbxassetid://84754145774998",
+			Mid = "rbxassetid://109560919735848",
+			Night = "rbxassetid://76121764927295",
 		},
 	},
 	skin_fox_vampire = { -- T_Skin_Vampire_<Pack>, T_Skin_VampireAtlas_<Pack>
@@ -82,6 +91,7 @@ const looks: { [string]: SkinLook } = {
 		},
 	},
 	skin_owl_skeleton = { -- T_Skin_Skeleton_<Pack>, T_Skin_SkeletonAtlas_<Pack>
+		HandFur = { Mid = Color3.fromHex("4A454F"), Night = Color3.fromHex("4C4851") },
 		Day = "rbxassetid://111586331236376",
 		Mid = "rbxassetid://89126279364079",
 		Night = "rbxassetid://74475644683834",
@@ -92,8 +102,8 @@ const looks: { [string]: SkinLook } = {
 		},
 		Atlas = {
 			Day = "rbxassetid://125323012040716",
-			Mid = "rbxassetid://79773283279821",
-			Night = "rbxassetid://95954020052660",
+			Mid = "rbxassetid://104952927553009",
+			Night = "rbxassetid://121949315393916",
 		},
 	},
 }
@@ -107,6 +117,9 @@ for _, look in looks do
 	table.freeze(look.Atlas)
 	if look.Head then
 		table.freeze(look.Head)
+	end
+	if look.HandFur then
+		table.freeze(look.HandFur)
 	end
 	table.freeze(look)
 end

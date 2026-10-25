@@ -341,7 +341,7 @@ local function build(species: string, outfit: string, opts: Options?): Model
 			continue
 		end
 		if part:GetAttribute("OutfitPart") then
-			part.TextureID = daySheet
+			Kit.ApplySheet(part, daySheet) -- SurfaceAppearance Overlay: the fur colour shows on hands / forearms
 			part.Color = fur
 		elseif part ~= head and part ~= face and part.TextureID ~= "" and part:GetAttribute("DayTextureID") == nil then
 			part:SetAttribute("DayTextureID", part.TextureID)

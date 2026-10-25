@@ -1,0 +1,3 @@
+{"beauty": "l301_beauty.jpg", "matte": "l301_matte.jpg", "out": "../L3-01_janela_sorriso_2.png",
+ "crop_y": 0.3, "glow": {"key": "magenta", "color": [150, 90, 255], "radius": 0.24, "strength": 0.9, "y_bias": 0.3},
+ "edge_blur": 0.7, "vignette": 0.3, "warm": 0.03, "sharpen": 0.35, "gain": 1.2}

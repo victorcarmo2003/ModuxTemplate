@@ -7,6 +7,8 @@ Sources (never edit CrewLooks.luau by hand; change the sources and run this agai
                                                    missing one is a hard error only if the file lists the species
   - Assets/textures/character/T_Head_<A>.png      fur colour = RGB stored under the alpha-0 texels (the head painter
                                                    keeps the fur there; same values as the skill's colors.json)
+  - T_Head_<A>_<Mid|Night>.png + outfit sheets     PackFur (hand colour per pack, hand_fur): the RGB the worn head
+                                                   shows on those texels, compensated for the sheets' fur overlay
   - CAP_PLAIN below                                species wearing the plain Cap (floppy ears / no ears); every other
                                                    species has ears up and wears AST-053_CrewCap_EarsUp. Read from the
                                                    REF_Cap object (mesh "Cap" vs "Cap_EarsUp") of each
@@ -75,10 +77,51 @@ def fur_hex(asset: str) -> str:
     return f"{r:02X}{g:02X}{b:02X}"
 
 
+def sheet_overlay(stem: str, pack: str) -> tuple[tuple[int, int, int], float] | None:
+    """Fur overlay of an outfit sheet: (rgb, alpha 0..1) shared by every partial-alpha texel, (_, 0.0) when the fur
+    texels are alpha 0, None when the sheet does not exist. A sheet with mixed partial texels is an error."""
+    from PIL import Image
+
+    path = TEX_DIR / f"T_{stem}_{pack}.png"
+    if not path.exists():
+        return None
+    partial = Counter(p for p in Image.open(path).convert("RGBA").getdata() if 0 < p[3] < 255)
+    if not partial:
+        return (0, 0, 0), 0.0
+    if len(partial) > 1:
+        raise SystemExit(f"{path.name}: fur overlay is not uniform ({len(partial)} distinct partial texels)")
+    r, g, b, a = next(iter(partial))
+    return (r, g, b), a / 255
+
+
+def pack_overlay(pack: str) -> tuple[tuple[int, int, int], float]:
+    """The one fur overlay every outfit sheet of `pack` shares (Night: worn navy, lessons 19; Day / Mid: none)."""
+    seen = {o for stem in [*OUTFITS.values(), *PENDING_OUTFITS.values()] if (o := sheet_overlay(stem, pack))}
+    if len(seen) != 1:
+        raise SystemExit(f"outfit sheets of {pack} disagree on the fur overlay: {sorted(seen)}")
+    return seen.pop()
+
+
+def hand_fur(asset: str, pack: str, overlay: tuple[tuple[int, int, int], float]) -> str:
+    """Hand colour of `asset` in `pack` (MeshPart.Color of the outfit pieces, shown through the sheet's alpha by the
+    SurfaceAppearance Overlay templates, Kit.ApplySheet): the colour the head shows in that pack (Roblox draws a
+    MeshPart TextureID ignoring its alpha, so the head shows the RGB of its fur texels, the alpha-0 texels of the Day
+    head), compensated for the sheet's own fur overlay so overlay-over-Color lands on that colour."""
+    from PIL import Image
+
+    day = Image.open(TEX_DIR / f"T_Head_{asset}.png").convert("RGBA").getdata()
+    worn = Image.open(TEX_DIR / f"T_Head_{asset}_{pack}.png").convert("RGBA").getdata()
+    counts = Counter(w[:3] for d, w in zip(day, worn) if d[3] == 0)
+    shown = counts.most_common(1)[0][0]
+    rgb, a = overlay
+    out = [round(min(255, max(0, (s - a * o) / (1 - a)))) for s, o in zip(shown, rgb)]
+    return "{:02X}{:02X}{:02X}".format(*out)
+
+
 def sheet_alpha_problems(stem: str) -> list[str]:
-    """Day/Mid outfit sheets: fur texels (hands, forearms) must be alpha 0 so MeshPart.Color (species fur) shows.
-    Roblox renders partial alpha on a MeshPart TextureID almost opaque: a shared grey overlay hid every species'
-    fur on the arms (Mid pack, NPCs at night). Night keeps its navy overlay on purpose (matches the navy heads)."""
+    """Day/Mid outfit sheets: fur texels (hands, forearms) must be alpha 0 so MeshPart.Color (species fur) shows
+    through the SurfaceAppearance Overlay (Kit.ApplySheet). Night keeps its uniform navy overlay (pack_overlay):
+    hand_fur compensates it."""
     from PIL import Image
 
     out: list[str] = []
@@ -141,8 +184,12 @@ def build() -> str:
     w("export type BlankLook = { Head: string, Atlas: { [Pack]: string } }")
     w("-- Blank variant (ANM-001 / ANM-004, AST-060): smooth skin-colour head + atlas pieces (ears, tail, nose, snout, beak,")
     w("-- eyes) repainted in the head colour. Absent (nil) for a species without it: Dress falls back to the ordinary look.")
+    w("-- Fur: Day colour of head and hands. PackFur: hand colour in Mid / Night (MeshPart.Color of the outfit pieces, shown")
+    w("-- through the sheet alpha by the SurfaceAppearance Overlay templates, Kit.ApplySheet): what the head shows in that")
+    w("-- pack, so hands and head agree (Night heads are navy for every species).")
     w("export type SpeciesLook = {")
     w("	Fur: Color3,")
+    w("	PackFur: { Mid: Color3, Night: Color3 },")
     w("	EarsUp: boolean,")
     w("	CapRaise: number,")
     w("	Head: { [Pack]: string },")
@@ -158,6 +205,7 @@ def build() -> str:
     w("")
     w("const looks: CrewLooks = {")
     w(f"\tKitVersion = {KIT_VERSION},")
+    overlays = {pack: pack_overlay(pack) for pack in ("Mid", "Night")}
     w("\tSpecies = { -- keys of Content.Species (18); kit model = Assets.Crew.Animals[Content.Species[k].Asset]")
     for key, asset in SPECIES.items():
         heads = []
@@ -167,6 +215,10 @@ def build() -> str:
         ears_up = "false" if asset in CAP_PLAIN else "true"
         w(f"\t\t{key} = {{ -- {asset}: T_Head_{asset}[_Mid|_Night]")
         w(f'\t\t\tFur = Color3.fromHex("{fur_hex(asset)}"),')
+        pack_fur = ", ".join(
+            f'{pack} = Color3.fromHex("{hand_fur(asset, pack, overlays[pack])}")' for pack in ("Mid", "Night")
+        )
+        w(f"\t\t\tPackFur = {{ {pack_fur} }},")
         w(f"\t\t\tEarsUp = {ears_up},")
         w(f"\t\t\tCapRaise = {CAP_RAISE:.2f},")
         w(f"\t\t\tHead = {{ {', '.join(heads)} }},")
@@ -193,6 +245,7 @@ def build() -> str:
     w("")
     w("for _, s in looks.Species do")
     w("\ttable.freeze(s.Head)")
+    w("\ttable.freeze(s.PackFur)")
     w("\tif s.Blank then")
     w("\t\ttable.freeze(s.Blank.Atlas)")
     w("\t\ttable.freeze(s.Blank)")

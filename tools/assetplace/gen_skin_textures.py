@@ -440,12 +440,17 @@ def cap_atlas(spec: dict, pack: str) -> np.ndarray:
         recolour(rgb, mask, spec.get("cap", spec["primary"]), ref)
     fur = spec.get("fur")
     if fur is not None:
+        # fur pieces (ears, tail, snout) follow the colour the skin head shows in this pack (owner 2026-10-25: "ears
+        # follow the body"): Day shading of the cell, target = head fur of the pack. Recolouring the Mid / Night cell
+        # itself crushed it (dark navy luma, clipped ratio): Franken's ears went black at night under a green head.
+        target = head_fur(spec, pack)
         for r, c in spec["fur_cells"]:
             ys, xs = slice(r * 256, (r + 1) * 256), slice(c * 128, (c + 1) * 128)
             ref = float(luma(day[ys, xs, :3]).mean())
             mask = np.zeros(rgb.shape[:2], bool)
             mask[ys, xs] = True
-            recolour(rgb, mask, fur, ref)
+            rgb[mask] = day[..., :3][mask]
+            recolour(rgb, mask, target, ref)
     out = np.concatenate([rgb, src[..., 3:4]], axis=-1).clip(0, 255).astype(np.uint8)
     return np.asarray(Image.fromarray(out).resize((ATLAS_OUT, ATLAS_OUT), Image.LANCZOS))
 
@@ -476,7 +481,47 @@ def board(paths: list[Path]) -> None:
     sheet.save(OUT / "_board.png")
 
 
+# --- hand colour per pack (skins with their own head) -------------------------------------------------------------------
+# The outfit pieces show MeshPart.Color through the sheet alpha (SurfaceAppearance Overlay, CrewRig Kit.ApplySheet). Day:
+# Content.Skins Fur. Mid / Night: the colour the skin head shows on the species' fur texels (alpha 0 of T_Head_<A>.png),
+# compensated for the sheet's fur overlay (Night: the crew's worn navy rows), so hands and head agree in every pack.
+# `python tools/assetplace/gen_skin_textures.py --hand-fur` prints the SkinLooks HandFur rows (no file is written).
+def head_fur(spec: dict, pack: str) -> tuple[int, int, int]:
+    """Colour the skin head shows on the species' fur texels in `pack` (Roblox draws the head TextureID opaque)."""
+    from collections import Counter
+
+    mask = np.asarray(Image.open(TEX / f"T_Head_{spec['species']}.png").convert("RGBA"))[..., 3] == 0
+    shown_px = np.asarray(Image.fromarray(head(spec, pack)).convert("RGB"))[mask]
+    r, g, b = Counter(map(tuple, shown_px.tolist())).most_common(1)[0][0]
+    return int(r), int(g), int(b)
+
+
+def hand_fur(spec: dict, pack: str) -> str:
+    shown = np.array(head_fur(spec, pack), dtype=np.float32)
+    sheet = np.asarray(Image.open(OUT / f"T_Skin_{spec['name']}_{pack}.png").convert("RGBA"))
+    partial = sheet[(sheet[..., 3] > 0) & (sheet[..., 3] < 255)]
+    if len(partial):
+        over = partial[0].astype(np.float32)
+        if (partial != partial[0]).any():
+            raise SystemExit(f"T_Skin_{spec['name']}_{pack}.png: fur overlay is not uniform")
+        a = over[3] / 255.0
+        shown = (shown - a * over[:3]) / (1.0 - a)
+    r, g, b = (int(round(v)) for v in shown.clip(0, 255))
+    return f"{r:02X}{g:02X}{b:02X}"
+
+
+def print_hand_fur() -> None:
+    for key, spec in SKINS.items():
+        if spec.get("fur") is None:
+            continue
+        packs = ", ".join(f'{p} = Color3.fromHex("{hand_fur(spec, p)}")' for p in ("Mid", "Night"))
+        print(f"{key}: HandFur = {{ {packs} }},")
+
+
 def main() -> None:
+    if "--hand-fur" in sys.argv:
+        print_hand_fur()
+        return
     only = sys.argv[1:]
     OUT.mkdir(parents=True, exist_ok=True)
     days: list[Path] = []

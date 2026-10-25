@@ -14,6 +14,8 @@
 	                                      name ("Acc_Badge"), attribute Anchor (R6 part) + DayTextureID; list, assets and
 	                                      anchors from AccessoryFit (src/Crew/shared, generated from AST-081_offsets.json)
 	  ReplicatedStorage.CrewExpressions   one SurfaceAppearance per expression (T_Expr_<Name>, AlphaMode Transparency)
+	(ReplicatedStorage.CrewOutfitSheets, the outfit sheet templates that let the fur colour show on hands, is built by
+	build_outfit_sheets.luau: rerun it after this script or any new outfit / skin sheet upload.)
 
 	Kit conventions (consumed by CrewRig, TASK-016):
 	  - every piece keeps the imported rest pose (common origin at the feet, front -Z): never PivotTo a kit model;

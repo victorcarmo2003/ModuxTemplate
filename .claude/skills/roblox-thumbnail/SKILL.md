@@ -15,6 +15,24 @@ monochrome warm (no cool counter-colour), soft (edge density 0.05 vs 0.13), subj
 This skill gives you the recipe, the numbers, scripts that do the mechanical parts, and a gate that tells you
 when a thumb is still "flat".
 
+## 0.0 The market recipe is a default, not a law (ad data, 2026-10)
+
+Real ad results on a cute-horror game (Sell Hotdogs) beat the market recipe:
+- **A06 "Janela Sorriso"**: a raw in-engine frame — scared cute hero close to the lens, a black monster with white
+  eyes behind him framed by the service window, warm interior × purple night street, edge blur, no text, no outline,
+  no glow. **4.5 % CTR in 2 days and rising.** `check` gave it 8 market warnings.
+- The same scenes "beautified" by an image AI (neon, saturated, bright, cute Halloween): ~3 % CTR, and players
+  **quit at the first anomaly** — the card promised a cute game. Play-through and first-play bounce paid for it.
+
+So: when the genre is horror or the game is darker than its art, **promise the real tone**. Run `check --profile
+cinematic` (A06 bands) or `--profile island` (one pool of light in the dark, A09) instead of the market bands, and do
+not "fix" a winning dark frame by brightening, saturating or outlining it. A spec can set `"profile": "cinematic"`.
+The cinematic recipe: camera at eye height inside the set, FOV 65–75; three planes (blurred prop / sharp scared hero
+in a side third, head 30–40 % of the height / threat inside a window, door or windshield); the threat's white eyes
+(or a light strip) are the only near-white pixels; warm inside × cool or purple outside; vignette + edge blur.
+Shooting it as **chroma passes + lit plate** still works (it is how A06's siblings were made): light the hero with
+local PointLights in the chroma pass to match the plate, then composite with no outline.
+
 ## 0. Read first
 - `references/rules.md` — composition, scale, light, finish, text, Roblox limits, A/B order. **Read every time.**
 - `references/market-study.md` — the metrics table + per-genre archetypes + reference games. Read when picking a
@@ -101,7 +119,7 @@ Pitfalls seen in production (all handled by helpers):
 
 ```
 python scripts/thumb.py compose spec.json        # writes the PNG, then prints check metrics + warnings
-python scripts/thumb.py check out.png [--icon]   # 250 px / 150 px colour + greyscale preview, metrics vs market bands
+python scripts/thumb.py check out.png [--icon] [--profile market|cinematic|island]   # 250 px preview + metrics vs bands
 python scripts/thumb.py batch spec.json --vary "text.0.text=\"RUN!\"|\"DON'T LOOK\"" --vary "layers.1.flip=true|false"
 ```
 

@@ -1,0 +1,10 @@
+{
+ "beauty": "l304_beauty.jpg",
+ "out": "../L3-04_cliente_sorridente.png",
+ "crop_y": 0.45,
+ "edge_blur": 0.55,
+ "vignette": 0.3,
+ "warm": 0.0,
+ "sharpen": 0.35,
+ "gain": 1.05
+}

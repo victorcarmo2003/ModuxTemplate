@@ -44,3 +44,18 @@
     re-applies the file's rest keys (unassign the action to test poses); ID-prop drivers need `update_tag()`;
     a generated (non-file) image LUT turns black after save → use a constant ColorRamp. Verify with joint separation
     (pivot seen from Part0 vs Part1) = 0, not only renders. Build/verify scripts: Sell Hotdogs `tools/animrig/`.
+21. (2026-10-25) "The frog has the cat's hands" → a plain `MeshPart.TextureID` is drawn IGNORING its alpha: the fur
+    texels (alpha 0) showed the neutral grey stored under them (206,196,182) on every species, never `MeshPart.Color`
+    (Studio probe: magenta arm + outfit TextureID = grey forearm; same arm + SurfaceAppearance AlphaMode **Overlay**
+    with that ColorMap = magenta forearm and pink pads on top). Same cause as lessons 8/12/15 (partial alpha "almost
+    opaque", fur under the head alpha read as RGB). Fix: outfit pieces wear the sheet through a SurfaceAppearance
+    Overlay template (ColorMap is not script-writable → one template per sheet id in ReplicatedStorage, built in edit
+    mode, cloned at runtime, like the expressions); `MeshPart.Color` = the colour the head shows in the worn pack
+    (Day: species/skin fur; Mid/Night: the head's pack fur, compensated for the sheet's own fur overlay). Rule:
+    **hands, ears, tail and every fur piece follow the body/head colour the character is wearing; clothing leaves
+    skin at alpha 0.** No per-species outfit sheets needed.
+22. (2026-10-25) Skin with its own fur (green Franken bear): the skin atlas recoloured the Night fur cell from the
+    Night atlas itself (navy luma, ratio clipped at 0.45) → black ears under a green head at night. Fur cells of a skin
+    atlas take the Day cell shading with the colour the skin head shows in that pack. A class skin only dresses its
+    class species: a Franken (bear head) on a pig/cat/fox in a test row looks green with pig/cat/fox ears — test skins
+    on their own species.

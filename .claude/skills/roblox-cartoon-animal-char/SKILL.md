@@ -57,6 +57,9 @@ heights, face UV) and `colors.json` (fur/hand colours). Accessory recipes per sp
 - Face shell normals = the head's normals (no shading seam); shell only on front-facing faces.
 - Eyes: tall ovals, narrow, ONE small white highlight top-right. Check at 60° and 75°, not only front.
 - Night must cover every piece (head texture, outfit texture AND night atlas for ears/tail/shell/beak/cap).
+- Hands, ears, tail and every fur piece follow the body/head colour the character wears (species, skin, pack); the
+  outfit leaves skin at alpha 0 and is worn through a SurfaceAppearance **Overlay** template, never a plain
+  TextureID (Roblox draws TextureID ignoring alpha: grey hands on every species). See textures.md, lessons 21-22.
 - Roblox renders a partial-alpha overlay on a MeshPart TextureID almost opaque: judge night colours in Studio.
 - When the head grows, move every accessory that rides on its attachments (cap +0.30 with HatAttachment).
 - Third-party pieces only with verified licence (see roblox-asset-pipeline / project credits).

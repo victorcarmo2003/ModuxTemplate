@@ -426,9 +426,18 @@ def metrics(path: Path):
 # reference bands from the 2026-10 study of 178 top Roblox thumbnails (see references/market-study.md)
 BANDS = {"dark": (0.10, 0.45), "bright": (0.06, 0.30), "contrast": (0.18, 0.30), "sat": (0.40, 0.65),
          "warm": (0.15, 0.50), "cool": (0.10, 0.45), "edges": (0.09, 0.20)}
+# measured winners that break the market bands (Sell Hotdogs ads, 2026-10): "cinematic" = A06 Janela Sorriso
+# (raw in-engine frame, dark, warm inside x night outside, monster eyes the only white; 4.5 % CTR and rising),
+# "island" = A09 Fica na Luz (one pool of light in the dark). Pick with --profile or spec "profile".
+PROFILES = {
+    "market": BANDS,
+    "cinematic": {"dark": (0.35, 0.60), "bright": (0.0, 0.03), "sat": (0.50, 0.72), "warm": (0.55, 0.92),
+                  "edges": (0.05, 0.10)},
+    "island": {"dark": (0.60, 0.95), "bright": (0.0, 0.03), "sat": (0.30, 0.72), "edges": (0.015, 0.10)},
+}
 
 
-def check(path: Path, icon=False):
+def check(path: Path, icon=False, profile="market"):
     m = metrics(path)
     im = Image.open(path).convert("RGB")
     w = 150 if icon else 250
@@ -440,18 +449,21 @@ def check(path: Path, icon=False):
     prev = path.with_name(path.stem + "_check.png")
     sheet.save(prev)
     notes = []
-    for k, (lo, hi) in BANDS.items():
+    for k, (lo, hi) in PROFILES[profile].items():
         v = m[k]
         if v < lo:
             notes.append(f"{k} {v:.2f} < {lo} (low)")
         elif v > hi:
             notes.append(f"{k} {v:.2f} > {hi} (high)")
-    if m["warm"] > 0.4 and m["cool"] < 0.08:
-        notes.append("monochrome warm: no cool counter-colour -> no temperature contrast")
-    if m["bright"] < 0.04:
-        notes.append("no bright anchor: add pure-white eyes/text/highlight")
-    print(json.dumps({"file": str(path), "metrics": {k: round(v, 3) for k, v in m.items()}, "warnings": notes,
-                      "preview": str(prev)}, indent=1))
+    if profile == "market":
+        if m["warm"] > 0.4 and m["cool"] < 0.08:
+            notes.append("monochrome warm: no cool counter-colour -> no temperature contrast")
+        if m["bright"] < 0.04:
+            notes.append("no bright anchor: add pure-white eyes/text/highlight")
+    elif m["bright"] < 0.0005:
+        notes.append("no white at all: the monster eyes / light strip must be the brightest pixels")
+    print(json.dumps({"file": str(path), "profile": profile, "metrics": {k: round(v, 3) for k, v in m.items()},
+                      "warnings": notes, "preview": str(prev)}, indent=1))
     return m, notes
 
 
@@ -505,6 +517,7 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     c = sub.add_parser("compose"); c.add_argument("spec"); c.add_argument("--out")
     k = sub.add_parser("check"); k.add_argument("image"); k.add_argument("--icon", action="store_true")
+    k.add_argument("--profile", choices=sorted(PROFILES), default="market")
     b = sub.add_parser("batch"); b.add_argument("spec"); b.add_argument("--vary", action="append", default=[])
     a = ap.parse_args()
     if a.cmd == "compose":
@@ -513,9 +526,9 @@ def main():
         out = compose(spec, p.parent, Path(a.out) if a.out else None)
         print(out)
         sz = spec.get("size", [1920, 1080])
-        check(out, icon=sz[0] == sz[1])
+        check(out, icon=sz[0] == sz[1], profile=spec.get("profile", "market"))
     elif a.cmd == "check":
-        check(Path(a.image), a.icon)
+        check(Path(a.image), a.icon, a.profile)
     else:
         batch(Path(a.spec), a.vary)
 

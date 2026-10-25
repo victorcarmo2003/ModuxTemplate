@@ -1,0 +1,22 @@
+{
+ "beauty": "l308_beauty.jpg",
+ "matte": "l308_matte.jpg",
+ "out": "../L3-08_e_ele_na_linha.png",
+ "crop_y": 0.45,
+ "glow": {
+  "key": "magenta",
+  "color": [
+   130,
+   140,
+   255
+  ],
+  "radius": 0.17,
+  "strength": 1.8,
+  "y_bias": 0.3
+ },
+ "edge_blur": 0.6,
+ "vignette": 0.3,
+ "warm": 0.02,
+ "sharpen": 0.35,
+ "gain": 1.15
+}

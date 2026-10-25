@@ -3,6 +3,7 @@
 -- The kits live outside Rojo, built in edit mode by tools/assetplace/build_kits.luau:
 --   ReplicatedStorage.Assets.Crew: Body, CivilArms, CapEarsUp, Hats/<Hat>, Animals/<Asset>, Accessories/<name>
 --   ReplicatedStorage.CrewExpressions: one SurfaceAppearance per expression (Content.Looks.Expressions)
+--   ReplicatedStorage.CrewOutfitSheets: one SurfaceAppearance per outfit sheet id (tools/assetplace/build_outfit_sheets.luau)
 -- No runtime asset loading here (§18.9 rule 1): meshes only exist as kit instances and are cloned.
 -- Nothing is cached but the kit folders themselves, so building and destroying rigs never leaks.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -98,6 +99,57 @@ function Kit.Expression(name: string): SurfaceAppearance?
 		return found
 	end
 	return nil
+end
+
+-- Outfit sheet on an outfit piece (OutfitPart: torso, arms, legs, apron, cap). Roblox draws a MeshPart TextureID ignoring
+-- its alpha, so the fur texels of the sheet (hands, forearms, shins) showed the neutral grey stored under them on every
+-- species, never MeshPart.Color (owner report 2026-10-25: "the frog has the cat's hands"). A SurfaceAppearance with
+-- AlphaMode Overlay shows MeshPart.Color under the alpha, but ColorMap is not script-writable: templates are built in
+-- edit mode (ReplicatedStorage.CrewOutfitSheets.<numeric id>, build_outfit_sheets.luau) and cloned here. TextureID is
+-- still set (the fallback when a template is missing, and the key other code reads). The caller sets MeshPart.Color.
+const SHEET_FOLDER = "CrewOutfitSheets"
+const SHEET_HINT = "run tools/assetplace/build_outfit_sheets.luau in edit mode and save the place"
+local sheetFolder: Instance? = nil
+local sheetWaited = false
+
+local function sheetTemplates(): Instance?
+	if sheetFolder ~= nil and sheetFolder.Parent == ReplicatedStorage then
+		return sheetFolder
+	end
+	local found = ReplicatedStorage:FindFirstChild(SHEET_FOLDER)
+	if found == nil and RunService:IsClient() and not sheetWaited then
+		sheetWaited = true -- wait once: a place without the folder must not stall every Dress
+		found = ReplicatedStorage:WaitForChild(SHEET_FOLDER, CLIENT_WAIT)
+	end
+	sheetFolder = found
+	return found
+end
+
+function Kit.ApplySheet(part: MeshPart, sheet: string)
+	if part.TextureID ~= sheet then
+		part.TextureID = sheet
+	end
+	const id = string.match(sheet, "%d+$")
+	const folder = sheetTemplates()
+	const found = if folder ~= nil and id ~= nil then folder:FindFirstChild(id) else nil
+	const template = if found ~= nil and found:IsA("SurfaceAppearance") then found else nil
+	local current: SurfaceAppearance? = nil
+	for _, child in part:GetChildren() do
+		if child:IsA("SurfaceAppearance") then
+			if current == nil and template ~= nil and child.Name == template.Name then
+				current = child
+			else
+				child:Destroy()
+			end
+		end
+	end
+	if template == nil then
+		Kit.WarnOnce(`Sheet:{sheet}`, `no ReplicatedStorage.{SHEET_FOLDER}.{id or sheet}: grey hands ({SHEET_HINT})`)
+		return
+	end
+	if current == nil then
+		template:Clone().Parent = part
+	end
 end
 
 -- Fresh clones of the BaseParts under `source` (kit parts are flat children of their Model; accessories may nest).

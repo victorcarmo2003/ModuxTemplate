@@ -9,6 +9,15 @@ Characters are the exception to "no painted textures": the scenery stays on pack
   its rest position/normal and paints in 3D body space (stitches, folds, pockets, logo, shoes).
 - **Fur by alpha**: alpha 0 texels = skin/fur (hands, neck) → the part's `MeshPart.Color` (= species fur) shows
   through; one outfit sheet serves every species. Semi-transparent dark pixels = shading/grime over fur.
+  **Only through a SurfaceAppearance with AlphaMode Overlay** (ColorMap = the sheet): a plain `MeshPart.TextureID` is
+  drawn ignoring its alpha, so the fur texels show the RGB stored under them (grey hands on every species, lessons 21).
+  ColorMap is not script-writable: build one SurfaceAppearance template per sheet id in edit mode (Sell Hotdogs
+  `tools/assetplace/build_outfit_sheets.luau` → `ReplicatedStorage.CrewOutfitSheets.<id>`) and clone it at runtime
+  (`CrewRig` `Kit.ApplySheet`); keep `TextureID` set too as the fallback. New sheet upload = rerun the builder.
+- **Body colour rule**: hands, ears, tail, snout and every fur piece follow the colour the head shows in the worn pack
+  (Day fur, Mid/Night head fur, skin fur). The outfit pieces get it as `MeshPart.Color` per pack (Sell Hotdogs
+  `CrewLooks.PackFur`, `SkinLooks.HandFur`); atlas fur pieces get it from the (skin) atlas cells — a skin atlas fur
+  cell = Day cell shading × the skin head's pack fur (`gen_skin_textures.py` `cap_atlas`).
 - Outfits made: `T_Crew_Uniform_Day/Night` (red cap, red apron with original logo, cream shirt, black pants, shoes),
   `T_Civil_A/B_Day/Night` (civilian sets for NPC animals; apron removed for civil outfits).
 

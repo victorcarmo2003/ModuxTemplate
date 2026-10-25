@@ -40,7 +40,10 @@ floppy ears / no ears use the plain cap. Two fur colours (main + secondary) for 
 - Clean UV unwrap in a per-character 512² sheet: outfit sheet (torso, limbs, cap, apron; apron front denser for
   the logo) + face sheet (head). Roblox reads **only the first UV channel** - put the paint UV first.
 - **Fur by alpha**: transparent texels = fur; the part's `Color` shows through (`MeshPart.Color = fur`), so one
-  outfit sheet serves every species. Semi-transparent dark pixels = shading/grime over fur.
+  outfit sheet serves every species. Semi-transparent dark pixels = shading/grime over fur. This needs a
+  SurfaceAppearance with AlphaMode **Overlay** (ColorMap = the sheet; template per sheet id built in edit mode and
+  cloned at runtime): a plain `TextureID` is drawn ignoring alpha and shows the RGB under the fur texels (2026-10-25).
+  Hands, ears, tail and every fur piece follow the body/head colour of the worn pack/skin.
 - Outfits: crew uniform (cap, apron with an original logo, shirt, pants, shoes) and civilian sets for NPCs.
 - **Day / night variants by texture only** (same mesh): day cute/clean/big shiny eyes; night darker, desaturated,
   grime, stains (brown, not blood), small glowing pupils, droopy brows - keep it within the audience rating.

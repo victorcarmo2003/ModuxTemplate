@@ -1,0 +1,16 @@
+{
+ "beauty": "l309_beauty.jpg",
+ "out": "../L3-09_fecha_a_janela.png",
+ "crop_y": 0.4,
+ "edge_blur": 0.7,
+ "vignette": 0.3,
+ "warm": 0.0,
+ "sharpen": 0.35,
+ "lift": [
+  0.4,
+  0.42,
+  0.18,
+  0.15
+ ],
+ "gain": 1.25
+}

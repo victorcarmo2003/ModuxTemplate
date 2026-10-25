@@ -11,6 +11,9 @@
 -- textures (CrewLooks.Species[k].Blank: smooth skin-colour head, ears / tail / nose repainted in that colour) of the
 -- worn pack. Silent fallback to the ordinary textures when the species has no Blank row. The face is the caller's
 -- (CrewExpressions.Blank): Dress does not pick it.
+-- Hands: the outfit pieces wear their sheet through Kit.ApplySheet (SurfaceAppearance Overlay), so MeshPart.Color shows
+-- on the fur texels (hands, forearms, shins); Dress sets that Color to what the head shows in the worn pack
+-- (handColour: Day = species / skin Fur, Mid / Night = CrewLooks PackFur or SkinLooks HandFur).
 -- Face: clone of ReplicatedStorage.CrewExpressions.<expression> on the face shell, shell TextureID = "" (the shell needs
 -- real transparency, SurfaceAppearance AlphaMode Transparency). Only Normal_Night has a night version (DEC-207): the
 -- caller passes the final name (Content.Looks.PackFace gives Normal_Night for the crew in Night).
@@ -79,6 +82,28 @@ local function setFace(model: Model, expression: string): boolean
 	return true
 end
 
+-- Hand colour (MeshPart.Color of the outfit pieces) for the worn pack: the colour the head shows there. A skin with its
+-- own fur (Content.Skins Fur) uses it by day and its SkinLooks HandFur after; the species uses Fur / PackFur.
+local function handColour(
+	look: CrewLooks.SpeciesLook,
+	skin: Content.Skin?,
+	skinSheets: SkinLooks.SkinLook?,
+	worn: Pack
+): Color3
+	const skinFur = if skin ~= nil then skin.Fur else nil
+	if worn == "Day" then
+		return skinFur or look.Fur
+	end
+	const skinHands = if skinSheets ~= nil then skinSheets.HandFur else nil
+	if skinHands ~= nil then
+		return if worn == "Mid" then skinHands.Mid else skinHands.Night
+	end
+	if skinFur ~= nil then
+		return skinFur
+	end
+	return if worn == "Mid" then look.PackFur.Mid else look.PackFur.Night
+end
+
 -- Dress `model` in `pack` (default: its LookPack attribute) with `expression` (default: Content.Looks.PackFace of
 -- the worn pack). `blank` dresses the species' Blank head / atlas (see top). Returns false when the model is not a
 -- dressable rig (missing attributes or unknown keys).
@@ -103,14 +128,18 @@ local function dress(model: Model, pack: Pack?, expression: string?, blank: bool
 	-- class skin (attribute Skin, CrewRig.Build): its own sheet per pack; no row = the outfit's sheet
 	const skin = model:GetAttribute("Skin")
 	local skinSheets: SkinLooks.SkinLook? = nil
+	local skinRow: Content.Skin? = nil
 	if typeof(skin) == "string" and skin ~= "" then
 		skinSheets = SkinLooks.BySkin[skin]
+		skinRow = if skinSheets ~= nil then Content.Skins.ByKey[skin] else nil
 		if skinSheets == nil then
 			Kit.WarnOnce(`DressSkin:{skin}`, `skin '{skin}' has no SkinLooks row: dressed in the outfit sheet`)
 		end
 	end
 	const sheet = if skinSheets ~= nil then SkinLooks.Sheet(skinSheets, worn) else sheets[worn] or sheets.Day
 	const blankLook = if blank == true then look.Blank else nil
+	-- the Blank head (AST-060) is the Day fur in every pack: its hands too
+	const hands = if blankLook ~= nil then look.Fur else handColour(look, skinRow, skinSheets, worn)
 	const skinHead = if skinSheets ~= nil then skinSheets.Head else nil
 	const headTexture = if blankLook
 		then blankLook.Head
@@ -125,10 +154,15 @@ local function dress(model: Model, pack: Pack?, expression: string?, blank: bool
 		if not child:IsA("MeshPart") then
 			continue
 		end
-		local texture: string? = nil
 		if child:GetAttribute("OutfitPart") then
-			texture = sheet
-		elseif skinSheets ~= nil and child:GetAttribute("DayTextureID") == SkinLooks.BaseAtlas then
+			Kit.ApplySheet(child, sheet)
+			if child.Color ~= hands then
+				child.Color = hands
+			end
+			continue
+		end
+		local texture: string? = nil
+		if skinSheets ~= nil and child:GetAttribute("DayTextureID") == SkinLooks.BaseAtlas then
 			texture = SkinLooks.Sheet(skinSheets.Atlas, worn) -- atlas piece (cap, ears, tail): the skin's atlas copy
 		elseif child.Name == "Head" then
 			texture = headTexture

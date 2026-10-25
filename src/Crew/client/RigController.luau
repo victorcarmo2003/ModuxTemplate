@@ -423,8 +423,8 @@ function RigController:ApplyVariant(model: Model, pack: Pack)
 		const sheet = if sheets and typeof(outfit) == "string" then sheets[CrewRig.EffectivePack(outfit, pack)] else nil
 		if sheet ~= nil then
 			for _, child in model:GetChildren() do
-				if child:IsA("MeshPart") and child:GetAttribute("OutfitPart") and child.TextureID ~= sheet then
-					child.TextureID = sheet
+				if child:IsA("MeshPart") and child:GetAttribute("OutfitPart") then
+					CrewRig.ApplySheet(child, sheet)
 				end
 			end
 		end
